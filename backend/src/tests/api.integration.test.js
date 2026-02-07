@@ -704,6 +704,55 @@ describe('API Integration Tests', () => {
     });
   });
 
+  describe('Teacher Dashboard — Class groups and no euros', () => {
+    let teacherToken2;
+
+    beforeAll(async () => {
+      const res = await request(app)
+        .post('/api/v1/auth/login')
+        .send({ email: 'enseignant@sacrecoeur.fr', password: 'VinsConv2026!' });
+      teacherToken2 = res.body.accessToken;
+    });
+
+    test('Teacher dashboard returns classGroups and classTotals', async () => {
+      if (!teacherToken2) return;
+
+      const res = await request(app)
+        .get('/api/v1/dashboard/teacher')
+        .set('Authorization', `Bearer ${teacherToken2}`)
+        .query({ campaign_id: campaignId });
+
+      expect(res.status).toBe(200);
+      expect(res.body).toHaveProperty('classGroups');
+      expect(res.body.classGroups).toBeInstanceOf(Array);
+      expect(res.body.classGroups).toContain('GA');
+      expect(res.body.classGroups).toContain('GB');
+      expect(res.body).toHaveProperty('classTotals');
+      expect(res.body.classTotals).toHaveProperty('GA');
+      expect(res.body.classTotals).toHaveProperty('GB');
+      expect(res.body.classTotals.GA).toHaveProperty('bottles');
+      expect(res.body.classTotals.GA).toHaveProperty('salesCount');
+      // Verify NO euro amounts in classTotals
+      const ctStr = JSON.stringify(res.body.classTotals);
+      expect(ctStr).not.toContain('"ca"');
+      expect(ctStr).not.toContain('"amount"');
+      expect(ctStr).not.toContain('"revenue"');
+    });
+
+    test('Teacher dashboard inactiveStudents contains names', async () => {
+      if (!teacherToken2) return;
+
+      const res = await request(app)
+        .get('/api/v1/dashboard/teacher')
+        .set('Authorization', `Bearer ${teacherToken2}`)
+        .query({ campaign_id: campaignId });
+
+      expect(res.status).toBe(200);
+      expect(res.body).toHaveProperty('inactiveStudents');
+      expect(res.body.inactiveStudents).toBeInstanceOf(Array);
+    });
+  });
+
   describe('BTS Dashboard — Formation modules', () => {
     let btsToken;
     let btsCampaignId;

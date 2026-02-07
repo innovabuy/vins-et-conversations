@@ -23,6 +23,8 @@ import AmbassadorLayout from './components/layout/AmbassadorLayout';
 import AmbassadorDashboard from './components/ambassador/AmbassadorDashboard';
 import BTSLayout from './components/layout/BTSLayout';
 import BTSDashboard from './components/bts/BTSDashboard';
+import TeacherLayout from './components/layout/TeacherLayout';
+import TeacherDashboard from './components/teacher/TeacherDashboard';
 
 function ProtectedRoute({ children, roles }) {
   const { user, loading } = useAuth();
@@ -90,6 +92,15 @@ function AppRoutes() {
         <Route index element={<AmbassadorDashboard />} />
       </Route>
 
+      {/* Teacher routes */}
+      <Route path="/teacher" element={
+        <ProtectedRoute roles={['enseignant']}>
+          <TeacherLayout />
+        </ProtectedRoute>
+      }>
+        <Route index element={<TeacherDashboard />} />
+      </Route>
+
       {/* BTS routes */}
       <Route path="/bts" element={
         <ProtectedRoute roles={['etudiant']}>
@@ -112,6 +123,7 @@ function AppRoutes() {
           ['super_admin', 'commercial'].includes(user.role) ? '/admin' :
           user.role === 'cse' ? '/cse' :
           user.role === 'ambassadeur' ? '/ambassador' :
+          user.role === 'enseignant' ? '/teacher' :
           user.role === 'etudiant' ? '/student' :
           '/login'
         } replace /> : <Navigate to="/login" replace />

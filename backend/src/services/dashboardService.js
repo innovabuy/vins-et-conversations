@@ -300,9 +300,42 @@ async function getTeacherDashboard(userId, campaignId) {
     return daysSince > 7;
   });
 
+  // Class groups from config
+  const config = typeof campaign.config === 'string' ? JSON.parse(campaign.config) : (campaign.config || {});
+  const classGroups = config.classes || [];
+
+  // Per-class aggregation (bottles only — NO euros)
+  const allStudentsWithGroup = await db('participations')
+    .join('users', 'participations.user_id', 'users.id')
+    .where({ campaign_id: campaignId, role_in_campaign: 'student' })
+    .select('users.id', 'users.name', 'participations.class_group');
+
+  const classTotals = {};
+  for (const cg of classGroups) {
+    const studentIds = allStudentsWithGroup.filter((s) => s.class_group === cg).map((s) => s.id);
+    if (studentIds.length === 0) {
+      classTotals[cg] = { bottles: 0, salesCount: 0, studentCount: studentIds.length };
+      continue;
+    }
+    const result = await db('orders')
+      .where({ campaign_id: campaignId })
+      .whereIn('user_id', studentIds)
+      .whereIn('status', ['submitted', 'validated', 'preparing', 'shipped', 'delivered'])
+      .sum('total_items as bottles')
+      .count('id as sales_count')
+      .first();
+    classTotals[cg] = {
+      bottles: parseInt(result?.bottles || 0, 10),
+      salesCount: parseInt(result?.sales_count || 0, 10),
+      studentCount: studentIds.length,
+    };
+  }
+
   return {
     progress,
     totalStudents: allStudents.length,
+    classGroups,
+    classTotals,
     students: students.map((s, i) => ({
       rank: i + 1,
       name: s.name,
