@@ -20,8 +20,15 @@ const IDS = {
   enseignant1: uuidv4(),
   // CSE
   cse_leroy: uuidv4(),
+  // BTS student
+  bts_student1: uuidv4(),
   // Ambassadeur
   ambassadeur1: uuidv4(),
+  // BTS campaign
+  camp_bts_espl: uuidv4(),
+  // Formation modules
+  fm1: uuidv4(), fm2: uuidv4(), fm3: uuidv4(),
+  fm4: uuidv4(), fm5: uuidv4(), fm6: uuidv4(),
   // Organisations
   sacre_coeur: uuidv4(),
   leroy_merlin: uuidv4(),
@@ -51,6 +58,7 @@ const IDS = {
 exports.seed = async function (knex) {
   // Clean en ordre inverse des FK
   const tables = [
+    'formation_progress', 'formation_modules',
     'pricing_conditions', 'delivery_routes', 'notifications', 'audit_log',
     'returns', 'delivery_notes', 'payments', 'financial_events',
     'order_items', 'orders', 'contacts',
@@ -102,6 +110,14 @@ exports.seed = async function (knex) {
       password_hash: hash,
       name: 'Marie Leroux (CSE)',
       role: 'cse',
+      status: 'active',
+    },
+    {
+      id: IDS.bts_student1,
+      email: 'bts@espl.fr',
+      password_hash: hash,
+      name: 'Lucas Dupont (BTS)',
+      role: 'etudiant',
       status: 'active',
     },
     {
@@ -284,6 +300,17 @@ exports.seed = async function (knex) {
       end_date: '2026-03-14',
       config: JSON.stringify({ classes: ['A'], project: 'Financement Projet' }),
     },
+    {
+      id: IDS.camp_bts_espl,
+      org_id: IDS.espl_angers,
+      client_type_id: IDS.ct_bts,
+      name: 'BTS NDRC ESPL 2025-2026',
+      status: 'active',
+      goal: 10000,
+      start_date: '2025-09-15',
+      end_date: '2026-06-30',
+      config: JSON.stringify({ classes: ['NDRC1'], project: 'Projet BTS NDRC', show_formation: true }),
+    },
   ]);
 
   // ═══════════════════════════════════════════════════════
@@ -312,7 +339,7 @@ exports.seed = async function (knex) {
   );
 
   // Idem pour les autres campagnes
-  for (const campId of [IDS.camp_cse_leroy, IDS.camp_ambassadeurs, IDS.camp_espl]) {
+  for (const campId of [IDS.camp_cse_leroy, IDS.camp_ambassadeurs, IDS.camp_espl, IDS.camp_bts_espl]) {
     await knex('campaign_products').insert(
       allProductIds.map((pid, i) => ({
         campaign_id: campId,
@@ -371,8 +398,17 @@ exports.seed = async function (knex) {
     role_in_campaign: 'ambassador',
   });
 
+  // Participation BTS student
+  await knex('participations').insert({
+    user_id: IDS.bts_student1,
+    campaign_id: IDS.camp_bts_espl,
+    organization_id: IDS.espl_angers,
+    role_in_campaign: 'student',
+    class_group: 'NDRC1',
+  });
+
   // Admin/commercial participent à toutes les campagnes
-  for (const campId of [IDS.camp_sacre_coeur, IDS.camp_cse_leroy, IDS.camp_ambassadeurs, IDS.camp_espl]) {
+  for (const campId of [IDS.camp_sacre_coeur, IDS.camp_cse_leroy, IDS.camp_ambassadeurs, IDS.camp_espl, IDS.camp_bts_espl]) {
     await knex('participations').insert([
       { user_id: IDS.nicolas, campaign_id: campId, role_in_campaign: 'admin' },
       { user_id: IDS.matheo, campaign_id: campId, role_in_campaign: 'commercial' },
@@ -473,6 +509,47 @@ exports.seed = async function (knex) {
       amount: ao.ca,
       description: `Vente ${aoRef} - Ambassadeur Martin`,
       created_at: aoDate,
+    });
+  }
+
+  // ═══════════════════════════════════════════════════════
+  // FORMATION MODULES BTS NDRC (6 modules prédéfinis)
+  // ═══════════════════════════════════════════════════════
+  await knex('formation_modules').insert([
+    { id: IDS.fm1, title: 'Techniques de vente directe', description: 'Fondamentaux de la vente en face-à-face : argumentaire, objections, closing.', type: 'video', url: 'https://example.com/formation/vente-directe', duration_minutes: 45, sort_order: 1 },
+    { id: IDS.fm2, title: 'Négociation commerciale', description: 'Stratégies de négociation, concessions mutuelles, gestion des prix.', type: 'video', url: 'https://example.com/formation/negociation', duration_minutes: 60, sort_order: 2 },
+    { id: IDS.fm3, title: 'Quiz — Connaissance produit vin', description: 'Évaluation des connaissances sur les cépages, appellations et accords mets-vins.', type: 'quiz', url: null, duration_minutes: 20, sort_order: 3 },
+    { id: IDS.fm4, title: 'Relation client et CRM', description: 'Suivi client, outils CRM, fidélisation et relance.', type: 'document', url: 'https://example.com/formation/crm', duration_minutes: 30, sort_order: 4 },
+    { id: IDS.fm5, title: 'Prospection terrain', description: 'Organisation de tournées, ciblage, prise de rendez-vous, pitch.', type: 'exercise', url: null, duration_minutes: 40, sort_order: 5 },
+    { id: IDS.fm6, title: 'Bilan et soutenance', description: 'Préparation du dossier de soutenance BTS NDRC avec résultats de campagne.', type: 'document', url: 'https://example.com/formation/soutenance', duration_minutes: 90, sort_order: 6 },
+  ]);
+
+  // BTS student orders (2 orders for test data)
+  for (let i = 0; i < 2; i++) {
+    const btsRef = `VC-2026-${String(orderCounter++).padStart(4, '0')}`;
+    const btsOrdId = uuidv4();
+    const btsDate = new Date(2025, 10 + i, 20);
+
+    await knex('orders').insert({
+      id: btsOrdId,
+      ref: btsRef,
+      campaign_id: IDS.camp_bts_espl,
+      user_id: IDS.bts_student1,
+      status: 'delivered',
+      total_ttc: 195,
+      total_ht: 162.50,
+      total_items: 15,
+      created_at: btsDate,
+      updated_at: btsDate,
+    });
+
+    await knex('financial_events').insert({
+      order_id: btsOrdId,
+      campaign_id: IDS.camp_bts_espl,
+      type: 'sale',
+      amount: 195,
+      description: `Vente ${btsRef} - BTS Dupont`,
+      created_at: btsDate,
     });
   }
 

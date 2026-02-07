@@ -259,4 +259,78 @@ router.get(
   }
 );
 
+// GET /api/v1/dashboard/bts?campaign_id=xxx — BTS NDRC Dashboard
+router.get(
+  '/bts',
+  authenticate,
+  requireRole('etudiant', 'super_admin'),
+  async (req, res) => {
+    try {
+      const campaignId = req.query.campaign_id || req.user.campaign_ids?.[0];
+      if (!campaignId) return res.status(400).json({ error: 'CAMPAIGN_REQUIRED' });
+
+      // Check the campaign uses a BTS client_type (show_formation=true)
+      const campaign = await db('campaigns')
+        .join('client_types', 'campaigns.client_type_id', 'client_types.id')
+        .where('campaigns.id', campaignId)
+        .select('campaigns.*', 'client_types.ui_config', 'client_types.name as ct_name')
+        .first();
+
+      if (!campaign) return res.status(404).json({ error: 'CAMPAIGN_NOT_FOUND' });
+
+      const uiConfig = typeof campaign.ui_config === 'string'
+        ? JSON.parse(campaign.ui_config) : campaign.ui_config;
+
+      if (!uiConfig?.show_formation) {
+        return res.status(400).json({ error: 'NOT_BTS_CAMPAIGN', message: 'This campaign does not have formation modules' });
+      }
+
+      const participation = await db('participations')
+        .where({ user_id: req.user.userId, campaign_id: campaignId })
+        .first();
+      if (!participation) return res.status(403).json({ error: 'NOT_PARTICIPANT' });
+
+      // Student dashboard data (same as student but with formation)
+      const rulesEngine = require('../services/rulesEngine');
+      const dashboardService = require('../services/dashboardService');
+      const studentData = await dashboardService.getStudentDashboard(req.user.userId, campaignId);
+
+      // Formation modules & progress
+      const modules = await db('formation_modules').where({ active: true }).orderBy('sort_order');
+      const progress = await db('formation_progress').where({ user_id: req.user.userId });
+      const progressMap = {};
+      progress.forEach((p) => { progressMap[p.module_id] = p; });
+
+      const formationModules = modules.map((m) => ({
+        id: m.id,
+        title: m.title,
+        description: m.description,
+        type: m.type,
+        url: m.url,
+        duration_minutes: m.duration_minutes,
+        status: progressMap[m.id]?.status || 'not_started',
+        score: progressMap[m.id]?.score || 0,
+        completed_at: progressMap[m.id]?.completed_at || null,
+      }));
+
+      const completedModules = formationModules.filter((m) => m.status === 'completed').length;
+
+      res.json({
+        ...studentData,
+        formation: {
+          modules: formationModules,
+          completed: completedModules,
+          total: formationModules.length,
+          pct: formationModules.length > 0 ? Math.round((completedModules / formationModules.length) * 100) : 0,
+        },
+      });
+    } catch (err) {
+      if (err.message === 'NOT_PARTICIPANT') {
+        return res.status(403).json({ error: 'NOT_PARTICIPANT' });
+      }
+      res.status(500).json({ error: 'SERVER_ERROR', message: err.message });
+    }
+  }
+);
+
 module.exports = router;

@@ -51,6 +51,7 @@ export const dashboardAPI = {
   studentOrders: (campaignId) => api.get('/dashboard/student/orders', { params: { campaign_id: campaignId } }),
   adminCockpit: (campaignIds) => api.get('/dashboard/admin/cockpit', { params: { campaign_ids: campaignIds?.join(',') } }),
   teacher: (campaignId) => api.get('/dashboard/teacher', { params: { campaign_id: campaignId } }),
+  bts: (campaignId) => api.get('/dashboard/bts', { params: { campaign_id: campaignId } }),
 };
 
 // ─── Products ─────────────────────────────────────────
@@ -163,6 +164,12 @@ export const exportsAPI = {
   stock: () => api.get('/admin/exports/stock', { responseType: 'blob' }),
   deliveryNotes: (start, end) => api.get('/admin/exports/delivery-notes', { params: { start, end }, responseType: 'blob' }),
   activityReport: (start, end) => api.get('/admin/exports/activity-report', { params: { start, end }, responseType: 'blob' }),
+};
+
+// ─── Formation (BTS) ───────────────────────────────
+export const formationAPI = {
+  modules: () => api.get('/formation/modules'),
+  updateProgress: (moduleId, data) => api.put(`/formation/modules/${moduleId}/progress`, data),
 };
 
 // ─── Ambassador ────────────────────────────────────

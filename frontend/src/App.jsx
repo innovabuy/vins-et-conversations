@@ -21,6 +21,8 @@ import CSELayout from './components/layout/CSELayout';
 import CSEDashboard from './components/cse/CSEDashboard';
 import AmbassadorLayout from './components/layout/AmbassadorLayout';
 import AmbassadorDashboard from './components/ambassador/AmbassadorDashboard';
+import BTSLayout from './components/layout/BTSLayout';
+import BTSDashboard from './components/bts/BTSDashboard';
 
 function ProtectedRoute({ children, roles }) {
   const { user, loading } = useAuth();
@@ -86,6 +88,15 @@ function AppRoutes() {
         </ProtectedRoute>
       }>
         <Route index element={<AmbassadorDashboard />} />
+      </Route>
+
+      {/* BTS routes */}
+      <Route path="/bts" element={
+        <ProtectedRoute roles={['etudiant']}>
+          <BTSLayout />
+        </ProtectedRoute>
+      }>
+        <Route index element={<BTSDashboard />} />
       </Route>
 
       {/* Student route */}

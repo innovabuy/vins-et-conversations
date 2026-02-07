@@ -704,6 +704,89 @@ describe('API Integration Tests', () => {
     });
   });
 
+  describe('BTS Dashboard — Formation modules', () => {
+    let btsToken;
+    let btsCampaignId;
+
+    beforeAll(async () => {
+      const res = await request(app)
+        .post('/api/v1/auth/login')
+        .send({ email: 'bts@espl.fr', password: 'VinsConv2026!' });
+      btsToken = res.body.accessToken;
+
+      const participation = await db('participations')
+        .join('users', 'participations.user_id', 'users.id')
+        .where('users.email', 'bts@espl.fr')
+        .first();
+      btsCampaignId = participation?.campaign_id;
+    });
+
+    test('BTS dashboard returns formation modules', async () => {
+      if (!btsToken || !btsCampaignId) return;
+
+      const res = await request(app)
+        .get('/api/v1/dashboard/bts')
+        .set('Authorization', `Bearer ${btsToken}`)
+        .query({ campaign_id: btsCampaignId });
+
+      expect(res.status).toBe(200);
+      expect(res.body).toHaveProperty('formation');
+      expect(res.body.formation).toHaveProperty('modules');
+      expect(res.body.formation.modules.length).toBe(6);
+      expect(res.body.formation).toHaveProperty('completed');
+      expect(res.body.formation).toHaveProperty('total');
+      expect(res.body.formation).toHaveProperty('pct');
+      // Also has student data
+      expect(res.body).toHaveProperty('ca');
+      expect(res.body).toHaveProperty('bottlesSold');
+    });
+
+    test('Formation module progress update works', async () => {
+      if (!btsToken) return;
+
+      const modules = await db('formation_modules').where({ active: true }).first();
+      if (!modules) return;
+
+      const res = await request(app)
+        .put(`/api/v1/formation/modules/${modules.id}/progress`)
+        .set('Authorization', `Bearer ${btsToken}`)
+        .send({ status: 'in_progress' });
+
+      expect(res.status).toBe(200);
+      expect(res.body.updated).toBe(true);
+
+      // Complete it
+      const res2 = await request(app)
+        .put(`/api/v1/formation/modules/${modules.id}/progress`)
+        .set('Authorization', `Bearer ${btsToken}`)
+        .send({ status: 'completed', score: 85 });
+
+      expect(res2.status).toBe(200);
+      expect(res2.body.status).toBe('completed');
+    });
+
+    test('Non-BTS campaign returns NOT_BTS_CAMPAIGN', async () => {
+      if (!btsToken) return;
+
+      // Use sacre-coeur campaign (scolaire, not BTS)
+      const scCampaign = await db('campaigns')
+        .join('client_types', 'campaigns.client_type_id', 'client_types.id')
+        .where('client_types.name', 'scolaire')
+        .select('campaigns.id')
+        .first();
+
+      if (!scCampaign) return;
+
+      const res = await request(app)
+        .get('/api/v1/dashboard/bts')
+        .set('Authorization', `Bearer ${btsToken}`)
+        .query({ campaign_id: scCampaign.id });
+
+      expect(res.status).toBe(400);
+      expect(res.body.error).toBe('NOT_BTS_CAMPAIGN');
+    });
+  });
+
   describe('Health Check', () => {
     test('GET /api/health returns ok', async () => {
       const res = await request(app).get('/api/health');
