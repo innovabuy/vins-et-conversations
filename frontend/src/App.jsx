@@ -19,6 +19,8 @@ import AdminFinance from './components/admin/AdminFinance';
 import StudentDashboard from './components/student/StudentDashboard';
 import CSELayout from './components/layout/CSELayout';
 import CSEDashboard from './components/cse/CSEDashboard';
+import AmbassadorLayout from './components/layout/AmbassadorLayout';
+import AmbassadorDashboard from './components/ambassador/AmbassadorDashboard';
 
 function ProtectedRoute({ children, roles }) {
   const { user, loading } = useAuth();
@@ -77,6 +79,15 @@ function AppRoutes() {
         <Route index element={<CSEDashboard />} />
       </Route>
 
+      {/* Ambassador routes */}
+      <Route path="/ambassador" element={
+        <ProtectedRoute roles={['ambassadeur']}>
+          <AmbassadorLayout />
+        </ProtectedRoute>
+      }>
+        <Route index element={<AmbassadorDashboard />} />
+      </Route>
+
       {/* Student route */}
       <Route path="/student" element={
         <ProtectedRoute roles={['etudiant']}>
@@ -89,6 +100,7 @@ function AppRoutes() {
         user ? <Navigate to={
           ['super_admin', 'commercial'].includes(user.role) ? '/admin' :
           user.role === 'cse' ? '/cse' :
+          user.role === 'ambassadeur' ? '/ambassador' :
           user.role === 'etudiant' ? '/student' :
           '/login'
         } replace /> : <Navigate to="/login" replace />

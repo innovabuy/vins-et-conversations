@@ -184,4 +184,79 @@ router.get(
   }
 );
 
+// GET /api/v1/dashboard/ambassador?campaign_id=xxx — Ambassador Dashboard
+router.get(
+  '/ambassador',
+  authenticate,
+  requireRole('ambassadeur', 'super_admin'),
+  async (req, res) => {
+    try {
+      const campaignId = req.query.campaign_id || req.user.campaign_ids?.[0];
+      if (!campaignId) return res.status(400).json({ error: 'CAMPAIGN_REQUIRED' });
+
+      const participation = await db('participations')
+        .where({ user_id: req.user.userId, campaign_id: campaignId })
+        .first();
+      if (!participation) return res.status(403).json({ error: 'NOT_PARTICIPANT' });
+
+      // Load rules (tier_rules, ui_config)
+      const rulesEngine = require('../services/rulesEngine');
+      const rules = await rulesEngine.loadRulesForCampaign(campaignId);
+
+      // Tier progression
+      const tier = await rulesEngine.calculateTier(req.user.userId, rules.tier);
+
+      // Sales stats
+      const salesResult = await db('orders')
+        .where({ user_id: req.user.userId, campaign_id: campaignId })
+        .whereIn('status', ['submitted', 'validated', 'preparing', 'shipped', 'delivered'])
+        .sum('total_ttc as ca_ttc')
+        .sum('total_ht as ca_ht')
+        .sum('total_items as bottles')
+        .count('id as order_count')
+        .first();
+
+      const caTTC = parseFloat(salesResult?.ca_ttc || 0);
+      const caHT = parseFloat(salesResult?.ca_ht || 0);
+      const bottles = parseInt(salesResult?.bottles || 0, 10);
+      const orderCount = parseInt(salesResult?.order_count || 0, 10);
+
+      // Recent orders
+      const recentOrders = await db('orders')
+        .where({ user_id: req.user.userId, campaign_id: campaignId })
+        .whereIn('status', ['submitted', 'validated', 'preparing', 'shipped', 'delivered'])
+        .orderBy('created_at', 'desc')
+        .limit(10)
+        .select('id', 'ref', 'status', 'total_ttc', 'total_items', 'created_at');
+
+      // Referral stats (entity_id = ambassador user_id)
+      const referralClicks = await db('audit_log')
+        .where({ entity: 'referral', action: 'REFERRAL_CLICK', entity_id: req.user.userId })
+        .count('id as count')
+        .first();
+
+      // Gains (rewards from tiers)
+      const currentTier = tier.current;
+      const gains = {
+        currentReward: currentTier?.reward || null,
+        currentTierLabel: currentTier?.label || null,
+        nextReward: tier.next?.reward || null,
+        nextTierLabel: tier.next?.label || null,
+        amountToNext: tier.next ? Math.max(0, tier.next.threshold - tier.ca) : 0,
+      };
+
+      res.json({
+        tier,
+        sales: { caTTC, caHT, bottles, orderCount },
+        recentOrders,
+        referralClicks: parseInt(referralClicks?.count || 0, 10),
+        gains,
+        ui: rules.ui,
+      });
+    } catch (err) {
+      res.status(500).json({ error: 'SERVER_ERROR', message: err.message });
+    }
+  }
+);
+
 module.exports = router;

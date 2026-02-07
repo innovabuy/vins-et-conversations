@@ -165,6 +165,13 @@ export const exportsAPI = {
   activityReport: (start, end) => api.get('/admin/exports/activity-report', { params: { start, end }, responseType: 'blob' }),
 };
 
+// ─── Ambassador ────────────────────────────────────
+export const ambassadorAPI = {
+  dashboard: (campaignId) => api.get('/dashboard/ambassador', { params: { campaign_id: campaignId } }),
+  referralClick: (userId, source) => api.post('/ambassador/referral-click', { user_id: userId, source }),
+  referralStats: () => api.get('/ambassador/referral-stats'),
+};
+
 // ─── Margins ────────────────────────────────────────
 export const marginsAPI = {
   list: () => api.get('/admin/margins'),

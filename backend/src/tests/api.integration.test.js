@@ -624,6 +624,86 @@ describe('API Integration Tests', () => {
     });
   });
 
+  // ─── Phase 4 — Ambassador, BTS, Teacher, Users ────────
+
+  describe('Ambassador Dashboard — Tier progression', () => {
+    let ambassadorToken;
+
+    beforeAll(async () => {
+      const res = await request(app)
+        .post('/api/v1/auth/login')
+        .send({ email: 'ambassadeur@example.fr', password: 'VinsConv2026!' });
+      ambassadorToken = res.body.accessToken;
+    });
+
+    test('Ambassador dashboard returns tier, sales, gains', async () => {
+      if (!ambassadorToken) return;
+
+      const participation = await db('participations')
+        .join('users', 'participations.user_id', 'users.id')
+        .where('users.email', 'ambassadeur@example.fr')
+        .first();
+
+      const res = await request(app)
+        .get('/api/v1/dashboard/ambassador')
+        .set('Authorization', `Bearer ${ambassadorToken}`)
+        .query({ campaign_id: participation.campaign_id });
+
+      expect(res.status).toBe(200);
+      expect(res.body).toHaveProperty('tier');
+      expect(res.body.tier).toHaveProperty('current');
+      expect(res.body.tier).toHaveProperty('next');
+      expect(res.body.tier).toHaveProperty('ca');
+      expect(res.body.tier).toHaveProperty('progress');
+      expect(res.body).toHaveProperty('sales');
+      expect(res.body.sales).toHaveProperty('caTTC');
+      expect(res.body.sales).toHaveProperty('bottles');
+      expect(res.body).toHaveProperty('gains');
+      expect(res.body.gains).toHaveProperty('currentReward');
+      // Ambassador has ~1800 EUR CA → should be Argent tier (1500+)
+      expect(res.body.tier.current.label).toBe('Argent');
+    });
+
+    test('Ambassador cannot access admin dashboard', async () => {
+      if (!ambassadorToken) return;
+
+      const res = await request(app)
+        .get('/api/v1/dashboard/admin/cockpit')
+        .set('Authorization', `Bearer ${ambassadorToken}`);
+
+      expect(res.status).toBe(403);
+    });
+
+    test('Student cannot access ambassador dashboard', async () => {
+      const res = await request(app)
+        .get('/api/v1/dashboard/ambassador')
+        .set('Authorization', `Bearer ${studentToken}`);
+
+      expect(res.status).toBe(403);
+    });
+  });
+
+  describe('Ambassador Referral — Track clicks', () => {
+    test('POST referral-click tracks and returns success', async () => {
+      const user = await db('users').where('email', 'ambassadeur@example.fr').first();
+      if (!user) return;
+
+      const res = await request(app)
+        .post('/api/v1/ambassador/referral-click')
+        .send({ user_id: user.id, source: 'whatsapp' });
+
+      expect(res.status).toBe(200);
+      expect(res.body.tracked).toBe(true);
+
+      // Verify audit_log entry
+      const entry = await db('audit_log')
+        .where({ entity: 'referral', action: 'REFERRAL_CLICK', entity_id: user.id })
+        .orderBy('created_at', 'desc')
+        .first();
+      expect(entry).toBeDefined();
+    });
+  });
+
   describe('Health Check', () => {
     test('GET /api/health returns ok', async () => {
       const res = await request(app).get('/api/health');

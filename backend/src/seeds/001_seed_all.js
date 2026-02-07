@@ -440,6 +440,43 @@ exports.seed = async function (knex) {
   }
 
   // ═══════════════════════════════════════════════════════
+  // COMMANDES AMBASSADEUR (pour test paliers — CA total ~1800€ → Bronze+Argent)
+  // ═══════════════════════════════════════════════════════
+  const ambassadorOrders = [
+    { ca: 650, items: 50 },
+    { ca: 580, items: 45 },
+    { ca: 570, items: 42 },
+  ];
+  for (let i = 0; i < ambassadorOrders.length; i++) {
+    const ao = ambassadorOrders[i];
+    const aoRef = `VC-2026-${String(orderCounter++).padStart(4, '0')}`;
+    const aoId = uuidv4();
+    const aoDate = new Date(2025, 10 + i, 10);
+
+    await knex('orders').insert({
+      id: aoId,
+      ref: aoRef,
+      campaign_id: IDS.camp_ambassadeurs,
+      user_id: IDS.ambassadeur1,
+      status: 'delivered',
+      total_ttc: ao.ca,
+      total_ht: parseFloat((ao.ca / 1.20).toFixed(2)),
+      total_items: ao.items,
+      created_at: aoDate,
+      updated_at: aoDate,
+    });
+
+    await knex('financial_events').insert({
+      order_id: aoId,
+      campaign_id: IDS.camp_ambassadeurs,
+      type: 'sale',
+      amount: ao.ca,
+      description: `Vente ${aoRef} - Ambassadeur Martin`,
+      created_at: aoDate,
+    });
+  }
+
+  // ═══════════════════════════════════════════════════════
   // CONDITIONS COMMERCIALES (CDC §Module 14)
   // ═══════════════════════════════════════════════════════
   await knex('pricing_conditions').insert([

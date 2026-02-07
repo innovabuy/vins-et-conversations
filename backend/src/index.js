@@ -61,6 +61,7 @@ app.use('/api/v1/admin/exports', require('./routes/exports'));
 app.use('/api/v1/admin/margins', require('./routes/margins'));
 app.use('/api/v1/payments', require('./routes/paymentIntents'));
 app.use('/api/v1/notifications', require('./routes/notifications'));
+app.use('/api/v1/ambassador', require('./routes/ambassador'));
 
 // ─── Health check ─────────────────────────────────────
 app.get('/api/health', async (req, res) => {
