@@ -13,7 +13,12 @@ import AdminSuppliers from './components/admin/AdminSuppliers';
 import AdminPayments from './components/admin/AdminPayments';
 import AdminRoutes from './components/admin/AdminRoutes';
 import AdminNotifications from './components/admin/AdminNotifications';
+import AdminPricing from './components/admin/AdminPricing';
+import AdminExports from './components/admin/AdminExports';
+import AdminFinance from './components/admin/AdminFinance';
 import StudentDashboard from './components/student/StudentDashboard';
+import CSELayout from './components/layout/CSELayout';
+import CSEDashboard from './components/cse/CSEDashboard';
 
 function ProtectedRoute({ children, roles }) {
   const { user, loading } = useAuth();
@@ -52,15 +57,24 @@ function AppRoutes() {
         <Route path="suppliers" element={<AdminSuppliers />} />
         <Route path="stock" element={<AdminStock />} />
         <Route path="crm" element={<AdminCRM />} />
-        <Route path="finance" element={<PlaceholderModule title="Finance & Marges" />} />
+        <Route path="finance" element={<AdminFinance />} />
         <Route path="payments" element={<AdminPayments />} />
         <Route path="analytics" element={<PlaceholderModule title="Analytics" />} />
         <Route path="catalog" element={<AdminCatalog />} />
         <Route path="notifications" element={<AdminNotifications />} />
         <Route path="routes" element={<AdminRoutes />} />
-        <Route path="pricing" element={<PlaceholderModule title="Conditions commerciales" />} />
-        <Route path="exports" element={<PlaceholderModule title="Exports comptables" />} />
+        <Route path="pricing" element={<AdminPricing />} />
+        <Route path="exports" element={<AdminExports />} />
         <Route path="users" element={<PlaceholderModule title="Utilisateurs & Droits" />} />
+      </Route>
+
+      {/* CSE routes */}
+      <Route path="/cse" element={
+        <ProtectedRoute roles={['cse']}>
+          <CSELayout />
+        </ProtectedRoute>
+      }>
+        <Route index element={<CSEDashboard />} />
       </Route>
 
       {/* Student route */}
@@ -74,6 +88,7 @@ function AppRoutes() {
       <Route path="/" element={
         user ? <Navigate to={
           ['super_admin', 'commercial'].includes(user.role) ? '/admin' :
+          user.role === 'cse' ? '/cse' :
           user.role === 'etudiant' ? '/student' :
           '/login'
         } replace /> : <Navigate to="/login" replace />

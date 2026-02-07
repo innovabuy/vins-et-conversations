@@ -1,4 +1,5 @@
 const express = require('express');
+const db = require('../config/database');
 const dashboardService = require('../services/dashboardService');
 const { authenticate, requireRole, requireCampaignAccess } = require('../middleware/auth');
 
@@ -99,6 +100,84 @@ router.get(
 
       const data = await dashboardService.getTeacherDashboard(req.user.userId, campaignId);
       res.json(data);
+    } catch (err) {
+      res.status(500).json({ error: 'SERVER_ERROR', message: err.message });
+    }
+  }
+);
+
+// GET /api/v1/dashboard/cse?campaign_id=xxx — CSE Dashboard
+router.get(
+  '/cse',
+  authenticate,
+  requireRole('cse', 'super_admin'),
+  async (req, res) => {
+    try {
+      const campaignId = req.query.campaign_id || req.user.campaign_ids?.[0];
+      if (!campaignId) return res.status(400).json({ error: 'CAMPAIGN_REQUIRED' });
+
+      // Load campaign with client_type rules
+      const campaign = await db('campaigns')
+        .join('client_types', 'campaigns.client_type_id', 'client_types.id')
+        .where('campaigns.id', campaignId)
+        .select('campaigns.*', 'client_types.pricing_rules')
+        .first();
+
+      if (!campaign) return res.status(404).json({ error: 'CAMPAIGN_NOT_FOUND' });
+
+      const pricingRules = typeof campaign.pricing_rules === 'string'
+        ? JSON.parse(campaign.pricing_rules) : campaign.pricing_rules;
+
+      const discountPct = pricingRules?.value || 0;
+      const minOrder = pricingRules?.min_order || 0;
+
+      // Products with original + CSE prices
+      const products = await db('products')
+        .join('campaign_products', 'products.id', 'campaign_products.product_id')
+        .where('campaign_products.campaign_id', campaignId)
+        .where('campaign_products.active', true)
+        .select('products.*', 'campaign_products.custom_price')
+        .orderBy('products.sort_order');
+
+      const productsWithCSE = products.map((p) => {
+        const originalTTC = p.custom_price ? parseFloat(p.custom_price) : parseFloat(p.price_ttc);
+        const originalHT = p.custom_price
+          ? parseFloat(p.custom_price) / (1 + parseFloat(p.tva_rate) / 100)
+          : parseFloat(p.price_ht);
+        const discount = discountPct / 100;
+        return {
+          id: p.id,
+          name: p.name,
+          category: p.category,
+          label: p.label,
+          image_url: p.image_url,
+          original_price_ttc: originalTTC,
+          cse_price_ttc: parseFloat((originalTTC * (1 - discount)).toFixed(2)),
+          original_price_ht: parseFloat(originalHT.toFixed(2)),
+          cse_price_ht: parseFloat((originalHT * (1 - discount)).toFixed(2)),
+          tva_rate: parseFloat(p.tva_rate),
+        };
+      });
+
+      // Orders with delivery tracking
+      const orders = await db('orders')
+        .leftJoin('delivery_notes', 'orders.id', 'delivery_notes.order_id')
+        .where('orders.user_id', req.user.userId)
+        .where('orders.campaign_id', campaignId)
+        .select(
+          'orders.id', 'orders.ref', 'orders.status', 'orders.total_ht',
+          'orders.total_ttc', 'orders.total_items', 'orders.created_at',
+          'delivery_notes.status as delivery_status',
+          'delivery_notes.planned_date as delivery_date'
+        )
+        .orderBy('orders.created_at', 'desc');
+
+      res.json({
+        products: productsWithCSE,
+        orders,
+        minOrder,
+        discountPct,
+      });
     } catch (err) {
       res.status(500).json({ error: 'SERVER_ERROR', message: err.message });
     }

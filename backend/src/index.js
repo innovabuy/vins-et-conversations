@@ -11,6 +11,9 @@ const logger = require('./utils/logger');
 const app = express();
 const PORT = process.env.PORT || 3001;
 
+// ─── Webhook route (BEFORE express.json for raw body) ─
+app.use('/api/v1/webhooks', require('./routes/webhooks'));
+
 // ─── Middlewares globaux ──────────────────────────────
 app.use(helmet());
 app.use(cors({
@@ -53,6 +56,10 @@ app.use('/api/v1/admin/contacts', require('./routes/contacts'));
 app.use('/api/v1/admin/suppliers', require('./routes/suppliers'));
 app.use('/api/v1/admin/payments', require('./routes/payments'));
 app.use('/api/v1/admin/delivery-routes', require('./routes/deliveryRoutes'));
+app.use('/api/v1/admin/pricing-conditions', require('./routes/pricingConditions'));
+app.use('/api/v1/admin/exports', require('./routes/exports'));
+app.use('/api/v1/admin/margins', require('./routes/margins'));
+app.use('/api/v1/payments', require('./routes/paymentIntents'));
 app.use('/api/v1/notifications', require('./routes/notifications'));
 
 // ─── Health check ─────────────────────────────────────

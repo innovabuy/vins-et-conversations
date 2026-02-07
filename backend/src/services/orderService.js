@@ -80,6 +80,15 @@ async function createOrder({ userId, campaignId, items, customerId, notes }) {
     });
   }
 
+  // CSE min_order check — done AFTER totals are computed
+  const user = await db('users').where({ id: userId }).first();
+  if (user && user.role === 'cse') {
+    const minOrder = rules.pricing?.min_order || 0;
+    if (minOrder > 0 && totalTTC < minOrder) {
+      throw new Error('MIN_ORDER_NOT_MET');
+    }
+  }
+
   await db.transaction(async (trx) => {
     // Créer la commande
     await trx('orders').insert({
@@ -117,6 +126,17 @@ async function createOrder({ userId, campaignId, items, customerId, notes }) {
       reference: ref,
     }));
     await trx('stock_movements').insert(stockMovements);
+
+    // CSE auto-payment: transfer with 30 days payment terms
+    if (user && user.role === 'cse') {
+      await trx('payments').insert({
+        order_id: orderId,
+        method: 'transfer',
+        amount: parseFloat(totalTTC.toFixed(2)),
+        status: 'pending',
+        metadata: JSON.stringify({ payment_terms: '30_days' }),
+      });
+    }
   });
 
   logger.info(`Order created: ${ref} by user ${userId} in campaign ${campaignId}`);

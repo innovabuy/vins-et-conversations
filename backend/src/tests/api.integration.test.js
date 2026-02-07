@@ -345,7 +345,7 @@ describe('API Integration Tests', () => {
 
       // Simulate Stripe webhook
       const res = await request(app)
-        .post('/api/v1/admin/payments/webhook/stripe')
+        .post('/api/v1/webhooks/stripe')
         .set('Content-Type', 'application/json')
         .send({
           type: 'payment_intent.succeeded',
@@ -433,6 +433,194 @@ describe('API Integration Tests', () => {
         .get('/api/v1/admin/stock')
         .set('Authorization', `Bearer ${studentToken}`);
       expect(res.status).toBe(403);
+    });
+  });
+
+  // ─── Phase 3 — CSE, Exports, Margins ──────────────────
+
+  describe('CSE — Min order enforcement', () => {
+    let cseToken;
+    let cseCampaignId;
+
+    beforeAll(async () => {
+      const res = await request(app)
+        .post('/api/v1/auth/login')
+        .send({ email: 'cse@leroymerlin.fr', password: 'VinsConv2026!' });
+      cseToken = res.body.accessToken;
+
+      // Get CSE campaign
+      const participation = await db('participations')
+        .join('users', 'participations.user_id', 'users.id')
+        .where('users.email', 'cse@leroymerlin.fr')
+        .first();
+      cseCampaignId = participation?.campaign_id;
+    });
+
+    test('CSE order < 200 EUR returns 400 MIN_ORDER_NOT_MET', async () => {
+      if (!cseToken || !cseCampaignId) return;
+
+      // Get a cheap product
+      const cp = await db('campaign_products')
+        .where({ campaign_id: cseCampaignId, active: true })
+        .first();
+      if (!cp) return;
+
+      const res = await request(app)
+        .post('/api/v1/orders')
+        .set('Authorization', `Bearer ${cseToken}`)
+        .send({
+          campaign_id: cseCampaignId,
+          items: [{ productId: cp.product_id, qty: 1 }],
+        });
+
+      expect(res.status).toBe(400);
+      expect(res.body.error).toBe('MIN_ORDER_NOT_MET');
+    });
+
+    test('CSE order >= 200 EUR returns 201 with discounted price', async () => {
+      if (!cseToken || !cseCampaignId) return;
+
+      // Get a product and order enough to exceed 200 EUR
+      const cp = await db('campaign_products')
+        .join('products', 'campaign_products.product_id', 'products.id')
+        .where({ 'campaign_products.campaign_id': cseCampaignId, 'campaign_products.active': true })
+        .orderBy('products.price_ttc', 'desc')
+        .first();
+      if (!cp) return;
+
+      // Calculate qty needed for >= 200 EUR (with 10% discount)
+      const discountedPrice = parseFloat(cp.price_ttc) * 0.9;
+      const qtyNeeded = Math.ceil(200 / discountedPrice) + 1;
+
+      const res = await request(app)
+        .post('/api/v1/orders')
+        .set('Authorization', `Bearer ${cseToken}`)
+        .send({
+          campaign_id: cseCampaignId,
+          items: [{ productId: cp.product_id, qty: qtyNeeded }],
+        });
+
+      expect(res.status).toBe(201);
+      expect(res.body.totalTTC).toBeGreaterThanOrEqual(200);
+    });
+  });
+
+  describe('Exports — Pennylane CSV', () => {
+    test('Pennylane CSV returns 200 with text/csv', async () => {
+      const res = await request(app)
+        .get('/api/v1/admin/exports/pennylane')
+        .set('Authorization', `Bearer ${adminToken}`);
+
+      expect(res.status).toBe(200);
+      expect(res.headers['content-type']).toContain('text/csv');
+      // Check column headers present
+      const body = res.text;
+      expect(body).toContain('journal');
+      expect(body).toContain('compte');
+      expect(body).toContain('debit');
+      expect(body).toContain('credit');
+    });
+  });
+
+  describe('Exports — Sales journal CSV', () => {
+    test('Sales journal CSV returns 200 with text/csv', async () => {
+      const res = await request(app)
+        .get('/api/v1/admin/exports/sales-journal')
+        .set('Authorization', `Bearer ${adminToken}`);
+
+      expect(res.status).toBe(200);
+      expect(res.headers['content-type']).toContain('text/csv');
+      const body = res.text;
+      expect(body).toContain('total_ht');
+      expect(body).toContain('tva_20');
+      expect(body).toContain('tva_55');
+    });
+  });
+
+  describe('Invoice — PDF generation', () => {
+    test('Invoice PDF returns 200 with application/pdf', async () => {
+      // Get an order to generate invoice for
+      const order = await db('orders').first();
+      if (!order) return;
+
+      const res = await request(app)
+        .get(`/api/v1/orders/${order.id}/invoice`)
+        .set('Authorization', `Bearer ${adminToken}`);
+
+      expect(res.status).toBe(200);
+      expect(res.headers['content-type']).toContain('application/pdf');
+    });
+  });
+
+  describe('Stripe Webhook — Invalid signature', () => {
+    test('Webhook with STRIPE_WEBHOOK_SECRET set rejects invalid signature', async () => {
+      // Set env var temporarily
+      const original = process.env.STRIPE_WEBHOOK_SECRET;
+      process.env.STRIPE_WEBHOOK_SECRET = 'whsec_test_secret';
+
+      const res = await request(app)
+        .post('/api/v1/webhooks/stripe')
+        .set('Content-Type', 'application/json')
+        .set('stripe-signature', 'invalid_sig')
+        .send(JSON.stringify({ type: 'payment_intent.succeeded', data: { object: {} } }));
+
+      expect(res.status).toBe(400);
+
+      // Restore
+      if (original) {
+        process.env.STRIPE_WEBHOOK_SECRET = original;
+      } else {
+        delete process.env.STRIPE_WEBHOOK_SECRET;
+      }
+    });
+  });
+
+  describe('CSE Dashboard — No gamification fields', () => {
+    test('CSE dashboard has no streak/ranking/freeBottles', async () => {
+      let cseToken;
+      const loginRes = await request(app)
+        .post('/api/v1/auth/login')
+        .send({ email: 'cse@leroymerlin.fr', password: 'VinsConv2026!' });
+      cseToken = loginRes.body.accessToken;
+      if (!cseToken) return;
+
+      const participation = await db('participations')
+        .join('users', 'participations.user_id', 'users.id')
+        .where('users.email', 'cse@leroymerlin.fr')
+        .first();
+      if (!participation) return;
+
+      const res = await request(app)
+        .get('/api/v1/dashboard/cse')
+        .set('Authorization', `Bearer ${cseToken}`)
+        .query({ campaign_id: participation.campaign_id });
+
+      expect(res.status).toBe(200);
+      const jsonStr = JSON.stringify(res.body);
+      expect(jsonStr).not.toContain('"streak"');
+      expect(jsonStr).not.toContain('"ranking"');
+      expect(jsonStr).not.toContain('"freeBottles"');
+      expect(res.body).toHaveProperty('products');
+      expect(res.body).toHaveProperty('minOrder');
+      expect(res.body).toHaveProperty('discountPct');
+    });
+  });
+
+  describe('Margins — Global analysis', () => {
+    test('Margins endpoint returns global/byProduct/bySegment', async () => {
+      const res = await request(app)
+        .get('/api/v1/admin/margins')
+        .set('Authorization', `Bearer ${adminToken}`);
+
+      expect(res.status).toBe(200);
+      expect(res.body).toHaveProperty('global');
+      expect(res.body.global).toHaveProperty('ca_ht');
+      expect(res.body.global).toHaveProperty('margin');
+      expect(res.body.global).toHaveProperty('margin_pct');
+      expect(res.body).toHaveProperty('byProduct');
+      expect(res.body.byProduct).toBeInstanceOf(Array);
+      expect(res.body).toHaveProperty('bySegment');
+      expect(res.body.bySegment).toBeInstanceOf(Array);
     });
   });
 

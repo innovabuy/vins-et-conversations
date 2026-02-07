@@ -88,35 +88,4 @@ router.post('/cash-deposit', authenticate, requireRole('super_admin', 'commercia
   }
 });
 
-// POST /api/v1/webhooks/stripe — Webhook Stripe (payment_intent.succeeded)
-router.post('/webhook/stripe', express.raw({ type: 'application/json' }), async (req, res) => {
-  try {
-    const event = req.body;
-
-    if (event.type === 'payment_intent.succeeded') {
-      const paymentIntent = event.data?.object;
-      const stripeId = paymentIntent?.id;
-      const orderId = paymentIntent?.metadata?.order_id;
-
-      if (stripeId && orderId) {
-        await db('payments')
-          .where({ order_id: orderId, method: 'stripe' })
-          .update({
-            status: 'reconciled',
-            stripe_id: stripeId,
-            reconciled_at: new Date(),
-            updated_at: new Date(),
-          });
-
-        logger.info(`Stripe webhook: payment ${stripeId} reconciled for order ${orderId}`);
-      }
-    }
-
-    res.json({ received: true });
-  } catch (err) {
-    logger.error('Stripe webhook error:', err);
-    res.status(400).json({ error: 'WEBHOOK_ERROR' });
-  }
-});
-
 module.exports = router;

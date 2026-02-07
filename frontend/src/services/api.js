@@ -133,4 +133,42 @@ export const notificationsAPI = {
   updateSettings: (settings) => api.put('/notifications/settings', { settings }),
 };
 
+// ─── Stripe Payments ────────────────────────────────
+export const stripeAPI = {
+  createIntent: (orderId) => api.post('/payments/create-intent', { order_id: orderId }),
+};
+
+// ─── CSE Dashboard ──────────────────────────────────
+export const cseDashboardAPI = {
+  get: (campaignId) => api.get('/dashboard/cse', { params: { campaign_id: campaignId } }),
+};
+
+// ─── Invoices ───────────────────────────────────────
+export const invoicesAPI = {
+  download: (orderId) => api.get(`/orders/${orderId}/invoice`, { responseType: 'blob' }),
+};
+
+// ─── Pricing Conditions ─────────────────────────────
+export const pricingConditionsAPI = {
+  list: () => api.get('/admin/pricing-conditions'),
+  create: (data) => api.post('/admin/pricing-conditions', data),
+  update: (id, data) => api.put(`/admin/pricing-conditions/${id}`, data),
+};
+
+// ─── Exports ────────────────────────────────────────
+export const exportsAPI = {
+  pennylane: (start, end) => api.get('/admin/exports/pennylane', { params: { start, end }, responseType: 'blob' }),
+  salesJournal: (start, end) => api.get('/admin/exports/sales-journal', { params: { start, end }, responseType: 'blob' }),
+  commissions: (campaignId) => api.get('/admin/exports/commissions', { params: { campaign_id: campaignId }, responseType: 'blob' }),
+  stock: () => api.get('/admin/exports/stock', { responseType: 'blob' }),
+  deliveryNotes: (start, end) => api.get('/admin/exports/delivery-notes', { params: { start, end }, responseType: 'blob' }),
+  activityReport: (start, end) => api.get('/admin/exports/activity-report', { params: { start, end }, responseType: 'blob' }),
+};
+
+// ─── Margins ────────────────────────────────────────
+export const marginsAPI = {
+  list: () => api.get('/admin/margins'),
+  byCampaign: (campaignId) => api.get('/admin/margins/by-campaign', { params: { campaign_id: campaignId } }),
+};
+
 export default api;
