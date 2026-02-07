@@ -1,0 +1,184 @@
+const db = require('../config/database');
+const rulesEngine = require('./rulesEngine');
+const logger = require('../utils/logger');
+const { v4: uuidv4 } = require('uuid');
+
+/**
+ * Génère une référence commande unique : VC-2026-0001
+ */
+async function generateOrderRef() {
+  const year = new Date().getFullYear();
+  const lastOrder = await db('orders')
+    .where('ref', 'like', `VC-${year}-%`)
+    .orderBy('ref', 'desc')
+    .first();
+
+  let counter = 1;
+  if (lastOrder) {
+    const lastNum = parseInt(lastOrder.ref.split('-')[2], 10);
+    counter = lastNum + 1;
+  }
+  return `VC-${year}-${String(counter).padStart(4, '0')}`;
+}
+
+/**
+ * Créer une commande (CDC §Commandes)
+ * @param {Object} params - { userId, campaignId, items: [{ productId, qty }], customerId?, notes? }
+ */
+async function createOrder({ userId, campaignId, items, customerId, notes }) {
+  // Charger les règles de la campagne
+  const rules = await rulesEngine.loadRulesForCampaign(campaignId);
+
+  // Vérifier participation
+  const participation = await db('participations')
+    .where({ user_id: userId, campaign_id: campaignId })
+    .first();
+  if (!participation) throw new Error('NOT_PARTICIPANT');
+
+  // Charger les produits de la campagne
+  const productIds = items.map((i) => i.productId);
+  const products = await db('products')
+    .join('campaign_products', 'products.id', 'campaign_products.product_id')
+    .where('campaign_products.campaign_id', campaignId)
+    .whereIn('products.id', productIds)
+    .where('campaign_products.active', true)
+    .select('products.*', 'campaign_products.custom_price');
+
+  if (products.length !== productIds.length) {
+    throw new Error('INVALID_PRODUCTS');
+  }
+
+  const ref = await generateOrderRef();
+  const orderId = uuidv4();
+
+  let totalHT = 0;
+  let totalTTC = 0;
+  let totalItems = 0;
+  const orderItems = [];
+
+  for (const item of items) {
+    const product = products.find((p) => p.id === item.productId);
+    const effectiveProduct = product.custom_price
+      ? { ...product, price_ttc: product.custom_price, price_ht: product.custom_price / (1 + product.tva_rate / 100) }
+      : product;
+
+    const priced = rulesEngine.applyPricingRules(effectiveProduct, rules.pricing);
+
+    const lineHT = priced.price_ht * item.qty;
+    const lineTTC = priced.price_ttc * item.qty;
+    totalHT += lineHT;
+    totalTTC += lineTTC;
+    totalItems += item.qty;
+
+    orderItems.push({
+      order_id: orderId,
+      product_id: item.productId,
+      qty: item.qty,
+      unit_price_ht: priced.price_ht,
+      unit_price_ttc: priced.price_ttc,
+      free_qty: 0,
+    });
+  }
+
+  await db.transaction(async (trx) => {
+    // Créer la commande
+    await trx('orders').insert({
+      id: orderId,
+      ref,
+      campaign_id: campaignId,
+      user_id: userId,
+      customer_id: customerId || null,
+      status: 'submitted',
+      items: JSON.stringify(items), // snapshot
+      total_ht: parseFloat(totalHT.toFixed(2)),
+      total_ttc: parseFloat(totalTTC.toFixed(2)),
+      total_items: totalItems,
+      notes,
+    });
+
+    // Insérer les lignes
+    await trx('order_items').insert(orderItems);
+
+    // Événement financier append-only
+    await trx('financial_events').insert({
+      order_id: orderId,
+      campaign_id: campaignId,
+      type: 'sale',
+      amount: parseFloat(totalTTC.toFixed(2)),
+      description: `Commande ${ref}`,
+    });
+
+    // Mouvement de stock (sortie)
+    const stockMovements = items.map((item) => ({
+      product_id: item.productId,
+      campaign_id: campaignId,
+      type: 'exit',
+      qty: item.qty,
+      reference: ref,
+    }));
+    await trx('stock_movements').insert(stockMovements);
+  });
+
+  logger.info(`Order created: ${ref} by user ${userId} in campaign ${campaignId}`);
+
+  return {
+    id: orderId,
+    ref,
+    totalHT: parseFloat(totalHT.toFixed(2)),
+    totalTTC: parseFloat(totalTTC.toFixed(2)),
+    totalItems,
+    status: 'submitted',
+  };
+}
+
+/**
+ * Valider une commande (admin)
+ */
+async function validateOrder(orderId, adminUserId) {
+  const order = await db('orders').where({ id: orderId }).first();
+  if (!order) throw new Error('ORDER_NOT_FOUND');
+  if (order.status !== 'submitted') throw new Error('ORDER_NOT_SUBMITTABLE');
+
+  await db('orders').where({ id: orderId }).update({
+    status: 'validated',
+    updated_at: new Date(),
+  });
+
+  logger.info(`Order ${order.ref} validated by admin ${adminUserId}`);
+  return { ...order, status: 'validated' };
+}
+
+/**
+ * Liste des commandes avec filtres
+ */
+async function listOrders({ campaignId, status, userId, page = 1, limit = 20 }) {
+  let query = db('orders')
+    .join('users', 'orders.user_id', 'users.id')
+    .select(
+      'orders.*',
+      'users.name as user_name',
+      'users.email as user_email'
+    );
+
+  if (campaignId) query = query.where('orders.campaign_id', campaignId);
+  if (status) query = query.where('orders.status', status);
+  if (userId) query = query.where('orders.user_id', userId);
+
+  const total = await query.clone().clearSelect().count('orders.id as count').first();
+  const orders = await query
+    .orderBy('orders.created_at', 'desc')
+    .limit(limit)
+    .offset((page - 1) * limit);
+
+  return {
+    data: orders,
+    pagination: {
+      page,
+      limit,
+      total: parseInt(total?.count || 0, 10),
+      pages: Math.ceil(parseInt(total?.count || 0, 10) / limit),
+    },
+  };
+}
+
+module.exports = { createOrder, validateOrder, listOrders, generateOrderRef };

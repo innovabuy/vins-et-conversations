@@ -1,0 +1,71 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: vc-postgres
+    environment:
+      POSTGRES_DB: vins_conversations
+      POSTGRES_USER: vc_admin
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-vc_dev_2026}
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U vc_admin -d vins_conversations"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    container_name: vc-redis
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  api:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: vc-api
+    environment:
+      NODE_ENV: development
+      PORT: 3001
+      DATABASE_URL: postgres://vc_admin:${DB_PASSWORD:-vc_dev_2026}@postgres:5432/vins_conversations
+      REDIS_URL: redis://redis:6379
+      JWT_SECRET: ${JWT_SECRET:-vc_jwt_secret_dev_change_in_prod}
+      JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET:-vc_refresh_secret_dev_change_in_prod}
+      STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY:-sk_test_placeholder}
+      STRIPE_WEBHOOK_SECRET: ${STRIPE_WEBHOOK_SECRET:-whsec_placeholder}
+    ports:
+      - "3001:3001"
+    volumes:
+      - ./backend/src:/app/src
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    command: npm run dev
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: vc-frontend
+    ports:
+      - "5173:5173"
+    volumes:
+      - ./frontend/src:/app/src
+    depends_on:
+      - api
+    command: npm run dev -- --host
+
+volumes:
+  pgdata:
