@@ -63,6 +63,8 @@ app.use('/api/v1/payments', require('./routes/paymentIntents'));
 app.use('/api/v1/notifications', require('./routes/notifications'));
 app.use('/api/v1/ambassador', require('./routes/ambassador'));
 app.use('/api/v1/formation', require('./routes/formation'));
+app.use('/api/v1/admin/users', require('./routes/users'));
+app.use('/api/v1/admin/invitations', require('./routes/invitations'));
 
 // ─── Health check ─────────────────────────────────────
 app.get('/api/health', async (req, res) => {

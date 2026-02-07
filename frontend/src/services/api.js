@@ -166,6 +166,21 @@ export const exportsAPI = {
   activityReport: (start, end) => api.get('/admin/exports/activity-report', { params: { start, end }, responseType: 'blob' }),
 };
 
+// ─── Users Admin ───────────────────────────────────
+export const usersAPI = {
+  list: (params) => api.get('/admin/users', { params }),
+  create: (data) => api.post('/admin/users', data),
+  update: (id, data) => api.put(`/admin/users/${id}`, data),
+  toggleStatus: (id) => api.post(`/admin/users/${id}/toggle-status`),
+  importCSV: (data) => api.post('/admin/users/import-csv', data),
+};
+
+// ─── Invitations ───────────────────────────────────
+export const invitationsAPI = {
+  list: (params) => api.get('/admin/invitations', { params }),
+  create: (data) => api.post('/admin/invitations', data),
+};
+
 // ─── Formation (BTS) ───────────────────────────────
 export const formationAPI = {
   modules: () => api.get('/formation/modules'),

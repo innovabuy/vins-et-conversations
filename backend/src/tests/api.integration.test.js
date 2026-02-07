@@ -836,6 +836,109 @@ describe('API Integration Tests', () => {
     });
   });
 
+  describe('Users Admin — CRUD and RBAC', () => {
+    test('Admin can list users', async () => {
+      const res = await request(app)
+        .get('/api/v1/admin/users')
+        .set('Authorization', `Bearer ${adminToken}`);
+
+      expect(res.status).toBe(200);
+      expect(res.body.data).toBeInstanceOf(Array);
+      expect(res.body.data.length).toBeGreaterThan(0);
+      expect(res.body.pagination).toHaveProperty('total');
+    });
+
+    test('Admin can create a user', async () => {
+      // Clean up any leftover test user
+      await db('users').where({ email: 'phase4test@test.fr' }).delete();
+
+      const res = await request(app)
+        .post('/api/v1/admin/users')
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({
+          email: 'phase4test@test.fr',
+          name: 'Test User Phase4',
+          role: 'etudiant',
+          password: 'Test1234!',
+        });
+
+      expect(res.status).toBe(201);
+      expect(res.body.email).toBe('phase4test@test.fr');
+      expect(res.body.role).toBe('etudiant');
+    });
+
+    test('Duplicate email returns 409', async () => {
+      const res = await request(app)
+        .post('/api/v1/admin/users')
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({
+          email: 'phase4test@test.fr',
+          name: 'Duplicate',
+          role: 'etudiant',
+          password: 'Test1234!',
+        });
+
+      expect(res.status).toBe(409);
+      expect(res.body.error).toBe('EMAIL_EXISTS');
+    });
+
+    test('Admin can toggle user status', async () => {
+      const user = await db('users').where({ email: 'phase4test@test.fr' }).first();
+      if (!user) return;
+
+      // User should be active after creation
+      expect(user.status).toBe('active');
+
+      const res = await request(app)
+        .post(`/api/v1/admin/users/${user.id}/toggle-status`)
+        .set('Authorization', `Bearer ${adminToken}`);
+
+      expect(res.status).toBe(200);
+      expect(res.body.status).toBe('disabled');
+    });
+
+    test('Student cannot access admin users', async () => {
+      const res = await request(app)
+        .get('/api/v1/admin/users')
+        .set('Authorization', `Bearer ${studentToken}`);
+
+      expect(res.status).toBe(403);
+    });
+  });
+
+  describe('Invitations — Create and list', () => {
+    test('Admin can create invitation', async () => {
+      const campaign = await db('campaigns').first();
+      if (!campaign) return;
+
+      const res = await request(app)
+        .post('/api/v1/admin/invitations')
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({
+          campaign_id: campaign.id,
+          role: 'etudiant',
+          method: 'link',
+          count: 2,
+        });
+
+      expect(res.status).toBe(201);
+      expect(res.body.data).toBeInstanceOf(Array);
+      expect(res.body.data.length).toBe(2);
+      expect(res.body.data[0]).toHaveProperty('code');
+      expect(res.body.data[0]).toHaveProperty('link');
+    });
+
+    test('Admin can list invitations', async () => {
+      const res = await request(app)
+        .get('/api/v1/admin/invitations')
+        .set('Authorization', `Bearer ${adminToken}`);
+
+      expect(res.status).toBe(200);
+      expect(res.body.data).toBeInstanceOf(Array);
+      expect(res.body.data.length).toBeGreaterThan(0);
+    });
+  });
+
   describe('Health Check', () => {
     test('GET /api/health returns ok', async () => {
       const res = await request(app).get('/api/health');

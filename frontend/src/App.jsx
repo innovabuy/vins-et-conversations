@@ -16,6 +16,7 @@ import AdminNotifications from './components/admin/AdminNotifications';
 import AdminPricing from './components/admin/AdminPricing';
 import AdminExports from './components/admin/AdminExports';
 import AdminFinance from './components/admin/AdminFinance';
+import AdminUsers from './components/admin/AdminUsers';
 import StudentDashboard from './components/student/StudentDashboard';
 import CSELayout from './components/layout/CSELayout';
 import CSEDashboard from './components/cse/CSEDashboard';
@@ -71,7 +72,7 @@ function AppRoutes() {
         <Route path="routes" element={<AdminRoutes />} />
         <Route path="pricing" element={<AdminPricing />} />
         <Route path="exports" element={<AdminExports />} />
-        <Route path="users" element={<PlaceholderModule title="Utilisateurs & Droits" />} />
+        <Route path="users" element={<AdminUsers />} />
       </Route>
 
       {/* CSE routes */}
