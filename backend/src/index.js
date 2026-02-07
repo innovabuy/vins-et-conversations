@@ -6,6 +6,9 @@ const helmet = require('helmet');
 const morgan = require('morgan');
 const rateLimit = require('express-rate-limit');
 const cookieParser = require('cookie-parser');
+const compression = require('compression');
+const swaggerUi = require('swagger-ui-express');
+const swaggerSpec = require('./docs/swagger');
 const logger = require('./utils/logger');
 
 const app = express();
@@ -16,6 +19,7 @@ app.use('/api/v1/webhooks', require('./routes/webhooks'));
 
 // ─── Middlewares globaux ──────────────────────────────
 app.use(helmet());
+app.use(compression());
 app.use(cors({
   origin: process.env.FRONTEND_URL || 'http://localhost:5173',
   credentials: true,
@@ -44,6 +48,12 @@ const authLimiter = rateLimit({
 });
 app.use('/api/v1/auth/', authLimiter);
 
+// ─── Swagger documentation ───────────────────────────
+app.use('/api/docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec, {
+  customCss: '.swagger-ui .topbar { display: none }',
+  customSiteTitle: 'Vins & Conversations API',
+}));
+
 // ─── Routes ───────────────────────────────────────────
 app.use('/api/v1/auth', require('./routes/auth'));
 app.use('/api/v1/products', require('./routes/products'));
@@ -59,6 +69,8 @@ app.use('/api/v1/admin/delivery-routes', require('./routes/deliveryRoutes'));
 app.use('/api/v1/admin/pricing-conditions', require('./routes/pricingConditions'));
 app.use('/api/v1/admin/exports', require('./routes/exports'));
 app.use('/api/v1/admin/margins', require('./routes/margins'));
+app.use('/api/v1/admin/analytics', require('./routes/analytics'));
+app.use('/api/v1/admin/audit-log', require('./routes/auditLog'));
 app.use('/api/v1/payments', require('./routes/paymentIntents'));
 app.use('/api/v1/notifications', require('./routes/notifications'));
 app.use('/api/v1/ambassador', require('./routes/ambassador'));
@@ -90,8 +102,9 @@ app.use((err, req, res, _next) => {
 // ─── Start ────────────────────────────────────────────
 if (require.main === module) {
   app.listen(PORT, () => {
-    logger.info(`🍷 Vins & Conversations API running on port ${PORT}`);
+    logger.info(`Vins & Conversations API running on port ${PORT}`);
     logger.info(`   Environment: ${process.env.NODE_ENV || 'development'}`);
+    logger.info(`   Swagger docs: http://localhost:${PORT}/api/docs`);
   });
 }
 

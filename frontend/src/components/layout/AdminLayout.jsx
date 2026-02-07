@@ -4,7 +4,7 @@ import { Outlet, NavLink, useNavigate } from 'react-router-dom';
 import {
   LayoutDashboard, ShoppingCart, Truck, Factory, Package, Users,
   CreditCard, BarChart3, BookOpen, Bell, Map, FileText, Settings,
-  Download, Wine, LogOut, Menu, X, ChevronRight
+  Download, Wine, LogOut, Menu, X, ChevronRight, Shield
 } from 'lucide-react';
 
 const navItems = [
@@ -24,6 +24,7 @@ const navItems = [
   { to: '/admin/pricing', icon: FileText, label: 'Conditions' },
   { to: '/admin/exports', icon: Download, label: 'Exports' },
   { to: '/admin/users', icon: Settings, label: 'Utilisateurs' },
+  { to: '/admin/audit', icon: Shield, label: 'Audit' },
 ];
 
 export default function AdminLayout() {

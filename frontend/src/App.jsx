@@ -17,6 +17,8 @@ import AdminPricing from './components/admin/AdminPricing';
 import AdminExports from './components/admin/AdminExports';
 import AdminFinance from './components/admin/AdminFinance';
 import AdminUsers from './components/admin/AdminUsers';
+import AdminAnalytics from './components/admin/AdminAnalytics';
+import AdminAuditLog from './components/admin/AdminAuditLog';
 import StudentDashboard from './components/student/StudentDashboard';
 import CSELayout from './components/layout/CSELayout';
 import CSEDashboard from './components/cse/CSEDashboard';
@@ -33,15 +35,6 @@ function ProtectedRoute({ children, roles }) {
   if (!user) return <Navigate to="/login" replace />;
   if (roles && !roles.includes(user.role)) return <Navigate to="/login" replace />;
   return children;
-}
-
-function PlaceholderModule({ title }) {
-  return (
-    <div className="card text-center py-12">
-      <h2 className="text-xl font-semibold text-gray-400 mb-2">{title}</h2>
-      <p className="text-gray-400">Module en cours de développement — Phase 2+</p>
-    </div>
-  );
 }
 
 function AppRoutes() {
@@ -66,7 +59,8 @@ function AppRoutes() {
         <Route path="crm" element={<AdminCRM />} />
         <Route path="finance" element={<AdminFinance />} />
         <Route path="payments" element={<AdminPayments />} />
-        <Route path="analytics" element={<PlaceholderModule title="Analytics" />} />
+        <Route path="analytics" element={<AdminAnalytics />} />
+        <Route path="audit" element={<AdminAuditLog />} />
         <Route path="catalog" element={<AdminCatalog />} />
         <Route path="notifications" element={<AdminNotifications />} />
         <Route path="routes" element={<AdminRoutes />} />
@@ -121,7 +115,7 @@ function AppRoutes() {
       {/* Redirects */}
       <Route path="/" element={
         user ? <Navigate to={
-          ['super_admin', 'commercial'].includes(user.role) ? '/admin' :
+          ['super_admin', 'commercial', 'comptable'].includes(user.role) ? '/admin' :
           user.role === 'cse' ? '/cse' :
           user.role === 'ambassadeur' ? '/ambassador' :
           user.role === 'enseignant' ? '/teacher' :

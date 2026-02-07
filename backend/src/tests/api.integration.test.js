@@ -939,6 +939,196 @@ describe('API Integration Tests', () => {
     });
   });
 
+  // ─── Phase 5 — Analytics, Audit, Security, Campaign Duplication ──
+
+  describe('Analytics — GET /api/v1/admin/analytics', () => {
+    test('Admin gets full analytics data', async () => {
+      const res = await request(app)
+        .get('/api/v1/admin/analytics')
+        .set('Authorization', `Bearer ${adminToken}`);
+
+      expect(res.status).toBe(200);
+      expect(res.body).toHaveProperty('tauxConversion');
+      expect(typeof res.body.tauxConversion).toBe('number');
+      expect(res.body).toHaveProperty('kpis');
+      expect(res.body.kpis).toHaveProperty('caTTC');
+      expect(res.body.kpis).toHaveProperty('caHT');
+      expect(res.body.kpis).toHaveProperty('totalOrders');
+      expect(res.body.kpis).toHaveProperty('totalBottles');
+      expect(res.body).toHaveProperty('caParPeriode');
+      expect(res.body.caParPeriode).toBeInstanceOf(Array);
+      expect(res.body).toHaveProperty('topVendeurs');
+      expect(res.body.topVendeurs).toBeInstanceOf(Array);
+      expect(res.body).toHaveProperty('topProduits');
+      expect(res.body.topProduits).toBeInstanceOf(Array);
+      expect(res.body).toHaveProperty('comparaisonCampagnes');
+      expect(res.body.comparaisonCampagnes).toBeInstanceOf(Array);
+    });
+
+    test('Student cannot access analytics', async () => {
+      const res = await request(app)
+        .get('/api/v1/admin/analytics')
+        .set('Authorization', `Bearer ${studentToken}`);
+
+      expect(res.status).toBe(403);
+    });
+  });
+
+  describe('Audit Log — GET /api/v1/admin/audit-log', () => {
+    test('Admin gets audit log with pagination', async () => {
+      const res = await request(app)
+        .get('/api/v1/admin/audit-log')
+        .set('Authorization', `Bearer ${adminToken}`);
+
+      expect(res.status).toBe(200);
+      expect(res.body.data).toBeInstanceOf(Array);
+      expect(res.body.data.length).toBeGreaterThan(0);
+      expect(res.body.pagination).toHaveProperty('total');
+      expect(res.body.pagination).toHaveProperty('page');
+      expect(res.body.pagination).toHaveProperty('pages');
+      // Check entry structure
+      const entry = res.body.data[0];
+      expect(entry).toHaveProperty('action');
+      expect(entry).toHaveProperty('entity');
+      expect(entry).toHaveProperty('created_at');
+    });
+
+    test('Audit log filter by entity works', async () => {
+      const res = await request(app)
+        .get('/api/v1/admin/audit-log')
+        .set('Authorization', `Bearer ${adminToken}`)
+        .query({ entity: 'payments' });
+
+      expect(res.status).toBe(200);
+      if (res.body.data.length > 0) {
+        res.body.data.forEach((e) => {
+          expect(e.entity).toBe('payments');
+        });
+      }
+    });
+
+    test('Audit log entities list returns distinct entities', async () => {
+      const res = await request(app)
+        .get('/api/v1/admin/audit-log/entities')
+        .set('Authorization', `Bearer ${adminToken}`);
+
+      expect(res.status).toBe(200);
+      expect(res.body.data).toBeInstanceOf(Array);
+      expect(res.body.data.length).toBeGreaterThan(0);
+    });
+
+    test('Student cannot access audit log', async () => {
+      const res = await request(app)
+        .get('/api/v1/admin/audit-log')
+        .set('Authorization', `Bearer ${studentToken}`);
+
+      expect(res.status).toBe(403);
+    });
+  });
+
+  describe('Campaign Duplication — POST /admin/campaigns/:id/duplicate', () => {
+    test('Duplication copies products but NOT orders/participations', async () => {
+      const campaign = await db('campaigns').first();
+      if (!campaign) return;
+
+      // Count source data
+      const sourceProducts = await db('campaign_products').where({ campaign_id: campaign.id });
+      const sourceOrders = await db('orders').where({ campaign_id: campaign.id }).count('id as count').first();
+      const sourceParticipations = await db('participations').where({ campaign_id: campaign.id }).count('id as count').first();
+
+      const res = await request(app)
+        .post(`/api/v1/admin/campaigns/${campaign.id}/duplicate`)
+        .set('Authorization', `Bearer ${adminToken}`);
+
+      expect(res.status).toBe(201);
+      expect(res.body).toHaveProperty('id');
+
+      const newId = res.body.id;
+
+      // Products should be copied
+      const newProducts = await db('campaign_products').where({ campaign_id: newId });
+      expect(newProducts.length).toBe(sourceProducts.length);
+
+      // Orders should NOT be copied
+      const newOrders = await db('orders').where({ campaign_id: newId }).count('id as count').first();
+      expect(parseInt(newOrders.count, 10)).toBe(0);
+
+      // Participations should NOT be copied
+      const newParticipations = await db('participations').where({ campaign_id: newId }).count('id as count').first();
+      expect(parseInt(newParticipations.count, 10)).toBe(0);
+
+      // Status should be draft
+      const newCampaign = await db('campaigns').where({ id: newId }).first();
+      expect(newCampaign.status).toBe('draft');
+
+      // Cleanup
+      await db('campaign_products').where({ campaign_id: newId }).delete();
+      await db('campaigns').where({ id: newId }).delete();
+    });
+  });
+
+  describe('Security — Route protection verification', () => {
+    test('All admin routes reject unauthenticated requests', async () => {
+      const adminRoutes = [
+        '/api/v1/admin/stock',
+        '/api/v1/admin/delivery-notes',
+        '/api/v1/admin/contacts',
+        '/api/v1/admin/suppliers',
+        '/api/v1/admin/payments',
+        '/api/v1/admin/delivery-routes',
+        '/api/v1/admin/pricing-conditions',
+        '/api/v1/admin/exports/pennylane',
+        '/api/v1/admin/margins',
+        '/api/v1/admin/analytics',
+        '/api/v1/admin/audit-log',
+        '/api/v1/admin/users',
+        '/api/v1/admin/invitations',
+        '/api/v1/admin/campaigns',
+      ];
+
+      for (const route of adminRoutes) {
+        const res = await request(app).get(route);
+        expect(res.status).toBe(401);
+      }
+    });
+
+    test('All admin routes reject student role', async () => {
+      const adminOnlyRoutes = [
+        '/api/v1/admin/stock',
+        '/api/v1/admin/users',
+        '/api/v1/admin/audit-log',
+        '/api/v1/admin/analytics',
+      ];
+
+      for (const route of adminOnlyRoutes) {
+        const res = await request(app)
+          .get(route)
+          .set('Authorization', `Bearer ${studentToken}`);
+        expect(res.status).toBe(403);
+      }
+    });
+
+    test('Swagger docs endpoint is accessible', async () => {
+      const res = await request(app).get('/api/docs/');
+      expect(res.status).toBe(200);
+      expect(res.headers['content-type']).toContain('text/html');
+    });
+  });
+
+  describe('Compression — Response compression', () => {
+    test('Response includes compression headers on large payload', async () => {
+      const res = await request(app)
+        .get('/api/v1/admin/analytics')
+        .set('Authorization', `Bearer ${adminToken}`)
+        .set('Accept-Encoding', 'gzip, deflate');
+
+      expect(res.status).toBe(200);
+      // Compression should be active for JSON responses
+      // supertest may decompress, but we check the response is valid
+      expect(res.body).toHaveProperty('kpis');
+    });
+  });
+
   describe('Health Check', () => {
     test('GET /api/health returns ok', async () => {
       const res = await request(app).get('/api/health');

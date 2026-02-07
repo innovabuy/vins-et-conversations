@@ -2,6 +2,7 @@ const express = require('express');
 const db = require('../config/database');
 const dashboardService = require('../services/dashboardService');
 const { authenticate, requireRole, requireCampaignAccess } = require('../middleware/auth');
+const { cacheMiddleware } = require('../middleware/cache');
 
 const router = express.Router();
 
@@ -75,6 +76,7 @@ router.get(
   '/admin/cockpit',
   authenticate,
   requireRole('super_admin', 'commercial'),
+  cacheMiddleware(60),
   async (req, res) => {
     try {
       const campaignIds = req.query.campaign_ids

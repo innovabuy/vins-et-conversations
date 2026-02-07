@@ -200,4 +200,15 @@ export const marginsAPI = {
   byCampaign: (campaignId) => api.get('/admin/margins/by-campaign', { params: { campaign_id: campaignId } }),
 };
 
+// ─── Analytics ─────────────────────────────────────
+export const analyticsAPI = {
+  get: (params) => api.get('/admin/analytics', { params }),
+};
+
+// ─── Audit Log ─────────────────────────────────────
+export const auditLogAPI = {
+  list: (params) => api.get('/admin/audit-log', { params }),
+  entities: () => api.get('/admin/audit-log/entities'),
+};
+
 export default api;
