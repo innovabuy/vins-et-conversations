@@ -209,6 +209,233 @@ describe('API Integration Tests', () => {
     });
   });
 
+  // ─── Phase 2 — Back-office Tests ──────────────────────
+
+  describe('Stock — Returns increment stock', () => {
+    test('Creating a return creates stock_movement and financial_event', async () => {
+      if (!orderId) return;
+
+      // Get a product from the order
+      const item = await db('order_items').where({ order_id: orderId }).first();
+      if (!item) return;
+
+      // Get stock before return
+      const beforeMove = await db('stock_movements')
+        .where({ product_id: item.product_id, type: 'return' })
+        .count('id as count')
+        .first();
+      const beforeCount = parseInt(beforeMove?.count || 0, 10);
+
+      const res = await request(app)
+        .post('/api/v1/admin/stock/returns')
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({
+          order_id: orderId,
+          product_id: item.product_id,
+          qty: 1,
+          reason: 'Test return',
+        });
+
+      expect(res.status).toBe(201);
+      expect(res.body.qty).toBe(1);
+      expect(res.body.status).toBe('pending');
+
+      // Verify stock_movement was created
+      const afterMove = await db('stock_movements')
+        .where({ product_id: item.product_id, type: 'return' })
+        .count('id as count')
+        .first();
+      expect(parseInt(afterMove.count, 10)).toBe(beforeCount + 1);
+
+      // Verify financial_event (refund) was created
+      const refund = await db('financial_events')
+        .where({ order_id: orderId, type: 'refund' })
+        .orderBy('created_at', 'desc')
+        .first();
+      expect(refund).toBeDefined();
+      expect(parseFloat(refund.amount)).toBeLessThan(0);
+    });
+  });
+
+  describe('Payments — Cash deposit creates audit_log', () => {
+    test('Cash deposit with full traceability', async () => {
+      const res = await request(app)
+        .post('/api/v1/admin/payments/cash-deposit')
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({
+          date: '2026-02-07',
+          amount: 150,
+          depositor: 'Nicolas Froment',
+          reference: 'DEP-TEST-001',
+        });
+
+      expect(res.status).toBe(201);
+      expect(res.body.method).toBe('cash');
+      expect(parseFloat(res.body.amount)).toBe(150);
+
+      // Verify audit_log entry
+      const auditEntry = await db('audit_log')
+        .where({ entity: 'payments', entity_id: res.body.id, action: 'CASH_DEPOSIT' })
+        .first();
+      expect(auditEntry).toBeDefined();
+      const afterData = typeof auditEntry.after === 'string' ? JSON.parse(auditEntry.after) : auditEntry.after;
+      expect(afterData.depositor).toBe('Nicolas Froment');
+    });
+
+    test('Cash deposit without required fields returns 400', async () => {
+      const res = await request(app)
+        .post('/api/v1/admin/payments/cash-deposit')
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({ amount: 100 }); // Missing date and depositor
+
+      expect(res.status).toBe(400);
+      expect(res.body.error).toBe('VALIDATION_ERROR');
+    });
+  });
+
+  describe('Delivery Notes — BL generation from validated order', () => {
+    test('Generate BL from validated order', async () => {
+      if (!orderId) return;
+
+      const res = await request(app)
+        .post('/api/v1/admin/delivery-notes')
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({
+          order_id: orderId,
+          recipient_name: 'Client Test',
+          delivery_address: '123 Rue de Test, 69001 Lyon',
+          planned_date: '2026-02-15',
+        });
+
+      expect(res.status).toBe(201);
+      expect(res.body.ref).toMatch(/^BL-\d{4}-\d{4}$/);
+      expect(res.body.status).toBe('draft');
+      expect(res.body.order_id).toBe(orderId);
+
+      // Verify order status updated to preparing
+      const order = await db('orders').where({ id: orderId }).first();
+      expect(order.status).toBe('preparing');
+    });
+
+    test('Cannot generate duplicate BL for same order', async () => {
+      if (!orderId) return;
+
+      const res = await request(app)
+        .post('/api/v1/admin/delivery-notes')
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({ order_id: orderId });
+
+      expect(res.status).toBe(409);
+      expect(res.body.error).toBe('BL_EXISTS');
+    });
+  });
+
+  describe('Stripe Webhook — Payment reconciliation', () => {
+    test('payment_intent.succeeded reconciles payment', async () => {
+      // Create a payment record for an order (simulate Stripe pending)
+      const order = await db('orders').first();
+      if (!order) return;
+
+      const [payment] = await db('payments').insert({
+        order_id: order.id,
+        method: 'stripe',
+        amount: 100,
+        status: 'pending',
+      }).returning('*');
+
+      // Simulate Stripe webhook
+      const res = await request(app)
+        .post('/api/v1/admin/payments/webhook/stripe')
+        .set('Content-Type', 'application/json')
+        .send({
+          type: 'payment_intent.succeeded',
+          data: {
+            object: {
+              id: 'pi_test_123',
+              metadata: { order_id: order.id },
+            },
+          },
+        });
+
+      expect(res.status).toBe(200);
+      expect(res.body.received).toBe(true);
+
+      // Verify payment was reconciled
+      const updated = await db('payments').where({ id: payment.id }).first();
+      expect(updated.status).toBe('reconciled');
+      expect(updated.stripe_id).toBe('pi_test_123');
+
+      // Cleanup
+      await db('payments').where({ id: payment.id }).delete();
+    });
+  });
+
+  describe('Admin Module Access — Phase 2 endpoints', () => {
+    test('Admin can list stock', async () => {
+      const res = await request(app)
+        .get('/api/v1/admin/stock')
+        .set('Authorization', `Bearer ${adminToken}`);
+      expect(res.status).toBe(200);
+      expect(res.body.data).toBeInstanceOf(Array);
+    });
+
+    test('Admin can list delivery notes', async () => {
+      const res = await request(app)
+        .get('/api/v1/admin/delivery-notes')
+        .set('Authorization', `Bearer ${adminToken}`);
+      expect(res.status).toBe(200);
+      expect(res.body.data).toBeInstanceOf(Array);
+    });
+
+    test('Admin can list contacts', async () => {
+      const res = await request(app)
+        .get('/api/v1/admin/contacts')
+        .set('Authorization', `Bearer ${adminToken}`);
+      expect(res.status).toBe(200);
+      expect(res.body.data).toBeInstanceOf(Array);
+    });
+
+    test('Admin can list suppliers', async () => {
+      const res = await request(app)
+        .get('/api/v1/admin/suppliers')
+        .set('Authorization', `Bearer ${adminToken}`);
+      expect(res.status).toBe(200);
+      expect(res.body.data).toBeInstanceOf(Array);
+    });
+
+    test('Admin can list payments', async () => {
+      const res = await request(app)
+        .get('/api/v1/admin/payments')
+        .set('Authorization', `Bearer ${adminToken}`);
+      expect(res.status).toBe(200);
+      expect(res.body.data).toBeInstanceOf(Array);
+    });
+
+    test('Admin can list delivery routes', async () => {
+      const res = await request(app)
+        .get('/api/v1/admin/delivery-routes')
+        .set('Authorization', `Bearer ${adminToken}`);
+      expect(res.status).toBe(200);
+      expect(res.body.data).toBeInstanceOf(Array);
+    });
+
+    test('Admin can access notifications', async () => {
+      const res = await request(app)
+        .get('/api/v1/notifications')
+        .set('Authorization', `Bearer ${adminToken}`);
+      expect(res.status).toBe(200);
+      expect(res.body.data).toBeInstanceOf(Array);
+      expect(res.body).toHaveProperty('unread');
+    });
+
+    test('Student cannot access admin stock', async () => {
+      const res = await request(app)
+        .get('/api/v1/admin/stock')
+        .set('Authorization', `Bearer ${studentToken}`);
+      expect(res.status).toBe(403);
+    });
+  });
+
   describe('Health Check', () => {
     test('GET /api/health returns ok', async () => {
       const res = await request(app).get('/api/health');

@@ -80,7 +80,57 @@ export const campaignsAPI = {
 export const stockAPI = {
   list: () => api.get('/admin/stock'),
   alerts: () => api.get('/admin/stock/alerts'),
+  history: (productId) => api.get('/admin/stock/history', { params: { product_id: productId } }),
   addMovement: (data) => api.post('/admin/stock/movements', data),
+  returns: () => api.get('/admin/stock/returns'),
+  createReturn: (data) => api.post('/admin/stock/returns', data),
+  updateReturn: (id, data) => api.put(`/admin/stock/returns/${id}`, data),
+};
+
+// ─── Delivery Notes ──────────────────────────────────
+export const deliveryNotesAPI = {
+  list: (params) => api.get('/admin/delivery-notes', { params }),
+  get: (id) => api.get(`/admin/delivery-notes/${id}`),
+  create: (data) => api.post('/admin/delivery-notes', data),
+  update: (id, data) => api.put(`/admin/delivery-notes/${id}`, data),
+  sign: (id, data) => api.post(`/admin/delivery-notes/${id}/sign`, data),
+};
+
+// ─── Contacts / CRM ─────────────────────────────────
+export const contactsAPI = {
+  list: (params) => api.get('/admin/contacts', { params }),
+  search: (q) => api.get('/admin/contacts/search', { params: { q } }),
+  history: (id) => api.get(`/admin/contacts/${id}/history`),
+  create: (data) => api.post('/admin/contacts', data),
+  update: (id, data) => api.put(`/admin/contacts/${id}`, data),
+};
+
+// ─── Suppliers ───────────────────────────────────────
+export const suppliersAPI = {
+  list: () => api.get('/admin/suppliers'),
+};
+
+// ─── Payments ────────────────────────────────────────
+export const paymentsAPI = {
+  list: (params) => api.get('/admin/payments', { params }),
+  reconcile: (id, data) => api.put(`/admin/payments/${id}/reconcile`, data),
+  cashDeposit: (data) => api.post('/admin/payments/cash-deposit', data),
+};
+
+// ─── Delivery Routes ─────────────────────────────────
+export const deliveryRoutesAPI = {
+  list: (params) => api.get('/admin/delivery-routes', { params }),
+  create: (data) => api.post('/admin/delivery-routes', data),
+  update: (id, data) => api.put(`/admin/delivery-routes/${id}`, data),
+};
+
+// ─── Notifications ───────────────────────────────────
+export const notificationsAPI = {
+  list: () => api.get('/notifications'),
+  markRead: (id) => api.put(`/notifications/${id}/read`),
+  markAllRead: () => api.put('/notifications/read-all'),
+  getSettings: () => api.get('/notifications/settings'),
+  updateSettings: (settings) => api.put('/notifications/settings', { settings }),
 };
 
 export default api;

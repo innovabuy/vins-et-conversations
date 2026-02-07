@@ -48,6 +48,12 @@ app.use('/api/v1/orders', require('./routes/orders'));
 app.use('/api/v1/dashboard', require('./routes/dashboard'));
 app.use('/api/v1/admin/campaigns', require('./routes/campaigns'));
 app.use('/api/v1/admin/stock', require('./routes/stock'));
+app.use('/api/v1/admin/delivery-notes', require('./routes/deliveryNotes'));
+app.use('/api/v1/admin/contacts', require('./routes/contacts'));
+app.use('/api/v1/admin/suppliers', require('./routes/suppliers'));
+app.use('/api/v1/admin/payments', require('./routes/payments'));
+app.use('/api/v1/admin/delivery-routes', require('./routes/deliveryRoutes'));
+app.use('/api/v1/notifications', require('./routes/notifications'));
 
 // ─── Health check ─────────────────────────────────────
 app.get('/api/health', async (req, res) => {

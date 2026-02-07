@@ -6,6 +6,13 @@ import AdminCockpit from './components/admin/AdminCockpit';
 import AdminOrders from './components/admin/AdminOrders';
 import AdminCatalog from './components/admin/AdminCatalog';
 import AdminCampaigns from './components/admin/AdminCampaigns';
+import AdminStock from './components/admin/AdminStock';
+import AdminDeliveryNotes from './components/admin/AdminDeliveryNotes';
+import AdminCRM from './components/admin/AdminCRM';
+import AdminSuppliers from './components/admin/AdminSuppliers';
+import AdminPayments from './components/admin/AdminPayments';
+import AdminRoutes from './components/admin/AdminRoutes';
+import AdminNotifications from './components/admin/AdminNotifications';
 import StudentDashboard from './components/student/StudentDashboard';
 
 function ProtectedRoute({ children, roles }) {
@@ -41,16 +48,16 @@ function AppRoutes() {
         <Route index element={<AdminCockpit />} />
         <Route path="campaigns" element={<AdminCampaigns />} />
         <Route path="orders" element={<AdminOrders />} />
-        <Route path="delivery" element={<PlaceholderModule title="Bons de livraison" />} />
-        <Route path="suppliers" element={<PlaceholderModule title="Fournisseurs" />} />
-        <Route path="stock" element={<PlaceholderModule title="Stock" />} />
-        <Route path="crm" element={<PlaceholderModule title="Contacts / CRM" />} />
+        <Route path="delivery" element={<AdminDeliveryNotes />} />
+        <Route path="suppliers" element={<AdminSuppliers />} />
+        <Route path="stock" element={<AdminStock />} />
+        <Route path="crm" element={<AdminCRM />} />
         <Route path="finance" element={<PlaceholderModule title="Finance & Marges" />} />
-        <Route path="payments" element={<PlaceholderModule title="Paiements" />} />
+        <Route path="payments" element={<AdminPayments />} />
         <Route path="analytics" element={<PlaceholderModule title="Analytics" />} />
         <Route path="catalog" element={<AdminCatalog />} />
-        <Route path="notifications" element={<PlaceholderModule title="Notifications" />} />
-        <Route path="routes" element={<PlaceholderModule title="Tournées" />} />
+        <Route path="notifications" element={<AdminNotifications />} />
+        <Route path="routes" element={<AdminRoutes />} />
         <Route path="pricing" element={<PlaceholderModule title="Conditions commerciales" />} />
         <Route path="exports" element={<PlaceholderModule title="Exports comptables" />} />
         <Route path="users" element={<PlaceholderModule title="Utilisateurs & Droits" />} />
