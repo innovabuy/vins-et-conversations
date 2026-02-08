@@ -683,6 +683,7 @@ export default function AdminCatalog() {
                   </div>
                   <div className="flex items-center gap-2" onClick={e => e.stopPropagation()}>
                     <button onClick={() => setEditing(p)} className="text-xs px-2 py-1 border rounded-lg hover:bg-gray-100">Modifier</button>
+                    <button onClick={() => { const url = productsAPI.pdf(p.id); window.open(url + '?token=' + localStorage.getItem('accessToken'), '_blank'); }} className="text-xs px-2 py-1 border rounded-lg hover:bg-gray-100"><FileText size={12} className="inline mr-1" />PDF</button>
                     <button onClick={() => handleDelete(p.id, p.name)} className="text-xs px-2 py-1 border border-red-200 text-red-500 rounded-lg hover:bg-red-50">Désactiver</button>
                   </div>
                 </div>
@@ -737,6 +738,7 @@ export default function AdminCatalog() {
                     <td className="py-3 text-right" onClick={e => e.stopPropagation()}>
                       <div className="flex items-center justify-end gap-1">
                         <button onClick={() => setEditing(p)} className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-500" title="Modifier"><Pencil size={16} /></button>
+                        <button onClick={() => { const url = productsAPI.pdf(p.id); window.open(url + '?token=' + localStorage.getItem('accessToken'), '_blank'); }} className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-500" title="Fiche PDF"><FileText size={16} /></button>
                         <button onClick={() => handleDelete(p.id, p.name)} className="p-1.5 rounded-lg hover:bg-red-50 text-red-400" title="Désactiver"><Trash2 size={16} /></button>
                       </div>
                     </td>

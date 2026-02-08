@@ -62,6 +62,7 @@ export const productsAPI = {
   create: (data) => api.post('/admin/products', data),
   update: (id, data) => api.put(`/admin/products/${id}`, data),
   remove: (id) => api.delete(`/admin/products/${id}`),
+  pdf: (id) => `${api.defaults.baseURL}/admin/products/${id}/pdf`,
 };
 
 // ─── Orders ───────────────────────────────────────────
@@ -87,6 +88,7 @@ export const campaignsAPI = {
   sendReport: (id, userIds) => api.post(`/admin/campaigns/${id}/send-report`, { user_ids: userIds }),
   resources: () => api.get('/admin/campaigns/resources'),
   listActive: () => api.get('/admin/campaigns', { params: { status: 'active' } }),
+  reportPdf: (id) => `${api.defaults.baseURL}/admin/campaigns/${id}/report-pdf`,
 };
 
 // ─── Stock ────────────────────────────────────────────
@@ -236,6 +238,7 @@ export const marginsAPI = {
   byCampaign: (params) => api.get('/admin/margins/by-campaign', { params }),
   byClient: (params) => api.get('/admin/margins/by-client', { params }),
   bySupplier: (params) => api.get('/admin/margins/by-supplier', { params }),
+  byProduct: (params) => api.get('/admin/margins/by-product', { params }),
   bySeller: (params) => api.get('/admin/margins/by-seller', { params }),
   overview: (params) => api.get('/admin/margins/overview', { params }),
   filterOptions: () => api.get('/admin/margins/filter-options'),

@@ -4,7 +4,7 @@ import { campaignsAPI } from '../../services/api';
 import {
   ArrowLeft, Users, ShoppingCart, Wine, TrendingUp, Calendar,
   Target, Package, BarChart3, Mail, CreditCard, ExternalLink,
-  Copy, Check, Store,
+  Copy, Check, Store, FileText,
 } from 'lucide-react';
 import {
   ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip,
@@ -393,14 +393,22 @@ export default function AdminCampaignDetail() {
           </div>
           <p className="text-sm text-gray-500">{campaign.org_name} — {campaign.type_label}</p>
         </div>
-        <button
-          onClick={handleSendReport}
-          disabled={sendingReport}
-          className="flex items-center gap-2 px-4 py-2 border rounded-lg hover:bg-gray-50 text-sm disabled:opacity-50"
-        >
-          {sendingReport ? <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-wine-700" /> : <Mail size={16} />}
-          Envoyer rapports
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => { const url = campaignsAPI.reportPdf(id); window.open(url + '?token=' + localStorage.getItem('accessToken'), '_blank'); }}
+            className="flex items-center gap-2 px-4 py-2 border rounded-lg hover:bg-gray-50 text-sm"
+          >
+            <FileText size={16} /> Rapport PDF
+          </button>
+          <button
+            onClick={handleSendReport}
+            disabled={sendingReport}
+            className="flex items-center gap-2 px-4 py-2 border rounded-lg hover:bg-gray-50 text-sm disabled:opacity-50"
+          >
+            {sendingReport ? <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-wine-700" /> : <Mail size={16} />}
+            Envoyer rapports
+          </button>
+        </div>
         {campaign.start_date && (
           <div className="text-right text-sm text-gray-500 hidden sm:block">
             <div className="flex items-center gap-1"><Calendar size={14} /> {new Date(campaign.start_date).toLocaleDateString('fr-FR')} → {campaign.end_date ? new Date(campaign.end_date).toLocaleDateString('fr-FR') : '…'}</div>

@@ -186,18 +186,22 @@ router.get('/:id', authenticate, requireRole('super_admin', 'commercial'), async
   }
 });
 
-// GET /api/v1/admin/campaigns/:id/report-pdf — PDF rapport campagne
+// GET /api/v1/admin/campaigns/:id/report-pdf — PDF rapport campagne enrichi
 router.get('/:id/report-pdf', authenticate, requireRole('super_admin', 'commercial', 'comptable'), async (req, res) => {
   try {
     const campaign = await db('campaigns')
       .where('campaigns.id', req.params.id)
       .join('organizations', 'campaigns.org_id', 'organizations.id')
-      .select('campaigns.*', 'organizations.name as org_name')
+      .leftJoin('client_types', 'campaigns.client_type_id', 'client_types.id')
+      .select('campaigns.*', 'organizations.name as org_name', 'client_types.name as type_name', 'client_types.commission_rules')
       .first();
     if (!campaign) return res.status(404).json({ error: 'NOT_FOUND' });
 
     const validStatuses = ['submitted', 'validated', 'preparing', 'shipped', 'delivered'];
-    const formatEur = (v) => new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR' }).format(v);
+    const formatEur = (v) => new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR' }).format(v || 0);
+    const BURGUNDY = '#7a1c3b';
+    const DARK = '#1f2937';
+    const GRAY = '#6b7280';
 
     // Stats globales
     const stats = await db('orders')
@@ -221,6 +225,13 @@ router.get('/:id/report-pdf', authenticate, requireRole('super_admin', 'commerci
     const progress = campaign.goal > 0
       ? Math.round((parseFloat(stats.ca_ttc) / campaign.goal) * 100) : 0;
 
+    // Commission association
+    let commissionRules = campaign.commission_rules;
+    if (typeof commissionRules === 'string') try { commissionRules = JSON.parse(commissionRules); } catch { commissionRules = {}; }
+    const assoCommission = commissionRules?.association;
+    const commissionAmount = assoCommission && assoCommission.type === 'percentage'
+      ? parseFloat(stats.ca_ht) * (assoCommission.value / 100) : 0;
+
     // Top vendeurs
     const topSellers = await db('orders')
       .join('users', 'orders.user_id', 'users.id')
@@ -231,73 +242,189 @@ router.get('/:id/report-pdf', authenticate, requireRole('super_admin', 'commerci
       .orderBy('ca', 'desc')
       .limit(10);
 
-    // Top produits
-    const topProducts = await db('order_items')
+    // CA par produit (tous produits, pas juste top 10)
+    const productSales = await db('order_items')
       .join('products', 'order_items.product_id', 'products.id')
       .join('orders', 'order_items.order_id', 'orders.id')
       .where('orders.campaign_id', campaign.id)
       .whereIn('orders.status', validStatuses)
+      .groupBy('products.id', 'products.name', 'products.purchase_price')
+      .select(
+        'products.name',
+        'products.purchase_price',
+        db.raw('SUM(order_items.qty) as qty'),
+        db.raw('SUM(order_items.qty * order_items.unit_price_ht) as ca_ht'),
+        db.raw('SUM(order_items.qty * order_items.unit_price_ttc) as ca_ttc')
+      )
+      .orderBy('ca_ttc', 'desc');
+
+    // Stock par produit pour cette campagne (computed from stock_movements)
+    const stockData = await db('campaign_products')
+      .join('products', 'campaign_products.product_id', 'products.id')
+      .leftJoin('stock_movements as sm', 'products.id', 'sm.product_id')
+      .where('campaign_products.campaign_id', campaign.id)
+      .where('campaign_products.active', true)
       .groupBy('products.id', 'products.name')
-      .select('products.name', db.raw('SUM(order_items.qty) as qty'), db.raw('SUM(order_items.qty * order_items.unit_price_ttc) as revenue'))
-      .orderBy('qty', 'desc')
-      .limit(10);
+      .select(
+        'products.id', 'products.name',
+        db.raw("COALESCE(SUM(CASE WHEN sm.type IN ('initial','entry','return') THEN sm.qty ELSE -sm.qty END), 0) as current_stock")
+      );
+
+    const soldMap = {};
+    for (const ps of productSales) soldMap[ps.name] = parseInt(ps.qty) || 0;
 
     // Generate PDF
-    const doc = new PDFDocument({ size: 'A4', margin: 50 });
+    const doc = new PDFDocument({ size: 'A4', margin: 50, bufferPages: true });
     res.setHeader('Content-Type', 'application/pdf');
     const safeName = campaign.name.replace(/[^a-zA-Z0-9_-]/g, '_');
     res.setHeader('Content-Disposition', `inline; filename="rapport-${safeName}.pdf"`);
     doc.pipe(res);
 
-    // Header
-    doc.fontSize(22).font('Helvetica-Bold').text('Rapport de Campagne', { align: 'center' });
-    doc.moveDown(0.5);
-    doc.fontSize(16).font('Helvetica').text(campaign.name, { align: 'center' });
-    doc.fontSize(10).fillColor('#666').text(`Organisation : ${campaign.org_name}`, { align: 'center' });
+    // ─── Header V&C ───
+    doc.rect(0, 0, 595.28, 80).fill(BURGUNDY);
+    doc.fontSize(20).font('Helvetica-Bold').fillColor('#fff').text('Vins & Conversations', 50, 18, { align: 'center' });
+    doc.fontSize(10).font('Helvetica').text('Nicolas Froment — Angers', 50, 42, { align: 'center' });
+    doc.fontSize(9).text('Rapport de Campagne', 50, 58, { align: 'center' });
+    doc.moveDown(2);
+    doc.y = 100;
+
+    // Campaign title
+    doc.fillColor(DARK).fontSize(18).font('Helvetica-Bold').text(campaign.name, { align: 'center' });
+    doc.moveDown(0.3);
+    doc.fontSize(10).font('Helvetica').fillColor(GRAY).text(`Organisation : ${campaign.org_name}  •  Type : ${campaign.type_name || '—'}`, { align: 'center' });
     if (campaign.start_date && campaign.end_date) {
       doc.text(`Période : ${new Date(campaign.start_date).toLocaleDateString('fr-FR')} — ${new Date(campaign.end_date).toLocaleDateString('fr-FR')}`, { align: 'center' });
     }
-    doc.text(`Généré le ${new Date().toLocaleDateString('fr-FR')}`, { align: 'center' });
-    doc.moveDown(1.5);
+    doc.text(`Statut : ${campaign.status}  •  Généré le ${new Date().toLocaleDateString('fr-FR')}`, { align: 'center' });
+    doc.moveDown(1.2);
 
-    // KPIs
-    doc.fillColor('#000').fontSize(14).font('Helvetica-Bold').text('Indicateurs clés');
-    doc.moveDown(0.3);
-    doc.fontSize(10).font('Helvetica');
-    const kpis = [
-      ['CA TTC', formatEur(stats.ca_ttc)],
-      ['CA HT', formatEur(stats.ca_ht)],
-      ['Commandes', String(stats.orders_count)],
-      ['Bouteilles vendues', String(bottlesRes.total)],
-      ['Participants', String(participantsCount.count)],
-      ['Progression', `${progress}% de l'objectif (${formatEur(campaign.goal || 0)})`],
+    // ─── KPIs section ───
+    const drawSectionTitle = (title) => {
+      doc.fillColor(BURGUNDY).fontSize(13).font('Helvetica-Bold').text(title);
+      doc.moveTo(50, doc.y).lineTo(545, doc.y).strokeColor(BURGUNDY).lineWidth(0.5).stroke();
+      doc.moveDown(0.4);
+    };
+
+    drawSectionTitle('Indicateurs clés');
+    doc.fillColor(DARK).fontSize(10).font('Helvetica');
+
+    const kpiTable = [
+      ['CA TTC', formatEur(stats.ca_ttc), 'CA HT', formatEur(stats.ca_ht)],
+      ['Commandes', String(stats.orders_count), 'Bouteilles vendues', String(bottlesRes.total)],
+      ['Participants', String(participantsCount.count), 'Progression', `${progress}% (obj: ${formatEur(campaign.goal)})`],
     ];
-    for (const [label, value] of kpis) {
-      doc.text(`${label} : ${value}`);
+    for (const row of kpiTable) {
+      const y = doc.y;
+      doc.font('Helvetica-Bold').text(row[0] + ' :', 50, y, { width: 120 });
+      doc.font('Helvetica').text(row[1], 170, y, { width: 120 });
+      doc.font('Helvetica-Bold').text(row[2] + ' :', 310, y, { width: 120 });
+      doc.font('Helvetica').text(row[3], 430, y, { width: 120 });
+      doc.y = y + 16;
+    }
+
+    // Commission association
+    if (assoCommission && assoCommission.type === 'percentage') {
+      doc.moveDown(0.5);
+      doc.fillColor(BURGUNDY).font('Helvetica-Bold').fontSize(10)
+        .text(`Commission association : ${assoCommission.value}% du CA HT = ${formatEur(commissionAmount)}`);
+      doc.fillColor(DARK);
     }
     doc.moveDown(1);
 
-    // Top vendeurs
-    if (topSellers.length) {
-      doc.fontSize(14).font('Helvetica-Bold').text('Top 10 Vendeurs');
-      doc.moveDown(0.3);
-      doc.fontSize(9).font('Helvetica');
-      for (let i = 0; i < topSellers.length; i++) {
-        const s = topSellers[i];
-        doc.text(`${i + 1}. ${s.name} — ${formatEur(s.ca)} (${s.orders_count} cmd)`);
+    // ─── CA par produit (table complète) ───
+    if (productSales.length) {
+      drawSectionTitle('Chiffre d\'affaires par produit');
+      // Table header
+      const colX = [50, 250, 310, 380, 460];
+      const colW = [200, 55, 65, 75, 80];
+      let y = doc.y;
+      doc.rect(50, y, 495, 16).fill('#f3f4f6');
+      doc.fillColor(DARK).fontSize(8).font('Helvetica-Bold');
+      doc.text('Produit', colX[0] + 4, y + 4, { width: colW[0] });
+      doc.text('Qté', colX[1] + 4, y + 4, { width: colW[1], align: 'right' });
+      doc.text('CA HT', colX[2] + 4, y + 4, { width: colW[2], align: 'right' });
+      doc.text('CA TTC', colX[3] + 4, y + 4, { width: colW[3], align: 'right' });
+      doc.text('Marge', colX[4] + 4, y + 4, { width: colW[4], align: 'right' });
+      y += 18;
+
+      doc.font('Helvetica').fontSize(8);
+      let totalQty = 0, totalHT = 0, totalTTC = 0, totalMargin = 0;
+      for (const p of productSales) {
+        if (y > 750) { doc.addPage(); y = 50; }
+        const qty = parseInt(p.qty) || 0;
+        const caHT = parseFloat(p.ca_ht) || 0;
+        const caTTC = parseFloat(p.ca_ttc) || 0;
+        const cost = qty * (parseFloat(p.purchase_price) || 0);
+        const margin = caHT - cost;
+        totalQty += qty; totalHT += caHT; totalTTC += caTTC; totalMargin += margin;
+
+        doc.fillColor(DARK).text(p.name.substring(0, 40), colX[0] + 4, y, { width: colW[0] });
+        doc.text(String(qty), colX[1] + 4, y, { width: colW[1], align: 'right' });
+        doc.text(formatEur(caHT), colX[2] + 4, y, { width: colW[2], align: 'right' });
+        doc.text(formatEur(caTTC), colX[3] + 4, y, { width: colW[3], align: 'right' });
+        doc.fillColor(margin >= 0 ? '#16a34a' : '#dc2626').text(formatEur(margin), colX[4] + 4, y, { width: colW[4], align: 'right' });
+        y += 14;
       }
-      doc.moveDown(1);
+      // Total row
+      doc.rect(50, y, 495, 16).fill('#f3f4f6');
+      doc.fillColor(DARK).fontSize(8).font('Helvetica-Bold');
+      doc.text('TOTAL', colX[0] + 4, y + 3, { width: colW[0] });
+      doc.text(String(totalQty), colX[1] + 4, y + 3, { width: colW[1], align: 'right' });
+      doc.text(formatEur(totalHT), colX[2] + 4, y + 3, { width: colW[2], align: 'right' });
+      doc.text(formatEur(totalTTC), colX[3] + 4, y + 3, { width: colW[3], align: 'right' });
+      doc.text(formatEur(totalMargin), colX[4] + 4, y + 3, { width: colW[4], align: 'right' });
+      doc.y = y + 22;
+      doc.moveDown(0.5);
     }
 
-    // Top produits
-    if (topProducts.length) {
-      doc.fontSize(14).font('Helvetica-Bold').text('Top 10 Produits');
-      doc.moveDown(0.3);
-      doc.fontSize(9).font('Helvetica');
-      for (let i = 0; i < topProducts.length; i++) {
-        const p = topProducts[i];
-        doc.text(`${i + 1}. ${p.name} — ${p.qty} bouteilles (${formatEur(p.revenue)})`);
+    // ─── État du stock ───
+    if (stockData.length) {
+      if (doc.y > 650) doc.addPage();
+      drawSectionTitle('État du stock');
+      const sColX = [50, 300, 380, 460];
+      let y = doc.y;
+      doc.rect(50, y, 495, 16).fill('#f3f4f6');
+      doc.fillColor(DARK).fontSize(8).font('Helvetica-Bold');
+      doc.text('Produit', sColX[0] + 4, y + 4, { width: 245 });
+      doc.text('Stock actuel', sColX[1] + 4, y + 4, { width: 75, align: 'right' });
+      doc.text('Vendu', sColX[2] + 4, y + 4, { width: 75, align: 'right' });
+      doc.text('Restant', sColX[3] + 4, y + 4, { width: 80, align: 'right' });
+      y += 18;
+      doc.font('Helvetica').fontSize(8);
+      for (const s of stockData) {
+        if (y > 750) { doc.addPage(); y = 50; }
+        const sold = soldMap[s.name] || 0;
+        const stockQty = parseInt(s.current_stock) || 0;
+        doc.fillColor(DARK).text(s.name.substring(0, 50), sColX[0] + 4, y, { width: 245 });
+        doc.text(String(stockQty), sColX[1] + 4, y, { width: 75, align: 'right' });
+        doc.text(String(sold), sColX[2] + 4, y, { width: 75, align: 'right' });
+        const remaining = stockQty - sold;
+        doc.fillColor(remaining <= 0 ? '#dc2626' : DARK).text(String(remaining), sColX[3] + 4, y, { width: 80, align: 'right' });
+        y += 14;
       }
+      doc.y = y + 8;
+      doc.moveDown(0.5);
+    }
+
+    // ─── Top vendeurs ───
+    if (topSellers.length) {
+      if (doc.y > 650) doc.addPage();
+      drawSectionTitle('Top 10 Vendeurs');
+      doc.fontSize(9).font('Helvetica').fillColor(DARK);
+      for (let i = 0; i < topSellers.length; i++) {
+        const s = topSellers[i];
+        doc.text(`${i + 1}. ${s.name} — ${formatEur(s.ca)} (${s.orders_count} commande${parseInt(s.orders_count) > 1 ? 's' : ''})`);
+      }
+      doc.moveDown(0.8);
+    }
+
+    // ─── Footer on all pages ───
+    const range = doc.bufferedPageRange();
+    const now = new Date().toLocaleDateString('fr-FR');
+    for (let i = range.start; i < range.start + range.count; i++) {
+      doc.switchToPage(i);
+      doc.fillColor(GRAY).fontSize(7).font('Helvetica');
+      doc.text(`Vins & Conversations — Rapport ${campaign.name} — ${now} — Page ${i + 1}/${range.count}`, 50, 800, { align: 'center', width: 495 });
     }
 
     doc.end();
