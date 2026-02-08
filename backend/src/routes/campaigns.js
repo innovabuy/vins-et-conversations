@@ -5,6 +5,7 @@ const { v4: uuidv4 } = require('uuid');
 const { authenticate, requireRole } = require('../middleware/auth');
 const { validate } = require('../middleware/validate');
 const { auditAction } = require('../middleware/audit');
+const PDFDocument = require('pdfkit');
 const emailService = require('../services/emailService');
 const logger = require('../utils/logger');
 
@@ -181,6 +182,127 @@ router.get('/:id', authenticate, requireRole('super_admin', 'commercial'), async
       dailyCA,
     });
   } catch (err) {
+    res.status(500).json({ error: 'SERVER_ERROR', message: err.message });
+  }
+});
+
+// GET /api/v1/admin/campaigns/:id/report-pdf — PDF rapport campagne
+router.get('/:id/report-pdf', authenticate, requireRole('super_admin', 'commercial', 'comptable'), async (req, res) => {
+  try {
+    const campaign = await db('campaigns')
+      .where('campaigns.id', req.params.id)
+      .join('organizations', 'campaigns.org_id', 'organizations.id')
+      .select('campaigns.*', 'organizations.name as org_name')
+      .first();
+    if (!campaign) return res.status(404).json({ error: 'NOT_FOUND' });
+
+    const validStatuses = ['submitted', 'validated', 'preparing', 'shipped', 'delivered'];
+    const formatEur = (v) => new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR' }).format(v);
+
+    // Stats globales
+    const stats = await db('orders')
+      .where({ campaign_id: campaign.id })
+      .whereIn('status', validStatuses)
+      .select(
+        db.raw('COALESCE(SUM(total_ttc), 0) as ca_ttc'),
+        db.raw('COALESCE(SUM(total_ht), 0) as ca_ht'),
+        db.raw('COUNT(id) as orders_count')
+      ).first();
+
+    const bottlesRes = await db('order_items')
+      .join('orders', 'order_items.order_id', 'orders.id')
+      .where('orders.campaign_id', campaign.id)
+      .whereIn('orders.status', validStatuses)
+      .select(db.raw('COALESCE(SUM(order_items.qty), 0) as total')).first();
+
+    const participantsCount = await db('participations')
+      .where({ campaign_id: campaign.id }).count('id as count').first();
+
+    const progress = campaign.goal > 0
+      ? Math.round((parseFloat(stats.ca_ttc) / campaign.goal) * 100) : 0;
+
+    // Top vendeurs
+    const topSellers = await db('orders')
+      .join('users', 'orders.user_id', 'users.id')
+      .where('orders.campaign_id', campaign.id)
+      .whereIn('orders.status', validStatuses)
+      .groupBy('users.id', 'users.name')
+      .select('users.name', db.raw('SUM(orders.total_ttc) as ca'), db.raw('COUNT(orders.id) as orders_count'))
+      .orderBy('ca', 'desc')
+      .limit(10);
+
+    // Top produits
+    const topProducts = await db('order_items')
+      .join('products', 'order_items.product_id', 'products.id')
+      .join('orders', 'order_items.order_id', 'orders.id')
+      .where('orders.campaign_id', campaign.id)
+      .whereIn('orders.status', validStatuses)
+      .groupBy('products.id', 'products.name')
+      .select('products.name', db.raw('SUM(order_items.qty) as qty'), db.raw('SUM(order_items.qty * order_items.unit_price_ttc) as revenue'))
+      .orderBy('qty', 'desc')
+      .limit(10);
+
+    // Generate PDF
+    const doc = new PDFDocument({ size: 'A4', margin: 50 });
+    res.setHeader('Content-Type', 'application/pdf');
+    const safeName = campaign.name.replace(/[^a-zA-Z0-9_-]/g, '_');
+    res.setHeader('Content-Disposition', `inline; filename="rapport-${safeName}.pdf"`);
+    doc.pipe(res);
+
+    // Header
+    doc.fontSize(22).font('Helvetica-Bold').text('Rapport de Campagne', { align: 'center' });
+    doc.moveDown(0.5);
+    doc.fontSize(16).font('Helvetica').text(campaign.name, { align: 'center' });
+    doc.fontSize(10).fillColor('#666').text(`Organisation : ${campaign.org_name}`, { align: 'center' });
+    if (campaign.start_date && campaign.end_date) {
+      doc.text(`Période : ${new Date(campaign.start_date).toLocaleDateString('fr-FR')} — ${new Date(campaign.end_date).toLocaleDateString('fr-FR')}`, { align: 'center' });
+    }
+    doc.text(`Généré le ${new Date().toLocaleDateString('fr-FR')}`, { align: 'center' });
+    doc.moveDown(1.5);
+
+    // KPIs
+    doc.fillColor('#000').fontSize(14).font('Helvetica-Bold').text('Indicateurs clés');
+    doc.moveDown(0.3);
+    doc.fontSize(10).font('Helvetica');
+    const kpis = [
+      ['CA TTC', formatEur(stats.ca_ttc)],
+      ['CA HT', formatEur(stats.ca_ht)],
+      ['Commandes', String(stats.orders_count)],
+      ['Bouteilles vendues', String(bottlesRes.total)],
+      ['Participants', String(participantsCount.count)],
+      ['Progression', `${progress}% de l'objectif (${formatEur(campaign.goal || 0)})`],
+    ];
+    for (const [label, value] of kpis) {
+      doc.text(`${label} : ${value}`);
+    }
+    doc.moveDown(1);
+
+    // Top vendeurs
+    if (topSellers.length) {
+      doc.fontSize(14).font('Helvetica-Bold').text('Top 10 Vendeurs');
+      doc.moveDown(0.3);
+      doc.fontSize(9).font('Helvetica');
+      for (let i = 0; i < topSellers.length; i++) {
+        const s = topSellers[i];
+        doc.text(`${i + 1}. ${s.name} — ${formatEur(s.ca)} (${s.orders_count} cmd)`);
+      }
+      doc.moveDown(1);
+    }
+
+    // Top produits
+    if (topProducts.length) {
+      doc.fontSize(14).font('Helvetica-Bold').text('Top 10 Produits');
+      doc.moveDown(0.3);
+      doc.fontSize(9).font('Helvetica');
+      for (let i = 0; i < topProducts.length; i++) {
+        const p = topProducts[i];
+        doc.text(`${i + 1}. ${p.name} — ${p.qty} bouteilles (${formatEur(p.revenue)})`);
+      }
+    }
+
+    doc.end();
+  } catch (err) {
+    logger.error(`Campaign report-pdf error: ${err.message}`);
     res.status(500).json({ error: 'SERVER_ERROR', message: err.message });
   }
 });

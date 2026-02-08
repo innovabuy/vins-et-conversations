@@ -58,7 +58,7 @@ export default function AdminExports() {
     {
       key: 'commissions',
       title: 'Commissions',
-      description: 'Commissions association par campagne (5% CA HT)',
+      description: 'Commissions association par campagne (% CA HT configurable)',
       icon: FileSpreadsheet,
       type: 'csv',
       needsCampaign: true,
