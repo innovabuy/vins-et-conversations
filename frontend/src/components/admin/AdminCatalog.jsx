@@ -3,7 +3,8 @@ import { productsAPI, catalogPdfAPI } from '../../services/api';
 import {
   RadarChart, Radar, PolarGrid, PolarAngleAxis, PolarRadiusAxis, ResponsiveContainer
 } from 'recharts';
-import { Wine, Plus, Pencil, Trash2, X, Save, ChevronLeft, Award, Thermometer, Grape, UtensilsCrossed, Download, Mail, FileText } from 'lucide-react';
+import { Wine, Plus, Pencil, Trash2, X, Save, ChevronLeft, Award, Thermometer, Grape, UtensilsCrossed, Download, Mail, FileText, Package } from 'lucide-react';
+import { WINE_TYPE_OPTIONS, TASTING_CRITERIA, resolveWineType, getCriteriaForProduct, buildRadarData } from '../../config/tastingCriteria';
 
 const formatEur = (v) => new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR' }).format(v);
 
@@ -22,11 +23,7 @@ const COLOR_BADGES = {
   rosé: 'bg-pink-100 text-pink-800',
   effervescent: 'bg-sky-100 text-sky-800',
   sans_alcool: 'bg-green-100 text-green-800',
-};
-
-const TASTING_LABELS = {
-  fruite: 'Fruité', mineralite: 'Minéralité', rondeur: 'Rondeur', acidite: 'Acidité',
-  tanins: 'Tanins', boise: 'Boisé', longueur: 'Longueur', puissance: 'Puissance',
+  coffret: 'bg-amber-100 text-amber-800',
 };
 
 const EMPTY_PRODUCT = {
@@ -34,13 +31,8 @@ const EMPTY_PRODUCT = {
   tva_rate: 20, category: '', label: '', image_url: '', description: '', active: true,
   region: '', appellation: '', color: '', vintage: '', grape_varieties: [],
   serving_temp: '', food_pairing: [], tasting_notes: null, winemaker_notes: '', awards: [],
+  bundle_products: [],
 };
-
-function parseTasting(tn) {
-  if (!tn) return null;
-  const parsed = typeof tn === 'string' ? JSON.parse(tn) : tn;
-  return Object.entries(TASTING_LABELS).map(([key, label]) => ({ axis: label, value: parsed[key] || 0 }));
-}
 
 function parseJsonField(val) {
   if (!val) return [];
@@ -48,9 +40,9 @@ function parseJsonField(val) {
   try { return JSON.parse(val); } catch { return []; }
 }
 
-// ─── Tasting Radar Chart ─────────────────────────────
-function TastingRadar({ notes, size = 250 }) {
-  const data = parseTasting(notes);
+// ─── Tasting Radar Chart (dynamic axes) ─────────────
+function TastingRadar({ notes, color, category, size = 250 }) {
+  const data = buildRadarData(notes, color, category);
   if (!data) return null;
   return (
     <div style={{ width: size, height: size }}>
@@ -165,7 +157,7 @@ function ProductDetail({ product, onClose, onEdit }) {
         {product.tasting_notes && (
           <div className="flex flex-col items-center">
             <h3 className="font-semibold text-sm mb-2">Profil de dégustation</h3>
-            <TastingRadar notes={product.tasting_notes} size={280} />
+            <TastingRadar notes={product.tasting_notes} color={product.color} category={product.category} size={280} />
           </div>
         )}
       </div>
@@ -174,17 +166,23 @@ function ProductDetail({ product, onClose, onEdit }) {
 }
 
 // ─── Product Form (enriched) ─────────────────────────
-function ProductForm({ product, onSave, onCancel }) {
+function ProductForm({ product, onSave, onCancel, allProducts = [] }) {
   const initial = product ? {
     ...product,
     grape_varieties: parseJsonField(product.grape_varieties),
     food_pairing: parseJsonField(product.food_pairing),
     awards: parseJsonField(product.awards),
     tasting_notes: product.tasting_notes ? (typeof product.tasting_notes === 'string' ? JSON.parse(product.tasting_notes) : product.tasting_notes) : null,
+    bundle_products: parseJsonField(product.bundle_products),
   } : EMPTY_PRODUCT;
   const [form, setForm] = useState(initial);
   const [saving, setSaving] = useState(false);
-  const [showTasting, setShowTasting] = useState(!!initial.tasting_notes);
+
+  // Resolve wine type from color + category
+  const wineType = resolveWineType(form.color, form.category);
+  const criteria = TASTING_CRITERIA[wineType] || null;
+  const isCoffret = wineType === 'coffret';
+  const showTasting = !!criteria && !!form.tasting_notes;
 
   const handleChange = (field, value) => {
     setForm((f) => {
@@ -198,11 +196,43 @@ function ProductForm({ product, onSave, onCancel }) {
     });
   };
 
+  // When wine type changes, adapt tasting_notes to keep common keys
+  const handleWineTypeChange = (newColor, newCategory) => {
+    setForm(f => {
+      const next = { ...f, color: newColor, category: newCategory };
+      const newType = resolveWineType(newColor, newCategory);
+      const newCriteria = TASTING_CRITERIA[newType];
+      if (!newCriteria) {
+        next.tasting_notes = null;
+      } else if (f.tasting_notes) {
+        const adapted = {};
+        newCriteria.forEach(c => { adapted[c.key] = f.tasting_notes[c.key] || 0; });
+        next.tasting_notes = adapted;
+      }
+      return next;
+    });
+  };
+
   const handleTastingChange = (key, value) => {
-    setForm(f => ({
-      ...f,
-      tasting_notes: { ...(f.tasting_notes || { fruite: 0, mineralite: 0, rondeur: 0, acidite: 0, tanins: 0, boise: 0, longueur: 0, puissance: 0 }), [key]: parseInt(value) },
-    }));
+    setForm(f => {
+      const base = f.tasting_notes || {};
+      return { ...f, tasting_notes: { ...base, [key]: parseInt(value) } };
+    });
+  };
+
+  const enableTasting = () => {
+    if (!criteria) return;
+    const notes = {};
+    criteria.forEach(c => { notes[c.key] = form.tasting_notes?.[c.key] || 0; });
+    setForm(f => ({ ...f, tasting_notes: notes }));
+  };
+
+  const toggleBundleProduct = (productId) => {
+    setForm(f => {
+      const current = f.bundle_products || [];
+      const next = current.includes(productId) ? current.filter(id => id !== productId) : [...current, productId];
+      return { ...f, bundle_products: next };
+    });
   };
 
   const addAward = () => setForm(f => ({ ...f, awards: [...f.awards, { year: new Date().getFullYear(), name: '' }] }));
@@ -220,7 +250,8 @@ function ProductForm({ product, onSave, onCancel }) {
         purchase_price: parseFloat(form.purchase_price),
         tva_rate: parseFloat(form.tva_rate),
         vintage: form.vintage ? parseInt(form.vintage) : null,
-        tasting_notes: showTasting ? form.tasting_notes : null,
+        tasting_notes: form.tasting_notes || null,
+        bundle_products: isCoffret ? (form.bundle_products || []) : [],
       };
       await onSave(payload);
     } catch (err) {
@@ -244,10 +275,16 @@ function ProductForm({ product, onSave, onCancel }) {
             <input value={form.name} onChange={e => handleChange('name', e.target.value)} className="w-full border rounded-lg px-3 py-2 text-sm" required />
           </div>
           <div>
-            <label className="block text-xs font-medium text-gray-500 mb-1">Couleur</label>
-            <select value={form.color || ''} onChange={e => handleChange('color', e.target.value || null)} className="w-full border rounded-lg px-3 py-2 text-sm">
-              <option value="">—</option>
-              {COLOR_OPTIONS.filter(c => c.value).map(c => <option key={c.value} value={c.value}>{c.label}</option>)}
+            <label className="block text-xs font-medium text-gray-500 mb-1">Couleur / Type</label>
+            <select value={wineType} onChange={e => {
+              const t = e.target.value;
+              if (t === 'coffret') handleWineTypeChange(null, 'Coffrets');
+              else if (t === 'blanc_sec') handleWineTypeChange('blanc', 'Blancs Secs');
+              else if (t === 'blanc_moelleux') handleWineTypeChange('blanc', 'Blancs Moelleux');
+              else if (t === 'rose') handleWineTypeChange('rosé', form.category);
+              else handleWineTypeChange(t, form.category);
+            }} className="w-full border rounded-lg px-3 py-2 text-sm">
+              {WINE_TYPE_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
             </select>
           </div>
           <div>
@@ -307,31 +344,59 @@ function ProductForm({ product, onSave, onCancel }) {
         </div>
       </fieldset>
 
-      {/* Section Dégustation */}
-      <fieldset className="border rounded-lg p-4 space-y-4">
-        <legend className="text-sm font-semibold text-gray-700 px-2">Dégustation</legend>
-        <label className="flex items-center gap-2 text-sm cursor-pointer">
-          <input type="checkbox" checked={showTasting} onChange={e => { setShowTasting(e.target.checked); if (!e.target.checked) handleChange('tasting_notes', null); }} className="rounded text-wine-700" />
-          Activer les critères de dégustation
-        </label>
-        {showTasting && (
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-            {Object.entries(TASTING_LABELS).map(([key, label]) => (
-              <div key={key}>
-                <label className="block text-xs text-gray-500 mb-1">{label} <span className="font-semibold">{form.tasting_notes?.[key] ?? 0}</span>/5</label>
-                <input type="range" min="0" max="5" step="1" value={form.tasting_notes?.[key] ?? 0} onChange={e => handleTastingChange(key, e.target.value)} className="w-full accent-wine-700" />
-              </div>
+      {/* Section Dégustation / Coffret */}
+      {isCoffret ? (
+        <fieldset className="border rounded-lg p-4 space-y-4">
+          <legend className="text-sm font-semibold text-gray-700 px-2">Contenu du coffret</legend>
+          <p className="text-xs text-gray-500">Sélectionnez les produits inclus dans ce coffret :</p>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+            {allProducts.filter(p => p.id !== product?.id && p.color !== null).map(p => (
+              <label key={p.id} className={`flex items-center gap-2 p-2 rounded-lg border cursor-pointer text-sm ${(form.bundle_products || []).includes(p.id) ? 'border-wine-500 bg-wine-50' : 'hover:bg-gray-50'}`}>
+                <input type="checkbox" checked={(form.bundle_products || []).includes(p.id)} onChange={() => toggleBundleProduct(p.id)} className="rounded text-wine-700" />
+                <Package size={14} className="text-wine-500 shrink-0" />
+                <span>{p.name}</span>
+                {p.color && <span className={`ml-auto px-1.5 py-0.5 rounded-full text-[10px] ${COLOR_BADGES[p.color] || 'bg-gray-100'}`}>{p.color}</span>}
+              </label>
             ))}
           </div>
-        )}
-        {showTasting && form.tasting_notes && (
-          <div className="flex justify-center"><TastingRadar notes={form.tasting_notes} size={200} /></div>
-        )}
-        <div>
-          <label className="block text-xs font-medium text-gray-500 mb-1">Notes du vigneron</label>
-          <textarea value={form.winemaker_notes || ''} onChange={e => handleChange('winemaker_notes', e.target.value)} className="w-full border rounded-lg px-3 py-2 text-sm" rows={2} placeholder="Description personnelle du vigneron..." />
-        </div>
-      </fieldset>
+        </fieldset>
+      ) : (
+        <fieldset className="border rounded-lg p-4 space-y-4">
+          <legend className="text-sm font-semibold text-gray-700 px-2">Dégustation</legend>
+          {criteria ? (
+            <>
+              {!form.tasting_notes ? (
+                <button type="button" onClick={enableTasting} className="text-sm text-wine-700 hover:text-wine-800 font-medium">+ Activer les critères de dégustation</button>
+              ) : (
+                <>
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs text-gray-500">{criteria.length} critères pour {WINE_TYPE_OPTIONS.find(o => o.value === wineType)?.label || wineType}</span>
+                    <button type="button" onClick={() => handleChange('tasting_notes', null)} className="text-xs text-red-400 hover:text-red-600">Désactiver</button>
+                  </div>
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                    {criteria.map(c => (
+                      <div key={c.key} title={c.description}>
+                        <label className="block text-xs text-gray-500 mb-1">{c.label} <span className="font-semibold">{form.tasting_notes?.[c.key] ?? 0}</span>/5</label>
+                        <input type="range" min="0" max="5" step="1" value={form.tasting_notes?.[c.key] ?? 0} onChange={e => handleTastingChange(c.key, e.target.value)} className="w-full accent-wine-700" />
+                        <p className="text-[10px] text-gray-400 mt-0.5">{c.description}</p>
+                      </div>
+                    ))}
+                  </div>
+                  <div className="flex justify-center">
+                    <TastingRadar notes={form.tasting_notes} color={form.color} category={form.category} size={200} />
+                  </div>
+                </>
+              )}
+            </>
+          ) : (
+            <p className="text-xs text-gray-400">Sélectionnez un type de vin pour activer les critères de dégustation.</p>
+          )}
+          <div>
+            <label className="block text-xs font-medium text-gray-500 mb-1">Notes du vigneron</label>
+            <textarea value={form.winemaker_notes || ''} onChange={e => handleChange('winemaker_notes', e.target.value)} className="w-full border rounded-lg px-3 py-2 text-sm" rows={2} placeholder="Description personnelle du vigneron..." />
+          </div>
+        </fieldset>
+      )}
 
       {/* Section Accords */}
       <fieldset className="border rounded-lg p-4 space-y-4">
@@ -448,7 +513,7 @@ export default function AdminCatalog() {
   if (editing) {
     return (
       <div className="card">
-        <ProductForm product={editing === 'new' ? null : editing} onSave={handleSave} onCancel={() => setEditing(null)} />
+        <ProductForm product={editing === 'new' ? null : editing} onSave={handleSave} onCancel={() => setEditing(null)} allProducts={products} />
       </div>
     );
   }

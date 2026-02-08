@@ -188,7 +188,7 @@ router.get('/catalog/:id/pdf', async (req, res) => {
     // Radar chart (right)
     const notes = parseNotes(product.tasting_notes);
     if (notes) {
-      drawRadarSimple(doc, notes, 420, photoY + 80, 70);
+      drawRadarSimple(doc, notes, 420, photoY + 80, 70, product.color, product.category);
     }
 
     doc.y = photoY + 175;

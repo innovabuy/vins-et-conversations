@@ -3,6 +3,7 @@ const PDFDocument = require('pdfkit');
 const nodemailer = require('nodemailer');
 const db = require('../config/database');
 const { authenticate, requireRole } = require('../middleware/auth');
+const { getCriteriaForProduct } = require('../config/tastingCriteria');
 const logger = require('../utils/logger');
 
 const router = express.Router();
@@ -25,10 +26,12 @@ const SEGMENT_LABELS = {
   bts_ndrc: 'BTS NDRC',
 };
 
-function drawRadarSimple(doc, notes, cx, cy, radius) {
+function drawRadarSimple(doc, notes, cx, cy, radius, color, category) {
   if (!notes) return;
-  const axes = ['fruite', 'mineralite', 'rondeur', 'acidite', 'tanins', 'boise', 'longueur', 'puissance'];
-  const labels = ['Fruité', 'Minéral', 'Rondeur', 'Acidité', 'Tanins', 'Boisé', 'Longueur', 'Puissance'];
+  const criteria = getCriteriaForProduct(color, category);
+  if (!criteria) return;
+  const axes = criteria.map(c => c.key);
+  const labels = criteria.map(c => c.label);
   const n = axes.length;
   const angle = (2 * Math.PI) / n;
 
@@ -154,7 +157,7 @@ function generatePremiumPDF(doc, products, { segment = 'public', pricingRules = 
     // Radar chart (right side, larger)
     const notes = parseNotes(product.tasting_notes);
     if (notes) {
-      drawRadarSimple(doc, notes, 410, doc.y + 70, 65);
+      drawRadarSimple(doc, notes, 410, doc.y + 70, 65, product.color, product.category);
     }
 
     doc.y += 155;

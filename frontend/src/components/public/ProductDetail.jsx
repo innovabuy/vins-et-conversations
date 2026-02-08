@@ -1,8 +1,9 @@
 import { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { ArrowLeft, Wine, Thermometer, Award, Grape, Download } from 'lucide-react';
-import { ResponsiveContainer, RadarChart, PolarGrid, PolarAngleAxis, Radar } from 'recharts';
+import { ResponsiveContainer, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Radar } from 'recharts';
 import api from '../../services/api';
+import { buildRadarData } from '../../config/tastingCriteria';
 
 const formatEur = (v) => new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR' }).format(v);
 
@@ -27,19 +28,8 @@ export default function ProductDetail() {
   if (loading) return <div className="flex justify-center py-20"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-wine-700" /></div>;
   if (!product) return <div className="text-center py-20 text-gray-400">Vin introuvable</div>;
 
-  const rawNotes = product.tasting_notes || {};
-  const notes = typeof rawNotes === 'string' ? JSON.parse(rawNotes) : rawNotes;
-  const radarData = [
-    { axis: 'Fruité', value: notes.fruite || 0 },
-    { axis: 'Minéral', value: notes.mineralite || 0 },
-    { axis: 'Rondeur', value: notes.rondeur || 0 },
-    { axis: 'Acidité', value: notes.acidite || 0 },
-    { axis: 'Tanins', value: notes.tanins || 0 },
-    { axis: 'Boisé', value: notes.boise || 0 },
-    { axis: 'Longueur', value: notes.longueur || 0 },
-    { axis: 'Puissance', value: notes.puissance || 0 },
-  ];
-  const hasRadar = radarData.some(d => d.value > 0);
+  const radarData = buildRadarData(product.tasting_notes, product.color, product.category);
+  const hasRadar = !!radarData;
 
   const grapes = product.grape_varieties || [];
   const foodPairing = product.food_pairing || [];
