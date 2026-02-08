@@ -12,7 +12,7 @@ export default function CSEDashboard() {
   const [error, setError] = useState(null);
   const [activeTab, setActiveTab] = useState('products');
 
-  const campaignId = user?.campaign_ids?.[0];
+  const campaignId = user?.campaigns?.[0]?.campaign_id;
 
   useEffect(() => {
     if (!campaignId) return;

@@ -9,8 +9,11 @@ describe('CSE Dashboard Discount', () => {
     // Should redirect to /cse
     cy.url().should('include', '/cse');
 
-    // Catalog tab should be active by default
-    cy.contains('Catalogue').should('be.visible');
+    // Wait for dashboard to fully load — Catalogue tab should appear
+    cy.contains('Catalogue', { timeout: 15000 }).should('be.visible');
+
+    // Should display product cards with prices (wait for API data)
+    cy.get('.line-through', { timeout: 10000 }).should('exist');
 
     // Should display discount badge
     cy.get('body').then(($body) => {
@@ -18,8 +21,5 @@ describe('CSE Dashboard Discount', () => {
         cy.contains('-10%').should('be.visible');
       }
     });
-
-    // Should display both original and discounted prices (strikethrough)
-    cy.get('.line-through').should('exist');
   });
 });

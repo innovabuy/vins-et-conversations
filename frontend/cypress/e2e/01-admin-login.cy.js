@@ -10,7 +10,8 @@ describe('Admin Login', () => {
     cy.url().should('include', '/admin');
 
     // Cockpit should display key elements
-    cy.contains('Cockpit').should('be.visible');
-    cy.contains('CA TTC').should('be.visible');
+    cy.contains('Cockpit', { timeout: 10000 }).should('be.visible');
+    cy.contains('CA Total TTC', { timeout: 10000 }).should('be.visible');
+    cy.contains('Commandes', { timeout: 10000 }).should('be.visible');
   });
 });

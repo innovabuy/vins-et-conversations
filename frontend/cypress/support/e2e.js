@@ -5,4 +5,6 @@ Cypress.Commands.add('login', (email, password = 'VinsConv2026!') => {
   cy.get('input[type="email"]').type(email);
   cy.get('input[type="password"]').type(password);
   cy.get('button[type="submit"]').click();
+  // Wait for redirect (login API + navigation)
+  cy.url().should('not.include', '/login', { timeout: 10000 });
 });

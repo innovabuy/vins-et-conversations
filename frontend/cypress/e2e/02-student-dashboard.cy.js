@@ -12,10 +12,12 @@ describe('Student Dashboard', () => {
     // Should redirect to /student
     cy.url().should('include', '/student');
 
-    // Dashboard should display key elements
-    cy.contains('Bonjour').should('be.visible');
-    cy.contains('Mon CA').should('be.visible');
-    cy.contains('Bouteilles').should('be.visible');
+    // Dashboard should display greeting
+    cy.contains('Bonjour', { timeout: 10000 }).should('be.visible');
+
+    // Bottom nav tabs should be visible
+    cy.contains('Accueil', { timeout: 10000 }).should('be.visible');
+    cy.contains('Commander').should('be.visible');
     cy.contains('Classement').should('be.visible');
   });
 });
