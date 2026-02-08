@@ -223,9 +223,12 @@ router.get(
       // Tier progression
       const tier = await rulesEngine.calculateTier(req.user.userId, rules.tier);
 
-      // Sales stats
+      // Sales stats (direct sales + referred orders via link)
       const salesResult = await db('orders')
-        .where({ user_id: req.user.userId, campaign_id: campaignId })
+        .where(function () {
+          this.where({ user_id: req.user.userId, campaign_id: campaignId })
+            .orWhere({ referred_by: req.user.userId });
+        })
         .whereIn('status', ['submitted', 'validated', 'preparing', 'shipped', 'delivered'])
         .sum('total_ttc as ca_ttc')
         .sum('total_ht as ca_ht')
@@ -238,9 +241,12 @@ router.get(
       const bottles = parseInt(salesResult?.bottles || 0, 10);
       const orderCount = parseInt(salesResult?.order_count || 0, 10);
 
-      // Recent orders
+      // Recent orders (direct + referred)
       const recentOrders = await db('orders')
-        .where({ user_id: req.user.userId, campaign_id: campaignId })
+        .where(function () {
+          this.where({ user_id: req.user.userId, campaign_id: campaignId })
+            .orWhere({ referred_by: req.user.userId });
+        })
         .whereIn('status', ['submitted', 'validated', 'preparing', 'shipped', 'delivered'])
         .orderBy('created_at', 'desc')
         .limit(10)

@@ -151,9 +151,11 @@ async function calculateTier(userId, tierRules) {
     return { current: null, next: null, ca: 0, progress: 0 };
   }
 
-  // CA total de l'ambassadeur (toutes campagnes si cumulative)
+  // CA total de l'ambassadeur (ventes directes + ventes via lien de parrainage)
   const caResult = await db('orders')
-    .where({ user_id: userId })
+    .where(function () {
+      this.where({ user_id: userId }).orWhere({ referred_by: userId });
+    })
     .whereIn('status', ['validated', 'preparing', 'shipped', 'delivered'])
     .sum('total_ttc as total')
     .first();

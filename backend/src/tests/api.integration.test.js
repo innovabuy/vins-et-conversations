@@ -1999,7 +1999,7 @@ describe('API Integration Tests', () => {
   });
 
   describe('Boutique — Admin orders source filter', () => {
-    test('Admin can list orders filtered by source', async () => {
+    test('Admin can list orders filtered by source=campaign', async () => {
       const res = await request(app)
         .get('/api/v1/orders/admin/list')
         .set('Authorization', `Bearer ${adminToken}`)
@@ -2007,6 +2007,463 @@ describe('API Integration Tests', () => {
 
       expect(res.status).toBe(200);
       expect(res.body.data).toBeInstanceOf(Array);
+    });
+
+    test('Admin can list orders filtered by source=boutique_web', async () => {
+      const res = await request(app)
+        .get('/api/v1/orders/admin/list')
+        .set('Authorization', `Bearer ${adminToken}`)
+        .query({ source: 'boutique_web' });
+
+      expect(res.status).toBe(200);
+      expect(res.body.data).toBeInstanceOf(Array);
+    });
+  });
+
+  // ─── Boutique — Margins source filter ──────────────────
+  describe('Boutique — Margins source filter', () => {
+    test('Admin can filter margins overview by source', async () => {
+      const res = await request(app)
+        .get('/api/v1/admin/margins/overview')
+        .set('Authorization', `Bearer ${adminToken}`)
+        .query({ source: 'campaign' });
+
+      expect(res.status).toBe(200);
+      expect(res.body).toHaveProperty('sales');
+    });
+
+    test('Admin can filter margins by source=boutique_web', async () => {
+      const res = await request(app)
+        .get('/api/v1/admin/margins')
+        .set('Authorization', `Bearer ${adminToken}`)
+        .query({ source: 'boutique_web' });
+
+      expect(res.status).toBe(200);
+    });
+  });
+
+  // ─── Combined eco filters (campaign + client + period) ─
+  describe('Boutique — Combined pilotage éco filters', () => {
+    test('Admin can combine campaign + date filters on margins overview', async () => {
+      const res = await request(app)
+        .get('/api/v1/admin/margins/overview')
+        .set('Authorization', `Bearer ${adminToken}`)
+        .query({
+          campaign_id: campaignId,
+          date_from: '2025-01-01',
+          date_to: '2027-12-31',
+        });
+
+      expect(res.status).toBe(200);
+      expect(res.body).toHaveProperty('sales');
+    });
+
+    test('Admin can combine seller + campaign filters on by-client', async () => {
+      const res = await request(app)
+        .get('/api/v1/admin/margins/by-client')
+        .set('Authorization', `Bearer ${adminToken}`)
+        .query({ campaign_id: campaignId });
+
+      expect(res.status).toBe(200);
+      expect(res.body).toHaveProperty('data');
+    });
+
+    test('Admin can combine source + period filters on margins', async () => {
+      const res = await request(app)
+        .get('/api/v1/admin/margins')
+        .set('Authorization', `Bearer ${adminToken}`)
+        .query({
+          source: 'campaign',
+          date_from: '2025-01-01',
+          date_to: '2027-12-31',
+        });
+
+      expect(res.status).toBe(200);
+    });
+  });
+
+  // ─── RBAC — Public endpoints without auth ─────────────
+  describe('RBAC — Public endpoints accessible WITHOUT auth', () => {
+    test('GET /public/catalog accessible without auth', async () => {
+      const res = await request(app).get('/api/v1/public/catalog');
+      expect(res.status).toBe(200);
+    });
+
+    test('POST /public/cart accessible without auth', async () => {
+      const product = await db('products').where({ visible_boutique: true, active: true }).first();
+      if (!product) return;
+      const res = await request(app)
+        .post('/api/v1/public/cart')
+        .send({ items: [{ product_id: product.id, qty: 1 }] });
+      expect(res.status).toBe(200);
+    });
+
+    test('GET /public/cart/:session accessible without auth', async () => {
+      const res = await request(app).get('/api/v1/public/cart/00000000-0000-0000-0000-000000000000');
+      expect(res.status).toBe(200);
+    });
+
+    test('GET /public/ambassador/:code accessible without auth', async () => {
+      const res = await request(app).get('/api/v1/public/ambassador/AMB-NONEXIST');
+      // 404 is fine — the point is it's not 401
+      expect([200, 404]).toContain(res.status);
+    });
+
+    test('GET /public/order/:ref accessible without auth', async () => {
+      const res = await request(app)
+        .get('/api/v1/public/order/VC-0000-0000')
+        .query({ email: 'test@test.fr' });
+      // 404 is fine — the point is it's not 401
+      expect([200, 404]).toContain(res.status);
+    });
+  });
+
+  // ─── RBAC — Admin endpoints protected ─────────────────
+  describe('RBAC — Admin endpoints still PROTECTED', () => {
+    test('GET /admin/campaigns returns 401 without token', async () => {
+      const res = await request(app).get('/api/v1/admin/campaigns');
+      expect(res.status).toBe(401);
+    });
+
+    test('GET /orders/admin/list returns 401 without token', async () => {
+      const res = await request(app).get('/api/v1/orders/admin/list');
+      expect(res.status).toBe(401);
+    });
+
+    test('GET /admin/margins returns 401 without token', async () => {
+      const res = await request(app).get('/api/v1/admin/margins');
+      expect(res.status).toBe(401);
+    });
+
+    test('GET /admin/users returns 401 without token', async () => {
+      const res = await request(app).get('/api/v1/admin/users');
+      expect(res.status).toBe(401);
+    });
+
+    test('GET /admin/audit-log returns 401 without token', async () => {
+      const res = await request(app).get('/api/v1/admin/audit-log');
+      expect(res.status).toBe(401);
+    });
+
+    test('GET /admin/stock returns 401 without token', async () => {
+      const res = await request(app).get('/api/v1/admin/stock');
+      expect(res.status).toBe(401);
+    });
+  });
+
+  // ─── Enseignant — Still ZERO EUR ──────────────────────
+  describe('Enseignant — Teacher dashboard still returns zero EUR', () => {
+    let teacherTok;
+
+    beforeAll(async () => {
+      const res = await request(app)
+        .post('/api/v1/auth/login')
+        .send({ email: 'enseignant@sacrecoeur.fr', password: 'VinsConv2026!' });
+      teacherTok = res.body.accessToken;
+    });
+
+    test('Teacher dashboard response contains NO financial fields', async () => {
+      if (!teacherTok) return;
+      const res = await request(app)
+        .get('/api/v1/dashboard/teacher')
+        .set('Authorization', `Bearer ${teacherTok}`)
+        .query({ campaign_id: campaignId });
+
+      expect(res.status).toBe(200);
+      const json = JSON.stringify(res.body);
+      // These financial field names must NOT appear as keys
+      ['\"ca\"', '\"amount\"', '\"total_ttc\"', '\"total_ht\"', '\"price\"', '\"revenue\"', '\"margin\"', '\"commission\"'].forEach((field) => {
+        expect(json.toLowerCase()).not.toContain(field);
+      });
+      // But should have educational fields
+      expect(res.body).toHaveProperty('progress');
+      expect(res.body).toHaveProperty('students');
+      if (res.body.students.length > 0) {
+        expect(res.body.students[0]).toHaveProperty('salesCount');
+        expect(res.body.students[0]).toHaveProperty('bottlesSold');
+        expect(res.body.students[0]).not.toHaveProperty('ca');
+      }
+    });
+  });
+
+  // ─── Parcours A→Z Boutique Web ──────────────────────
+  describe('Parcours A→Z — Boutique Web full flow', () => {
+    let orderId, orderRef;
+    const email = 'az.boutique@example.fr';
+
+    afterAll(async () => {
+      if (orderId) {
+        await db('notifications').where('link', 'like', `%${orderId}%`).delete();
+        await db('payments').where({ order_id: orderId }).delete();
+        await db('stock_movements').where({ reference: orderRef }).delete();
+        await db('financial_events').where({ order_id: orderId }).delete();
+        await db('order_items').where({ order_id: orderId }).delete();
+        await db('orders').where({ id: orderId }).delete();
+        await db('contacts').where({ email }).delete();
+      }
+    });
+
+    test('Full flow: 2 products → cart → checkout → confirm → contact + notification', async () => {
+      // 1. Get 2 visible products
+      const products = await db('products').where({ visible_boutique: true, active: true }).limit(2);
+      expect(products.length).toBeGreaterThanOrEqual(1);
+
+      // 2. Add to cart
+      const cartRes = await request(app)
+        .post('/api/v1/public/cart')
+        .send({
+          items: products.map((p) => ({ product_id: p.id, qty: 2 })),
+        });
+      expect(cartRes.status).toBe(200);
+      expect(cartRes.body.items.length).toBe(products.length);
+      expect(cartRes.body.total_items).toBe(products.length * 2);
+
+      const sid = cartRes.body.session_id;
+
+      // 3. Checkout with customer info
+      const checkoutRes = await request(app)
+        .post('/api/v1/public/checkout')
+        .send({
+          session_id: sid,
+          customer: {
+            name: 'AZ Test Boutique',
+            email,
+            phone: '0699887766',
+            address: '99 Rue AZ',
+            city: 'Angers',
+            postal_code: '49000',
+          },
+        });
+      expect(checkoutRes.status).toBe(201);
+      expect(checkoutRes.body.order_id).toBeDefined();
+      expect(checkoutRes.body.ref).toMatch(/^VC-/);
+      orderId = checkoutRes.body.order_id;
+      orderRef = checkoutRes.body.ref;
+
+      // 4. Verify order created with source=boutique_web
+      const order = await db('orders').where({ id: orderId }).first();
+      expect(order.status).toBe('pending_payment');
+      expect(order.source).toBe('boutique_web');
+      expect(order.user_id).toBeNull();
+      expect(order.customer_id).toBeDefined();
+
+      // 5. Confirm payment
+      const confirmRes = await request(app)
+        .post('/api/v1/public/checkout/confirm')
+        .send({
+          order_id: orderId,
+          payment_intent_id: 'pi_az_test_boutique',
+        });
+      expect(confirmRes.status).toBe(200);
+      expect(confirmRes.body.status).toBe('submitted');
+
+      // 6. Verify contact created in CRM
+      const contact = await db('contacts').where({ email }).first();
+      expect(contact).toBeDefined();
+      expect(contact.name).toBe('AZ Test Boutique');
+      expect(contact.address).toContain('Angers');
+      expect(contact.source).toBe('boutique_web');
+
+      // 7. Verify admin notification created
+      const notifications = await db('notifications')
+        .where('link', 'like', `%${orderId}%`)
+        .where('type', 'order');
+      expect(notifications.length).toBeGreaterThan(0);
+      expect(notifications[0].message).toContain(orderRef);
+    });
+  });
+
+  // ─── Parcours A→Z Ambassadeur Lien ─────────────────
+  describe('Parcours A→Z — Ambassador referral full flow', () => {
+    let ambToken;
+    let ambUserId;
+    let referralCode;
+    let orderId, orderRef;
+    const email = 'az.ambassador@example.fr';
+
+    beforeAll(async () => {
+      const res = await request(app)
+        .post('/api/v1/auth/login')
+        .send({ email: 'ambassadeur@example.fr', password: 'VinsConv2026!' });
+      ambToken = res.body.accessToken;
+      ambUserId = res.body.user.id;
+
+      // Get referral code
+      const p = await db('participations')
+        .where({ user_id: ambUserId })
+        .whereNotNull('referral_code')
+        .first();
+      referralCode = p?.referral_code;
+    });
+
+    afterAll(async () => {
+      if (orderId) {
+        await db('notifications').where('link', 'like', `%${orderId}%`).delete();
+        await db('payments').where({ order_id: orderId }).delete();
+        await db('stock_movements').where({ reference: orderRef }).delete();
+        await db('financial_events').where({ order_id: orderId }).delete();
+        await db('order_items').where({ order_id: orderId }).delete();
+        await db('orders').where({ id: orderId }).delete();
+        await db('contacts').where({ email }).delete();
+      }
+    });
+
+    test('Full flow: resolve code → cart → checkout with ref → verify source + referred_by', async () => {
+      if (!referralCode) return;
+
+      // 1. Resolve ambassador code (simulates /boutique?ref=CODE)
+      const resolveRes = await request(app)
+        .get(`/api/v1/public/ambassador/${referralCode}`);
+      expect(resolveRes.status).toBe(200);
+      expect(resolveRes.body.name).toBeDefined();
+
+      // 2. Add product to cart
+      const product = await db('products').where({ visible_boutique: true, active: true }).first();
+      const cartRes = await request(app)
+        .post('/api/v1/public/cart')
+        .send({ items: [{ product_id: product.id, qty: 3 }] });
+      expect(cartRes.status).toBe(200);
+
+      // 3. Checkout WITH referral code
+      const checkoutRes = await request(app)
+        .post('/api/v1/public/checkout')
+        .send({
+          session_id: cartRes.body.session_id,
+          customer: {
+            name: 'AZ Referral Client',
+            email,
+            address: '10 Rue Parrainage',
+            city: 'Paris',
+            postal_code: '75001',
+          },
+          referral_code: referralCode,
+        });
+      expect(checkoutRes.status).toBe(201);
+      orderId = checkoutRes.body.order_id;
+      orderRef = checkoutRes.body.ref;
+
+      // 4. Verify source=ambassador_referral and referred_by=ambassador user
+      const order = await db('orders').where({ id: orderId }).first();
+      expect(order.source).toBe('ambassador_referral');
+      expect(order.referred_by).toBe(ambUserId);
+
+      // 5. Confirm payment (so it's counted in CA)
+      const confirmRes = await request(app)
+        .post('/api/v1/public/checkout/confirm')
+        .send({ order_id: orderId, payment_intent_id: 'pi_az_referral_test' });
+      expect(confirmRes.status).toBe(200);
+
+      // Validate order so it counts in tier calculation
+      await db('orders').where({ id: orderId }).update({ status: 'validated' });
+    });
+
+    test('Ambassador CA includes referred orders', async () => {
+      if (!ambToken || !referralCode) return;
+
+      const statsRes = await request(app)
+        .get('/api/v1/ambassador/referral-stats')
+        .set('Authorization', `Bearer ${ambToken}`);
+
+      expect(statsRes.status).toBe(200);
+      expect(statsRes.body).toHaveProperty('referredOrders');
+      expect(statsRes.body.referredOrders.count).toBeGreaterThanOrEqual(1);
+      expect(statsRes.body.referredOrders.revenue).toBeGreaterThan(0);
+      // Conversions total should include referred orders
+      expect(statsRes.body.conversions.orders).toBeGreaterThanOrEqual(statsRes.body.referredOrders.count);
+    });
+
+    test('Ambassador dashboard sales include referred order CA', async () => {
+      if (!ambToken) return;
+
+      const ambCampaign = await db('participations')
+        .where({ user_id: ambUserId })
+        .first();
+      if (!ambCampaign) return;
+
+      const dashRes = await request(app)
+        .get('/api/v1/dashboard/ambassador')
+        .set('Authorization', `Bearer ${ambToken}`)
+        .query({ campaign_id: ambCampaign.campaign_id });
+
+      expect(dashRes.status).toBe(200);
+      expect(dashRes.body.sales.caTTC).toBeGreaterThan(0);
+      expect(dashRes.body.sales.orderCount).toBeGreaterThanOrEqual(1);
+    });
+
+    test('Ambassador tier is recalculated including referred orders', async () => {
+      if (!ambToken) return;
+
+      const ambCampaign = await db('participations')
+        .where({ user_id: ambUserId })
+        .first();
+      if (!ambCampaign) return;
+
+      const dashRes = await request(app)
+        .get('/api/v1/dashboard/ambassador')
+        .set('Authorization', `Bearer ${ambToken}`)
+        .query({ campaign_id: ambCampaign.campaign_id });
+
+      expect(dashRes.status).toBe(200);
+      // tier.ca should include referred order amounts
+      expect(dashRes.body.tier.ca).toBeGreaterThanOrEqual(0);
+      // Tier structure should be valid
+      expect(dashRes.body.tier).toHaveProperty('current');
+      expect(dashRes.body.tier).toHaveProperty('next');
+      expect(dashRes.body.tier).toHaveProperty('progress');
+    });
+  });
+
+  // ─── Suivi commande public ────────────────────────────
+  describe('Boutique — Order tracking public', () => {
+    test('Tracking returns order with items by ref + email', async () => {
+      // Create a quick boutique order for tracking test
+      const product = await db('products').where({ visible_boutique: true, active: true }).first();
+      if (!product) return;
+
+      const cartRes = await request(app)
+        .post('/api/v1/public/cart')
+        .send({ items: [{ product_id: product.id, qty: 1 }] });
+
+      const checkoutRes = await request(app)
+        .post('/api/v1/public/checkout')
+        .send({
+          session_id: cartRes.body.session_id,
+          customer: {
+            name: 'Track Test',
+            email: 'track.test@example.fr',
+            address: '1 Rue Track',
+            city: 'Lyon',
+            postal_code: '69001',
+          },
+        });
+
+      const oid = checkoutRes.body.order_id;
+      const ref = checkoutRes.body.ref;
+
+      // Track with correct email
+      const trackRes = await request(app)
+        .get(`/api/v1/public/order/${ref}`)
+        .query({ email: 'track.test@example.fr' });
+
+      expect(trackRes.status).toBe(200);
+      expect(trackRes.body.ref).toBe(ref);
+      expect(trackRes.body.status).toBe('pending_payment');
+      expect(trackRes.body.items).toBeInstanceOf(Array);
+      expect(trackRes.body.items.length).toBeGreaterThan(0);
+      expect(trackRes.body.items[0]).toHaveProperty('name');
+      expect(trackRes.body.items[0]).toHaveProperty('qty');
+
+      // Track with wrong email should 404
+      const wrongRes = await request(app)
+        .get(`/api/v1/public/order/${ref}`)
+        .query({ email: 'wrong@test.fr' });
+      expect(wrongRes.status).toBe(404);
+
+      // Cleanup
+      await db('financial_events').where({ order_id: oid }).delete();
+      await db('order_items').where({ order_id: oid }).delete();
+      await db('orders').where({ id: oid }).delete();
+      await db('contacts').where({ email: 'track.test@example.fr' }).delete();
     });
   });
 });

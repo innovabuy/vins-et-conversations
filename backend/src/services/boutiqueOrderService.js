@@ -25,16 +25,20 @@ async function getBoutiqueWebCampaignId() {
  * Find or create a contact by email
  */
 async function upsertContact({ name, email, phone, address, city, postal_code }) {
+  // Combine address + city + postal_code into single address field
+  const fullAddress = [address, postal_code, city].filter(Boolean).join(', ');
+  const notes = {};
+  if (city) notes.city = city;
+  if (postal_code) notes.postal_code = postal_code;
+
   let contact = await db('contacts').where({ email }).first();
 
   if (contact) {
-    // Update if new data provided
     const updates = {};
     if (name && name !== contact.name) updates.name = name;
     if (phone && phone !== contact.phone) updates.phone = phone;
-    if (address && address !== contact.address) updates.address = address;
-    if (city && city !== contact.city) updates.city = city;
-    if (postal_code && postal_code !== contact.postal_code) updates.postal_code = postal_code;
+    if (fullAddress && fullAddress !== contact.address) updates.address = fullAddress;
+    if (Object.keys(notes).length > 0) updates.notes = JSON.stringify(notes);
 
     if (Object.keys(updates).length > 0) {
       updates.updated_at = new Date();
@@ -49,10 +53,9 @@ async function upsertContact({ name, email, phone, address, city, postal_code })
     name,
     email,
     phone: phone || null,
-    address: address || null,
-    city: city || null,
-    postal_code: postal_code || null,
+    address: fullAddress || null,
     source: 'boutique_web',
+    notes: Object.keys(notes).length > 0 ? JSON.stringify(notes) : null,
   }).returning('*');
 
   return newContact;

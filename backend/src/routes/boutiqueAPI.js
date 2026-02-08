@@ -5,8 +5,9 @@ const cartService = require('../services/cartService');
 const boutiqueOrderService = require('../services/boutiqueOrderService');
 const logger = require('../utils/logger');
 
-const stripe = process.env.STRIPE_SECRET_KEY
-  ? require('stripe')(process.env.STRIPE_SECRET_KEY)
+const stripeKey = process.env.STRIPE_SECRET_KEY;
+const stripe = stripeKey && !stripeKey.includes('placeholder')
+  ? require('stripe')(stripeKey)
   : null;
 
 const router = express.Router();
