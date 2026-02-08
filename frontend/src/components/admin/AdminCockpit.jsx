@@ -1,12 +1,11 @@
 import { useState, useEffect } from 'react';
 import { dashboardAPI } from '../../services/api';
-import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts';
+import { BarChart, Bar, XAxis, YAxis, ResponsiveContainer, CartesianGrid } from 'recharts';
 import {
   ShoppingCart, CreditCard, Truck, AlertTriangle, Package, Banknote,
   TrendingUp, Wine, Trophy, ArrowRight
 } from 'lucide-react';
-
-const formatEur = (v) => new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR' }).format(v);
+import { WINE_PALETTE, axisStyle, gridStyle, PremiumTooltip, ChartGradient, chartAnimation, formatEur } from '../../utils/chartTheme';
 
 export default function AdminCockpit() {
   const [data, setData] = useState(null);
@@ -41,21 +40,17 @@ export default function AdminCockpit() {
       {/* KPIs principaux */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {[
-          { label: 'CA Total TTC', value: formatEur(data.kpis.caTTC), icon: TrendingUp, color: 'text-wine-700' },
-          { label: 'CA HT', value: formatEur(data.kpis.caHT), icon: Wine, color: 'text-blue-600' },
-          { label: 'Marge globale', value: formatEur(data.kpis.marge), icon: Trophy, color: 'text-green-600' },
-          { label: 'Commandes', value: data.kpis.totalOrders, icon: ShoppingCart, color: 'text-purple-600' },
+          { label: 'CA Total TTC', value: formatEur(data.kpis.caTTC), icon: TrendingUp, gradient: 'from-wine-700 to-wine-900' },
+          { label: 'CA HT', value: formatEur(data.kpis.caHT), icon: Wine, gradient: 'from-blue-500 to-blue-700' },
+          { label: 'Marge globale', value: formatEur(data.kpis.marge), icon: Trophy, gradient: 'from-emerald-500 to-emerald-700' },
+          { label: 'Commandes', value: data.kpis.totalOrders, icon: ShoppingCart, gradient: 'from-purple-500 to-purple-700' },
         ].map((kpi) => (
-          <div key={kpi.label} className="card">
-            <div className="flex items-center gap-3">
-              <div className={`${kpi.color} bg-gray-50 p-2 rounded-lg`}>
-                <kpi.icon size={20} />
-              </div>
-              <div>
-                <p className="text-sm text-gray-500">{kpi.label}</p>
-                <p className="text-xl font-bold">{kpi.value}</p>
-              </div>
+          <div key={kpi.label} className={`bg-gradient-to-br ${kpi.gradient} rounded-2xl p-5 text-white shadow-lg`}>
+            <div className="flex items-center justify-between mb-3">
+              <kpi.icon size={22} className="opacity-80" />
             </div>
+            <p className="text-2xl font-bold">{kpi.value}</p>
+            <p className="text-sm opacity-80 mt-1">{kpi.label}</p>
           </div>
         ))}
       </div>
@@ -77,7 +72,7 @@ export default function AdminCockpit() {
       <div className="grid lg:grid-cols-2 gap-6">
         {/* Top étudiants */}
         <div className="card">
-          <h3 className="font-semibold mb-4">🏆 Classement étudiants</h3>
+          <h3 className="font-semibold mb-4">Classement étudiants</h3>
           <div className="space-y-2">
             {data.topStudents.map((s, i) => (
               <div key={s.user_id} className={`flex items-center gap-3 p-2 rounded-lg ${i < 3 ? 'bg-wine-50' : ''}`}>
@@ -101,15 +96,19 @@ export default function AdminCockpit() {
 
         {/* CA par campagne */}
         <div className="card">
-          <h3 className="font-semibold mb-4">📊 CA par campagne</h3>
+          <h3 className="font-semibold mb-4">CA par campagne</h3>
           <div className="h-[180px] md:h-[250px]">
           <ResponsiveContainer width="100%" height="100%">
-            <BarChart data={data.caByCampaign}>
-              <XAxis dataKey="name" tick={{ fontSize: 11 }} />
-              <YAxis tickFormatter={(v) => `${(v/1000).toFixed(0)}k€`} />
-              <Tooltip formatter={(v) => formatEur(v)} />
-              <Bar dataKey="ca" fill="#ab2049" radius={[4, 4, 0, 0]} name="CA" />
-              <Bar dataKey="goal" fill="#e5e7eb" radius={[4, 4, 0, 0]} name="Objectif" />
+            <BarChart data={data.caByCampaign} {...chartAnimation}>
+              <defs>
+                <ChartGradient id="barWine" color="#7f1d1d" opacity={0.9} />
+              </defs>
+              <CartesianGrid {...gridStyle} />
+              <XAxis dataKey="name" {...axisStyle} />
+              <YAxis {...axisStyle} tickFormatter={(v) => `${(v/1000).toFixed(0)}k€`} />
+              <PremiumTooltip formatter={formatEur} />
+              <Bar dataKey="ca" fill={WINE_PALETTE[0]} radius={[6, 6, 0, 0]} name="CA" />
+              <Bar dataKey="goal" fill="#e5e7eb" radius={[6, 6, 0, 0]} name="Objectif" />
             </BarChart>
           </ResponsiveContainer>
           </div>
@@ -118,14 +117,19 @@ export default function AdminCockpit() {
 
       {/* Top produits */}
       <div className="card">
-        <h3 className="font-semibold mb-4">🍷 Top 3 Produits</h3>
+        <h3 className="font-semibold mb-4">Top 3 Produits</h3>
         <div className="grid sm:grid-cols-3 gap-4">
           {data.topProducts.map((p, i) => (
-            <div key={p.id} className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg">
-              <span className="text-2xl">{['🥇', '🥈', '🥉'][i]}</span>
+            <div key={p.id} className={`flex items-center gap-3 p-4 rounded-xl border ${
+              i === 0 ? 'bg-gradient-to-r from-yellow-50 to-amber-50 border-yellow-200' :
+              i === 1 ? 'bg-gradient-to-r from-gray-50 to-slate-50 border-gray-200' :
+              'bg-gradient-to-r from-orange-50 to-amber-50 border-orange-200'
+            }`}>
+              <span className="text-3xl">{['🥇', '🥈', '🥉'][i]}</span>
               <div>
-                <p className="font-medium text-sm">{p.name}</p>
-                <p className="text-xs text-gray-500">{p.total_qty} vendues · {formatEur(p.total_revenue)}</p>
+                <p className="font-semibold text-sm">{p.name}</p>
+                <p className="text-xs text-gray-500">{p.total_qty} vendues</p>
+                <p className="text-sm font-bold text-wine-700 mt-0.5">{formatEur(p.total_revenue)}</p>
               </div>
             </div>
           ))}

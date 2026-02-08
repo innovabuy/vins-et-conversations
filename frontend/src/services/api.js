@@ -56,7 +56,8 @@ export const dashboardAPI = {
 
 // ─── Products ─────────────────────────────────────────
 export const productsAPI = {
-  list: () => api.get('/products'),
+  list: (params) => api.get('/products', { params }),
+  get: (id) => api.get(`/products/${id}`),
   byCampaign: (campaignId) => api.get(`/campaigns/${campaignId}/products`),
   create: (data) => api.post('/admin/products', data),
   update: (id, data) => api.put(`/admin/products/${id}`, data),
@@ -79,7 +80,11 @@ export const ordersAPI = {
 // ─── Campaigns ────────────────────────────────────────
 export const campaignsAPI = {
   list: () => api.get('/admin/campaigns'),
+  get: (id) => api.get(`/admin/campaigns/${id}`),
+  create: (data) => api.post('/admin/campaigns', data),
+  update: (id, data) => api.put(`/admin/campaigns/${id}`, data),
   duplicate: (id) => api.post(`/admin/campaigns/${id}/duplicate`),
+  resources: () => api.get('/admin/campaigns/resources'),
   listActive: () => api.get('/admin/campaigns', { params: { status: 'active' } }),
 };
 
@@ -170,6 +175,15 @@ export const pricingConditionsAPI = {
   update: (id, data) => api.put(`/admin/pricing-conditions/${id}`, data),
 };
 
+// ─── Catalog PDF ───────────────────────────────────
+export const catalogPdfAPI = {
+  pdfUrl: (params) => {
+    const qs = new URLSearchParams(params).toString();
+    return `${api.defaults.baseURL}/admin/catalog/pdf${qs ? '?' + qs : ''}`;
+  },
+  sendEmail: (data) => api.post('/admin/catalog/send-email', data),
+};
+
 // ─── Exports ────────────────────────────────────────
 export const exportsAPI = {
   pennylane: (start, end) => api.get('/admin/exports/pennylane', { params: { start, end }, responseType: 'blob' }),
@@ -212,6 +226,9 @@ export const ambassadorAPI = {
 export const marginsAPI = {
   list: () => api.get('/admin/margins'),
   byCampaign: (campaignId) => api.get('/admin/margins/by-campaign', { params: { campaign_id: campaignId } }),
+  byClient: () => api.get('/admin/margins/by-client'),
+  bySupplier: () => api.get('/admin/margins/by-supplier'),
+  overview: () => api.get('/admin/margins/overview'),
 };
 
 // ─── Analytics ─────────────────────────────────────

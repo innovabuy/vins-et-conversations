@@ -6,6 +6,8 @@ import AdminCockpit from './components/admin/AdminCockpit';
 import AdminOrders from './components/admin/AdminOrders';
 import AdminCatalog from './components/admin/AdminCatalog';
 import AdminCampaigns from './components/admin/AdminCampaigns';
+import AdminCampaignDetail from './components/admin/AdminCampaignDetail';
+import CampaignWizard from './components/admin/CampaignWizard';
 import AdminStock from './components/admin/AdminStock';
 import AdminDeliveryNotes from './components/admin/AdminDeliveryNotes';
 import AdminCRM from './components/admin/AdminCRM';
@@ -53,6 +55,8 @@ function AppRoutes() {
       }>
         <Route index element={<AdminCockpit />} />
         <Route path="campaigns" element={<AdminCampaigns />} />
+        <Route path="campaigns/new" element={<CampaignWizard />} />
+        <Route path="campaigns/:id" element={<AdminCampaignDetail />} />
         <Route path="orders" element={<AdminOrders />} />
         <Route path="delivery" element={<AdminDeliveryNotes />} />
         <Route path="suppliers" element={<AdminSuppliers />} />

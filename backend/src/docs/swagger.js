@@ -62,6 +62,7 @@ const options = {
       { name: 'Ambassador', description: 'Parrainage ambassadeur' },
       { name: 'Formation', description: 'Modules de formation BTS' },
       { name: 'Stripe', description: 'Paiement Stripe et webhooks' },
+      { name: 'Public', description: 'API publique catalogue (sans authentification, rate limit 30/min)' },
     ],
     paths: {
       // ─── Auth ─────────────────────────────────────
@@ -357,6 +358,59 @@ const options = {
       },
       '/webhooks/stripe': {
         post: { tags: ['Stripe'], summary: 'Webhook Stripe (raw body)', security: [], responses: { 200: { description: 'received: true' } } },
+      },
+
+      // ─── Public API ──────────────────────────────
+      '/public/catalog': {
+        get: {
+          tags: ['Public'],
+          summary: 'Catalogue produits public (filtrable, pagine)',
+          security: [],
+          parameters: [
+            { name: 'color', in: 'query', schema: { type: 'string', enum: ['rouge', 'blanc', 'rosé', 'effervescent', 'sans_alcool'] } },
+            { name: 'region', in: 'query', schema: { type: 'string' } },
+            { name: 'category', in: 'query', schema: { type: 'string' } },
+            { name: 'label', in: 'query', schema: { type: 'string' } },
+            { name: 'search', in: 'query', schema: { type: 'string' }, description: 'Recherche par nom (ILIKE)' },
+            { name: 'page', in: 'query', schema: { type: 'integer', default: 1 } },
+            { name: 'limit', in: 'query', schema: { type: 'integer', default: 20, maximum: 50 } },
+          ],
+          responses: { 200: { description: 'Produits + pagination (data, pagination: {page, limit, total, pages})' } },
+        },
+      },
+      '/public/catalog/{id}': {
+        get: {
+          tags: ['Public'],
+          summary: 'Fiche produit publique complete',
+          security: [],
+          parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string', format: 'uuid' } }],
+          responses: { 200: { description: 'Produit complet avec tasting_notes, awards, etc.' }, 404: { description: 'Produit non trouve ou inactif' } },
+        },
+      },
+      '/public/filters': {
+        get: {
+          tags: ['Public'],
+          summary: 'Filtres disponibles (couleurs, regions, categories, labels)',
+          security: [],
+          responses: { 200: { description: '{colors, regions, categories, labels}' } },
+        },
+      },
+      '/public/campaigns': {
+        get: {
+          tags: ['Public'],
+          summary: 'Campagnes actives publiques',
+          security: [],
+          responses: { 200: { description: 'Liste campagnes actives avec org_name' } },
+        },
+      },
+      '/public/campaigns/{id}/products': {
+        get: {
+          tags: ['Public'],
+          summary: 'Produits d\'une campagne active',
+          security: [],
+          parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string', format: 'uuid' } }],
+          responses: { 200: { description: 'Produits de la campagne' }, 404: { description: 'Campagne non trouvee ou inactive' } },
+        },
       },
 
       // ─── Health ───────────────────────────────────

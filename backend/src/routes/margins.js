@@ -164,4 +164,194 @@ router.get(
   }
 );
 
+// GET /api/v1/admin/margins/by-client — Margins by client (user)
+router.get(
+  '/by-client',
+  authenticate,
+  requireRole('super_admin', 'commercial', 'comptable'),
+  async (req, res) => {
+    try {
+      const byClient = await db('order_items')
+        .join('orders', 'order_items.order_id', 'orders.id')
+        .join('products', 'order_items.product_id', 'products.id')
+        .join('users', 'orders.user_id', 'users.id')
+        .whereIn('orders.status', ['validated', 'preparing', 'shipped', 'delivered'])
+        .groupBy('users.id', 'users.name', 'users.email', 'users.role')
+        .select(
+          'users.id', 'users.name', 'users.email', 'users.role',
+          db.raw('COUNT(DISTINCT orders.id) as orders_count'),
+          db.raw('SUM(order_items.qty) as qty'),
+          db.raw('SUM(order_items.qty * order_items.unit_price_ttc) as ca_ttc'),
+          db.raw('SUM(order_items.qty * order_items.unit_price_ht) as ca_ht'),
+          db.raw('SUM(order_items.qty * products.purchase_price) as cost'),
+          db.raw('SUM(order_items.qty * (order_items.unit_price_ht - products.purchase_price)) as margin')
+        )
+        .orderBy('ca_ttc', 'desc');
+
+      res.json({
+        data: byClient.map(c => ({
+          ...c,
+          orders_count: parseInt(c.orders_count, 10),
+          qty: parseInt(c.qty, 10),
+          ca_ttc: parseFloat(c.ca_ttc),
+          ca_ht: parseFloat(c.ca_ht),
+          cost: parseFloat(c.cost),
+          margin: parseFloat(c.margin),
+        })),
+      });
+    } catch (err) {
+      res.status(500).json({ error: 'SERVER_ERROR', message: err.message });
+    }
+  }
+);
+
+// GET /api/v1/admin/margins/by-supplier — Margins by supplier
+router.get(
+  '/by-supplier',
+  authenticate,
+  requireRole('super_admin', 'commercial', 'comptable'),
+  async (req, res) => {
+    try {
+      const bySupplier = await db('order_items')
+        .join('orders', 'order_items.order_id', 'orders.id')
+        .join('products', 'order_items.product_id', 'products.id')
+        .leftJoin('suppliers', 'products.supplier_id', 'suppliers.id')
+        .whereIn('orders.status', ['validated', 'preparing', 'shipped', 'delivered'])
+        .groupBy('suppliers.id', 'suppliers.name')
+        .select(
+          db.raw("COALESCE(suppliers.id::text, 'direct') as supplier_id"),
+          db.raw("COALESCE(suppliers.name, 'Direct / Sans fournisseur') as supplier_name"),
+          db.raw('COUNT(DISTINCT products.id) as products_count'),
+          db.raw('SUM(order_items.qty) as qty'),
+          db.raw('SUM(order_items.qty * order_items.unit_price_ht) as ca_ht'),
+          db.raw('SUM(order_items.qty * products.purchase_price) as cost'),
+          db.raw('SUM(order_items.qty * (order_items.unit_price_ht - products.purchase_price)) as margin')
+        )
+        .orderBy('ca_ht', 'desc');
+
+      res.json({
+        data: bySupplier.map(s => ({
+          ...s,
+          products_count: parseInt(s.products_count, 10),
+          qty: parseInt(s.qty, 10),
+          ca_ht: parseFloat(s.ca_ht),
+          cost: parseFloat(s.cost),
+          margin: parseFloat(s.margin),
+          margin_pct: parseFloat(s.ca_ht) > 0
+            ? parseFloat(((parseFloat(s.margin) / parseFloat(s.ca_ht)) * 100).toFixed(1)) : 0,
+        })),
+      });
+    } catch (err) {
+      res.status(500).json({ error: 'SERVER_ERROR', message: err.message });
+    }
+  }
+);
+
+// GET /api/v1/admin/margins/overview — Financial summary (achats/ventes)
+router.get(
+  '/overview',
+  authenticate,
+  requireRole('super_admin', 'commercial', 'comptable'),
+  async (req, res) => {
+    try {
+      // Sales totals
+      const sales = await db('orders')
+        .whereIn('status', ['validated', 'preparing', 'shipped', 'delivered'])
+        .select(
+          db.raw('COALESCE(SUM(total_ttc), 0) as total_ttc'),
+          db.raw('COALESCE(SUM(total_ht), 0) as total_ht'),
+          db.raw('COUNT(id) as orders_count')
+        )
+        .first();
+
+      // Purchase costs
+      const purchases = await db('order_items')
+        .join('orders', 'order_items.order_id', 'orders.id')
+        .join('products', 'order_items.product_id', 'products.id')
+        .whereIn('orders.status', ['validated', 'preparing', 'shipped', 'delivered'])
+        .select(
+          db.raw('COALESCE(SUM(order_items.qty * products.purchase_price), 0) as total_cost'),
+          db.raw('COALESCE(SUM(order_items.qty), 0) as total_bottles')
+        )
+        .first();
+
+      // Monthly evolution
+      const monthly = await db('orders')
+        .whereIn('status', ['validated', 'preparing', 'shipped', 'delivered'])
+        .select(
+          db.raw("TO_CHAR(created_at, 'YYYY-MM') as month"),
+          db.raw('SUM(total_ttc) as ca_ttc'),
+          db.raw('SUM(total_ht) as ca_ht'),
+          db.raw('COUNT(id) as orders_count')
+        )
+        .groupBy('month')
+        .orderBy('month');
+
+      // Monthly cost for P&L
+      const monthlyCost = await db('order_items')
+        .join('orders', 'order_items.order_id', 'orders.id')
+        .join('products', 'order_items.product_id', 'products.id')
+        .whereIn('orders.status', ['validated', 'preparing', 'shipped', 'delivered'])
+        .select(
+          db.raw("TO_CHAR(orders.created_at, 'YYYY-MM') as month"),
+          db.raw('SUM(order_items.qty * products.purchase_price) as cost')
+        )
+        .groupBy('month')
+        .orderBy('month');
+
+      const costByMonth = {};
+      monthlyCost.forEach(r => { costByMonth[r.month] = parseFloat(r.cost); });
+
+      const pl = monthly.map(m => ({
+        month: m.month,
+        ca_ttc: parseFloat(m.ca_ttc),
+        ca_ht: parseFloat(m.ca_ht),
+        cost: costByMonth[m.month] || 0,
+        margin: parseFloat(m.ca_ht) - (costByMonth[m.month] || 0),
+        orders: parseInt(m.orders_count, 10),
+      }));
+
+      // By campaign
+      const byCampaign = await db('orders')
+        .join('campaigns', 'orders.campaign_id', 'campaigns.id')
+        .join('organizations', 'campaigns.org_id', 'organizations.id')
+        .whereIn('orders.status', ['validated', 'preparing', 'shipped', 'delivered'])
+        .groupBy('campaigns.id', 'campaigns.name', 'organizations.name')
+        .select(
+          'campaigns.id', 'campaigns.name',
+          'organizations.name as org_name',
+          db.raw('SUM(orders.total_ttc) as ca_ttc'),
+          db.raw('SUM(orders.total_ht) as ca_ht'),
+          db.raw('COUNT(orders.id) as orders_count')
+        )
+        .orderBy('ca_ttc', 'desc');
+
+      res.json({
+        sales: {
+          total_ttc: parseFloat(sales.total_ttc),
+          total_ht: parseFloat(sales.total_ht),
+          orders_count: parseInt(sales.orders_count, 10),
+        },
+        purchases: {
+          total_cost: parseFloat(purchases.total_cost),
+          total_bottles: parseInt(purchases.total_bottles, 10),
+        },
+        margin: parseFloat(sales.total_ht) - parseFloat(purchases.total_cost),
+        margin_pct: parseFloat(sales.total_ht) > 0
+          ? parseFloat((((parseFloat(sales.total_ht) - parseFloat(purchases.total_cost)) / parseFloat(sales.total_ht)) * 100).toFixed(1))
+          : 0,
+        pl,
+        byCampaign: byCampaign.map(c => ({
+          ...c,
+          ca_ttc: parseFloat(c.ca_ttc),
+          ca_ht: parseFloat(c.ca_ht),
+          orders_count: parseInt(c.orders_count, 10),
+        })),
+      });
+    } catch (err) {
+      res.status(500).json({ error: 'SERVER_ERROR', message: err.message });
+    }
+  }
+);
+
 module.exports = router;

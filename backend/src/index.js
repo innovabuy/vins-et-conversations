@@ -48,6 +48,16 @@ const authLimiter = rateLimit({
 });
 app.use('/api/v1/auth/', authLimiter);
 
+// Rate limit API publique (30 req/min)
+const publicLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 30,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'RATE_LIMITED', message: 'Limite de requêtes API publique atteinte (30/min)' },
+});
+app.use('/api/v1/public/', publicLimiter);
+
 // ─── Swagger documentation ───────────────────────────
 app.use('/api/docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec, {
   customCss: '.swagger-ui .topbar { display: none }',
@@ -77,6 +87,8 @@ app.use('/api/v1/ambassador', require('./routes/ambassador'));
 app.use('/api/v1/formation', require('./routes/formation'));
 app.use('/api/v1/admin/users', require('./routes/users'));
 app.use('/api/v1/admin/invitations', require('./routes/invitations'));
+app.use('/api/v1/public', require('./routes/publicCatalog'));
+app.use('/api/v1/admin/catalog', require('./routes/catalogPdf'));
 
 // ─── Health check ─────────────────────────────────────
 app.get('/api/health', async (req, res) => {

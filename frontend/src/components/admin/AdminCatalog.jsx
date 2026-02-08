@@ -1,32 +1,209 @@
-import { useState, useEffect } from 'react';
-import { productsAPI } from '../../services/api';
-import { Wine, Plus, Pencil, Trash2, X, Save } from 'lucide-react';
+import { useState, useEffect, useCallback } from 'react';
+import { productsAPI, catalogPdfAPI } from '../../services/api';
+import {
+  RadarChart, Radar, PolarGrid, PolarAngleAxis, PolarRadiusAxis, ResponsiveContainer
+} from 'recharts';
+import { Wine, Plus, Pencil, Trash2, X, Save, ChevronLeft, Award, Thermometer, Grape, UtensilsCrossed, Download, Mail } from 'lucide-react';
 
 const formatEur = (v) => new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR' }).format(v);
+
+const COLOR_OPTIONS = [
+  { value: '', label: 'Toutes' },
+  { value: 'rouge', label: 'Rouge' },
+  { value: 'blanc', label: 'Blanc' },
+  { value: 'rosé', label: 'Rosé' },
+  { value: 'effervescent', label: 'Effervescent' },
+  { value: 'sans_alcool', label: 'Sans alcool' },
+];
+
+const COLOR_BADGES = {
+  rouge: 'bg-red-100 text-red-800',
+  blanc: 'bg-yellow-100 text-yellow-800',
+  rosé: 'bg-pink-100 text-pink-800',
+  effervescent: 'bg-sky-100 text-sky-800',
+  sans_alcool: 'bg-green-100 text-green-800',
+};
+
+const TASTING_LABELS = {
+  fruite: 'Fruité', mineralite: 'Minéralité', rondeur: 'Rondeur', acidite: 'Acidité',
+  tanins: 'Tanins', boise: 'Boisé', longueur: 'Longueur', puissance: 'Puissance',
+};
 
 const EMPTY_PRODUCT = {
   name: '', price_ht: '', price_ttc: '', purchase_price: '',
   tva_rate: 20, category: '', label: '', image_url: '', description: '', active: true,
+  region: '', appellation: '', color: '', vintage: '', grape_varieties: [],
+  serving_temp: '', food_pairing: [], tasting_notes: null, winemaker_notes: '', awards: [],
 };
 
+function parseTasting(tn) {
+  if (!tn) return null;
+  const parsed = typeof tn === 'string' ? JSON.parse(tn) : tn;
+  return Object.entries(TASTING_LABELS).map(([key, label]) => ({ axis: label, value: parsed[key] || 0 }));
+}
+
+function parseJsonField(val) {
+  if (!val) return [];
+  if (Array.isArray(val)) return val;
+  try { return JSON.parse(val); } catch { return []; }
+}
+
+// ─── Tasting Radar Chart ─────────────────────────────
+function TastingRadar({ notes, size = 250 }) {
+  const data = parseTasting(notes);
+  if (!data) return null;
+  return (
+    <div style={{ width: size, height: size }}>
+      <ResponsiveContainer width="100%" height="100%">
+        <RadarChart data={data} outerRadius="75%">
+          <PolarGrid stroke="#e5e7eb" />
+          <PolarAngleAxis dataKey="axis" tick={{ fontSize: 10, fill: '#6b7280' }} />
+          <PolarRadiusAxis angle={90} domain={[0, 5]} tick={false} axisLine={false} />
+          <Radar dataKey="value" stroke="#7a1c3b" fill="#7a1c3b" fillOpacity={0.25} strokeWidth={2} />
+        </RadarChart>
+      </ResponsiveContainer>
+    </div>
+  );
+}
+
+// ─── Tags Input ──────────────────────────────────────
+function TagsInput({ value, onChange, placeholder }) {
+  const [input, setInput] = useState('');
+  const handleKeyDown = (e) => {
+    if ((e.key === 'Enter' || e.key === ',') && input.trim()) {
+      e.preventDefault();
+      if (!value.includes(input.trim())) onChange([...value, input.trim()]);
+      setInput('');
+    }
+  };
+  const remove = (tag) => onChange(value.filter(t => t !== tag));
+  return (
+    <div className="border rounded-lg px-2 py-1.5 flex flex-wrap gap-1 items-center min-h-[38px]">
+      {value.map(tag => (
+        <span key={tag} className="inline-flex items-center gap-0.5 px-2 py-0.5 rounded-full text-xs bg-wine-50 text-wine-700">
+          {tag}
+          <button type="button" onClick={() => remove(tag)} className="text-wine-400 hover:text-wine-700"><X size={12} /></button>
+        </span>
+      ))}
+      <input value={input} onChange={e => setInput(e.target.value)} onKeyDown={handleKeyDown} placeholder={value.length === 0 ? placeholder : ''} className="flex-1 min-w-[100px] text-sm outline-none py-0.5" />
+    </div>
+  );
+}
+
+// ─── Product Detail (fiche produit) ──────────────────
+function ProductDetail({ product, onClose, onEdit }) {
+  const grapes = parseJsonField(product.grape_varieties);
+  const pairing = parseJsonField(product.food_pairing);
+  const awards = parseJsonField(product.awards);
+
+  return (
+    <div className="space-y-6">
+      <div className="flex items-center justify-between">
+        <button onClick={onClose} className="flex items-center gap-1 text-sm text-gray-500 hover:text-gray-700"><ChevronLeft size={16} /> Retour</button>
+        <button onClick={() => onEdit(product)} className="flex items-center gap-1.5 px-3 py-1.5 text-sm rounded-lg border hover:bg-gray-50"><Pencil size={14} /> Modifier</button>
+      </div>
+
+      <div className="flex flex-col md:flex-row gap-6">
+        {/* Left: info */}
+        <div className="flex-1 space-y-4">
+          <div>
+            <h1 className="text-2xl font-bold text-gray-900">{product.name}</h1>
+            <div className="flex items-center gap-2 mt-1 flex-wrap">
+              {product.color && <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${COLOR_BADGES[product.color] || 'bg-gray-100 text-gray-700'}`}>{product.color}</span>}
+              {product.label && <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-wine-50 text-wine-700">{product.label}</span>}
+              {product.vintage && <span className="text-sm text-gray-500">{product.vintage}</span>}
+            </div>
+          </div>
+
+          {product.appellation && (
+            <div className="text-sm"><span className="text-gray-500">Appellation :</span> {product.appellation} — {product.region}</div>
+          )}
+
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+            <div className="bg-gray-50 rounded-lg p-3"><p className="text-xs text-gray-500">Prix TTC</p><p className="text-lg font-bold text-wine-700">{formatEur(product.price_ttc)}</p></div>
+            <div className="bg-gray-50 rounded-lg p-3"><p className="text-xs text-gray-500">Prix HT</p><p className="text-lg font-bold">{formatEur(product.price_ht)}</p></div>
+            <div className="bg-gray-50 rounded-lg p-3"><p className="text-xs text-gray-500">Marge</p><p className="text-lg font-bold text-green-600">{formatEur(product.price_ht - product.purchase_price)}</p></div>
+          </div>
+
+          {grapes.length > 0 && (
+            <div className="flex items-start gap-2">
+              <Grape size={16} className="text-wine-600 mt-0.5 shrink-0" />
+              <div><p className="text-xs text-gray-500 mb-1">Cépages</p><div className="flex flex-wrap gap-1">{grapes.map(g => <span key={g} className="px-2 py-0.5 rounded-full text-xs bg-purple-50 text-purple-700">{g}</span>)}</div></div>
+            </div>
+          )}
+
+          {product.serving_temp && (
+            <div className="flex items-center gap-2 text-sm"><Thermometer size={16} className="text-blue-500" /><span className="text-gray-500">Service :</span> {product.serving_temp}</div>
+          )}
+
+          {pairing.length > 0 && (
+            <div className="flex items-start gap-2">
+              <UtensilsCrossed size={16} className="text-orange-500 mt-0.5 shrink-0" />
+              <div><p className="text-xs text-gray-500 mb-1">Accords mets</p><div className="flex flex-wrap gap-1">{pairing.map(f => <span key={f} className="px-2 py-0.5 rounded-full text-xs bg-orange-50 text-orange-700">{f}</span>)}</div></div>
+            </div>
+          )}
+
+          {product.winemaker_notes && (
+            <div className="bg-wine-50 rounded-lg p-4 text-sm text-wine-800 italic">"{product.winemaker_notes}"</div>
+          )}
+
+          {awards.length > 0 && (
+            <div>
+              <p className="text-xs text-gray-500 mb-2 flex items-center gap-1"><Award size={14} className="text-yellow-500" /> Distinctions</p>
+              <div className="space-y-1">
+                {awards.map((a, i) => <div key={i} className="flex items-center gap-2 text-sm"><span className="text-yellow-600 font-semibold">{a.year}</span><span>{a.name}</span></div>)}
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Right: radar */}
+        {product.tasting_notes && (
+          <div className="flex flex-col items-center">
+            <h3 className="font-semibold text-sm mb-2">Profil de dégustation</h3>
+            <TastingRadar notes={product.tasting_notes} size={280} />
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ─── Product Form (enriched) ─────────────────────────
 function ProductForm({ product, onSave, onCancel }) {
-  const [form, setForm] = useState(product || EMPTY_PRODUCT);
+  const initial = product ? {
+    ...product,
+    grape_varieties: parseJsonField(product.grape_varieties),
+    food_pairing: parseJsonField(product.food_pairing),
+    awards: parseJsonField(product.awards),
+    tasting_notes: product.tasting_notes ? (typeof product.tasting_notes === 'string' ? JSON.parse(product.tasting_notes) : product.tasting_notes) : null,
+  } : EMPTY_PRODUCT;
+  const [form, setForm] = useState(initial);
   const [saving, setSaving] = useState(false);
+  const [showTasting, setShowTasting] = useState(!!initial.tasting_notes);
 
   const handleChange = (field, value) => {
     setForm((f) => {
       const next = { ...f, [field]: value };
-      // Auto-calculate TTC from HT when tva_rate or price_ht changes
       if (field === 'price_ht' || field === 'tva_rate') {
         const ht = field === 'price_ht' ? parseFloat(value) : parseFloat(next.price_ht);
         const tva = field === 'tva_rate' ? parseFloat(value) : parseFloat(next.tva_rate);
-        if (!isNaN(ht) && !isNaN(tva)) {
-          next.price_ttc = (ht * (1 + tva / 100)).toFixed(2);
-        }
+        if (!isNaN(ht) && !isNaN(tva)) next.price_ttc = (ht * (1 + tva / 100)).toFixed(2);
       }
       return next;
     });
   };
+
+  const handleTastingChange = (key, value) => {
+    setForm(f => ({
+      ...f,
+      tasting_notes: { ...(f.tasting_notes || { fruite: 0, mineralite: 0, rondeur: 0, acidite: 0, tanins: 0, boise: 0, longueur: 0, puissance: 0 }), [key]: parseInt(value) },
+    }));
+  };
+
+  const addAward = () => setForm(f => ({ ...f, awards: [...f.awards, { year: new Date().getFullYear(), name: '' }] }));
+  const updateAward = (i, field, val) => setForm(f => ({ ...f, awards: f.awards.map((a, j) => j === i ? { ...a, [field]: field === 'year' ? parseInt(val) || '' : val } : a) }));
+  const removeAward = (i) => setForm(f => ({ ...f, awards: f.awards.filter((_, j) => j !== i) }));
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -38,193 +215,376 @@ function ProductForm({ product, onSave, onCancel }) {
         price_ttc: parseFloat(form.price_ttc),
         purchase_price: parseFloat(form.purchase_price),
         tva_rate: parseFloat(form.tva_rate),
+        vintage: form.vintage ? parseInt(form.vintage) : null,
+        tasting_notes: showTasting ? form.tasting_notes : null,
       };
       await onSave(payload);
     } catch (err) {
       alert(err.response?.data?.message || 'Erreur');
-    } finally {
-      setSaving(false);
-    }
+    } finally { setSaving(false); }
   };
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-4">
+    <form onSubmit={handleSubmit} className="space-y-6">
       <div className="flex items-center justify-between mb-2">
         <h2 className="text-lg font-bold">{product?.id ? 'Modifier le produit' : 'Nouveau produit'}</h2>
         <button type="button" onClick={onCancel} className="text-gray-400 hover:text-gray-600"><X size={20} /></button>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <div className="md:col-span-2">
-          <label className="block text-xs font-medium text-gray-500 mb-1">Nom *</label>
-          <input value={form.name} onChange={(e) => handleChange('name', e.target.value)} className="w-full border rounded-lg px-3 py-2 text-sm" required />
+      {/* Section Identité */}
+      <fieldset className="border rounded-lg p-4 space-y-4">
+        <legend className="text-sm font-semibold text-gray-700 px-2">Identité</legend>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="md:col-span-2">
+            <label className="block text-xs font-medium text-gray-500 mb-1">Nom *</label>
+            <input value={form.name} onChange={e => handleChange('name', e.target.value)} className="w-full border rounded-lg px-3 py-2 text-sm" required />
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-gray-500 mb-1">Couleur</label>
+            <select value={form.color || ''} onChange={e => handleChange('color', e.target.value || null)} className="w-full border rounded-lg px-3 py-2 text-sm">
+              <option value="">—</option>
+              {COLOR_OPTIONS.filter(c => c.value).map(c => <option key={c.value} value={c.value}>{c.label}</option>)}
+            </select>
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-gray-500 mb-1">Catégorie</label>
+            <input value={form.category || ''} onChange={e => handleChange('category', e.target.value)} className="w-full border rounded-lg px-3 py-2 text-sm" />
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-gray-500 mb-1">Région</label>
+            <input value={form.region || ''} onChange={e => handleChange('region', e.target.value)} className="w-full border rounded-lg px-3 py-2 text-sm" placeholder="Ex: Loire, Bordeaux" />
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-gray-500 mb-1">Appellation</label>
+            <input value={form.appellation || ''} onChange={e => handleChange('appellation', e.target.value)} className="w-full border rounded-lg px-3 py-2 text-sm" placeholder="Ex: Anjou, Vouvray" />
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-gray-500 mb-1">Millésime</label>
+            <input type="number" value={form.vintage || ''} onChange={e => handleChange('vintage', e.target.value)} className="w-full border rounded-lg px-3 py-2 text-sm" placeholder="2023" />
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-gray-500 mb-1">Label</label>
+            <input value={form.label || ''} onChange={e => handleChange('label', e.target.value)} className="w-full border rounded-lg px-3 py-2 text-sm" placeholder="Bio, HVE, AOP..." />
+          </div>
+          <div className="md:col-span-2">
+            <label className="block text-xs font-medium text-gray-500 mb-1">Cépages</label>
+            <TagsInput value={form.grape_varieties} onChange={v => handleChange('grape_varieties', v)} placeholder="Ajouter un cépage..." />
+          </div>
+          <div className="md:col-span-2">
+            <label className="block text-xs font-medium text-gray-500 mb-1">Description</label>
+            <textarea value={form.description || ''} onChange={e => handleChange('description', e.target.value)} className="w-full border rounded-lg px-3 py-2 text-sm" rows={2} />
+          </div>
+        </div>
+      </fieldset>
+
+      {/* Section Prix */}
+      <fieldset className="border rounded-lg p-4 space-y-4">
+        <legend className="text-sm font-semibold text-gray-700 px-2">Prix</legend>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <div>
+            <label className="block text-xs font-medium text-gray-500 mb-1">TVA *</label>
+            <select value={form.tva_rate} onChange={e => handleChange('tva_rate', e.target.value)} className="w-full border rounded-lg px-3 py-2 text-sm">
+              <option value={20}>20%</option>
+              <option value={5.5}>5.5%</option>
+            </select>
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-gray-500 mb-1">Prix HT *</label>
+            <input type="number" step="0.01" value={form.price_ht} onChange={e => handleChange('price_ht', e.target.value)} className="w-full border rounded-lg px-3 py-2 text-sm" required />
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-gray-500 mb-1">Prix TTC *</label>
+            <input type="number" step="0.01" value={form.price_ttc} onChange={e => handleChange('price_ttc', e.target.value)} className="w-full border rounded-lg px-3 py-2 text-sm" required />
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-gray-500 mb-1">Prix achat *</label>
+            <input type="number" step="0.01" value={form.purchase_price} onChange={e => handleChange('purchase_price', e.target.value)} className="w-full border rounded-lg px-3 py-2 text-sm" required />
+          </div>
+        </div>
+      </fieldset>
+
+      {/* Section Dégustation */}
+      <fieldset className="border rounded-lg p-4 space-y-4">
+        <legend className="text-sm font-semibold text-gray-700 px-2">Dégustation</legend>
+        <label className="flex items-center gap-2 text-sm cursor-pointer">
+          <input type="checkbox" checked={showTasting} onChange={e => { setShowTasting(e.target.checked); if (!e.target.checked) handleChange('tasting_notes', null); }} className="rounded text-wine-700" />
+          Activer les critères de dégustation
+        </label>
+        {showTasting && (
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+            {Object.entries(TASTING_LABELS).map(([key, label]) => (
+              <div key={key}>
+                <label className="block text-xs text-gray-500 mb-1">{label} <span className="font-semibold">{form.tasting_notes?.[key] ?? 0}</span>/5</label>
+                <input type="range" min="0" max="5" step="1" value={form.tasting_notes?.[key] ?? 0} onChange={e => handleTastingChange(key, e.target.value)} className="w-full accent-wine-700" />
+              </div>
+            ))}
+          </div>
+        )}
+        {showTasting && form.tasting_notes && (
+          <div className="flex justify-center"><TastingRadar notes={form.tasting_notes} size={200} /></div>
+        )}
+        <div>
+          <label className="block text-xs font-medium text-gray-500 mb-1">Notes du vigneron</label>
+          <textarea value={form.winemaker_notes || ''} onChange={e => handleChange('winemaker_notes', e.target.value)} className="w-full border rounded-lg px-3 py-2 text-sm" rows={2} placeholder="Description personnelle du vigneron..." />
+        </div>
+      </fieldset>
+
+      {/* Section Accords */}
+      <fieldset className="border rounded-lg p-4 space-y-4">
+        <legend className="text-sm font-semibold text-gray-700 px-2">Accords & Service</legend>
+        <div>
+          <label className="block text-xs font-medium text-gray-500 mb-1">Accords mets</label>
+          <TagsInput value={form.food_pairing} onChange={v => handleChange('food_pairing', v)} placeholder="Ajouter un accord..." />
         </div>
         <div>
-          <label className="block text-xs font-medium text-gray-500 mb-1">TVA *</label>
-          <select value={form.tva_rate} onChange={(e) => handleChange('tva_rate', e.target.value)} className="w-full border rounded-lg px-3 py-2 text-sm">
-            <option value={20}>20%</option>
-            <option value={5.5}>5.5%</option>
-          </select>
+          <label className="block text-xs font-medium text-gray-500 mb-1">Température de service</label>
+          <input value={form.serving_temp || ''} onChange={e => handleChange('serving_temp', e.target.value)} className="w-full border rounded-lg px-3 py-2 text-sm" placeholder="Ex: 8-10°C" />
         </div>
-        <div>
-          <label className="block text-xs font-medium text-gray-500 mb-1">Prix HT *</label>
-          <input type="number" step="0.01" value={form.price_ht} onChange={(e) => handleChange('price_ht', e.target.value)} className="w-full border rounded-lg px-3 py-2 text-sm" required />
-        </div>
-        <div>
-          <label className="block text-xs font-medium text-gray-500 mb-1">Prix TTC *</label>
-          <input type="number" step="0.01" value={form.price_ttc} onChange={(e) => handleChange('price_ttc', e.target.value)} className="w-full border rounded-lg px-3 py-2 text-sm" required />
-        </div>
-        <div>
-          <label className="block text-xs font-medium text-gray-500 mb-1">Prix d'achat *</label>
-          <input type="number" step="0.01" value={form.purchase_price} onChange={(e) => handleChange('purchase_price', e.target.value)} className="w-full border rounded-lg px-3 py-2 text-sm" required />
-        </div>
-        <div>
-          <label className="block text-xs font-medium text-gray-500 mb-1">Catégorie</label>
-          <input value={form.category || ''} onChange={(e) => handleChange('category', e.target.value)} className="w-full border rounded-lg px-3 py-2 text-sm" placeholder="Rouge, Blanc, Rosé..." />
-        </div>
-        <div>
-          <label className="block text-xs font-medium text-gray-500 mb-1">Label</label>
-          <input value={form.label || ''} onChange={(e) => handleChange('label', e.target.value)} className="w-full border rounded-lg px-3 py-2 text-sm" placeholder="Bio, AOP..." />
-        </div>
-        <div className="md:col-span-2">
-          <label className="block text-xs font-medium text-gray-500 mb-1">URL image</label>
-          <input value={form.image_url || ''} onChange={(e) => handleChange('image_url', e.target.value)} className="w-full border rounded-lg px-3 py-2 text-sm" placeholder="https://..." />
-        </div>
-        <div className="md:col-span-2">
-          <label className="block text-xs font-medium text-gray-500 mb-1">Description</label>
-          <textarea value={form.description || ''} onChange={(e) => handleChange('description', e.target.value)} className="w-full border rounded-lg px-3 py-2 text-sm" rows={2} />
-        </div>
-      </div>
+      </fieldset>
+
+      {/* Section Distinctions */}
+      <fieldset className="border rounded-lg p-4 space-y-4">
+        <legend className="text-sm font-semibold text-gray-700 px-2">Distinctions</legend>
+        {form.awards.map((a, i) => (
+          <div key={i} className="flex items-center gap-2">
+            <input type="number" value={a.year} onChange={e => updateAward(i, 'year', e.target.value)} className="w-20 border rounded-lg px-2 py-1.5 text-sm" placeholder="Année" />
+            <input value={a.name} onChange={e => updateAward(i, 'name', e.target.value)} className="flex-1 border rounded-lg px-2 py-1.5 text-sm" placeholder="Nom de la récompense" />
+            <button type="button" onClick={() => removeAward(i)} className="p-1 text-red-400 hover:text-red-600"><X size={16} /></button>
+          </div>
+        ))}
+        <button type="button" onClick={addAward} className="text-xs text-wine-700 hover:text-wine-800 font-medium">+ Ajouter une distinction</button>
+      </fieldset>
 
       <div className="flex justify-end gap-3 pt-2">
         <button type="button" onClick={onCancel} className="px-4 py-2 text-sm text-gray-600 hover:bg-gray-100 rounded-lg">Annuler</button>
         <button type="submit" disabled={saving} className="btn-primary flex items-center gap-2">
-          <Save size={16} />
-          {saving ? 'Enregistrement...' : 'Enregistrer'}
+          <Save size={16} />{saving ? 'Enregistrement...' : 'Enregistrer'}
         </button>
       </div>
     </form>
   );
 }
 
+// ─── Main Component ──────────────────────────────────
 export default function AdminCatalog() {
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [editing, setEditing] = useState(null); // null | 'new' | product object
+  const [editing, setEditing] = useState(null);
+  const [viewing, setViewing] = useState(null);
+  const [filters, setFilters] = useState({ color: '', region: '', category: '' });
+  const [emailModal, setEmailModal] = useState(false);
+  const [emailForm, setEmailForm] = useState({ email: '', subject: 'Catalogue Vins & Conversations', message: '' });
+  const [sending, setSending] = useState(false);
 
-  const fetchProducts = async () => {
+  const fetchProducts = useCallback(async () => {
     setLoading(true);
     try {
-      const { data } = await productsAPI.list();
+      const params = {};
+      if (filters.color) params.color = filters.color;
+      if (filters.region) params.region = filters.region;
+      if (filters.category) params.category = filters.category;
+      const { data } = await productsAPI.list(params);
       setProducts(data.data || []);
-    } catch (err) {
-      console.error(err);
-    } finally {
-      setLoading(false);
-    }
-  };
+    } catch (err) { console.error(err); }
+    finally { setLoading(false); }
+  }, [filters]);
 
-  useEffect(() => { fetchProducts(); }, []);
+  useEffect(() => { fetchProducts(); }, [fetchProducts]);
 
   const handleSave = async (payload) => {
-    if (editing?.id) {
-      await productsAPI.update(editing.id, payload);
-    } else {
-      await productsAPI.create(payload);
-    }
+    if (editing?.id) await productsAPI.update(editing.id, payload);
+    else await productsAPI.create(payload);
     setEditing(null);
     fetchProducts();
   };
 
   const handleDelete = async (id, name) => {
     if (!confirm(`Désactiver le produit "${name}" ?`)) return;
+    try { await productsAPI.remove(id); fetchProducts(); } catch { alert('Erreur'); }
+  };
+
+  const handleDownloadPdf = () => {
+    const token = localStorage.getItem('accessToken');
+    const url = catalogPdfAPI.pdfUrl(filters.color ? { color: filters.color } : {});
+    const a = document.createElement('a');
+    a.href = url + (url.includes('?') ? '&' : '?') + `token=${token}`;
+    a.target = '_blank';
+    a.click();
+  };
+
+  const handleSendEmail = async () => {
+    setSending(true);
     try {
-      await productsAPI.remove(id);
-      fetchProducts();
+      await catalogPdfAPI.sendEmail(emailForm);
+      alert('Catalogue envoyé !');
+      setEmailModal(false);
+      setEmailForm({ email: '', subject: 'Catalogue Vins & Conversations', message: '' });
     } catch (err) {
-      alert('Erreur lors de la désactivation');
+      alert(err.response?.data?.message || 'Erreur d\'envoi');
+    } finally {
+      setSending(false);
     }
   };
 
-  if (editing) {
+  // Product detail view
+  if (viewing) {
     return (
       <div className="card">
-        <ProductForm
-          product={editing === 'new' ? null : editing}
-          onSave={handleSave}
-          onCancel={() => setEditing(null)}
-        />
+        <ProductDetail product={viewing} onClose={() => setViewing(null)} onEdit={(p) => { setViewing(null); setEditing(p); }} />
       </div>
     );
   }
 
+  // Product form
+  if (editing) {
+    return (
+      <div className="card">
+        <ProductForm product={editing === 'new' ? null : editing} onSave={handleSave} onCancel={() => setEditing(null)} />
+      </div>
+    );
+  }
+
+  // Unique regions for filter
+  const regions = [...new Set(products.map(p => p.region).filter(Boolean))];
+
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between flex-wrap gap-3">
         <h1 className="text-2xl font-bold text-gray-900">Catalogue</h1>
-        <button onClick={() => setEditing('new')} className="btn-primary flex items-center gap-2">
-          <Plus size={16} />
-          Nouveau produit
-        </button>
+        <div className="flex gap-2">
+          <button onClick={handleDownloadPdf} className="flex items-center gap-1.5 px-3 py-2 text-sm border rounded-lg hover:bg-gray-50"><Download size={14} /> PDF</button>
+          <button onClick={() => setEmailModal(true)} className="flex items-center gap-1.5 px-3 py-2 text-sm border rounded-lg hover:bg-gray-50"><Mail size={14} /> Envoyer</button>
+          <button onClick={() => setEditing('new')} className="btn-primary flex items-center gap-2"><Plus size={16} /> Nouveau produit</button>
+        </div>
       </div>
 
-      <div className="card overflow-x-auto">
+      {/* Email modal */}
+      {emailModal && (
+        <div className="fixed inset-0 bg-black/30 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6 space-y-4">
+            <div className="flex items-center justify-between">
+              <h3 className="font-bold text-lg">Envoyer le catalogue</h3>
+              <button onClick={() => setEmailModal(false)} className="p-1 hover:bg-gray-100 rounded-lg"><X size={18} /></button>
+            </div>
+            <div>
+              <label className="block text-sm font-medium mb-1">Email destinataire *</label>
+              <input type="email" value={emailForm.email} onChange={e => setEmailForm(f => ({ ...f, email: e.target.value }))} className="w-full border rounded-lg px-3 py-2 text-sm" placeholder="client@example.fr" />
+            </div>
+            <div>
+              <label className="block text-sm font-medium mb-1">Objet</label>
+              <input type="text" value={emailForm.subject} onChange={e => setEmailForm(f => ({ ...f, subject: e.target.value }))} className="w-full border rounded-lg px-3 py-2 text-sm" />
+            </div>
+            <div>
+              <label className="block text-sm font-medium mb-1">Message (optionnel)</label>
+              <textarea value={emailForm.message} onChange={e => setEmailForm(f => ({ ...f, message: e.target.value }))} rows={3} className="w-full border rounded-lg px-3 py-2 text-sm" placeholder="Veuillez trouver ci-joint notre catalogue..." />
+            </div>
+            <div className="flex justify-end gap-2">
+              <button onClick={() => setEmailModal(false)} className="px-4 py-2 text-sm border rounded-lg hover:bg-gray-50">Annuler</button>
+              <button onClick={handleSendEmail} disabled={!emailForm.email || sending} className="btn-primary flex items-center gap-2 disabled:opacity-50">
+                {sending ? <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white" /> : <Mail size={14} />}
+                Envoyer
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Filters */}
+      <div className="card">
+        <div className="flex flex-wrap gap-3 items-end">
+          <div className="min-w-[140px]">
+            <label className="block text-xs font-medium text-gray-500 mb-1">Couleur</label>
+            <select value={filters.color} onChange={e => setFilters(f => ({ ...f, color: e.target.value }))} className="w-full border rounded-lg px-3 py-2 text-sm">
+              {COLOR_OPTIONS.map(c => <option key={c.value} value={c.value}>{c.label}</option>)}
+            </select>
+          </div>
+          <div className="min-w-[140px]">
+            <label className="block text-xs font-medium text-gray-500 mb-1">Région</label>
+            <select value={filters.region} onChange={e => setFilters(f => ({ ...f, region: e.target.value }))} className="w-full border rounded-lg px-3 py-2 text-sm">
+              <option value="">Toutes</option>
+              {regions.map(r => <option key={r} value={r}>{r}</option>)}
+            </select>
+          </div>
+          <button onClick={() => setFilters({ color: '', region: '', category: '' })} className="text-sm text-gray-500 hover:text-gray-700 px-3 py-2">Effacer</button>
+        </div>
+      </div>
+
+      {/* Products grid */}
+      <div className="card">
         {loading ? (
           <div className="flex justify-center py-12"><div className="animate-spin rounded-full h-6 w-6 border-b-2 border-wine-700" /></div>
         ) : products.length === 0 ? (
-          <div className="text-center py-12 text-gray-400">
-            <Wine size={40} className="mx-auto mb-3" />
-            <p>Aucun produit dans le catalogue</p>
-          </div>
+          <div className="text-center py-12 text-gray-400"><Wine size={40} className="mx-auto mb-3" /><p>Aucun produit</p></div>
         ) : (
-          <table className="w-full text-sm">
+          <>
+          {/* Mobile cards */}
+          <div className="md:hidden space-y-3">
+            {products.map(p => {
+              const margin = p.price_ht - p.purchase_price;
+              return (
+                <div key={p.id} onClick={() => setViewing(p)} className="border rounded-lg p-4 hover:bg-gray-50 cursor-pointer space-y-2">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <div className="w-8 h-8 bg-wine-50 rounded-lg flex items-center justify-center"><Wine size={14} className="text-wine-600" /></div>
+                      <p className="font-medium text-sm">{p.name}</p>
+                    </div>
+                    {p.color && <span className={`px-2 py-0.5 rounded-full text-[10px] font-medium ${COLOR_BADGES[p.color] || 'bg-gray-100 text-gray-700'}`}>{p.color}</span>}
+                  </div>
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="font-semibold">{formatEur(p.price_ttc)}</span>
+                    <span className="text-xs text-green-600">Marge {formatEur(margin)}</span>
+                  </div>
+                  <div className="flex items-center gap-2" onClick={e => e.stopPropagation()}>
+                    <button onClick={() => setEditing(p)} className="text-xs px-2 py-1 border rounded-lg hover:bg-gray-100">Modifier</button>
+                    <button onClick={() => handleDelete(p.id, p.name)} className="text-xs px-2 py-1 border border-red-200 text-red-500 rounded-lg hover:bg-red-50">Désactiver</button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+          {/* Desktop table */}
+          <table className="hidden md:table w-full text-sm">
             <thead>
               <tr className="border-b text-left text-gray-500">
                 <th className="pb-3 font-medium">Produit</th>
-                <th className="pb-3 font-medium">Catégorie</th>
-                <th className="pb-3 font-medium">Prix HT</th>
+                <th className="pb-3 font-medium">Couleur</th>
+                <th className="pb-3 font-medium">Région</th>
                 <th className="pb-3 font-medium">Prix TTC</th>
                 <th className="pb-3 font-medium">Achat</th>
-                <th className="pb-3 font-medium">TVA</th>
                 <th className="pb-3 font-medium">Marge</th>
+                <th className="pb-3 font-medium">Dégustation</th>
                 <th className="pb-3 font-medium text-right">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y">
-              {products.map((p) => {
+              {products.map(p => {
                 const margin = p.price_ht - p.purchase_price;
                 const marginPct = p.purchase_price > 0 ? ((margin / p.purchase_price) * 100).toFixed(0) : 0;
+                const hasTasting = !!p.tasting_notes;
                 return (
-                  <tr key={p.id} className="hover:bg-gray-50">
+                  <tr key={p.id} className="hover:bg-gray-50 cursor-pointer" onClick={() => setViewing(p)}>
                     <td className="py-3">
                       <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 bg-wine-50 rounded-lg flex items-center justify-center flex-shrink-0">
-                          <Wine size={16} className="text-wine-600" />
-                        </div>
+                        <div className="w-10 h-10 bg-wine-50 rounded-lg flex items-center justify-center flex-shrink-0"><Wine size={16} className="text-wine-600" /></div>
                         <div>
                           <p className="font-medium">{p.name}</p>
-                          {p.label && <p className="text-xs text-gray-400">{p.label}</p>}
+                          <div className="flex items-center gap-1">
+                            {p.label && <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-wine-50 text-wine-700">{p.label}</span>}
+                            {p.vintage && <span className="text-xs text-gray-400">{p.vintage}</span>}
+                          </div>
                         </div>
                       </div>
                     </td>
-                    <td className="py-3 text-gray-500">{p.category || '—'}</td>
-                    <td className="py-3">{formatEur(p.price_ht)}</td>
+                    <td className="py-3">{p.color && <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${COLOR_BADGES[p.color] || 'bg-gray-100 text-gray-700'}`}>{p.color}</span>}</td>
+                    <td className="py-3 text-gray-500 text-xs">{p.region || '—'}{p.appellation ? ` · ${p.appellation}` : ''}</td>
                     <td className="py-3 font-semibold">{formatEur(p.price_ttc)}</td>
                     <td className="py-3 text-gray-500">{formatEur(p.purchase_price)}</td>
-                    <td className="py-3">{p.tva_rate}%</td>
-                    <td className="py-3">
-                      <span className={`text-xs font-medium ${margin > 0 ? 'text-green-600' : 'text-red-600'}`}>
-                        {formatEur(margin)} ({marginPct}%)
-                      </span>
-                    </td>
-                    <td className="py-3 text-right">
+                    <td className="py-3"><span className={`text-xs font-medium ${margin > 0 ? 'text-green-600' : 'text-red-600'}`}>{formatEur(margin)} ({marginPct}%)</span></td>
+                    <td className="py-3">{hasTasting ? <span className="text-xs text-wine-600">★ Profil</span> : <span className="text-xs text-gray-300">—</span>}</td>
+                    <td className="py-3 text-right" onClick={e => e.stopPropagation()}>
                       <div className="flex items-center justify-end gap-1">
-                        <button onClick={() => setEditing(p)} className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-500" title="Modifier">
-                          <Pencil size={16} />
-                        </button>
-                        <button onClick={() => handleDelete(p.id, p.name)} className="p-1.5 rounded-lg hover:bg-red-50 text-red-400" title="Désactiver">
-                          <Trash2 size={16} />
-                        </button>
+                        <button onClick={() => setEditing(p)} className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-500" title="Modifier"><Pencil size={16} /></button>
+                        <button onClick={() => handleDelete(p.id, p.name)} className="p-1.5 rounded-lg hover:bg-red-50 text-red-400" title="Désactiver"><Trash2 size={16} /></button>
                       </div>
                     </td>
                   </tr>
@@ -232,6 +592,7 @@ export default function AdminCatalog() {
               })}
             </tbody>
           </table>
+          </>
         )}
       </div>
     </div>

@@ -1,12 +1,11 @@
 import { useState, useEffect } from 'react';
 import { analyticsAPI, campaignsAPI } from '../../services/api';
 import {
-  LineChart, Line, BarChart, Bar, XAxis, YAxis, Tooltip,
+  AreaChart, Area, BarChart, Bar, XAxis, YAxis,
   ResponsiveContainer, CartesianGrid, Legend
 } from 'recharts';
 import { TrendingUp, Users, ShoppingCart, Wine } from 'lucide-react';
-
-const formatEur = (v) => new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR' }).format(v);
+import { WINE_PALETTE, MULTI_PALETTE, axisStyle, gridStyle, PremiumTooltip, ChartGradient, chartAnimation, formatEur } from '../../utils/chartTheme';
 
 export default function AdminAnalytics() {
   const [data, setData] = useState(null);
@@ -57,39 +56,39 @@ export default function AdminAnalytics() {
       {/* KPI cards */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         {[
-          { label: 'Taux de conversion', value: `${data.tauxConversion}%`, icon: TrendingUp, color: 'text-green-600' },
-          { label: 'CA TTC', value: formatEur(data.kpis.caTTC), icon: Wine, color: 'text-wine-700' },
-          { label: 'Commandes', value: data.kpis.totalOrders, icon: ShoppingCart, color: 'text-blue-600' },
-          { label: 'Bouteilles', value: data.kpis.totalBottles, icon: Users, color: 'text-purple-600' },
+          { label: 'Taux de conversion', value: `${data.tauxConversion}%`, icon: TrendingUp, gradient: 'from-emerald-500 to-emerald-700' },
+          { label: 'CA TTC', value: formatEur(data.kpis.caTTC), icon: Wine, gradient: 'from-wine-700 to-wine-900' },
+          { label: 'Commandes', value: data.kpis.totalOrders, icon: ShoppingCart, gradient: 'from-blue-500 to-blue-700' },
+          { label: 'Bouteilles', value: data.kpis.totalBottles, icon: Users, gradient: 'from-purple-500 to-purple-700' },
         ].map((kpi) => (
-          <div key={kpi.label} className="card">
-            <div className="flex items-center gap-3">
-              <div className={`${kpi.color} bg-gray-50 p-2 rounded-lg`}>
-                <kpi.icon size={20} />
-              </div>
-              <div>
-                <p className="text-sm text-gray-500">{kpi.label}</p>
-                <p className="text-xl font-bold">{kpi.value}</p>
-              </div>
+          <div key={kpi.label} className={`bg-gradient-to-br ${kpi.gradient} rounded-2xl p-5 text-white shadow-lg`}>
+            <div className="flex items-center justify-between mb-3">
+              <kpi.icon size={22} className="opacity-80" />
             </div>
+            <p className="text-2xl font-bold">{kpi.value}</p>
+            <p className="text-sm opacity-80 mt-1">{kpi.label}</p>
           </div>
         ))}
       </div>
 
-      {/* LineChart — CA par période */}
+      {/* AreaChart — CA par période (was LineChart, now premium AreaChart) */}
       <div className="card">
         <h3 className="font-semibold mb-4">CA par mois</h3>
         <div className="h-[200px] md:h-[300px]">
         <ResponsiveContainer width="100%" height="100%">
-          <LineChart data={data.caParPeriode}>
-            <CartesianGrid strokeDasharray="3 3" />
-            <XAxis dataKey="mois" tick={{ fontSize: 11 }} />
-            <YAxis tickFormatter={(v) => `${(v / 1000).toFixed(0)}k`} />
-            <Tooltip formatter={(v) => formatEur(v)} />
-            <Legend />
-            <Line type="monotone" dataKey="ca_ttc" stroke="#ab2049" strokeWidth={2} name="CA TTC" />
-            <Line type="monotone" dataKey="ca_ht" stroke="#2563eb" strokeWidth={2} name="CA HT" dot={false} />
-          </LineChart>
+          <AreaChart data={data.caParPeriode} {...chartAnimation}>
+            <defs>
+              <ChartGradient id="areaWine" color="#7f1d1d" opacity={0.3} />
+              <ChartGradient id="areaBlue" color="#2563eb" opacity={0.2} />
+            </defs>
+            <CartesianGrid {...gridStyle} />
+            <XAxis dataKey="mois" {...axisStyle} />
+            <YAxis {...axisStyle} tickFormatter={(v) => `${(v / 1000).toFixed(0)}k`} />
+            <PremiumTooltip formatter={formatEur} />
+            <Legend wrapperStyle={{ fontSize: 12 }} />
+            <Area type="monotone" dataKey="ca_ttc" stroke="#7f1d1d" fill="url(#areaWine)" strokeWidth={2.5} name="CA TTC" />
+            <Area type="monotone" dataKey="ca_ht" stroke="#2563eb" fill="url(#areaBlue)" strokeWidth={2} name="CA HT" />
+          </AreaChart>
         </ResponsiveContainer>
         </div>
       </div>
@@ -100,12 +99,12 @@ export default function AdminAnalytics() {
           <h3 className="font-semibold mb-4">Top Vendeurs</h3>
           <div className="h-[200px] md:h-[300px]">
           <ResponsiveContainer width="100%" height="100%">
-            <BarChart data={data.topVendeurs} layout="vertical">
-              <CartesianGrid strokeDasharray="3 3" />
-              <XAxis type="number" tickFormatter={(v) => `${(v / 1000).toFixed(0)}k`} />
-              <YAxis dataKey="name" type="category" width={100} tick={{ fontSize: 10 }} />
-              <Tooltip formatter={(v) => formatEur(v)} />
-              <Bar dataKey="ca" fill="#ab2049" radius={[0, 4, 4, 0]} name="CA" />
+            <BarChart data={data.topVendeurs} layout="vertical" {...chartAnimation}>
+              <CartesianGrid {...gridStyle} />
+              <XAxis type="number" {...axisStyle} tickFormatter={(v) => `${(v / 1000).toFixed(0)}k`} />
+              <YAxis dataKey="name" type="category" width={100} {...axisStyle} />
+              <PremiumTooltip formatter={formatEur} />
+              <Bar dataKey="ca" fill={WINE_PALETTE[0]} radius={[0, 6, 6, 0]} name="CA" />
             </BarChart>
           </ResponsiveContainer>
           </div>
@@ -116,12 +115,12 @@ export default function AdminAnalytics() {
           <h3 className="font-semibold mb-4">Top Produits</h3>
           <div className="h-[200px] md:h-[300px]">
           <ResponsiveContainer width="100%" height="100%">
-            <BarChart data={data.topProduits} layout="vertical">
-              <CartesianGrid strokeDasharray="3 3" />
-              <XAxis type="number" />
-              <YAxis dataKey="name" type="category" width={120} tick={{ fontSize: 10 }} />
-              <Tooltip />
-              <Bar dataKey="qty" fill="#7c3aed" radius={[0, 4, 4, 0]} name="Bouteilles" />
+            <BarChart data={data.topProduits} layout="vertical" {...chartAnimation}>
+              <CartesianGrid {...gridStyle} />
+              <XAxis type="number" {...axisStyle} />
+              <YAxis dataKey="name" type="category" width={120} {...axisStyle} />
+              <PremiumTooltip />
+              <Bar dataKey="qty" fill={MULTI_PALETTE[4]} radius={[0, 6, 6, 0]} name="Bouteilles" />
             </BarChart>
           </ResponsiveContainer>
           </div>
@@ -133,14 +132,14 @@ export default function AdminAnalytics() {
         <h3 className="font-semibold mb-4">Comparaison Campagnes</h3>
         <div className="h-[200px] md:h-[300px]">
         <ResponsiveContainer width="100%" height="100%">
-          <BarChart data={data.comparaisonCampagnes}>
-            <CartesianGrid strokeDasharray="3 3" />
-            <XAxis dataKey="name" tick={{ fontSize: 10 }} />
-            <YAxis tickFormatter={(v) => `${(v / 1000).toFixed(0)}k`} />
-            <Tooltip formatter={(v, name) => name === 'CA' || name === 'Objectif' ? formatEur(v) : v} />
-            <Legend />
-            <Bar dataKey="ca" fill="#ab2049" radius={[4, 4, 0, 0]} name="CA" />
-            <Bar dataKey="goal" fill="#e5e7eb" radius={[4, 4, 0, 0]} name="Objectif" />
+          <BarChart data={data.comparaisonCampagnes} {...chartAnimation}>
+            <CartesianGrid {...gridStyle} />
+            <XAxis dataKey="name" {...axisStyle} />
+            <YAxis {...axisStyle} tickFormatter={(v) => `${(v / 1000).toFixed(0)}k`} />
+            <PremiumTooltip formatter={(v, name) => name === 'CA' || name === 'Objectif' ? formatEur(v) : v} />
+            <Legend wrapperStyle={{ fontSize: 12 }} />
+            <Bar dataKey="ca" fill={WINE_PALETTE[0]} radius={[6, 6, 0, 0]} name="CA" />
+            <Bar dataKey="goal" fill="#e5e7eb" radius={[6, 6, 0, 0]} name="Objectif" />
           </BarChart>
         </ResponsiveContainer>
         </div>

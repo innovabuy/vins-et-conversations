@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
 import { campaignsAPI } from '../../services/api';
-import { BookOpen, Copy, Users, ShoppingCart, Calendar, TrendingUp } from 'lucide-react';
+import { BookOpen, Copy, Users, ShoppingCart, Calendar, TrendingUp, ChevronRight, Plus } from 'lucide-react';
 
 const formatEur = (v) => new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR' }).format(v);
 
@@ -66,7 +67,10 @@ export default function AdminCampaigns() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold text-gray-900">Campagnes</h1>
-        <span className="text-sm text-gray-500">{campaigns.length} campagne(s)</span>
+        <div className="flex items-center gap-3">
+          <span className="text-sm text-gray-500">{campaigns.length} campagne(s)</span>
+          <Link to="/admin/campaigns/new" className="btn-primary flex items-center gap-2 text-sm"><Plus size={16} /> Nouvelle campagne</Link>
+        </div>
       </div>
 
       {campaigns.length === 0 ? (
@@ -81,13 +85,14 @@ export default function AdminCampaigns() {
             return (
               <div key={c.id} className="card">
                 <div className="flex items-start justify-between mb-4">
-                  <div>
+                  <Link to={`/admin/campaigns/${c.id}`} className="flex-1 hover:opacity-80">
                     <div className="flex items-center gap-2 mb-1">
                       <h2 className="text-lg font-bold">{c.name}</h2>
                       <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${status.color}`}>{status.label}</span>
+                      <ChevronRight size={16} className="text-gray-400" />
                     </div>
                     <p className="text-sm text-gray-500">{c.org_name} — {c.type_label}</p>
-                  </div>
+                  </Link>
                   <button
                     onClick={() => handleDuplicate(c.id, c.name)}
                     className="flex items-center gap-1.5 px-3 py-1.5 text-sm border rounded-lg hover:bg-gray-50 text-gray-600"
