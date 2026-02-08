@@ -11,12 +11,13 @@ const BADGE_ICONS = {
   zap: Zap, heart: Heart, target: Target,
 };
 
-const ALL_BADGES = [
+// Badge definitions now loaded from API (CDC §2.2 — zero hardcoded constants)
+const FALLBACK_BADGES = [
   { id: 'top_vendeur', name: 'Top Vendeur', icon: 'trophy', description: '1er au classement' },
   { id: 'streak_7', name: 'Série 7j', icon: 'flame', description: '7 jours consécutifs' },
-  { id: 'premier_1000', name: 'Premier 1000€', icon: 'banknote', description: 'CA >= 1000€' },
-  { id: 'machine_vendre', name: 'Machine à vendre', icon: 'zap', description: '50+ bouteilles' },
-  { id: 'fidele', name: 'Fidèle', icon: 'heart', description: '14 jours consécutifs' },
+  { id: 'premier_1000', name: 'Premier 1000\u20AC', icon: 'banknote', description: 'CA atteint' },
+  { id: 'machine_vendre', name: 'Machine à vendre', icon: 'zap', description: 'Objectif bouteilles' },
+  { id: 'fidele', name: 'Fidèle', icon: 'heart', description: 'Série longue' },
   { id: 'objectif_perso', name: 'Objectif perso', icon: 'target', description: 'Objectif atteint' },
 ];
 
@@ -242,6 +243,7 @@ export default function StudentDashboard() {
                 <div className="flex-1">
                   <p className="font-medium text-sm">{p.name}</p>
                   <p className="text-xs text-gray-500">{p.category}{p.label ? ` · ${p.label}` : ''}</p>
+                  {p.description && <p className="text-xs text-gray-400 line-clamp-1">{p.description}</p>}
                   <p className="font-semibold text-wine-700">{formatEur(p.custom_price || p.price_ttc)}</p>
                 </div>
                 <div className="flex items-center gap-2">
@@ -285,7 +287,7 @@ export default function StudentDashboard() {
                   </div>
                 </div>
                 <div className="grid grid-cols-3 gap-2">
-                  {ALL_BADGES.map((badge) => {
+                  {(data.badgeDefinitions || FALLBACK_BADGES).map((badge) => {
                     const earned = data.badges?.find((b) => b.id === badge.id);
                     const Icon = BADGE_ICONS[badge.icon] || Award;
                     return (

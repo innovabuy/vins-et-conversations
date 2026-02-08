@@ -3,7 +3,7 @@ import { productsAPI, catalogPdfAPI } from '../../services/api';
 import {
   RadarChart, Radar, PolarGrid, PolarAngleAxis, PolarRadiusAxis, ResponsiveContainer
 } from 'recharts';
-import { Wine, Plus, Pencil, Trash2, X, Save, ChevronLeft, Award, Thermometer, Grape, UtensilsCrossed, Download, Mail } from 'lucide-react';
+import { Wine, Plus, Pencil, Trash2, X, Save, ChevronLeft, Award, Thermometer, Grape, UtensilsCrossed, Download, Mail, FileText } from 'lucide-react';
 
 const formatEur = (v) => new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR' }).format(v);
 
@@ -117,6 +117,10 @@ function ProductDetail({ product, onClose, onEdit }) {
 
           {product.appellation && (
             <div className="text-sm"><span className="text-gray-500">Appellation :</span> {product.appellation} — {product.region}</div>
+          )}
+
+          {product.description && (
+            <div className="text-sm text-gray-600 leading-relaxed">{product.description}</div>
           )}
 
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
@@ -375,6 +379,8 @@ export default function AdminCatalog() {
   const [emailModal, setEmailModal] = useState(false);
   const [emailForm, setEmailForm] = useState({ email: '', subject: 'Catalogue Vins & Conversations', message: '' });
   const [sending, setSending] = useState(false);
+  const [pdfModal, setPdfModal] = useState(false);
+  const [pdfSegment, setPdfSegment] = useState('public');
 
   const fetchProducts = useCallback(async () => {
     setLoading(true);
@@ -403,9 +409,12 @@ export default function AdminCatalog() {
     try { await productsAPI.remove(id); fetchProducts(); } catch { alert('Erreur'); }
   };
 
-  const handleDownloadPdf = () => {
+  const handleDownloadPdf = (segment = 'public') => {
     const token = localStorage.getItem('accessToken');
-    const url = catalogPdfAPI.pdfUrl(filters.color ? { color: filters.color } : {});
+    const params = {};
+    if (filters.color) params.color = filters.color;
+    if (segment !== 'public') params.segment = segment;
+    const url = catalogPdfAPI.pdfUrl(params);
     const a = document.createElement('a');
     a.href = url + (url.includes('?') ? '&' : '?') + `token=${token}`;
     a.target = '_blank';
@@ -415,7 +424,7 @@ export default function AdminCatalog() {
   const handleSendEmail = async () => {
     setSending(true);
     try {
-      await catalogPdfAPI.sendEmail(emailForm);
+      await catalogPdfAPI.sendEmail({ ...emailForm, segment: pdfSegment });
       alert('Catalogue envoyé !');
       setEmailModal(false);
       setEmailForm({ email: '', subject: 'Catalogue Vins & Conversations', message: '' });
@@ -452,39 +461,66 @@ export default function AdminCatalog() {
       <div className="flex items-center justify-between flex-wrap gap-3">
         <h1 className="text-2xl font-bold text-gray-900">Catalogue</h1>
         <div className="flex gap-2">
-          <button onClick={handleDownloadPdf} className="flex items-center gap-1.5 px-3 py-2 text-sm border rounded-lg hover:bg-gray-50"><Download size={14} /> PDF</button>
-          <button onClick={() => setEmailModal(true)} className="flex items-center gap-1.5 px-3 py-2 text-sm border rounded-lg hover:bg-gray-50"><Mail size={14} /> Envoyer</button>
+          <button onClick={() => setPdfModal(true)} className="flex items-center gap-1.5 px-3 py-2 text-sm border rounded-lg hover:bg-gray-50"><FileText size={14} /> Catalogue PDF</button>
           <button onClick={() => setEditing('new')} className="btn-primary flex items-center gap-2"><Plus size={16} /> Nouveau produit</button>
         </div>
       </div>
 
-      {/* Email modal */}
-      {emailModal && (
+      {/* PDF Catalog Modal */}
+      {pdfModal && (
         <div className="fixed inset-0 bg-black/30 z-50 flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6 space-y-4">
             <div className="flex items-center justify-between">
-              <h3 className="font-bold text-lg">Envoyer le catalogue</h3>
-              <button onClick={() => setEmailModal(false)} className="p-1 hover:bg-gray-100 rounded-lg"><X size={18} /></button>
+              <h3 className="font-bold text-lg">Catalogue PDF</h3>
+              <button onClick={() => { setPdfModal(false); setEmailModal(false); }} className="p-1 hover:bg-gray-100 rounded-lg"><X size={18} /></button>
             </div>
+
             <div>
-              <label className="block text-sm font-medium mb-1">Email destinataire *</label>
-              <input type="email" value={emailForm.email} onChange={e => setEmailForm(f => ({ ...f, email: e.target.value }))} className="w-full border rounded-lg px-3 py-2 text-sm" placeholder="client@example.fr" />
+              <label className="block text-sm font-medium mb-1">Segment client</label>
+              <select value={pdfSegment} onChange={e => setPdfSegment(e.target.value)} className="w-full border rounded-lg px-3 py-2 text-sm">
+                <option value="public">Grand Public</option>
+                <option value="scolaire">Scolaire</option>
+                <option value="cse">CSE (prix remisés)</option>
+                <option value="ambassadeur_bronze">Ambassadeur Bronze</option>
+                <option value="ambassadeur_argent">Ambassadeur Argent</option>
+                <option value="ambassadeur_or">Ambassadeur Or</option>
+                <option value="bts_ndrc">BTS NDRC</option>
+              </select>
             </div>
-            <div>
-              <label className="block text-sm font-medium mb-1">Objet</label>
-              <input type="text" value={emailForm.subject} onChange={e => setEmailForm(f => ({ ...f, subject: e.target.value }))} className="w-full border rounded-lg px-3 py-2 text-sm" />
-            </div>
-            <div>
-              <label className="block text-sm font-medium mb-1">Message (optionnel)</label>
-              <textarea value={emailForm.message} onChange={e => setEmailForm(f => ({ ...f, message: e.target.value }))} rows={3} className="w-full border rounded-lg px-3 py-2 text-sm" placeholder="Veuillez trouver ci-joint notre catalogue..." />
-            </div>
-            <div className="flex justify-end gap-2">
-              <button onClick={() => setEmailModal(false)} className="px-4 py-2 text-sm border rounded-lg hover:bg-gray-50">Annuler</button>
-              <button onClick={handleSendEmail} disabled={!emailForm.email || sending} className="btn-primary flex items-center gap-2 disabled:opacity-50">
-                {sending ? <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white" /> : <Mail size={14} />}
-                Envoyer
+
+            <p className="text-xs text-gray-500">
+              Le catalogue PDF premium sera généré avec les prix et conditions du segment sélectionné.
+            </p>
+
+            <div className="flex gap-2">
+              <button onClick={() => { handleDownloadPdf(pdfSegment); }} className="flex-1 flex items-center justify-center gap-2 px-4 py-2 text-sm border rounded-lg hover:bg-gray-50 font-medium">
+                <Download size={14} /> Télécharger
+              </button>
+              <button onClick={() => setEmailModal(true)} className="flex-1 flex items-center justify-center gap-2 px-4 py-2 text-sm border rounded-lg hover:bg-gray-50 font-medium">
+                <Mail size={14} /> Envoyer par email
               </button>
             </div>
+
+            {emailModal && (
+              <div className="border-t pt-4 space-y-3">
+                <div>
+                  <label className="block text-sm font-medium mb-1">Email destinataire *</label>
+                  <input type="email" value={emailForm.email} onChange={e => setEmailForm(f => ({ ...f, email: e.target.value }))} className="w-full border rounded-lg px-3 py-2 text-sm" placeholder="client@example.fr" />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium mb-1">Objet</label>
+                  <input type="text" value={emailForm.subject} onChange={e => setEmailForm(f => ({ ...f, subject: e.target.value }))} className="w-full border rounded-lg px-3 py-2 text-sm" />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium mb-1">Message (optionnel)</label>
+                  <textarea value={emailForm.message} onChange={e => setEmailForm(f => ({ ...f, message: e.target.value }))} rows={2} className="w-full border rounded-lg px-3 py-2 text-sm" placeholder="Veuillez trouver ci-joint notre catalogue..." />
+                </div>
+                <button onClick={handleSendEmail} disabled={!emailForm.email || sending} className="btn-primary w-full flex items-center justify-center gap-2 disabled:opacity-50">
+                  {sending ? <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white" /> : <Mail size={14} />}
+                  Envoyer le catalogue
+                </button>
+              </div>
+            )}
           </div>
         </div>
       )}

@@ -241,13 +241,19 @@ router.post('/:id/send-report', authenticate, requireRole('super_admin', 'commer
     for (const user of recipients) {
       let reportContent = '';
 
-      if (['super_admin', 'commercial', 'comptable'].includes(user.role)) {
+      // Load rules for this campaign (CDC §2.2 — zero hardcoded constants)
+    const rulesEngine = require('../services/rulesEngine');
+    const rules = await rulesEngine.loadRulesForCampaign(campaign.id);
+    const commissionRate = rules.commission?.association?.value || 0;
+    const commissionPct = commissionRate / 100;
+
+    if (['super_admin', 'commercial', 'comptable'].includes(user.role)) {
         // Admin: full financials
         reportContent = `
           <div class="card">
             <div class="card-row"><span class="card-label">CA TTC</span><span class="card-value">${formatEur(globalStats.ca_ttc)}</span></div>
             <div class="card-row"><span class="card-label">CA HT</span><span class="card-value">${formatEur(globalStats.ca_ht)}</span></div>
-            <div class="card-row"><span class="card-label">Commission (5% HT)</span><span class="card-value">${formatEur(parseFloat(globalStats.ca_ht) * 0.05)}</span></div>
+            <div class="card-row"><span class="card-label">Commission (${commissionRate}% HT)</span><span class="card-value">${formatEur(parseFloat(globalStats.ca_ht) * commissionPct)}</span></div>
             <div class="card-row"><span class="card-label">Commandes</span><span class="card-value">${globalStats.orders_count}</span></div>
             <div class="card-row"><span class="card-label">Bouteilles</span><span class="card-value">${totalBottles.total}</span></div>
             <div class="card-row"><span class="card-label">Participants</span><span class="card-value">${participantsCount.count}</span></div>
@@ -282,26 +288,26 @@ router.post('/:id/send-report', authenticate, requireRole('super_admin', 'commer
             <div class="card-row"><span class="card-label">Bouteilles vendues</span><span class="card-value">${myBottles.total}</span></div>
           </div>`;
       } else if (user.role === 'cse') {
-        // CSE: savings
+        // CSE: savings — load discount from pricing_rules (CDC §2.2)
         const cseStats = await db('orders')
           .where({ campaign_id: campaign.id, user_id: user.id })
           .whereIn('status', validStatuses)
           .select(db.raw('COALESCE(SUM(total_ttc), 0) as my_ca')).first();
-        const savings = parseFloat(cseStats.my_ca) * 0.10; // 10% discount
+        const cseDiscountValue = rules.pricing?.value || 0;
+        const savings = parseFloat(cseStats.my_ca) * (cseDiscountValue / 100);
         reportContent = `
           <div class="card">
             <div class="card-row"><span class="card-label">Total commandes</span><span class="card-value">${formatEur(cseStats.my_ca)}</span></div>
-            <div class="card-row"><span class="card-label">Économie réalisée (-10%)</span><span class="card-value highlight">${formatEur(savings)}</span></div>
+            <div class="card-row"><span class="card-label">Économie réalisée (-${cseDiscountValue}%)</span><span class="card-value highlight">${formatEur(savings)}</span></div>
           </div>`;
       } else if (user.role === 'ambassadeur') {
-        // Ambassador: tier progress
-        const ambStats = await db('orders')
-          .where({ campaign_id: campaign.id, user_id: user.id })
-          .whereIn('status', validStatuses)
-          .select(db.raw('COALESCE(SUM(total_ttc), 0) as my_ca')).first();
-        const ca = parseFloat(ambStats.my_ca);
-        const tier = ca >= 5000 ? 'Platine' : ca >= 3000 ? 'Or' : ca >= 1500 ? 'Argent' : ca >= 500 ? 'Bronze' : 'Débutant';
-        const nextTier = ca >= 5000 ? '—' : ca >= 3000 ? `${formatEur(5000 - ca)} pour Platine` : ca >= 1500 ? `${formatEur(3000 - ca)} pour Or` : ca >= 500 ? `${formatEur(1500 - ca)} pour Argent` : `${formatEur(500 - ca)} pour Bronze`;
+        // Ambassador: tier progress — load from tier_rules (CDC §2.2)
+        const tierResult = await rulesEngine.calculateTier(user.id, rules.tier);
+        const ca = tierResult.ca;
+        const tier = tierResult.current?.label || 'Débutant';
+        const nextTier = tierResult.next
+          ? `${formatEur(tierResult.next.threshold - ca)} pour ${tierResult.next.label}`
+          : '—';
         reportContent = `
           <div class="card">
             <div class="card-row"><span class="card-label">Mon CA</span><span class="card-value">${formatEur(ca)}</span></div>

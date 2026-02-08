@@ -9,7 +9,17 @@ const COLOR_MAP = {
   rouge: 'bg-red-100 text-red-700',
   blanc: 'bg-yellow-50 text-yellow-700',
   rosé: 'bg-pink-100 text-pink-700',
+  effervescent: 'bg-sky-100 text-sky-700',
+  sans_alcool: 'bg-green-100 text-green-700',
 };
+
+const COLOR_CHIPS = [
+  { value: 'rouge', label: 'Rouge', dot: 'bg-red-500' },
+  { value: 'blanc', label: 'Blanc', dot: 'bg-yellow-400' },
+  { value: 'rosé', label: 'Rosé', dot: 'bg-pink-400' },
+  { value: 'effervescent', label: 'Effervescent', dot: 'bg-sky-400' },
+  { value: 'sans_alcool', label: 'Sans alcool', dot: 'bg-green-500' },
+];
 
 export default function BoutiqueHome() {
   const [products, setProducts] = useState([]);
@@ -66,8 +76,8 @@ export default function BoutiqueHome() {
 
       {/* Catalog */}
       <section id="catalog" className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
-        {/* Search + Filters */}
-        <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 mb-8">
+        {/* Search */}
+        <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 mb-4">
           <div className="relative flex-1 w-full">
             <Search size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
             <input
@@ -79,23 +89,43 @@ export default function BoutiqueHome() {
             />
           </div>
           <button onClick={() => setShowFilters(!showFilters)} className="flex items-center gap-2 px-4 py-2.5 border rounded-xl text-sm hover:bg-gray-50">
-            <Filter size={16} /> Filtres
-            {(color || region) && <span className="w-2 h-2 rounded-full bg-wine-600" />}
+            <Filter size={16} /> Régions
+            {region && <span className="w-2 h-2 rounded-full bg-wine-600" />}
           </button>
+        </div>
+
+        {/* Color chips */}
+        <div className="flex flex-wrap gap-2 mb-6">
+          <button
+            onClick={() => setColor('')}
+            className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium transition-all ${
+              !color ? 'bg-wine-700 text-white shadow-sm' : 'bg-white border border-gray-200 text-gray-600 hover:border-gray-300'
+            }`}
+          >
+            Tous
+          </button>
+          {COLOR_CHIPS.map((c) => (
+            <button
+              key={c.value}
+              onClick={() => setColor(color === c.value ? '' : c.value)}
+              className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium transition-all ${
+                color === c.value ? 'bg-wine-700 text-white shadow-sm' : 'bg-white border border-gray-200 text-gray-600 hover:border-gray-300'
+              }`}
+            >
+              <span className={`w-2.5 h-2.5 rounded-full ${c.dot} ${color === c.value ? 'ring-1 ring-white' : ''}`} />
+              {c.label}
+            </button>
+          ))}
         </div>
 
         {showFilters && filters && (
           <div className="flex flex-wrap gap-3 mb-6 p-4 bg-gray-50 rounded-xl">
-            <select value={color} onChange={(e) => setColor(e.target.value)} className="border rounded-lg px-3 py-2 text-sm">
-              <option value="">Toutes couleurs</option>
-              {filters.colors.map(c => <option key={c} value={c}>{c}</option>)}
-            </select>
             <select value={region} onChange={(e) => setRegion(e.target.value)} className="border rounded-lg px-3 py-2 text-sm">
               <option value="">Toutes régions</option>
               {filters.regions.map(r => <option key={r} value={r}>{r}</option>)}
             </select>
-            {(color || region) && (
-              <button onClick={() => { setColor(''); setRegion(''); }} className="text-sm text-wine-700 hover:underline">Réinitialiser</button>
+            {region && (
+              <button onClick={() => setRegion('')} className="text-sm text-wine-700 hover:underline">Réinitialiser</button>
             )}
           </div>
         )}
@@ -132,6 +162,7 @@ export default function BoutiqueHome() {
                   </div>
                   <h3 className="font-semibold text-gray-900 group-hover:text-wine-700 transition-colors">{p.name}</h3>
                   {p.appellation && <p className="text-xs text-gray-500 mt-1">{p.appellation}</p>}
+                  {p.description && <p className="text-xs text-gray-500 mt-1 line-clamp-2">{p.description}</p>}
                   <div className="flex items-center justify-between mt-3">
                     <span className="text-lg font-bold text-wine-700">{formatEur(p.price_ttc)}</span>
                     <span className="text-xs text-gray-400 group-hover:text-wine-600 flex items-center gap-1">

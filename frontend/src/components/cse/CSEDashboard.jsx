@@ -49,7 +49,7 @@ export default function CSEDashboard() {
   };
 
   const cartTotal = cart.reduce((sum, i) => sum + i.cse_price_ttc * i.qty, 0);
-  const minOrder = data?.minOrder || 200;
+  const minOrder = data?.minOrder || 0;
   const isUnderMin = cartTotal > 0 && cartTotal < minOrder;
 
   const handleOrder = async () => {
@@ -147,7 +147,8 @@ export default function CSEDashboard() {
           {data.products.map((p) => (
             <div key={p.id} className="card">
               <h3 className="font-semibold text-sm mb-1">{p.name}</h3>
-              <p className="text-xs text-gray-500 mb-2">{p.category} {p.label ? `— ${p.label}` : ''}</p>
+              <p className="text-xs text-gray-500">{p.category} {p.label ? `— ${p.label}` : ''}</p>
+              {p.description && <p className="text-xs text-gray-600 mb-2 line-clamp-2">{p.description}</p>}
               <div className="flex items-baseline gap-2 mb-3">
                 <span className="text-lg font-bold text-wine-700">{p.cse_price_ttc.toFixed(2)} EUR</span>
                 <span className="text-sm text-gray-400 line-through">{p.original_price_ttc.toFixed(2)} EUR</span>

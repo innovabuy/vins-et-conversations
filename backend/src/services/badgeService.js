@@ -1,6 +1,7 @@
 /**
  * Badge Service — Gamification (CDC §4.2)
  * Évalue et attribue des badges après chaque commande.
+ * Thresholds loaded from campaign config (CDC §2.2 — zero hardcoded constants)
  */
 const db = require('../config/database');
 const notificationService = require('./notificationService');
@@ -12,7 +13,7 @@ const BADGE_DEFINITIONS = [
     name: 'Top Vendeur',
     icon: 'trophy',
     description: '1er au classement de la campagne',
-    check: async (userId, campaignId) => {
+    check: async (userId, campaignId, badgeConfig) => {
       const ranking = await db('orders')
         .where({ campaign_id: campaignId })
         .whereNot('status', 'cancelled')
@@ -27,19 +28,20 @@ const BADGE_DEFINITIONS = [
     id: 'streak_7',
     name: 'Série de 7 jours',
     icon: 'flame',
-    description: 'Streak de ventes de 7 jours consécutifs',
-    check: async (userId, campaignId) => {
+    description: 'Streak de ventes consécutifs',
+    check: async (userId, campaignId, badgeConfig) => {
+      const streakDays = badgeConfig?.streak_7_days ?? 7;
       const orders = await db('orders')
         .where({ user_id: userId, campaign_id: campaignId })
         .whereNot('status', 'cancelled')
         .select(db.raw("DATE(created_at) as day"))
         .groupBy(db.raw("DATE(created_at)"))
         .orderBy('day', 'desc');
-      if (orders.length < 7) return false;
+      if (orders.length < streakDays) return false;
       let streak = 1;
       for (let i = 1; i < orders.length; i++) {
         const diff = (new Date(orders[i - 1].day) - new Date(orders[i].day)) / (1000 * 60 * 60 * 24);
-        if (diff === 1) { streak++; if (streak >= 7) return true; }
+        if (diff === 1) { streak++; if (streak >= streakDays) return true; }
         else streak = 1;
       }
       return false;
@@ -47,49 +49,52 @@ const BADGE_DEFINITIONS = [
   },
   {
     id: 'premier_1000',
-    name: 'Premier 1000€',
+    name: 'Premier palier CA',
     icon: 'banknote',
-    description: 'CA cumulé >= 1000€',
-    check: async (userId, campaignId) => {
+    description: 'CA cumulé atteint',
+    check: async (userId, campaignId, badgeConfig) => {
+      const threshold = badgeConfig?.premier_1000_threshold ?? 1000;
       const result = await db('orders')
         .where({ user_id: userId, campaign_id: campaignId })
         .whereNot('status', 'cancelled')
         .sum('total_ttc as total')
         .first();
-      return parseFloat(result?.total || 0) >= 1000;
+      return parseFloat(result?.total || 0) >= threshold;
     },
   },
   {
     id: 'machine_vendre',
     name: 'Machine à vendre',
     icon: 'zap',
-    description: '50+ bouteilles vendues',
-    check: async (userId, campaignId) => {
+    description: 'Objectif bouteilles atteint',
+    check: async (userId, campaignId, badgeConfig) => {
+      const threshold = badgeConfig?.machine_vendre_threshold ?? 50;
       const result = await db('orders')
         .where({ user_id: userId, campaign_id: campaignId })
         .whereNot('status', 'cancelled')
         .sum('total_items as total')
         .first();
-      return parseInt(result?.total || 0, 10) >= 50;
+      return parseInt(result?.total || 0, 10) >= threshold;
     },
   },
   {
     id: 'fidele',
     name: 'Fidèle',
     icon: 'heart',
-    description: 'Streak de 14 jours consécutifs',
-    check: async (userId, campaignId) => {
+    description: 'Longue série de ventes consécutives',
+    check: async (userId, campaignId, badgeConfig) => {
+      const fideleDays = badgeConfig?.fidele_days ?? 14;
       const orders = await db('orders')
         .where({ user_id: userId, campaign_id: campaignId })
         .whereNot('status', 'cancelled')
         .select(db.raw("DATE(created_at) as day"))
         .groupBy(db.raw("DATE(created_at)"))
         .orderBy('day', 'desc');
-      if (orders.length < 14) return false;
+      if (orders.length < fideleDays) return false;
       let streak = 1;
       for (let i = 1; i < orders.length; i++) {
         const diff = (new Date(orders[i - 1].day) - new Date(orders[i].day)) / (1000 * 60 * 60 * 24);
-        if (diff === 1) { streak++; if (streak >= 14) return true; }
+        if (diff === 1) { streak++; if (streak >= fideleDays) return true; }
         else streak = 1;
       }
       return false;
@@ -100,7 +105,7 @@ const BADGE_DEFINITIONS = [
     name: 'Objectif perso',
     icon: 'target',
     description: 'CA >= objectif personnel défini',
-    check: async (userId, campaignId) => {
+    check: async (userId, campaignId, badgeConfig) => {
       const participation = await db('participations')
         .where({ user_id: userId, campaign_id: campaignId })
         .first();
@@ -129,6 +134,11 @@ async function evaluateBadges(userId, campaignId) {
       .first();
     if (!participation) return;
 
+    // Load badge_config from campaign config (CDC §2.2 — zero hardcoded constants)
+    const campaign = await db('campaigns').where({ id: campaignId }).select('config').first();
+    const campaignConfig = typeof campaign?.config === 'string' ? JSON.parse(campaign.config) : (campaign?.config || {});
+    const badgeConfig = campaignConfig.badge_config || {};
+
     const config = participation.config || {};
     const existingBadges = config.badges || [];
     const earnedIds = existingBadges.map((b) => b.id);
@@ -137,7 +147,7 @@ async function evaluateBadges(userId, campaignId) {
     for (const badge of BADGE_DEFINITIONS) {
       if (earnedIds.includes(badge.id)) continue;
       try {
-        const earned = await badge.check(userId, campaignId);
+        const earned = await badge.check(userId, campaignId, badgeConfig);
         if (earned) {
           newBadges.push({
             id: badge.id,

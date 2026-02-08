@@ -1,9 +1,11 @@
 const express = require('express');
 const Joi = require('joi');
+const PDFDocument = require('pdfkit');
 const db = require('../config/database');
 const emailService = require('../services/emailService');
 const notificationService = require('../services/notificationService');
 const logger = require('../utils/logger');
+const { drawRadarSimple } = require('./catalogPdf');
 
 const router = express.Router();
 
@@ -129,6 +131,129 @@ router.get('/campaigns/:id/products', async (req, res) => {
 
     res.json({ data: products });
   } catch (err) {
+    res.status(500).json({ error: 'SERVER_ERROR' });
+  }
+});
+
+// GET /api/v1/public/catalog/:id/pdf — Fiche produit PDF (1 page)
+router.get('/catalog/:id/pdf', async (req, res) => {
+  try {
+    const product = await db('products')
+      .where({ id: req.params.id, active: true })
+      .first();
+    if (!product) return res.status(404).json({ error: 'NOT_FOUND' });
+
+    const formatEur = (v) => parseFloat(v).toFixed(2).replace('.', ',') + ' €';
+    const parseJson = (val) => {
+      if (!val) return [];
+      if (Array.isArray(val)) return val;
+      try { return JSON.parse(val); } catch { return []; }
+    };
+    const parseNotes = (val) => {
+      if (!val) return null;
+      if (typeof val === 'object') return val;
+      try { return JSON.parse(val); } catch { return null; }
+    };
+
+    const doc = new PDFDocument({ margin: 50, size: 'A4' });
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `inline; filename=fiche-${product.name.replace(/[^a-zA-Z0-9]/g, '-')}.pdf`);
+    doc.pipe(res);
+
+    // Header
+    doc.fontSize(9).fillColor('#9ca3af').text('Vins & Conversations', 50, 30, { align: 'right' });
+
+    // Name
+    doc.fontSize(26).fillColor('#7f1d1d').text(product.name, 50, 60);
+
+    // Subtitle
+    const subtitle = [product.appellation, product.region, product.vintage].filter(Boolean).join(' — ');
+    if (subtitle) {
+      doc.fontSize(11).fillColor('#6b7280').text(subtitle);
+    }
+    if (product.label) {
+      doc.fontSize(9).fillColor('#059669').text(`Label: ${product.label}`);
+    }
+    doc.moveDown(0.5);
+    doc.moveTo(50, doc.y).lineTo(545, doc.y).lineWidth(0.5).stroke('#e5e7eb');
+    doc.moveDown(0.5);
+
+    // Photo placeholder (left)
+    const photoY = doc.y;
+    doc.save();
+    doc.rect(50, photoY, 210, 160).lineWidth(1).stroke('#e5e7eb');
+    doc.fontSize(10).fillColor('#d1d5db').text('Photo', 120, photoY + 70, { width: 70, align: 'center' });
+    doc.restore();
+
+    // Radar chart (right)
+    const notes = parseNotes(product.tasting_notes);
+    if (notes) {
+      drawRadarSimple(doc, notes, 420, photoY + 80, 70);
+    }
+
+    doc.y = photoY + 175;
+
+    // Description
+    if (product.description) {
+      doc.fontSize(10).fillColor('#4b5563').text(product.description, 50, doc.y, { width: 495 });
+      doc.moveDown(0.5);
+    }
+
+    // Cépages
+    const grapes = parseJson(product.grape_varieties);
+    if (grapes.length) {
+      doc.fontSize(9).fillColor('#7f1d1d').text('Cépages');
+      doc.fontSize(9).fillColor('#4b5563').text(grapes.join(', '));
+      doc.moveDown(0.3);
+    }
+
+    // Accords
+    const pairing = parseJson(product.food_pairing);
+    if (pairing.length) {
+      doc.fontSize(9).fillColor('#7f1d1d').text('Accords mets & vins');
+      doc.fontSize(9).fillColor('#4b5563').text(pairing.join(', '));
+      doc.moveDown(0.3);
+    }
+
+    // Température
+    if (product.serving_temp) {
+      doc.fontSize(9).fillColor('#7f1d1d').text('Température de service');
+      doc.fontSize(9).fillColor('#4b5563').text(product.serving_temp);
+      doc.moveDown(0.3);
+    }
+
+    // Awards
+    const awards = parseJson(product.awards);
+    if (awards.length) {
+      doc.fontSize(9).fillColor('#7f1d1d').text('Distinctions');
+      awards.forEach((a) => {
+        doc.fontSize(9).fillColor('#d97706').text(`  ${a.name} (${a.year})`);
+      });
+      doc.moveDown(0.3);
+    }
+
+    // Winemaker notes
+    if (product.winemaker_notes) {
+      doc.moveDown(0.3);
+      doc.fontSize(9).fillColor('#6b7280').font('Helvetica-Oblique')
+        .text(`« ${product.winemaker_notes} »`, 50, doc.y, { width: 495 });
+      doc.font('Helvetica');
+      doc.moveDown(0.5);
+    }
+
+    // Price
+    doc.moveDown(0.5);
+    doc.moveTo(50, doc.y).lineTo(545, doc.y).lineWidth(0.5).stroke('#e5e7eb');
+    doc.moveDown(0.5);
+    doc.fontSize(16).fillColor('#7f1d1d').text(`${formatEur(product.price_ttc)} TTC`);
+    doc.fontSize(9).fillColor('#6b7280').text(`${formatEur(product.price_ht)} HT — TVA ${product.tva_rate}%`);
+
+    // Footer
+    doc.fontSize(7).fillColor('#d1d5db').text('Vins & Conversations — nicolas@vins-conversations.fr', 50, 780, { align: 'center', width: 495 });
+
+    doc.end();
+  } catch (err) {
+    logger.error('Single wine PDF error:', err);
     res.status(500).json({ error: 'SERVER_ERROR' });
   }
 });

@@ -17,6 +17,20 @@ router.get(
       if (!campaignId) return res.status(400).json({ error: 'CAMPAIGN_REQUIRED' });
 
       const data = await dashboardService.getStudentDashboard(req.user.userId, campaignId);
+
+      // Add badge definitions with dynamic descriptions from campaign config (CDC §2.2)
+      const campaign = await db('campaigns').where({ id: campaignId }).select('config').first();
+      const campConfig = typeof campaign?.config === 'string' ? JSON.parse(campaign.config) : (campaign?.config || {});
+      const bc = campConfig.badge_config || {};
+      data.badgeDefinitions = [
+        { id: 'top_vendeur', name: 'Top Vendeur', icon: 'trophy', description: '1er au classement' },
+        { id: 'streak_7', name: `Série ${bc.streak_7_days || 7}j`, icon: 'flame', description: `${bc.streak_7_days || 7} jours consécutifs` },
+        { id: 'premier_1000', name: `Premier ${bc.premier_1000_threshold || 1000}\u20AC`, icon: 'banknote', description: `CA >= ${bc.premier_1000_threshold || 1000}\u20AC` },
+        { id: 'machine_vendre', name: 'Machine à vendre', icon: 'zap', description: `${bc.machine_vendre_threshold || 50}+ bouteilles` },
+        { id: 'fidele', name: 'Fidèle', icon: 'heart', description: `${bc.fidele_days || 14} jours consécutifs` },
+        { id: 'objectif_perso', name: 'Objectif perso', icon: 'target', description: 'Objectif atteint' },
+      ];
+
       res.json(data);
     } catch (err) {
       if (err.message === 'NOT_PARTICIPANT') {
@@ -150,6 +164,7 @@ router.get(
         return {
           id: p.id,
           name: p.name,
+          description: p.description,
           category: p.category,
           label: p.label,
           image_url: p.image_url,
@@ -249,6 +264,7 @@ router.get(
 
       res.json({
         tier,
+        tiers: rules.tier?.tiers || [],
         sales: { caTTC, caHT, bottles, orderCount },
         recentOrders,
         referralClicks: parseInt(referralClicks?.count || 0, 10),

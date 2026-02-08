@@ -251,6 +251,8 @@ async function getTeacherDashboard(userId, campaignId) {
   const campaign = await db('campaigns').where({ id: campaignId }).first();
   if (!campaign) throw new Error('CAMPAIGN_NOT_FOUND');
 
+  const config = typeof campaign.config === 'string' ? JSON.parse(campaign.config) : (campaign.config || {});
+
   // Progression classe (objectif global en %)
   const caResult = await db('orders')
     .where({ campaign_id: campaignId })
@@ -297,16 +299,18 @@ async function getTeacherDashboard(userId, campaignId) {
   const lastOrderMap = {};
   lastOrders.forEach((o) => { lastOrderMap[o.user_id] = o.last_order; });
 
+  // Load inactivity threshold from campaign config (CDC §2.2 — zero hardcoded)
+  const inactivityThreshold = config.inactivity_threshold ?? 7;
+
   const now = new Date();
   const inactiveStudents = allStudents.filter((s) => {
     const lastDate = lastOrderMap[s.id];
     if (!lastDate) return true;
     const daysSince = Math.floor((now - new Date(lastDate)) / (1000 * 60 * 60 * 24));
-    return daysSince > 7;
+    return daysSince > inactivityThreshold;
   });
 
   // Class groups from config
-  const config = typeof campaign.config === 'string' ? JSON.parse(campaign.config) : (campaign.config || {});
   const classGroups = config.classes || [];
 
   // Per-class aggregation (bottles only — NO euros)

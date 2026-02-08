@@ -88,14 +88,9 @@ export default function AmbassadorDashboard() {
           <p className="text-sm text-green-600 font-medium">Palier maximum atteint !</p>
         )}
 
-        {/* All tiers display */}
+        {/* All tiers display — loaded from API (CDC §2.2 — zero hardcoded) */}
         <div className="mt-4 grid grid-cols-4 gap-2">
-          {tier.current && [
-            { label: 'Bronze', threshold: 500 },
-            { label: 'Argent', threshold: 1500 },
-            { label: 'Or', threshold: 3000 },
-            { label: 'Platine', threshold: 5000 },
-          ].map((t) => {
+          {(data.tiers || []).map((t) => {
             const reached = tier.ca >= t.threshold;
             const style = TIER_COLORS[t.label];
             return (

@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { ArrowLeft, Wine, Thermometer, Award, Grape } from 'lucide-react';
+import { ArrowLeft, Wine, Thermometer, Award, Grape, Download } from 'lucide-react';
 import { ResponsiveContainer, RadarChart, PolarGrid, PolarAngleAxis, Radar } from 'recharts';
 import api from '../../services/api';
 
@@ -27,14 +27,17 @@ export default function ProductDetail() {
   if (loading) return <div className="flex justify-center py-20"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-wine-700" /></div>;
   if (!product) return <div className="text-center py-20 text-gray-400">Vin introuvable</div>;
 
-  const notes = product.tasting_notes || {};
+  const rawNotes = product.tasting_notes || {};
+  const notes = typeof rawNotes === 'string' ? JSON.parse(rawNotes) : rawNotes;
   const radarData = [
-    { axis: 'Fruité', value: notes.fruit || 0 },
-    { axis: 'Boisé', value: notes.wood || 0 },
-    { axis: 'Épicé', value: notes.spice || 0 },
-    { axis: 'Floral', value: notes.floral || 0 },
-    { axis: 'Tannins', value: notes.tannin || 0 },
-    { axis: 'Acidité', value: notes.acidity || 0 },
+    { axis: 'Fruité', value: notes.fruite || 0 },
+    { axis: 'Minéral', value: notes.mineralite || 0 },
+    { axis: 'Rondeur', value: notes.rondeur || 0 },
+    { axis: 'Acidité', value: notes.acidite || 0 },
+    { axis: 'Tanins', value: notes.tanins || 0 },
+    { axis: 'Boisé', value: notes.boise || 0 },
+    { axis: 'Longueur', value: notes.longueur || 0 },
+    { axis: 'Puissance', value: notes.puissance || 0 },
   ];
   const hasRadar = radarData.some(d => d.value > 0);
 
@@ -70,7 +73,17 @@ export default function ProductDetail() {
             {product.region && <p className="text-sm text-gray-400">{product.region}</p>}
           </div>
 
-          <div className="text-3xl font-bold text-wine-700">{formatEur(product.price_ttc)}</div>
+          <div className="flex items-center gap-4">
+            <span className="text-3xl font-bold text-wine-700">{formatEur(product.price_ttc)}</span>
+            <a
+              href={`${api.defaults.baseURL}/public/catalog/${product.id}/pdf`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm border border-gray-200 rounded-lg hover:bg-gray-50 text-gray-600 transition-colors"
+            >
+              <Download size={14} /> Fiche PDF
+            </a>
+          </div>
 
           {product.description && (
             <div>

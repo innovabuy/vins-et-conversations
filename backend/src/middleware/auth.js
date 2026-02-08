@@ -80,7 +80,15 @@ async function antifraudCheck(req, res, next) {
     }
 
     // --- Vérification 1: Limite commandes impayées ---
-    const MAX_UNPAID = 3; // configurable via client_type config
+    // Load max_unpaid_orders from campaign config (CDC §2.2 — zero hardcoded constants)
+    const campaignId = req.body.campaign_id;
+    let maxUnpaid = 3; // default if no campaign config
+    if (campaignId) {
+      const campaign = await db('campaigns').where({ id: campaignId }).select('config').first();
+      const config = typeof campaign?.config === 'string' ? JSON.parse(campaign.config) : (campaign?.config || {});
+      maxUnpaid = config.max_unpaid_orders ?? 3;
+    }
+
     const unpaidCount = await db('orders')
       .leftJoin('payments', 'orders.id', 'payments.order_id')
       .where('orders.user_id', userId)
@@ -92,7 +100,7 @@ async function antifraudCheck(req, res, next) {
       .countDistinct('orders.id as count')
       .first();
 
-    if (parseInt(unpaidCount?.count || 0, 10) >= MAX_UNPAID) {
+    if (parseInt(unpaidCount?.count || 0, 10) >= maxUnpaid) {
       return res.status(403).json({
         error: 'MAX_UNPAID_ORDERS',
         message: 'Vous avez atteint la limite de commandes impayées',
