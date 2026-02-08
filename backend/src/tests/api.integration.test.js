@@ -1747,4 +1747,266 @@ describe('API Integration Tests', () => {
       await expect(evaluateBadges(student.id, campaignId)).resolves.not.toThrow();
     });
   });
+
+  // ─── Boutique E-commerce Tests ────────────────────────
+
+  describe('Boutique — Cart CRUD via public API', () => {
+    let sessionId;
+
+    test('POST /public/cart creates a cart with session_id', async () => {
+      const product = await db('products').where({ visible_boutique: true, active: true }).first();
+      if (!product) return;
+
+      const res = await request(app)
+        .post('/api/v1/public/cart')
+        .send({
+          items: [{ product_id: product.id, qty: 2 }],
+        });
+
+      expect(res.status).toBe(200);
+      expect(res.body.session_id).toBeDefined();
+      expect(res.body.items.length).toBe(1);
+      expect(res.body.items[0].qty).toBe(2);
+      expect(res.body.total_ttc).toBeGreaterThan(0);
+      sessionId = res.body.session_id;
+    });
+
+    test('GET /public/cart/:session_id returns cart contents', async () => {
+      if (!sessionId) return;
+
+      const res = await request(app)
+        .get(`/api/v1/public/cart/${sessionId}`);
+
+      expect(res.status).toBe(200);
+      expect(res.body.items.length).toBe(1);
+      expect(res.body.total_ttc).toBeGreaterThan(0);
+    });
+
+    test('POST /public/cart updates existing cart', async () => {
+      if (!sessionId) return;
+
+      const products = await db('products').where({ visible_boutique: true, active: true }).limit(2);
+      if (products.length < 1) return;
+
+      const res = await request(app)
+        .post('/api/v1/public/cart')
+        .send({
+          session_id: sessionId,
+          items: products.map((p) => ({ product_id: p.id, qty: 3 })),
+        });
+
+      expect(res.status).toBe(200);
+      expect(res.body.items.length).toBe(products.length);
+      expect(res.body.total_items).toBe(products.length * 3);
+    });
+
+    test('Empty cart clears session', async () => {
+      if (!sessionId) return;
+
+      const res = await request(app)
+        .post('/api/v1/public/cart')
+        .send({ session_id: sessionId, items: [] });
+
+      expect(res.status).toBe(200);
+      expect(res.body.items.length).toBe(0);
+      expect(res.body.total_ttc).toBe(0);
+    });
+  });
+
+  describe('Boutique — Checkout creates order with pending_payment', () => {
+    let boutiqueOrderId;
+    let boutiqueOrderRef;
+
+    test('POST /public/checkout creates order', async () => {
+      const product = await db('products').where({ visible_boutique: true, active: true }).first();
+      if (!product) return;
+
+      // Create cart first
+      const cartRes = await request(app)
+        .post('/api/v1/public/cart')
+        .send({ items: [{ product_id: product.id, qty: 2 }] });
+      const sid = cartRes.body.session_id;
+
+      const res = await request(app)
+        .post('/api/v1/public/checkout')
+        .send({
+          session_id: sid,
+          customer: {
+            name: 'Jean Test',
+            email: 'jean.test@example.fr',
+            phone: '0612345678',
+            address: '123 Rue de Test',
+            city: 'Angers',
+            postal_code: '49000',
+          },
+        });
+
+      expect(res.status).toBe(201);
+      expect(res.body.order_id).toBeDefined();
+      expect(res.body.ref).toMatch(/^VC-\d{4}-\d{4}$/);
+      expect(res.body.total_ttc).toBeGreaterThan(0);
+      boutiqueOrderId = res.body.order_id;
+      boutiqueOrderRef = res.body.ref;
+
+      // Verify order status in DB
+      const order = await db('orders').where({ id: boutiqueOrderId }).first();
+      expect(order.status).toBe('pending_payment');
+      expect(order.source).toBe('boutique_web');
+      expect(order.user_id).toBeNull();
+    });
+
+    test('POST /public/checkout/confirm transitions to submitted', async () => {
+      if (!boutiqueOrderId) return;
+
+      const res = await request(app)
+        .post('/api/v1/public/checkout/confirm')
+        .send({
+          order_id: boutiqueOrderId,
+          payment_intent_id: 'pi_boutique_test_123',
+        });
+
+      expect(res.status).toBe(200);
+      expect(res.body.confirmed).toBe(true);
+      expect(res.body.status).toBe('submitted');
+
+      // Verify in DB
+      const order = await db('orders').where({ id: boutiqueOrderId }).first();
+      expect(order.status).toBe('submitted');
+    });
+
+    test('GET /public/order/:ref tracks order by ref + email', async () => {
+      if (!boutiqueOrderRef) return;
+
+      const res = await request(app)
+        .get(`/api/v1/public/order/${boutiqueOrderRef}`)
+        .query({ email: 'jean.test@example.fr' });
+
+      expect(res.status).toBe(200);
+      expect(res.body.ref).toBe(boutiqueOrderRef);
+      expect(res.body.status).toBe('submitted');
+      expect(res.body.items).toBeInstanceOf(Array);
+      expect(res.body.items.length).toBeGreaterThan(0);
+    });
+
+    test('GET /public/order/:ref with wrong email returns 404', async () => {
+      if (!boutiqueOrderRef) return;
+
+      const res = await request(app)
+        .get(`/api/v1/public/order/${boutiqueOrderRef}`)
+        .query({ email: 'wrong@example.fr' });
+
+      expect(res.status).toBe(404);
+    });
+
+    // Cleanup
+    afterAll(async () => {
+      if (boutiqueOrderId) {
+        await db('payments').where({ order_id: boutiqueOrderId }).delete();
+        await db('stock_movements').where({ reference: boutiqueOrderRef }).delete();
+        await db('financial_events').where({ order_id: boutiqueOrderId }).delete();
+        await db('order_items').where({ order_id: boutiqueOrderId }).delete();
+        await db('orders').where({ id: boutiqueOrderId }).delete();
+      }
+    });
+  });
+
+  describe('Boutique — Ambassador referral code', () => {
+    test('GET /public/ambassador/:code resolves valid referral code', async () => {
+      const participation = await db('participations')
+        .whereNotNull('referral_code')
+        .first();
+      if (!participation) return;
+
+      const res = await request(app)
+        .get(`/api/v1/public/ambassador/${participation.referral_code}`);
+
+      expect(res.status).toBe(200);
+      expect(res.body.name).toBeDefined();
+      expect(res.body.code).toBe(participation.referral_code);
+    });
+
+    test('GET /public/ambassador/:code returns 404 for invalid code', async () => {
+      const res = await request(app)
+        .get('/api/v1/public/ambassador/AMB-INVALID00');
+
+      expect(res.status).toBe(404);
+    });
+
+    test('Referral checkout creates order with ambassador_referral source', async () => {
+      const product = await db('products').where({ visible_boutique: true, active: true }).first();
+      const participation = await db('participations').whereNotNull('referral_code').first();
+      if (!product || !participation) return;
+
+      // Create cart
+      const cartRes = await request(app)
+        .post('/api/v1/public/cart')
+        .send({ items: [{ product_id: product.id, qty: 1 }] });
+
+      const res = await request(app)
+        .post('/api/v1/public/checkout')
+        .send({
+          session_id: cartRes.body.session_id,
+          customer: {
+            name: 'Referral Test',
+            email: 'referral.test@example.fr',
+            address: '456 Rue Ref',
+            city: 'Paris',
+            postal_code: '75001',
+          },
+          referral_code: participation.referral_code,
+        });
+
+      expect(res.status).toBe(201);
+
+      // Verify source in DB
+      const order = await db('orders').where({ id: res.body.order_id }).first();
+      expect(order.source).toBe('ambassador_referral');
+      expect(order.referred_by).toBe(participation.user_id);
+
+      // Cleanup
+      await db('financial_events').where({ order_id: res.body.order_id }).delete();
+      await db('order_items').where({ order_id: res.body.order_id }).delete();
+      await db('orders').where({ id: res.body.order_id }).delete();
+    });
+  });
+
+  describe('Boutique — Email templates render', () => {
+    test('Boutique order confirmation template renders', () => {
+      const { renderTemplate } = require('../services/emailService');
+      const html = renderTemplate('boutique-order-confirmation', {
+        NAME: 'Jean',
+        ORDER_REF: 'VC-2026-0099',
+        TOTAL_TTC: '45,00 EUR',
+        ITEMS_ROWS: '<tr><td>Bordeaux</td><td>3</td><td>15,00 EUR</td><td>45,00 EUR</td></tr>',
+        TRACKING_URL: 'http://localhost/boutique/suivi',
+      });
+      expect(html).toContain('VC-2026-0099');
+      expect(html).toContain('Bordeaux');
+      expect(html).toContain('Suivre ma commande');
+    });
+
+    test('Boutique payment confirmed template renders', () => {
+      const { renderTemplate } = require('../services/emailService');
+      const html = renderTemplate('boutique-payment-confirmed', {
+        NAME: 'Jean',
+        ORDER_REF: 'VC-2026-0099',
+        TOTAL_TTC: '45,00 EUR',
+        TRACKING_URL: 'http://localhost/boutique/suivi',
+      });
+      expect(html).toContain('VC-2026-0099');
+      expect(html).toContain('Paiement confirmé');
+    });
+  });
+
+  describe('Boutique — Admin orders source filter', () => {
+    test('Admin can list orders filtered by source', async () => {
+      const res = await request(app)
+        .get('/api/v1/orders/admin/list')
+        .set('Authorization', `Bearer ${adminToken}`)
+        .query({ source: 'campaign' });
+
+      expect(res.status).toBe(200);
+      expect(res.body.data).toBeInstanceOf(Array);
+    });
+  });
 });

@@ -10,6 +10,7 @@ const formatEur = (v) => new Intl.NumberFormat('fr-FR', { style: 'currency', cur
 const formatDate = (d) => new Date(d).toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
 
 const STATUS_LABELS = {
+  pending_payment: { label: 'Paiement en cours', color: 'bg-orange-100 text-orange-800' },
   draft: { label: 'Brouillon', color: 'bg-gray-100 text-gray-700' },
   submitted: { label: 'En attente', color: 'bg-yellow-100 text-yellow-800' },
   validated: { label: 'Validée', color: 'bg-green-100 text-green-800' },
@@ -17,6 +18,14 @@ const STATUS_LABELS = {
   shipped: { label: 'Expédiée', color: 'bg-purple-100 text-purple-800' },
   delivered: { label: 'Livrée', color: 'bg-gray-100 text-gray-800' },
   cancelled: { label: 'Annulée', color: 'bg-red-100 text-red-800' },
+};
+
+const SOURCE_LABELS = {
+  campaign: { label: 'Campagne', color: 'bg-blue-50 text-blue-700' },
+  boutique_web: { label: 'Boutique Web', color: 'bg-purple-50 text-purple-700' },
+  ambassador_referral: { label: 'Ambassadeur', color: 'bg-green-50 text-green-700' },
+  phone: { label: 'Téléphone', color: 'bg-gray-50 text-gray-700' },
+  email: { label: 'Email', color: 'bg-sky-50 text-sky-700' },
 };
 
 // ─── New Order Form ──────────────────────────────────
@@ -296,6 +305,7 @@ export default function AdminOrders() {
     campaign_id: searchParams.get('campaign_id') || '',
     status: searchParams.get('status') || '',
     user_id: searchParams.get('user_id') || '',
+    source: searchParams.get('source') || '',
     page: 1,
   });
   const [hideDelivered, setHideDelivered] = useState(false);
@@ -310,6 +320,7 @@ export default function AdminOrders() {
       if (filters.campaign_id) params.campaign_id = filters.campaign_id;
       if (filters.status) params.status = filters.status;
       if (filters.user_id) params.user_id = filters.user_id;
+      if (filters.source) params.source = filters.source;
       params.page = filters.page;
       params.limit = 20;
       const { data } = await ordersAPI.list(params);
@@ -372,6 +383,13 @@ export default function AdminOrders() {
               {Object.entries(STATUS_LABELS).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
             </select>
           </div>
+          <div className="min-w-[150px]">
+            <label className="block text-xs font-medium text-gray-500 mb-1">Source</label>
+            <select value={filters.source} onChange={e => setFilters(f => ({ ...f, source: e.target.value, page: 1 }))} className="w-full border rounded-lg px-3 py-2 text-sm">
+              <option value="">Toutes</option>
+              {Object.entries(SOURCE_LABELS).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
+            </select>
+          </div>
           <button onClick={() => setHideDelivered(h => !h)} className={`flex items-center gap-1.5 px-3 py-2 text-sm rounded-lg border ${hideDelivered ? 'bg-wine-50 border-wine-200 text-wine-700' : 'border-gray-200 text-gray-500'}`} title={hideDelivered ? 'Afficher les livrées' : 'Masquer les livrées'}>
             {hideDelivered ? <EyeOff size={14} /> : <Eye size={14} />}
             {hideDelivered ? 'Livrées masquées' : 'Masquer livrées'}
@@ -380,7 +398,7 @@ export default function AdminOrders() {
             <AlertTriangle size={14} />
             À vérifier
           </button>
-          <button onClick={() => { setFilters({ campaign_id: '', status: '', user_id: '', page: 1 }); setShowFlaggedOnly(false); }} className="text-sm text-gray-500 hover:text-gray-700 px-3 py-2">Effacer</button>
+          <button onClick={() => { setFilters({ campaign_id: '', status: '', user_id: '', source: '', page: 1 }); setShowFlaggedOnly(false); }} className="text-sm text-gray-500 hover:text-gray-700 px-3 py-2">Effacer</button>
         </div>
       </div>
 
@@ -430,6 +448,7 @@ export default function AdminOrders() {
                 <th className="pb-3 font-medium">Montant</th>
                 <th className="pb-3 font-medium">Date</th>
                 <th className="pb-3 font-medium">Articles</th>
+                <th className="pb-3 font-medium">Source</th>
                 <th className="pb-3 font-medium">Statut</th>
                 <th className="pb-3 font-medium text-right">Actions</th>
               </tr>
@@ -447,6 +466,9 @@ export default function AdminOrders() {
                     <td className="py-3 font-semibold">{formatEur(o.total_ttc)}</td>
                     <td className="py-3 text-gray-500 text-xs">{formatDate(o.created_at)}</td>
                     <td className="py-3">{o.total_items}</td>
+                    <td className="py-3">
+                      {(() => { const src = SOURCE_LABELS[o.source] || SOURCE_LABELS.campaign; return <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${src.color}`}>{src.label}</span>; })()}
+                    </td>
                     <td className="py-3">
                       <span className={`px-2 py-1 rounded-full text-xs font-medium ${status.color}`}>{status.label}</span>
                       {hasFlagged(o) && <span className="ml-1 text-orange-500" title="À vérifier"><AlertTriangle size={14} className="inline" /></span>}

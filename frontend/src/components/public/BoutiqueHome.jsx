@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
-import { Wine, Search, Filter, ChevronRight } from 'lucide-react';
+import { Wine, Search, Filter, ChevronRight, ShoppingCart, Check } from 'lucide-react';
 import api from '../../services/api';
+import { useCart } from '../../contexts/CartContext';
 
 const formatEur = (v) => new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR' }).format(v);
 
@@ -31,6 +32,8 @@ export default function BoutiqueHome() {
   const [color, setColor] = useState('');
   const [region, setRegion] = useState('');
   const [showFilters, setShowFilters] = useState(false);
+  const [addedId, setAddedId] = useState(null);
+  const { addToCart } = useCart();
 
   const fetchProducts = async () => {
     setLoading(true);
@@ -168,9 +171,22 @@ export default function BoutiqueHome() {
                   {p.description && <p className="text-xs text-gray-500 mt-1 line-clamp-2">{p.description}</p>}
                   <div className="flex items-center justify-between mt-3">
                     <span className="text-lg font-bold text-wine-700">{formatEur(p.price_ttc)}</span>
-                    <span className="text-xs text-gray-400 group-hover:text-wine-600 flex items-center gap-1">
-                      Voir <ChevronRight size={14} />
-                    </span>
+                    <button
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        addToCart({ id: p.id, name: p.name, price_ttc: p.price_ttc });
+                        setAddedId(p.id);
+                        setTimeout(() => setAddedId(null), 1500);
+                      }}
+                      className={`flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
+                        addedId === p.id
+                          ? 'bg-green-100 text-green-700'
+                          : 'bg-wine-50 text-wine-700 hover:bg-wine-100'
+                      }`}
+                    >
+                      {addedId === p.id ? <><Check size={14} /> Ajouté</> : <><ShoppingCart size={14} /> Ajouter</>}
+                    </button>
                   </div>
                 </div>
               </Link>

@@ -194,6 +194,33 @@ async function sendPasswordReset({ email, name, resetUrl }) {
   return sendEmail({ to: email, subject: 'Réinitialisation de votre mot de passe', html });
 }
 
+async function sendBoutiqueOrderConfirmation({ email, name, orderRef, totalTTC, items }) {
+  const itemsRows = (items || []).map((i) =>
+    `<tr><td>${i.name}</td><td>${i.qty}</td><td>${formatEur(i.unit_price_ttc)}</td><td>${formatEur(i.qty * i.unit_price_ttc)}</td></tr>`
+  ).join('');
+
+  const html = renderTemplate('boutique-order-confirmation', {
+    SUBJECT: `Commande ${orderRef} confirmée`,
+    NAME: name,
+    ORDER_REF: orderRef,
+    TOTAL_TTC: formatEur(totalTTC),
+    ITEMS_ROWS: itemsRows,
+    TRACKING_URL: `${BASE_URL}/boutique/suivi`,
+  });
+  return sendEmail({ to: email, subject: `Commande ${orderRef} confirmée — Vins & Conversations`, html });
+}
+
+async function sendBoutiquePaymentConfirmed({ email, name, orderRef, totalTTC }) {
+  const html = renderTemplate('boutique-payment-confirmed', {
+    SUBJECT: `Paiement ${orderRef} confirmé`,
+    NAME: name,
+    ORDER_REF: orderRef,
+    TOTAL_TTC: formatEur(totalTTC),
+    TRACKING_URL: `${BASE_URL}/boutique/suivi`,
+  });
+  return sendEmail({ to: email, subject: `Paiement confirmé — ${orderRef}`, html });
+}
+
 module.exports = {
   sendEmail,
   renderTemplate,
@@ -205,4 +232,6 @@ module.exports = {
   sendInvitation,
   sendPaymentReminder,
   sendPasswordReset,
+  sendBoutiqueOrderConfirmation,
+  sendBoutiquePaymentConfirmed,
 };

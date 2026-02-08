@@ -1,0 +1,16 @@
+<h2>Paiement confirmé !</h2>
+<p>Bonjour {{NAME}},</p>
+<p>Nous confirmons la réception de votre paiement pour la commande <span class="highlight">{{ORDER_REF}}</span>.</p>
+<div class="card">
+  <div class="card-row"><span class="card-label">Référence</span><span class="card-value">{{ORDER_REF}}</span></div>
+  <div class="card-row"><span class="card-label">Montant</span><span class="card-value highlight">{{TOTAL_TTC}}</span></div>
+  <div class="card-row"><span class="card-label">Paiement</span><span class="card-value" style="color:#16a34a">Confirmé</span></div>
+</div>
+<p>Prochaines étapes :</p>
+<ol>
+  <li>Préparation de votre commande</li>
+  <li>Expédition (vous serez notifié par email)</li>
+  <li>Livraison à l'adresse indiquée</li>
+</ol>
+<p style="text-align:center"><a class="btn" href="{{TRACKING_URL}}">Suivre ma commande</a></p>
+<p class="muted">Merci pour votre confiance. Pour toute question, contactez-nous à nicolas@vins-conversations.fr</p>

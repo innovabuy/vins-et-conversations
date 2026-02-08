@@ -36,6 +36,13 @@ import PublicLayout from './components/layout/PublicLayout';
 import BoutiqueHome from './components/public/BoutiqueHome';
 import ProductDetail from './components/public/ProductDetail';
 import ContactForm from './components/public/ContactForm';
+import CartPage from './components/public/CartPage';
+import CheckoutPage from './components/public/CheckoutPage';
+import ConfirmationPage from './components/public/ConfirmationPage';
+import OrderTrackingPage from './components/public/OrderTrackingPage';
+import CGVPage from './components/public/CGVPage';
+import MentionsLegalesPage from './components/public/MentionsLegalesPage';
+import { CartProvider } from './contexts/CartContext';
 
 function ProtectedRoute({ children, roles }) {
   const { user, loading } = useAuth();
@@ -53,10 +60,16 @@ function AppRoutes() {
       <Route path="/login" element={<LoginPage />} />
 
       {/* Public boutique */}
-      <Route path="/boutique" element={<PublicLayout />}>
+      <Route path="/boutique" element={<CartProvider><PublicLayout /></CartProvider>}>
         <Route index element={<BoutiqueHome />} />
         <Route path="vin/:id" element={<ProductDetail />} />
         <Route path="contact" element={<ContactForm />} />
+        <Route path="panier" element={<CartPage />} />
+        <Route path="commander" element={<CheckoutPage />} />
+        <Route path="confirmation/:ref" element={<ConfirmationPage />} />
+        <Route path="suivi" element={<OrderTrackingPage />} />
+        <Route path="cgv" element={<CGVPage />} />
+        <Route path="mentions-legales" element={<MentionsLegalesPage />} />
       </Route>
 
       {/* Admin routes */}

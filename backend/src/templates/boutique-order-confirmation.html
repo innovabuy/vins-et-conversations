@@ -1,0 +1,25 @@
+<h2>Commande confirmée !</h2>
+<p>Bonjour {{NAME}},</p>
+<p>Merci pour votre commande <span class="highlight">{{ORDER_REF}}</span> sur notre boutique en ligne.</p>
+<div class="card">
+  <div class="card-row"><span class="card-label">Référence</span><span class="card-value">{{ORDER_REF}}</span></div>
+  <div class="card-row"><span class="card-label">Total TTC</span><span class="card-value highlight">{{TOTAL_TTC}}</span></div>
+  <div class="card-row"><span class="card-label">Statut</span><span class="card-value" style="color:#16a34a">Confirmée</span></div>
+</div>
+{{#ITEMS_ROWS}}
+<h3 style="margin-top:20px">Détail de votre commande</h3>
+<table style="width:100%;border-collapse:collapse;margin-top:10px">
+  <thead>
+    <tr style="background:#f9fafb">
+      <th style="text-align:left;padding:8px;border-bottom:1px solid #e5e7eb">Produit</th>
+      <th style="text-align:center;padding:8px;border-bottom:1px solid #e5e7eb">Qté</th>
+      <th style="text-align:right;padding:8px;border-bottom:1px solid #e5e7eb">Prix unit.</th>
+      <th style="text-align:right;padding:8px;border-bottom:1px solid #e5e7eb">Total</th>
+    </tr>
+  </thead>
+  <tbody>{{ITEMS_ROWS}}</tbody>
+</table>
+{{/ITEMS_ROWS}}
+<p style="margin-top:20px">Votre commande est en cours de traitement. Vous recevrez un email lors de l'expédition.</p>
+<p style="text-align:center"><a class="btn" href="{{TRACKING_URL}}">Suivre ma commande</a></p>
+<p class="muted">Pour toute question, contactez-nous à nicolas@vins-conversations.fr</p>

@@ -36,7 +36,7 @@ function FilterBar({ filters, setFilters, filterOptions }) {
 
   const clearAll = () => setFilters({
     campaign_id: '', seller_id: '', product_id: '', supplier_id: '',
-    segment: '', class_group: '', date_from: '', date_to: '',
+    segment: '', class_group: '', date_from: '', date_to: '', source: '',
   });
 
   const clearOne = (key) => setFilters(prev => ({ ...prev, [key]: '' }));
@@ -50,6 +50,7 @@ function FilterBar({ filters, setFilters, filterOptions }) {
     class_group: 'Classe',
     date_from: 'Du',
     date_to: 'Au',
+    source: 'Source',
   };
 
   const getDisplayValue = (key, val) => {
@@ -59,6 +60,7 @@ function FilterBar({ filters, setFilters, filterOptions }) {
     if (key === 'product_id') return filterOptions.products?.find(p => p.id === val)?.name || val;
     if (key === 'supplier_id') return filterOptions.suppliers?.find(s => s.id === val)?.name || val;
     if (key === 'segment') return filterOptions.segments?.find(s => s.name === val)?.label || val;
+    if (key === 'source') return { campaign: 'Campagne', boutique_web: 'Boutique Web', ambassador_referral: 'Ambassadeur' }[val] || val;
     return val;
   };
 
@@ -87,7 +89,7 @@ function FilterBar({ filters, setFilters, filterOptions }) {
       </div>
 
       {/* Row 1: always visible */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+      <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
         <select value={filters.campaign_id} onChange={e => setFilters(f => ({ ...f, campaign_id: e.target.value }))} className={sel}>
           <option value="">Toutes campagnes</option>
           {filterOptions.campaigns?.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
@@ -99,6 +101,12 @@ function FilterBar({ filters, setFilters, filterOptions }) {
         <select value={filters.segment} onChange={e => setFilters(f => ({ ...f, segment: e.target.value }))} className={sel}>
           <option value="">Tous segments</option>
           {filterOptions.segments?.map(s => <option key={s.name} value={s.name}>{s.label}</option>)}
+        </select>
+        <select value={filters.source || ''} onChange={e => setFilters(f => ({ ...f, source: e.target.value }))} className={sel}>
+          <option value="">Toutes sources</option>
+          <option value="campaign">Campagne</option>
+          <option value="boutique_web">Boutique Web</option>
+          <option value="ambassador_referral">Ambassadeur</option>
         </select>
       </div>
 
@@ -473,6 +481,7 @@ export default function AdminFinance() {
     class_group: searchParams.get('class_group') || '',
     date_from: searchParams.get('date_from') || '',
     date_to: searchParams.get('date_to') || '',
+    source: searchParams.get('source') || '',
   }));
 
   // Build clean params (remove empty values)

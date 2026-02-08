@@ -1,9 +1,10 @@
 import { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { ArrowLeft, Wine, Thermometer, Award, Grape, Download } from 'lucide-react';
+import { ArrowLeft, Wine, Thermometer, Award, Grape, Download, ShoppingCart, Minus, Plus, Check } from 'lucide-react';
 import { ResponsiveContainer, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Radar } from 'recharts';
 import api from '../../services/api';
 import { buildRadarData } from '../../config/tastingCriteria';
+import { useCart } from '../../contexts/CartContext';
 
 const formatEur = (v) => new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR' }).format(v);
 
@@ -11,6 +12,9 @@ export default function ProductDetail() {
   const { id } = useParams();
   const [product, setProduct] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [qty, setQty] = useState(1);
+  const [added, setAdded] = useState(false);
+  const { addToCart } = useCart();
 
   useEffect(() => {
     (async () => {
@@ -73,6 +77,26 @@ export default function ProductDetail() {
             >
               <Download size={14} /> Fiche PDF
             </a>
+          </div>
+
+          <div className="flex items-center gap-4">
+            <div className="flex items-center border rounded-lg">
+              <button onClick={() => setQty(Math.max(1, qty - 1))} className="p-2 hover:bg-gray-50 text-gray-600"><Minus size={16} /></button>
+              <span className="w-12 text-center font-semibold">{qty}</span>
+              <button onClick={() => setQty(qty + 1)} className="p-2 hover:bg-gray-50 text-gray-600"><Plus size={16} /></button>
+            </div>
+            <button
+              onClick={() => {
+                addToCart({ id: product.id, name: product.name, price_ttc: product.price_ttc }, qty);
+                setAdded(true);
+                setTimeout(() => setAdded(false), 2000);
+              }}
+              className={`flex-1 flex items-center justify-center gap-2 px-6 py-3 rounded-xl font-semibold transition-all ${
+                added ? 'bg-green-600 text-white' : 'bg-wine-700 text-white hover:bg-wine-800'
+              }`}
+            >
+              {added ? <><Check size={18} /> Ajouté au panier</> : <><ShoppingCart size={18} /> Ajouter au panier</>}
+            </button>
           </div>
 
           {product.description && (

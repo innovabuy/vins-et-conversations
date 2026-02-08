@@ -245,18 +245,20 @@ async function validateOrder(orderId, adminUserId) {
 /**
  * Liste des commandes avec filtres
  */
-async function listOrders({ campaignId, status, userId, page = 1, limit = 20 }) {
+async function listOrders({ campaignId, status, userId, source, page = 1, limit = 20 }) {
   let query = db('orders')
-    .join('users', 'orders.user_id', 'users.id')
+    .leftJoin('users', 'orders.user_id', 'users.id')
+    .leftJoin('contacts', 'orders.customer_id', 'contacts.id')
     .select(
       'orders.*',
-      'users.name as user_name',
-      'users.email as user_email'
+      db.raw("COALESCE(users.name, contacts.name, 'Client boutique') as user_name"),
+      db.raw("COALESCE(users.email, contacts.email) as user_email")
     );
 
   if (campaignId) query = query.where('orders.campaign_id', campaignId);
   if (status) query = query.where('orders.status', status);
   if (userId) query = query.where('orders.user_id', userId);
+  if (source) query = query.where('orders.source', source);
 
   const total = await query.clone().clearSelect().count('orders.id as count').first();
   const orders = await query

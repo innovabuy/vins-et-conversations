@@ -1,0 +1,270 @@
+const db = require('../config/database');
+const { v4: uuidv4 } = require('uuid');
+const { generateOrderRef } = require('./orderService');
+const logger = require('../utils/logger');
+
+let cachedBoutiqueWebCampaignId = null;
+
+/**
+ * Get the Boutique Web campaign ID (cached)
+ */
+async function getBoutiqueWebCampaignId() {
+  if (cachedBoutiqueWebCampaignId) return cachedBoutiqueWebCampaignId;
+
+  const campaign = await db('campaigns')
+    .whereRaw("config->>'type' = 'boutique_web'")
+    .where({ status: 'active' })
+    .first();
+
+  if (!campaign) throw new Error('BOUTIQUE_CAMPAIGN_NOT_FOUND');
+  cachedBoutiqueWebCampaignId = campaign.id;
+  return cachedBoutiqueWebCampaignId;
+}
+
+/**
+ * Find or create a contact by email
+ */
+async function upsertContact({ name, email, phone, address, city, postal_code }) {
+  let contact = await db('contacts').where({ email }).first();
+
+  if (contact) {
+    // Update if new data provided
+    const updates = {};
+    if (name && name !== contact.name) updates.name = name;
+    if (phone && phone !== contact.phone) updates.phone = phone;
+    if (address && address !== contact.address) updates.address = address;
+    if (city && city !== contact.city) updates.city = city;
+    if (postal_code && postal_code !== contact.postal_code) updates.postal_code = postal_code;
+
+    if (Object.keys(updates).length > 0) {
+      updates.updated_at = new Date();
+      await db('contacts').where({ id: contact.id }).update(updates);
+      contact = { ...contact, ...updates };
+    }
+    return contact;
+  }
+
+  // Create new contact
+  const [newContact] = await db('contacts').insert({
+    name,
+    email,
+    phone: phone || null,
+    address: address || null,
+    city: city || null,
+    postal_code: postal_code || null,
+    source: 'boutique_web',
+  }).returning('*');
+
+  return newContact;
+}
+
+/**
+ * Create a boutique order (status: pending_payment)
+ */
+async function createBoutiqueOrder({ cartItems, customer, referralCode }) {
+  const campaignId = await getBoutiqueWebCampaignId();
+  const ref = await generateOrderRef();
+  const orderId = uuidv4();
+
+  // Resolve referral
+  let source = 'boutique_web';
+  let referredBy = null;
+
+  if (referralCode) {
+    const participation = await db('participations')
+      .where({ referral_code: referralCode })
+      .first();
+
+    if (participation) {
+      source = 'ambassador_referral';
+      referredBy = participation.user_id;
+    }
+  }
+
+  // Upsert contact
+  const contact = await upsertContact(customer);
+
+  // Fetch products (server-authoritative pricing)
+  const productIds = cartItems.map((i) => i.product_id);
+  const products = await db('products')
+    .whereIn('id', productIds)
+    .where({ active: true })
+    .select('id', 'name', 'price_ht', 'price_ttc', 'tva_rate');
+
+  const productMap = {};
+  products.forEach((p) => { productMap[p.id] = p; });
+
+  let totalHT = 0;
+  let totalTTC = 0;
+  let totalItems = 0;
+  const orderItems = [];
+
+  for (const item of cartItems) {
+    const product = productMap[item.product_id];
+    if (!product) throw new Error('INVALID_PRODUCTS');
+
+    const qty = item.qty;
+    const lineHT = parseFloat(product.price_ht) * qty;
+    const lineTTC = parseFloat(product.price_ttc) * qty;
+    totalHT += lineHT;
+    totalTTC += lineTTC;
+    totalItems += qty;
+
+    orderItems.push({
+      order_id: orderId,
+      product_id: product.id,
+      qty,
+      unit_price_ht: parseFloat(product.price_ht),
+      unit_price_ttc: parseFloat(product.price_ttc),
+      free_qty: 0,
+    });
+  }
+
+  await db.transaction(async (trx) => {
+    await trx('orders').insert({
+      id: orderId,
+      ref,
+      campaign_id: campaignId,
+      user_id: null, // No logged-in user for boutique
+      customer_id: contact.id,
+      status: 'pending_payment',
+      source,
+      referral_code: referralCode || null,
+      referred_by: referredBy,
+      items: JSON.stringify(cartItems),
+      total_ht: parseFloat(totalHT.toFixed(2)),
+      total_ttc: parseFloat(totalTTC.toFixed(2)),
+      total_items: totalItems,
+    });
+
+    await trx('order_items').insert(orderItems);
+
+    await trx('financial_events').insert({
+      order_id: orderId,
+      campaign_id: campaignId,
+      type: 'sale',
+      amount: parseFloat(totalTTC.toFixed(2)),
+      description: `Commande boutique ${ref}`,
+    });
+  });
+
+  logger.info(`Boutique order created: ${ref} for ${customer.email} (${source})`);
+
+  return {
+    id: orderId,
+    ref,
+    total_ht: parseFloat(totalHT.toFixed(2)),
+    total_ttc: parseFloat(totalTTC.toFixed(2)),
+    total_items: totalItems,
+    status: 'pending_payment',
+    source,
+    customer_email: contact.email,
+  };
+}
+
+/**
+ * Confirm a boutique order after payment
+ */
+async function confirmBoutiqueOrder(orderId, paymentIntentId) {
+  const order = await db('orders').where({ id: orderId }).first();
+  if (!order) throw new Error('ORDER_NOT_FOUND');
+  if (order.status !== 'pending_payment') throw new Error('ORDER_NOT_PENDING_PAYMENT');
+
+  await db('orders').where({ id: orderId }).update({
+    status: 'submitted',
+    updated_at: new Date(),
+  });
+
+  // Create payment record
+  await db('payments').insert({
+    order_id: orderId,
+    method: 'stripe',
+    amount: order.total_ttc,
+    status: 'reconciled',
+    stripe_id: paymentIntentId,
+    reconciled_at: new Date(),
+  });
+
+  // Stock movements
+  const items = await db('order_items').where({ order_id: orderId }).select('product_id', 'qty');
+  if (items.length > 0) {
+    await db('stock_movements').insert(
+      items.map((item) => ({
+        product_id: item.product_id,
+        campaign_id: order.campaign_id,
+        type: 'exit',
+        qty: item.qty,
+        reference: order.ref,
+      }))
+    );
+  }
+
+  // Notify admins
+  const admins = await db('users').whereIn('role', ['super_admin', 'comptable']).select('id');
+  if (admins.length) {
+    await db('notifications').insert(
+      admins.map((a) => ({
+        user_id: a.id,
+        type: 'order',
+        message: `Nouvelle commande boutique ${order.ref} (${parseFloat(order.total_ttc).toFixed(2)} EUR)`,
+        link: `/admin/orders?selected=${orderId}`,
+      }))
+    );
+  }
+
+  logger.info(`Boutique order confirmed: ${order.ref} (payment: ${paymentIntentId})`);
+
+  return { ...order, status: 'submitted' };
+}
+
+/**
+ * Get order by ref and email (public tracking)
+ */
+async function getOrderByRefAndEmail(ref, email) {
+  const order = await db('orders')
+    .leftJoin('contacts', 'orders.customer_id', 'contacts.id')
+    .where('orders.ref', ref)
+    .where('contacts.email', email)
+    .select(
+      'orders.id',
+      'orders.ref',
+      'orders.status',
+      'orders.total_ttc',
+      'orders.total_items',
+      'orders.created_at',
+      'orders.source',
+      'contacts.name as customer_name'
+    )
+    .first();
+
+  if (!order) return null;
+
+  const items = await db('order_items')
+    .join('products', 'order_items.product_id', 'products.id')
+    .where('order_items.order_id', order.id)
+    .select('products.name', 'order_items.qty', 'order_items.unit_price_ttc');
+
+  return { ...order, items };
+}
+
+/**
+ * Resolve ambassador by referral code (public)
+ */
+async function resolveReferralCode(code) {
+  const participation = await db('participations')
+    .join('users', 'participations.user_id', 'users.id')
+    .where('participations.referral_code', code)
+    .select('users.name', 'participations.referral_code')
+    .first();
+
+  return participation || null;
+}
+
+module.exports = {
+  getBoutiqueWebCampaignId,
+  upsertContact,
+  createBoutiqueOrder,
+  confirmBoutiqueOrder,
+  getOrderByRefAndEmail,
+  resolveReferralCode,
+};

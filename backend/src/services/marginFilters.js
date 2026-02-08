@@ -11,6 +11,7 @@ function parseMarginFilters(query) {
     supplier_id: query.supplier_id || null,
     segment: query.segment || null,
     class_group: query.class_group || null,
+    source: query.source || null,
     date_from: query.date_from || null,
     date_to: query.date_to || null,
   };
@@ -37,6 +38,9 @@ function applyMarginFilters(qb, filters, opts = {}) {
   }
   if (filters.supplier_id) {
     qb.where('products.supplier_id', filters.supplier_id);
+  }
+  if (filters.source) {
+    qb.where('orders.source', filters.source);
   }
   if (filters.segment) {
     if (!opts.hasCampaignsJoin) {
@@ -72,6 +76,9 @@ function applyOrderOnlyFilters(qb, filters, opts = {}) {
   }
   if (filters.seller_id) {
     qb.where('orders.user_id', filters.seller_id);
+  }
+  if (filters.source) {
+    qb.where('orders.source', filters.source);
   }
   if (filters.segment) {
     if (!opts.hasCampaignsJoin) {

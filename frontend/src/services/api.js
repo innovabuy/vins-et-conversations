@@ -245,4 +245,14 @@ export const auditLogAPI = {
   entities: () => api.get('/admin/audit-log/entities'),
 };
 
+// ─── Boutique E-commerce ──────────────────────────
+export const boutiqueAPI = {
+  getCart: (sessionId) => api.get(`/public/cart/${sessionId}`),
+  updateCart: (data) => api.post('/public/cart', data),
+  checkout: (data) => api.post('/public/checkout', data),
+  confirmCheckout: (data) => api.post('/public/checkout/confirm', data),
+  trackOrder: (ref, email) => api.get(`/public/order/${ref}`, { params: { email } }),
+  resolveAmbassador: (code) => api.get(`/public/ambassador/${code}`),
+};
+
 export default api;

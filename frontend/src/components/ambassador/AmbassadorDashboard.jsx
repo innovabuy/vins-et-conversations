@@ -11,11 +11,13 @@ const TIER_COLORS = {
 
 export default function AmbassadorDashboard() {
   const [data, setData] = useState(null);
+  const [referralData, setReferralData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [copied, setCopied] = useState(false);
 
   useEffect(() => {
     loadDashboard();
+    ambassadorAPI.referralStats().then(r => setReferralData(r.data)).catch(console.error);
   }, []);
 
   const loadDashboard = async () => {
@@ -29,8 +31,10 @@ export default function AmbassadorDashboard() {
     }
   };
 
-  const campaignId = data?.campaignId || data?.campaign_id;
-  const referralLink = `${window.location.origin}/boutique${campaignId ? `?campagne=${campaignId}` : ''}`;
+  const referralCode = referralData?.referralCode;
+  const referralLink = referralCode
+    ? `${window.location.origin}/boutique?ref=${referralCode}`
+    : `${window.location.origin}/boutique`;
 
   const copyLink = () => {
     navigator.clipboard.writeText(referralLink);
@@ -192,7 +196,40 @@ export default function AmbassadorDashboard() {
         )}
       </div>
 
-      {/* Section 4 — Gains */}
+      {/* Section 4 — Ventes via mon lien */}
+      {referralData?.referredOrders?.length > 0 && (
+        <div className="card">
+          <div className="flex items-center gap-2 mb-4">
+            <ExternalLink size={20} className="text-wine-700" />
+            <h2 className="font-semibold text-lg">Ventes via mon lien</h2>
+          </div>
+          <div className="grid grid-cols-2 gap-3 mb-4">
+            <div className="bg-indigo-50 rounded-lg p-3 text-center">
+              <p className="text-xl font-bold text-indigo-700">{referralData.referredOrders.length}</p>
+              <p className="text-xs text-gray-500">Commandes parrainées</p>
+            </div>
+            <div className="bg-wine-50 rounded-lg p-3 text-center">
+              <p className="text-xl font-bold text-wine-700">
+                {referralData.referredOrders.reduce((s, o) => s + parseFloat(o.total_ttc || 0), 0).toFixed(0)} EUR
+              </p>
+              <p className="text-xs text-gray-500">CA parrainé</p>
+            </div>
+          </div>
+          <div className="space-y-2">
+            {referralData.referredOrders.slice(0, 5).map((o) => (
+              <div key={o.id} className="flex items-center justify-between text-sm bg-gray-50 rounded p-2">
+                <div>
+                  <span className="font-medium">{o.ref}</span>
+                  <span className="text-xs text-gray-400 ml-2">{new Date(o.created_at).toLocaleDateString('fr-FR')}</span>
+                </div>
+                <span className="font-medium">{parseFloat(o.total_ttc).toFixed(0)} EUR</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Section 5 — Gains */}
       <div className="card">
         <div className="flex items-center gap-2 mb-4">
           <Gift size={20} className="text-wine-700" />

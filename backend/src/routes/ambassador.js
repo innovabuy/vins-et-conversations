@@ -46,13 +46,28 @@ router.get(
         .count('id as count')
         .groupByRaw("\"after\"->>'source'");
 
-      // Orders from contacts (referral conversions)
+      // Orders from contacts (referral conversions — legacy)
       const conversions = await db('orders')
         .join('contacts', 'orders.customer_id', 'contacts.id')
         .where('contacts.source_user_id', req.user.userId)
         .whereIn('orders.status', ['submitted', 'validated', 'preparing', 'shipped', 'delivered'])
         .count('orders.id as count')
         .sum('orders.total_ttc as revenue')
+        .first();
+
+      // Referred boutique orders (via referral_code)
+      const referredOrders = await db('orders')
+        .where('referred_by', req.user.userId)
+        .whereIn('status', ['submitted', 'validated', 'preparing', 'shipped', 'delivered'])
+        .count('id as count')
+        .sum('total_ttc as revenue')
+        .first();
+
+      // Get referral code from participation
+      const participation = await db('participations')
+        .where({ user_id: req.user.userId })
+        .whereNotNull('referral_code')
+        .select('referral_code')
         .first();
 
       res.json({
@@ -62,9 +77,14 @@ router.get(
           count: parseInt(s.count, 10),
         })),
         conversions: {
-          orders: parseInt(conversions?.count || 0, 10),
-          revenue: parseFloat(conversions?.revenue || 0),
+          orders: parseInt(conversions?.count || 0, 10) + parseInt(referredOrders?.count || 0, 10),
+          revenue: parseFloat(conversions?.revenue || 0) + parseFloat(referredOrders?.revenue || 0),
         },
+        referredOrders: {
+          count: parseInt(referredOrders?.count || 0, 10),
+          revenue: parseFloat(referredOrders?.revenue || 0),
+        },
+        referralCode: participation?.referral_code || null,
       });
     } catch (err) {
       res.status(500).json({ error: 'SERVER_ERROR', message: err.message });

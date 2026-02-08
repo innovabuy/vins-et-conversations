@@ -214,8 +214,18 @@ async function getAdminCockpit(campaignIds) {
       db.raw('SUM(orders.total_ttc) as ca')
     );
 
+  // Boutique Web KPI
+  const boutiqueStats = await db('orders')
+    .whereIn('source', ['boutique_web', 'ambassador_referral'])
+    .whereIn('status', ['submitted', 'validated', 'preparing', 'shipped', 'delivered'])
+    .sum('total_ttc as ca_ttc')
+    .count('id as count')
+    .first();
+  const boutiqueCaTTC = parseFloat(boutiqueStats?.ca_ttc || 0);
+  const boutiqueOrders = parseInt(boutiqueStats?.count || 0, 10);
+
   return {
-    kpis: { caTTC, caHT, marge, totalOrders },
+    kpis: { caTTC, caHT, marge, totalOrders, boutiqueCaTTC, boutiqueOrders },
     actions: {
       pendingOrders: parseInt(pendingOrders?.c || 0, 10),
       unreconciledPayments: parseFloat(unreconciledPayments?.total || 0),

@@ -1,0 +1,218 @@
+const express = require('express');
+const Joi = require('joi');
+const { v4: uuidv4 } = require('uuid');
+const cartService = require('../services/cartService');
+const boutiqueOrderService = require('../services/boutiqueOrderService');
+const logger = require('../utils/logger');
+
+const stripe = process.env.STRIPE_SECRET_KEY
+  ? require('stripe')(process.env.STRIPE_SECRET_KEY)
+  : null;
+
+const router = express.Router();
+
+// ─── Validation schemas ──────────────────────────────
+
+const cartSchema = Joi.object({
+  session_id: Joi.string().uuid().optional(),
+  items: Joi.array().items(
+    Joi.object({
+      product_id: Joi.string().uuid().required(),
+      qty: Joi.number().integer().min(1).max(99).required(),
+    })
+  ).min(0).required(),
+});
+
+const checkoutSchema = Joi.object({
+  session_id: Joi.string().uuid().required(),
+  customer: Joi.object({
+    name: Joi.string().min(2).max(100).required(),
+    email: Joi.string().email().required(),
+    phone: Joi.string().allow('', null).optional(),
+    address: Joi.string().min(5).max(200).required(),
+    city: Joi.string().min(2).max(100).required(),
+    postal_code: Joi.string().pattern(/^\d{5}$/).required(),
+  }).required(),
+  referral_code: Joi.string().allow('', null).optional(),
+});
+
+const confirmSchema = Joi.object({
+  order_id: Joi.string().uuid().required(),
+  payment_intent_id: Joi.string().required(),
+});
+
+const trackingSchema = Joi.object({
+  email: Joi.string().email().required(),
+});
+
+// ─── POST /cart — Create/update cart ─────────────────
+
+router.post('/cart', async (req, res) => {
+  try {
+    const { error, value } = cartSchema.validate(req.body);
+    if (error) return res.status(400).json({ error: 'VALIDATION_ERROR', message: error.details[0].message });
+
+    const sessionId = value.session_id || uuidv4();
+    const cart = await cartService.updateCart(sessionId, value.items);
+
+    res.json({ session_id: sessionId, ...cart });
+  } catch (err) {
+    logger.error(`Cart update error: ${err.message}`);
+    res.status(500).json({ error: 'SERVER_ERROR', message: err.message });
+  }
+});
+
+// ─── GET /cart/:session_id — Get cart ────────────────
+
+router.get('/cart/:session_id', async (req, res) => {
+  try {
+    const cart = await cartService.getCart(req.params.session_id);
+    res.json({ session_id: req.params.session_id, ...cart });
+  } catch (err) {
+    logger.error(`Cart get error: ${err.message}`);
+    res.status(500).json({ error: 'SERVER_ERROR', message: err.message });
+  }
+});
+
+// ─── POST /checkout — Create order + Stripe PaymentIntent ──
+
+router.post('/checkout', async (req, res) => {
+  try {
+    const { error, value } = checkoutSchema.validate(req.body);
+    if (error) return res.status(400).json({ error: 'VALIDATION_ERROR', message: error.details[0].message });
+
+    // Get cart
+    const cart = await cartService.getCart(value.session_id);
+    if (!cart.items || cart.items.length === 0) {
+      return res.status(400).json({ error: 'EMPTY_CART', message: 'Le panier est vide' });
+    }
+
+    // Create boutique order
+    const order = await boutiqueOrderService.createBoutiqueOrder({
+      cartItems: cart.items,
+      customer: value.customer,
+      referralCode: value.referral_code || null,
+    });
+
+    // Create Stripe PaymentIntent
+    let clientSecret = null;
+    if (stripe) {
+      const amountCents = Math.round(order.total_ttc * 100);
+      const paymentIntent = await stripe.paymentIntents.create({
+        amount: amountCents,
+        currency: 'eur',
+        metadata: {
+          order_id: order.id,
+          order_ref: order.ref,
+          source: 'boutique_web',
+        },
+      });
+      clientSecret = paymentIntent.client_secret;
+    }
+
+    // Clear cart
+    await cartService.deleteCart(value.session_id);
+
+    res.status(201).json({
+      order_id: order.id,
+      ref: order.ref,
+      total_ttc: order.total_ttc,
+      client_secret: clientSecret,
+    });
+  } catch (err) {
+    logger.error(`Checkout error: ${err.message}`);
+    if (err.message === 'INVALID_PRODUCTS') {
+      return res.status(400).json({ error: 'INVALID_PRODUCTS', message: 'Produits invalides dans le panier' });
+    }
+    res.status(500).json({ error: 'SERVER_ERROR', message: err.message });
+  }
+});
+
+// ─── POST /checkout/confirm — Confirm after payment ──
+
+router.post('/checkout/confirm', async (req, res) => {
+  try {
+    const { error, value } = confirmSchema.validate(req.body);
+    if (error) return res.status(400).json({ error: 'VALIDATION_ERROR', message: error.details[0].message });
+
+    const order = await boutiqueOrderService.confirmBoutiqueOrder(
+      value.order_id,
+      value.payment_intent_id
+    );
+
+    // Send confirmation email (fire and forget)
+    try {
+      const emailService = require('../services/emailService');
+      const contact = await require('../config/database')('contacts')
+        .where({ id: order.customer_id })
+        .first();
+      const orderItems = await require('../config/database')('order_items')
+        .join('products', 'order_items.product_id', 'products.id')
+        .where('order_items.order_id', order.id)
+        .select('products.name', 'order_items.qty', 'order_items.unit_price_ttc');
+
+      if (contact) {
+        emailService.sendBoutiqueOrderConfirmation({
+          email: contact.email,
+          name: contact.name,
+          orderRef: order.ref,
+          totalTTC: parseFloat(order.total_ttc),
+          items: orderItems,
+        }).catch((e) => logger.error(`Boutique confirmation email failed: ${e.message}`));
+      }
+    } catch (e) {
+      logger.error(`Email send error: ${e.message}`);
+    }
+
+    res.json({ confirmed: true, ref: order.ref, status: 'submitted' });
+  } catch (err) {
+    logger.error(`Checkout confirm error: ${err.message}`);
+    if (err.message === 'ORDER_NOT_FOUND') {
+      return res.status(404).json({ error: 'ORDER_NOT_FOUND', message: 'Commande introuvable' });
+    }
+    if (err.message === 'ORDER_NOT_PENDING_PAYMENT') {
+      return res.status(400).json({ error: 'ORDER_NOT_PENDING_PAYMENT', message: 'Commande déjà confirmée' });
+    }
+    res.status(500).json({ error: 'SERVER_ERROR', message: err.message });
+  }
+});
+
+// ─── GET /order/:ref — Order tracking by ref + email ─
+
+router.get('/order/:ref', async (req, res) => {
+  try {
+    const { error, value } = trackingSchema.validate(req.query);
+    if (error) return res.status(400).json({ error: 'VALIDATION_ERROR', message: error.details[0].message });
+
+    const order = await boutiqueOrderService.getOrderByRefAndEmail(
+      req.params.ref,
+      value.email
+    );
+
+    if (!order) {
+      return res.status(404).json({ error: 'ORDER_NOT_FOUND', message: 'Commande introuvable' });
+    }
+
+    res.json(order);
+  } catch (err) {
+    logger.error(`Order tracking error: ${err.message}`);
+    res.status(500).json({ error: 'SERVER_ERROR', message: err.message });
+  }
+});
+
+// ─── GET /ambassador/:code — Resolve referral code ───
+
+router.get('/ambassador/:code', async (req, res) => {
+  try {
+    const result = await boutiqueOrderService.resolveReferralCode(req.params.code);
+    if (!result) {
+      return res.status(404).json({ error: 'CODE_NOT_FOUND', message: 'Code de parrainage invalide' });
+    }
+    res.json({ name: result.name, code: result.referral_code });
+  } catch (err) {
+    logger.error(`Ambassador resolve error: ${err.message}`);
+    res.status(500).json({ error: 'SERVER_ERROR', message: err.message });
+  }
+});
+
+module.exports = router;

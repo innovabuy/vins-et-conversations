@@ -99,6 +99,18 @@ async function handleWebhook(rawBody, signature) {
           metadata: JSON.stringify({ stripe_id: stripeId }),
         });
 
+        // Auto-confirm boutique orders with pending_payment status
+        const order = await db('orders').where({ id: orderId }).first();
+        if (order && order.status === 'pending_payment') {
+          try {
+            const boutiqueOrderService = require('./boutiqueOrderService');
+            await boutiqueOrderService.confirmBoutiqueOrder(orderId, stripeId);
+            logger.info(`Stripe webhook: boutique order ${orderId} auto-confirmed`);
+          } catch (e) {
+            logger.error(`Stripe webhook: boutique order auto-confirm failed: ${e.message}`);
+          }
+        }
+
         logger.info(`Stripe webhook: payment ${stripeId} reconciled for order ${orderId}`);
       }
       break;

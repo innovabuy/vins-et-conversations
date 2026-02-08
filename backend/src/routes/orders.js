@@ -92,6 +92,7 @@ router.get(
         campaignId: req.query.campaign_id,
         status: req.query.status,
         userId: req.query.user_id,
+        source: req.query.source,
         page: parseInt(req.query.page || 1, 10),
         limit: parseInt(req.query.limit || 20, 10),
       });

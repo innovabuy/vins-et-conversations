@@ -4,7 +4,7 @@ import { dashboardAPI } from '../../services/api';
 import { BarChart, Bar, XAxis, YAxis, ResponsiveContainer, CartesianGrid } from 'recharts';
 import {
   ShoppingCart, CreditCard, Truck, AlertTriangle, Package, Banknote,
-  TrendingUp, Wine, Trophy, ArrowRight
+  TrendingUp, Wine, Trophy, ArrowRight, Globe
 } from 'lucide-react';
 import { WINE_PALETTE, axisStyle, gridStyle, PremiumTooltip, ChartGradient, chartAnimation, formatEur } from '../../utils/chartTheme';
 
@@ -40,12 +40,13 @@ export default function AdminCockpit() {
       </div>
 
       {/* KPIs principaux */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
         {[
           { label: 'CA Total TTC', value: formatEur(data.kpis.caTTC), icon: TrendingUp, gradient: 'from-wine-700 to-wine-900' },
           { label: 'CA HT', value: formatEur(data.kpis.caHT), icon: Wine, gradient: 'from-blue-500 to-blue-700' },
           { label: 'Marge globale', value: formatEur(data.kpis.marge), icon: Trophy, gradient: 'from-emerald-500 to-emerald-700' },
           { label: 'Commandes', value: data.kpis.totalOrders, icon: ShoppingCart, gradient: 'from-purple-500 to-purple-700' },
+          ...(data.kpis.boutiqueCaTTC ? [{ label: 'Boutique Web', value: `${formatEur(data.kpis.boutiqueCaTTC)} (${data.kpis.boutiqueOrders} cmd)`, icon: Globe, gradient: 'from-indigo-500 to-indigo-700' }] : []),
         ].map((kpi) => (
           <div key={kpi.label} className={`bg-gradient-to-br ${kpi.gradient} rounded-2xl p-5 text-white shadow-lg`}>
             <div className="flex items-center justify-between mb-3">

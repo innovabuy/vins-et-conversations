@@ -103,6 +103,7 @@ app.use('/api/v1/formation', require('./routes/formation'));
 app.use('/api/v1/admin/users', require('./routes/users'));
 app.use('/api/v1/admin/invitations', require('./routes/invitations'));
 app.use('/api/v1/public', require('./routes/publicCatalog'));
+app.use('/api/v1/public', require('./routes/boutiqueAPI'));
 app.use('/api/v1/admin/catalog', require('./routes/catalogPdf'));
 
 // ─── Health check ─────────────────────────────────────
