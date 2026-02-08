@@ -93,6 +93,15 @@ describe('API Integration Tests', () => {
 
   describe('Orders — Create and Validate', () => {
     test('Student can create an order', async () => {
+      // Clean up any unpaid orders from previous runs to avoid anti-fraud block
+      const student = await db('users').where({ email: 'ackavong@eleve.sc.fr' }).first();
+      if (student) {
+        await db('orders')
+          .where({ user_id: student.id })
+          .whereIn('status', ['submitted', 'validated'])
+          .update({ status: 'delivered' });
+      }
+
       // Get products for the campaign
       const productsRes = await request(app)
         .get('/api/v1/products')
