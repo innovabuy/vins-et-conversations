@@ -66,15 +66,21 @@ export const productsAPI = {
 // ─── Orders ───────────────────────────────────────────
 export const ordersAPI = {
   create: (data) => api.post('/orders', data),
+  adminCreate: (data) => api.post('/orders/admin/create', data),
   get: (id) => api.get(`/orders/${id}`),
   list: (params) => api.get('/orders/admin/list', { params }),
   validate: (id) => api.post(`/orders/admin/${id}/validate`),
+  update: (id, data) => api.put(`/orders/admin/${id}`, data),
+  cancel: (id) => api.delete(`/orders/admin/${id}`),
+  pdf: (id) => `${api.defaults.baseURL}/orders/${id}/pdf`,
+  sendEmail: (id) => api.post(`/orders/${id}/send-email`),
 };
 
 // ─── Campaigns ────────────────────────────────────────
 export const campaignsAPI = {
   list: () => api.get('/admin/campaigns'),
   duplicate: (id) => api.post(`/admin/campaigns/${id}/duplicate`),
+  listActive: () => api.get('/admin/campaigns', { params: { status: 'active' } }),
 };
 
 // ─── Stock ────────────────────────────────────────────
@@ -94,7 +100,10 @@ export const deliveryNotesAPI = {
   get: (id) => api.get(`/admin/delivery-notes/${id}`),
   create: (data) => api.post('/admin/delivery-notes', data),
   update: (id, data) => api.put(`/admin/delivery-notes/${id}`, data),
+  remove: (id) => api.delete(`/admin/delivery-notes/${id}`),
   sign: (id, data) => api.post(`/admin/delivery-notes/${id}/sign`, data),
+  pdf: (id) => `${api.defaults.baseURL}/admin/delivery-notes/${id}/pdf`,
+  sendEmail: (id) => api.post(`/admin/delivery-notes/${id}/send-email`),
 };
 
 // ─── Contacts / CRM ─────────────────────────────────
@@ -109,6 +118,11 @@ export const contactsAPI = {
 // ─── Suppliers ───────────────────────────────────────
 export const suppliersAPI = {
   list: () => api.get('/admin/suppliers'),
+  get: (id) => api.get(`/admin/suppliers/${id}`),
+  create: (data) => api.post('/admin/suppliers', data),
+  update: (id, data) => api.put(`/admin/suppliers/${id}`, data),
+  toggle: (id) => api.put(`/admin/suppliers/${id}/toggle`),
+  remove: (id) => api.delete(`/admin/suppliers/${id}`),
 };
 
 // ─── Payments ────────────────────────────────────────

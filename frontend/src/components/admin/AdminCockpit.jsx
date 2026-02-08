@@ -102,7 +102,8 @@ export default function AdminCockpit() {
         {/* CA par campagne */}
         <div className="card">
           <h3 className="font-semibold mb-4">📊 CA par campagne</h3>
-          <ResponsiveContainer width="100%" height={250}>
+          <div className="h-[180px] md:h-[250px]">
+          <ResponsiveContainer width="100%" height="100%">
             <BarChart data={data.caByCampaign}>
               <XAxis dataKey="name" tick={{ fontSize: 11 }} />
               <YAxis tickFormatter={(v) => `${(v/1000).toFixed(0)}k€`} />
@@ -111,6 +112,7 @@ export default function AdminCockpit() {
               <Bar dataKey="goal" fill="#e5e7eb" radius={[4, 4, 0, 0]} name="Objectif" />
             </BarChart>
           </ResponsiveContainer>
+          </div>
         </div>
       </div>
 

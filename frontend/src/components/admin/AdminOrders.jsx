@@ -1,14 +1,15 @@
-import { useState, useEffect, useCallback } from 'react';
-import { ordersAPI, campaignsAPI } from '../../services/api';
+import { useState, useEffect, useCallback, useRef } from 'react';
+import { ordersAPI, campaignsAPI, contactsAPI, productsAPI } from '../../services/api';
 import {
-  ShoppingCart, Search, Filter, Check, Eye, FileText,
-  ChevronLeft, ChevronRight, X
+  ShoppingCart, Search, Plus, Check, Eye, EyeOff, FileText, Printer, Mail,
+  ChevronLeft, ChevronRight, X, Trash2, Save
 } from 'lucide-react';
 
 const formatEur = (v) => new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR' }).format(v);
 const formatDate = (d) => new Date(d).toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
 
 const STATUS_LABELS = {
+  draft: { label: 'Brouillon', color: 'bg-gray-100 text-gray-700' },
   submitted: { label: 'En attente', color: 'bg-yellow-100 text-yellow-800' },
   validated: { label: 'Validée', color: 'bg-green-100 text-green-800' },
   preparing: { label: 'En préparation', color: 'bg-blue-100 text-blue-800' },
@@ -17,7 +18,156 @@ const STATUS_LABELS = {
   cancelled: { label: 'Annulée', color: 'bg-red-100 text-red-800' },
 };
 
-function OrderDetail({ orderId, onClose }) {
+// ─── New Order Form ──────────────────────────────────
+function NewOrderForm({ onClose, onCreated }) {
+  const [campaigns, setCampaigns] = useState([]);
+  const [products, setProducts] = useState([]);
+  const [contactSearch, setContactSearch] = useState('');
+  const [contacts, setContacts] = useState([]);
+  const [form, setForm] = useState({ campaign_id: '', customer_id: null, items: [], notes: '' });
+  const [saving, setSaving] = useState(false);
+  const debounceRef = useRef(null);
+
+  useEffect(() => {
+    campaignsAPI.list().then(res => setCampaigns(res.data.data || [])).catch(console.error);
+    productsAPI.list().then(res => setProducts(res.data.data || res.data || [])).catch(console.error);
+  }, []);
+
+  const searchContacts = (q) => {
+    setContactSearch(q);
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    if (!q.trim() || q.length < 2) { setContacts([]); return; }
+    debounceRef.current = setTimeout(async () => {
+      try {
+        const res = await contactsAPI.search(q);
+        setContacts(res.data.data || []);
+      } catch (e) { console.error(e); }
+    }, 300);
+  };
+
+  const addItem = (product) => {
+    setForm(f => {
+      const existing = f.items.find(i => i.productId === product.id);
+      if (existing) return { ...f, items: f.items.map(i => i.productId === product.id ? { ...i, qty: i.qty + 1 } : i) };
+      return { ...f, items: [...f.items, { productId: product.id, name: product.name, price_ttc: product.price_ttc, qty: 1 }] };
+    });
+  };
+
+  const updateQty = (productId, qty) => {
+    if (qty < 1) return removeItem(productId);
+    setForm(f => ({ ...f, items: f.items.map(i => i.productId === productId ? { ...i, qty } : i) }));
+  };
+
+  const removeItem = (productId) => {
+    setForm(f => ({ ...f, items: f.items.filter(i => i.productId !== productId) }));
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    if (!form.campaign_id || form.items.length === 0) { alert('Sélectionnez une campagne et au moins un produit'); return; }
+    setSaving(true);
+    try {
+      await ordersAPI.adminCreate({
+        campaign_id: form.campaign_id,
+        customer_id: form.customer_id,
+        items: form.items.map(i => ({ productId: i.productId, qty: i.qty })),
+        notes: form.notes,
+      });
+      onCreated();
+    } catch (err) {
+      alert(err.response?.data?.message || 'Erreur lors de la création');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const total = form.items.reduce((s, i) => s + parseFloat(i.price_ttc || 0) * i.qty, 0);
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+      <div className="absolute inset-0 bg-black/30" onClick={onClose} />
+      <div className="relative bg-white rounded-xl shadow-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto sm:mx-4">
+        <div className="flex items-center justify-between border-b px-4 sm:px-6 py-4">
+          <h2 className="text-lg font-bold">Nouvelle commande</h2>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600"><X size={20} /></button>
+        </div>
+        <form onSubmit={handleSubmit} className="p-4 sm:p-6 space-y-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-xs font-medium text-gray-500 mb-1">Campagne *</label>
+              <select value={form.campaign_id} onChange={e => setForm(f => ({ ...f, campaign_id: e.target.value }))} className="w-full border rounded-lg px-3 py-2 text-sm" required>
+                <option value="">Sélectionner...</option>
+                {campaigns.filter(c => c.status === 'active').map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-gray-500 mb-1">Client (contact CRM)</label>
+              <div className="relative">
+                <input type="text" value={contactSearch} onChange={e => searchContacts(e.target.value)} placeholder="Rechercher un contact..." className="w-full border rounded-lg px-3 py-2 text-sm" />
+                {contacts.length > 0 && (
+                  <div className="absolute z-10 w-full bg-white border rounded-lg shadow-lg mt-1 max-h-40 overflow-y-auto">
+                    {contacts.map(c => (
+                      <button key={c.id} type="button" onClick={() => { setForm(f => ({ ...f, customer_id: c.id })); setContactSearch(c.name); setContacts([]); }} className="w-full text-left px-3 py-2 hover:bg-gray-50 text-sm">
+                        <p className="font-medium">{c.name}</p>
+                        <p className="text-xs text-gray-400">{c.email || c.phone || ''}</p>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-xs font-medium text-gray-500 mb-1">Produits</label>
+            <div className="border rounded-lg p-3 max-h-40 overflow-y-auto space-y-1">
+              {products.map(p => (
+                <button key={p.id} type="button" onClick={() => addItem(p)} className="w-full text-left flex items-center justify-between px-2 py-1 hover:bg-gray-50 rounded text-sm">
+                  <span>{p.name}</span>
+                  <span className="text-xs text-gray-500">{formatEur(p.price_ttc)}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {form.items.length > 0 && (
+            <div>
+              <label className="block text-xs font-medium text-gray-500 mb-1">Articles sélectionnés</label>
+              <div className="border rounded-lg divide-y">
+                {form.items.map(item => (
+                  <div key={item.productId} className="flex items-center justify-between p-2 text-sm">
+                    <span className="font-medium flex-1">{item.name}</span>
+                    <div className="flex items-center gap-2">
+                      <input type="number" min="1" value={item.qty} onChange={e => updateQty(item.productId, parseInt(e.target.value) || 1)} className="w-16 border rounded px-2 py-1 text-sm text-center" />
+                      <span className="text-gray-500 w-20 text-right">{formatEur(parseFloat(item.price_ttc) * item.qty)}</span>
+                      <button type="button" onClick={() => removeItem(item.productId)} className="p-1 text-red-400 hover:text-red-600"><X size={14} /></button>
+                    </div>
+                  </div>
+                ))}
+                <div className="flex justify-end p-2 font-semibold text-sm">Total : {formatEur(total)}</div>
+              </div>
+            </div>
+          )}
+
+          <div>
+            <label className="block text-xs font-medium text-gray-500 mb-1">Notes</label>
+            <textarea value={form.notes} onChange={e => setForm(f => ({ ...f, notes: e.target.value }))} className="w-full border rounded-lg px-3 py-2 text-sm" rows={2} />
+          </div>
+
+          <div className="flex justify-end gap-3 pt-2">
+            <button type="button" onClick={onClose} className="px-4 py-2 text-sm text-gray-600 hover:bg-gray-100 rounded-lg">Annuler</button>
+            <button type="submit" disabled={saving} className="btn-primary flex items-center gap-2">
+              <Save size={16} />{saving ? 'Création...' : 'Créer la commande'}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
+// ─── Order Detail ─────────────────────────────────────
+function OrderDetail({ orderId, onClose, onUpdated }) {
   const [order, setOrder] = useState(null);
   const [loading, setLoading] = useState(true);
 
@@ -28,10 +178,35 @@ function OrderDetail({ orderId, onClose }) {
       .finally(() => setLoading(false));
   }, [orderId]);
 
+  const handleValidate = async () => {
+    if (!confirm('Valider cette commande ?')) return;
+    try { await ordersAPI.validate(orderId); onUpdated(); } catch (err) { alert(err.response?.data?.message || 'Erreur'); }
+  };
+
+  const handleCancel = async () => {
+    if (!confirm('Annuler cette commande ? Cette action créera un événement financier de correction.')) return;
+    try { await ordersAPI.cancel(orderId); onUpdated(); } catch (err) { alert(err.response?.data?.message || 'Erreur'); }
+  };
+
+  const handlePrint = () => {
+    const token = localStorage.getItem('accessToken');
+    const url = ordersAPI.pdf(orderId);
+    window.open(`${url}?token=${token}`, '_blank');
+  };
+
+  const handleEmail = async () => {
+    if (!confirm('Préparer l\'envoi de cette commande par email ?')) return;
+    try {
+      const res = await ordersAPI.sendEmail(orderId);
+      alert(`Email préparé pour ${res.data.to}`);
+    } catch (err) { alert(err.response?.data?.message || 'Erreur'); }
+  };
+
   if (loading) return <div className="flex justify-center py-12"><div className="animate-spin rounded-full h-6 w-6 border-b-2 border-wine-700" /></div>;
   if (!order) return <p className="text-center text-gray-500 py-8">Commande introuvable</p>;
 
   const status = STATUS_LABELS[order.status] || { label: order.status, color: 'bg-gray-100 text-gray-700' };
+  const canEdit = ['draft', 'submitted'].includes(order.status);
 
   return (
     <div className="space-y-4">
@@ -39,7 +214,7 @@ function OrderDetail({ orderId, onClose }) {
         <h2 className="text-lg font-bold">Commande {order.ref}</h2>
         <button onClick={onClose} className="text-gray-400 hover:text-gray-600"><X size={20} /></button>
       </div>
-      <div className="grid grid-cols-2 gap-4 text-sm">
+      <div className="grid grid-cols-2 md:grid-cols-3 gap-4 text-sm">
         <div><span className="text-gray-500">Client :</span> {order.user_name}</div>
         <div><span className="text-gray-500">Statut :</span> <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${status.color}`}>{status.label}</span></div>
         <div><span className="text-gray-500">Date :</span> {formatDate(order.created_at)}</div>
@@ -48,6 +223,27 @@ function OrderDetail({ orderId, onClose }) {
         <div><span className="text-gray-500">Articles :</span> {order.total_items}</div>
       </div>
       {order.notes && <div className="text-sm"><span className="text-gray-500">Notes :</span> {order.notes}</div>}
+
+      {/* Action buttons */}
+      <div className="flex flex-wrap gap-2">
+        {order.status === 'submitted' && (
+          <button onClick={handleValidate} className="flex items-center gap-1.5 px-3 py-1.5 text-sm rounded-lg bg-green-600 text-white hover:bg-green-700">
+            <Check size={14} /> Valider
+          </button>
+        )}
+        {canEdit && (
+          <button onClick={handleCancel} className="flex items-center gap-1.5 px-3 py-1.5 text-sm rounded-lg bg-red-600 text-white hover:bg-red-700">
+            <Trash2 size={14} /> Annuler
+          </button>
+        )}
+        <button onClick={handlePrint} className="flex items-center gap-1.5 px-3 py-1.5 text-sm rounded-lg border border-gray-300 hover:bg-gray-50">
+          <Printer size={14} /> Imprimer PDF
+        </button>
+        <button onClick={handleEmail} className="flex items-center gap-1.5 px-3 py-1.5 text-sm rounded-lg border border-gray-300 hover:bg-gray-50">
+          <Mail size={14} /> Envoyer par email
+        </button>
+      </div>
+
       <h3 className="font-semibold text-sm mt-4">Lignes de commande</h3>
       <div className="border rounded-lg divide-y">
         {order.order_items?.map((item) => (
@@ -64,13 +260,16 @@ function OrderDetail({ orderId, onClose }) {
   );
 }
 
+// ─── Main Component ─────────────────────────────────
 export default function AdminOrders() {
   const [orders, setOrders] = useState([]);
   const [campaigns, setCampaigns] = useState([]);
   const [pagination, setPagination] = useState({ page: 1, pages: 1, total: 0 });
   const [loading, setLoading] = useState(true);
   const [filters, setFilters] = useState({ campaign_id: '', status: '', page: 1 });
+  const [hideDelivered, setHideDelivered] = useState(false);
   const [selectedOrder, setSelectedOrder] = useState(null);
+  const [showNewForm, setShowNewForm] = useState(false);
 
   const fetchOrders = useCallback(async () => {
     setLoading(true);
@@ -90,28 +289,22 @@ export default function AdminOrders() {
     }
   }, [filters]);
 
-  useEffect(() => {
-    fetchOrders();
-  }, [fetchOrders]);
-
-  useEffect(() => {
-    campaignsAPI.list().then((res) => setCampaigns(res.data.data || [])).catch(console.error);
-  }, []);
+  useEffect(() => { fetchOrders(); }, [fetchOrders]);
+  useEffect(() => { campaignsAPI.list().then(res => setCampaigns(res.data.data || [])).catch(console.error); }, []);
 
   const handleValidate = async (id) => {
     if (!confirm('Valider cette commande ?')) return;
-    try {
-      await ordersAPI.validate(id);
-      fetchOrders();
-    } catch (err) {
-      alert(err.response?.data?.message || 'Erreur de validation');
-    }
+    try { await ordersAPI.validate(id); fetchOrders(); } catch (err) { alert(err.response?.data?.message || 'Erreur'); }
   };
+
+  const handleCreated = () => { setShowNewForm(false); fetchOrders(); };
+
+  const displayOrders = hideDelivered ? orders.filter(o => o.status !== 'delivered') : orders;
 
   if (selectedOrder) {
     return (
       <div className="card">
-        <OrderDetail orderId={selectedOrder} onClose={() => setSelectedOrder(null)} />
+        <OrderDetail orderId={selectedOrder} onClose={() => setSelectedOrder(null)} onUpdated={() => { setSelectedOrder(null); fetchOrders(); }} />
       </div>
     );
   }
@@ -120,58 +313,78 @@ export default function AdminOrders() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold text-gray-900">Commandes</h1>
-        <span className="text-sm text-gray-500">{pagination.total} commande(s)</span>
-      </div>
-
-      {/* Filtres */}
-      <div className="card">
-        <div className="flex flex-wrap gap-3 items-end">
-          <div className="flex-1 min-w-[180px]">
-            <label className="block text-xs font-medium text-gray-500 mb-1">Campagne</label>
-            <select
-              value={filters.campaign_id}
-              onChange={(e) => setFilters((f) => ({ ...f, campaign_id: e.target.value, page: 1 }))}
-              className="w-full border rounded-lg px-3 py-2 text-sm"
-            >
-              <option value="">Toutes</option>
-              {campaigns.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
-            </select>
-          </div>
-          <div className="min-w-[150px]">
-            <label className="block text-xs font-medium text-gray-500 mb-1">Statut</label>
-            <select
-              value={filters.status}
-              onChange={(e) => setFilters((f) => ({ ...f, status: e.target.value, page: 1 }))}
-              className="w-full border rounded-lg px-3 py-2 text-sm"
-            >
-              <option value="">Tous</option>
-              {Object.entries(STATUS_LABELS).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
-            </select>
-          </div>
-          <button
-            onClick={() => setFilters({ campaign_id: '', status: '', page: 1 })}
-            className="text-sm text-gray-500 hover:text-gray-700 px-3 py-2"
-          >
-            Effacer
+        <div className="flex items-center gap-3">
+          <span className="text-sm text-gray-500">{pagination.total} commande(s)</span>
+          <button onClick={() => setShowNewForm(true)} className="btn-primary flex items-center gap-2">
+            <Plus size={16} /> Nouvelle commande
           </button>
         </div>
       </div>
 
-      {/* Table */}
+      <div className="card">
+        <div className="flex flex-wrap gap-3 items-end">
+          <div className="flex-1 min-w-[180px]">
+            <label className="block text-xs font-medium text-gray-500 mb-1">Campagne</label>
+            <select value={filters.campaign_id} onChange={e => setFilters(f => ({ ...f, campaign_id: e.target.value, page: 1 }))} className="w-full border rounded-lg px-3 py-2 text-sm">
+              <option value="">Toutes</option>
+              {campaigns.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+            </select>
+          </div>
+          <div className="min-w-[150px]">
+            <label className="block text-xs font-medium text-gray-500 mb-1">Statut</label>
+            <select value={filters.status} onChange={e => setFilters(f => ({ ...f, status: e.target.value, page: 1 }))} className="w-full border rounded-lg px-3 py-2 text-sm">
+              <option value="">Tous</option>
+              {Object.entries(STATUS_LABELS).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
+            </select>
+          </div>
+          <button onClick={() => setHideDelivered(h => !h)} className={`flex items-center gap-1.5 px-3 py-2 text-sm rounded-lg border ${hideDelivered ? 'bg-wine-50 border-wine-200 text-wine-700' : 'border-gray-200 text-gray-500'}`} title={hideDelivered ? 'Afficher les livrées' : 'Masquer les livrées'}>
+            {hideDelivered ? <EyeOff size={14} /> : <Eye size={14} />}
+            {hideDelivered ? 'Livrées masquées' : 'Masquer livrées'}
+          </button>
+          <button onClick={() => setFilters({ campaign_id: '', status: '', page: 1 })} className="text-sm text-gray-500 hover:text-gray-700 px-3 py-2">Effacer</button>
+        </div>
+      </div>
+
       <div className="card overflow-x-auto">
         {loading ? (
           <div className="flex justify-center py-12"><div className="animate-spin rounded-full h-6 w-6 border-b-2 border-wine-700" /></div>
-        ) : orders.length === 0 ? (
+        ) : displayOrders.length === 0 ? (
           <div className="text-center py-12 text-gray-400">
             <ShoppingCart size={40} className="mx-auto mb-3" />
             <p>Aucune commande trouvée</p>
           </div>
         ) : (
-          <table className="w-full text-sm">
+          <>
+          {/* Mobile cards */}
+          <div className="md:hidden space-y-3">
+            {displayOrders.map(o => {
+              const status = STATUS_LABELS[o.status] || { label: o.status, color: 'bg-gray-100 text-gray-700' };
+              return (
+                <div key={o.id} onClick={() => setSelectedOrder(o.id)} className="border rounded-lg p-4 hover:bg-gray-50 cursor-pointer space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="font-mono text-xs text-gray-500">{o.ref}</span>
+                    <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${status.color}`}>{status.label}</span>
+                  </div>
+                  <p className="font-medium text-sm">{o.user_name}</p>
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="font-semibold">{formatEur(o.total_ttc)}</span>
+                    <span className="text-gray-500 text-xs">{o.total_items} art. · {formatDate(o.created_at)}</span>
+                  </div>
+                  {o.status === 'submitted' && (
+                    <div className="pt-1" onClick={e => e.stopPropagation()}>
+                      <button onClick={() => handleValidate(o.id)} className="text-xs px-3 py-1 rounded-lg bg-green-600 text-white hover:bg-green-700">Valider</button>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+          {/* Desktop table */}
+          <table className="hidden md:table w-full text-sm">
             <thead>
               <tr className="border-b text-left text-gray-500">
                 <th className="pb-3 font-medium">Ref</th>
-                <th className="pb-3 font-medium">Étudiant</th>
+                <th className="pb-3 font-medium">Client</th>
                 <th className="pb-3 font-medium">Montant</th>
                 <th className="pb-3 font-medium">Date</th>
                 <th className="pb-3 font-medium">Articles</th>
@@ -180,10 +393,10 @@ export default function AdminOrders() {
               </tr>
             </thead>
             <tbody className="divide-y">
-              {orders.map((o) => {
+              {displayOrders.map(o => {
                 const status = STATUS_LABELS[o.status] || { label: o.status, color: 'bg-gray-100 text-gray-700' };
                 return (
-                  <tr key={o.id} className="hover:bg-gray-50">
+                  <tr key={o.id} className="hover:bg-gray-50 cursor-pointer" onClick={() => setSelectedOrder(o.id)}>
                     <td className="py-3 font-mono text-xs">{o.ref}</td>
                     <td className="py-3">
                       <p className="font-medium">{o.user_name}</p>
@@ -192,26 +405,12 @@ export default function AdminOrders() {
                     <td className="py-3 font-semibold">{formatEur(o.total_ttc)}</td>
                     <td className="py-3 text-gray-500 text-xs">{formatDate(o.created_at)}</td>
                     <td className="py-3">{o.total_items}</td>
-                    <td className="py-3">
-                      <span className={`px-2 py-1 rounded-full text-xs font-medium ${status.color}`}>{status.label}</span>
-                    </td>
-                    <td className="py-3 text-right">
+                    <td className="py-3"><span className={`px-2 py-1 rounded-full text-xs font-medium ${status.color}`}>{status.label}</span></td>
+                    <td className="py-3 text-right" onClick={e => e.stopPropagation()}>
                       <div className="flex items-center justify-end gap-1">
-                        <button
-                          onClick={() => setSelectedOrder(o.id)}
-                          className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-500"
-                          title="Voir détail"
-                        >
-                          <Eye size={16} />
-                        </button>
+                        <button onClick={() => setSelectedOrder(o.id)} className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-500" title="Voir détail"><Eye size={16} /></button>
                         {o.status === 'submitted' && (
-                          <button
-                            onClick={() => handleValidate(o.id)}
-                            className="p-1.5 rounded-lg hover:bg-green-50 text-green-600"
-                            title="Valider"
-                          >
-                            <Check size={16} />
-                          </button>
+                          <button onClick={() => handleValidate(o.id)} className="p-1.5 rounded-lg hover:bg-green-50 text-green-600" title="Valider"><Check size={16} /></button>
                         )}
                       </div>
                     </td>
@@ -220,33 +419,21 @@ export default function AdminOrders() {
               })}
             </tbody>
           </table>
+          </>
         )}
       </div>
 
-      {/* Pagination */}
       {pagination.pages > 1 && (
         <div className="flex items-center justify-between">
-          <p className="text-sm text-gray-500">
-            Page {pagination.page} sur {pagination.pages}
-          </p>
+          <p className="text-sm text-gray-500">Page {pagination.page} sur {pagination.pages}</p>
           <div className="flex gap-2">
-            <button
-              onClick={() => setFilters((f) => ({ ...f, page: f.page - 1 }))}
-              disabled={pagination.page <= 1}
-              className="p-2 rounded-lg border hover:bg-gray-50 disabled:opacity-30"
-            >
-              <ChevronLeft size={16} />
-            </button>
-            <button
-              onClick={() => setFilters((f) => ({ ...f, page: f.page + 1 }))}
-              disabled={pagination.page >= pagination.pages}
-              className="p-2 rounded-lg border hover:bg-gray-50 disabled:opacity-30"
-            >
-              <ChevronRight size={16} />
-            </button>
+            <button onClick={() => setFilters(f => ({ ...f, page: f.page - 1 }))} disabled={pagination.page <= 1} className="p-2 rounded-lg border hover:bg-gray-50 disabled:opacity-30"><ChevronLeft size={16} /></button>
+            <button onClick={() => setFilters(f => ({ ...f, page: f.page + 1 }))} disabled={pagination.page >= pagination.pages} className="p-2 rounded-lg border hover:bg-gray-50 disabled:opacity-30"><ChevronRight size={16} /></button>
           </div>
         </div>
       )}
+
+      {showNewForm && <NewOrderForm onClose={() => setShowNewForm(false)} onCreated={handleCreated} />}
     </div>
   );
 }

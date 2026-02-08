@@ -213,4 +213,237 @@ router.get('/:id/invoice', authenticate, async (req, res) => {
   }
 });
 
+// POST /api/v1/orders/admin/create — Créer commande côté admin
+router.post(
+  '/admin/create',
+  authenticate,
+  requireRole('super_admin', 'commercial'),
+  auditAction('orders'),
+  async (req, res) => {
+    try {
+      const { campaign_id, customer_id, items, notes } = req.body;
+      if (!campaign_id || !items || !items.length) {
+        return res.status(400).json({ error: 'MISSING_FIELDS', message: 'campaign_id et items sont requis' });
+      }
+      const order = await orderService.createOrder({
+        userId: req.user.userId,
+        campaignId: campaign_id,
+        items,
+        customerId: customer_id,
+        notes,
+      });
+      res.status(201).json(order);
+    } catch (err) {
+      if (err.message === 'INVALID_PRODUCTS') return res.status(400).json({ error: err.message });
+      if (err.message === 'NOT_PARTICIPANT') return res.status(403).json({ error: err.message });
+      res.status(500).json({ error: 'SERVER_ERROR', message: err.message });
+    }
+  }
+);
+
+// PUT /api/v1/orders/admin/:id — Modifier commande (si draft/submitted)
+router.put(
+  '/admin/:id',
+  authenticate,
+  requireRole('super_admin', 'commercial'),
+  auditAction('orders'),
+  async (req, res) => {
+    try {
+      const order = await db('orders').where({ id: req.params.id }).first();
+      if (!order) return res.status(404).json({ error: 'NOT_FOUND' });
+      if (!['draft', 'submitted'].includes(order.status)) {
+        return res.status(400).json({ error: 'ORDER_NOT_EDITABLE', message: 'Seules les commandes en brouillon ou soumises peuvent être modifiées' });
+      }
+
+      const update = { updated_at: new Date() };
+      if (req.body.notes !== undefined) update.notes = req.body.notes;
+      if (req.body.status) update.status = req.body.status;
+
+      // If items are being updated, recalculate totals
+      if (req.body.items && Array.isArray(req.body.items)) {
+        const products = await db('products').whereIn('id', req.body.items.map(i => i.productId || i.product_id));
+        let totalHT = 0, totalTTC = 0, totalItems = 0;
+
+        // Delete old order_items and insert new ones
+        await db('order_items').where({ order_id: req.params.id }).del();
+
+        const orderItems = [];
+        for (const item of req.body.items) {
+          const pid = item.productId || item.product_id;
+          const product = products.find(p => p.id === pid);
+          if (!product) continue;
+          const qty = item.qty;
+          totalHT += parseFloat(product.price_ht) * qty;
+          totalTTC += parseFloat(product.price_ttc) * qty;
+          totalItems += qty;
+          orderItems.push({
+            order_id: req.params.id,
+            product_id: pid,
+            qty,
+            unit_price_ht: product.price_ht,
+            unit_price_ttc: product.price_ttc,
+          });
+        }
+        if (orderItems.length > 0) await db('order_items').insert(orderItems);
+
+        update.total_ht = parseFloat(totalHT.toFixed(2));
+        update.total_ttc = parseFloat(totalTTC.toFixed(2));
+        update.total_items = totalItems;
+        update.items = JSON.stringify(req.body.items);
+      }
+
+      const [updated] = await db('orders').where({ id: req.params.id }).update(update).returning('*');
+      res.json(updated);
+    } catch (err) {
+      res.status(500).json({ error: 'SERVER_ERROR', message: err.message });
+    }
+  }
+);
+
+// DELETE /api/v1/orders/admin/:id — Annuler commande
+router.delete(
+  '/admin/:id',
+  authenticate,
+  requireRole('super_admin', 'commercial'),
+  auditAction('orders'),
+  async (req, res) => {
+    try {
+      const order = await db('orders').where({ id: req.params.id }).first();
+      if (!order) return res.status(404).json({ error: 'NOT_FOUND' });
+      if (order.status === 'cancelled') return res.status(400).json({ error: 'ALREADY_CANCELLED' });
+
+      await db('orders').where({ id: req.params.id }).update({ status: 'cancelled', updated_at: new Date() });
+
+      // Create correction financial event
+      await db('financial_events').insert({
+        order_id: req.params.id,
+        campaign_id: order.campaign_id,
+        type: 'correction',
+        amount: -parseFloat(order.total_ttc),
+        description: `Annulation commande ${order.ref}`,
+      });
+
+      res.json({ message: 'Commande annulée', ref: order.ref });
+    } catch (err) {
+      res.status(500).json({ error: 'SERVER_ERROR', message: err.message });
+    }
+  }
+);
+
+// GET /api/v1/orders/:id/pdf — Générer PDF commande
+router.get('/:id/pdf', authenticate, async (req, res) => {
+  try {
+    const order = await db('orders')
+      .join('users', 'orders.user_id', 'users.id')
+      .leftJoin('contacts', 'orders.customer_id', 'contacts.id')
+      .where('orders.id', req.params.id)
+      .select('orders.*', 'users.name as user_name', 'users.email as user_email', 'contacts.name as customer_name', 'contacts.address as customer_address')
+      .first();
+
+    if (!order) return res.status(404).json({ error: 'NOT_FOUND' });
+
+    if (!['super_admin', 'commercial', 'comptable'].includes(req.user.role)) {
+      if (order.user_id !== req.user.userId) return res.status(403).json({ error: 'FORBIDDEN' });
+    }
+
+    const items = await db('order_items')
+      .join('products', 'order_items.product_id', 'products.id')
+      .where('order_items.order_id', req.params.id)
+      .select('order_items.*', 'products.name as product_name', 'products.tva_rate');
+
+    const doc = new PDFDocument({ margin: 50, size: 'A4' });
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `inline; filename=commande-${order.ref}.pdf`);
+    doc.pipe(res);
+
+    // Header
+    doc.fontSize(22).fillColor('#7a1c3b').text('Vins & Conversations', { align: 'center' });
+    doc.fontSize(9).fillColor('#666').text('Nicolas Froment — Angers — contact@vins-conversations.fr', { align: 'center' });
+    doc.moveDown(1.5);
+
+    // Order info
+    doc.fontSize(14).fillColor('#333').text(`Bon de commande ${order.ref}`);
+    doc.fontSize(10).fillColor('#666');
+    doc.text(`Date : ${new Date(order.created_at).toLocaleDateString('fr-FR')}`);
+    doc.text(`Client : ${order.customer_name || order.user_name}`);
+    if (order.customer_address) doc.text(`Adresse : ${order.customer_address}`);
+    doc.moveDown();
+
+    // Table header
+    doc.fontSize(9).fillColor('#333').font('Helvetica-Bold');
+    const tableTop = doc.y;
+    doc.text('Produit', 50, tableTop, { width: 200 });
+    doc.text('Qté', 260, tableTop, { width: 40 });
+    doc.text('P.U. HT', 310, tableTop, { width: 60 });
+    doc.text('TVA', 380, tableTop, { width: 40 });
+    doc.text('Total HT', 440, tableTop, { width: 70 });
+    doc.moveTo(50, doc.y + 4).lineTo(520, doc.y + 4).strokeColor('#ddd').stroke();
+    doc.moveDown(0.5);
+
+    // Items
+    doc.font('Helvetica').fillColor('#333');
+    for (const item of items) {
+      const lineHT = parseFloat(item.unit_price_ht) * item.qty;
+      const y = doc.y;
+      doc.text(item.product_name, 50, y, { width: 200 });
+      doc.text(String(item.qty), 260, y, { width: 40 });
+      doc.text(`${parseFloat(item.unit_price_ht).toFixed(2)} €`, 310, y, { width: 60 });
+      doc.text(`${parseFloat(item.tva_rate)}%`, 380, y, { width: 40 });
+      doc.text(`${lineHT.toFixed(2)} €`, 440, y, { width: 70 });
+    }
+
+    doc.moveDown();
+    doc.moveTo(50, doc.y).lineTo(520, doc.y).strokeColor('#ddd').stroke();
+    doc.moveDown(0.5);
+
+    // Totals
+    doc.font('Helvetica-Bold').fillColor('#333');
+    doc.text(`Total HT : ${parseFloat(order.total_ht).toFixed(2)} €`, 350, doc.y);
+    const tvaAmount = parseFloat(order.total_ttc) - parseFloat(order.total_ht);
+    doc.text(`TVA : ${tvaAmount.toFixed(2)} €`, 350);
+    doc.fontSize(12).fillColor('#7a1c3b').text(`Total TTC : ${parseFloat(order.total_ttc).toFixed(2)} €`, 350);
+
+    doc.moveDown(2);
+    doc.fontSize(8).fillColor('#999').font('Helvetica');
+    doc.text('Conditions : paiement à réception sauf accord préalable. Vins & Conversations — SIRET 000 000 000 00000', 50);
+
+    doc.end();
+  } catch (err) {
+    res.status(500).json({ error: 'SERVER_ERROR', message: err.message });
+  }
+});
+
+// POST /api/v1/orders/:id/send-email — Préparer envoi email
+router.post(
+  '/:id/send-email',
+  authenticate,
+  requireRole('super_admin', 'commercial'),
+  auditAction('orders'),
+  async (req, res) => {
+    try {
+      const order = await db('orders')
+        .join('users', 'orders.user_id', 'users.id')
+        .where('orders.id', req.params.id)
+        .select('orders.*', 'users.name as user_name', 'users.email as user_email')
+        .first();
+
+      if (!order) return res.status(404).json({ error: 'NOT_FOUND' });
+
+      // Log the email action (actual sending will be configured later with nodemailer)
+      await db('audit_log').insert({
+        user_id: req.user.userId,
+        action: 'SEND_EMAIL',
+        entity: 'orders',
+        entity_id: req.params.id,
+        after: JSON.stringify({ to: order.user_email, subject: `Commande ${order.ref}`, status: 'queued' }),
+        ip_address: req.ip,
+      });
+
+      res.json({ message: 'Email préparé', to: order.user_email, ref: order.ref, status: 'queued' });
+    } catch (err) {
+      res.status(500).json({ error: 'SERVER_ERROR', message: err.message });
+    }
+  }
+);
+
 module.exports = router;

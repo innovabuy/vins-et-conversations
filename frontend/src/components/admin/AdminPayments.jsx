@@ -3,24 +3,24 @@ import { paymentsAPI } from '../../services/api';
 import { CreditCard, Banknote, Check, Filter, X } from 'lucide-react';
 
 const formatEur = (v) => new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR' }).format(v);
-const formatDate = (d) => d ? new Date(d).toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '\u2014';
+const formatDate = (d) => d ? new Date(d).toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '—';
 
 const STATUS_LABELS = {
-  reconciled: { label: 'Rapproch\u00e9', color: 'bg-green-100 text-green-800' },
+  reconciled: { label: 'Rapproché', color: 'bg-green-100 text-green-800' },
   partial: { label: 'Partiel', color: 'bg-orange-100 text-orange-800' },
   manual: { label: 'Manuel', color: 'bg-purple-100 text-purple-800' },
-  unpaid: { label: 'Impay\u00e9', color: 'bg-red-100 text-red-800' },
+  unpaid: { label: 'Impayé', color: 'bg-red-100 text-red-800' },
   pending: { label: 'En attente', color: 'bg-yellow-100 text-yellow-800' },
 };
 
 const METHOD_LABELS = {
   CB: { label: 'CB', icon: CreditCard },
   Virement: { label: 'Virement', icon: Banknote },
-  'Esp\u00e8ces': { label: 'Esp\u00e8ces', icon: Banknote },
-  'Ch\u00e8que': { label: 'Ch\u00e8que', icon: Check },
+  'Espèces': { label: 'Espèces', icon: Banknote },
+  'Chèque': { label: 'Chèque', icon: Check },
 };
 
-const METHODS = ['CB', 'Virement', 'Esp\u00e8ces', 'Ch\u00e8que'];
+const METHODS = ['CB', 'Virement', 'Espèces', 'Chèque'];
 const STATUSES = ['reconciled', 'partial', 'manual', 'unpaid', 'pending'];
 
 function CashDepositForm({ onSubmit, onCancel }) {
@@ -32,8 +32,8 @@ function CashDepositForm({ onSubmit, onCancel }) {
     const errs = {};
     if (!form.date) errs.date = 'La date est requise';
     if (!form.amount || parseFloat(form.amount) <= 0) errs.amount = 'Le montant est requis';
-    if (!form.depositor.trim()) errs.depositor = 'Le d\u00e9posant est requis';
-    if (!form.reference.trim()) errs.reference = 'La r\u00e9f\u00e9rence est requise';
+    if (!form.depositor.trim()) errs.depositor = 'Le déposant est requis';
+    if (!form.reference.trim()) errs.reference = 'La référence est requise';
     setErrors(errs);
     return Object.keys(errs).length === 0;
   };
@@ -51,7 +51,7 @@ function CashDepositForm({ onSubmit, onCancel }) {
       setForm({ date: '', amount: '', depositor: '', reference: '', order_id: '' });
       setErrors({});
     } catch (err) {
-      alert(err.response?.data?.message || 'Erreur lors de l\u2019enregistrement');
+      alert(err.response?.data?.message || 'Erreur lors de l’enregistrement');
     } finally {
       setSaving(false);
     }
@@ -60,7 +60,7 @@ function CashDepositForm({ onSubmit, onCancel }) {
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
       <div className="flex items-center justify-between mb-2">
-        <h2 className="text-lg font-bold">D\u00e9p\u00f4t d\u2019esp\u00e8ces</h2>
+        <h2 className="text-lg font-bold">Dépôt d’espèces</h2>
         <button type="button" onClick={onCancel} className="text-gray-400 hover:text-gray-600">
           <X size={20} />
         </button>
@@ -87,43 +87,43 @@ function CashDepositForm({ onSubmit, onCancel }) {
             value={form.amount}
             onChange={(e) => setForm((f) => ({ ...f, amount: e.target.value }))}
             className={`w-full border rounded-lg px-3 py-2 text-sm ${errors.amount ? 'border-red-400' : ''}`}
-            placeholder="0,00 \u20ac"
+            placeholder="0,00 €"
             required
           />
           {errors.amount && <p className="text-xs text-red-500 mt-1">{errors.amount}</p>}
         </div>
         <div>
-          <label className="block text-xs font-medium text-gray-500 mb-1">D\u00e9posant *</label>
+          <label className="block text-xs font-medium text-gray-500 mb-1">Déposant *</label>
           <input
             type="text"
             value={form.depositor}
             onChange={(e) => setForm((f) => ({ ...f, depositor: e.target.value }))}
             className={`w-full border rounded-lg px-3 py-2 text-sm ${errors.depositor ? 'border-red-400' : ''}`}
-            placeholder="Nom du d\u00e9posant"
+            placeholder="Nom du déposant"
             required
           />
           {errors.depositor && <p className="text-xs text-red-500 mt-1">{errors.depositor}</p>}
         </div>
         <div>
-          <label className="block text-xs font-medium text-gray-500 mb-1">R\u00e9f\u00e9rence *</label>
+          <label className="block text-xs font-medium text-gray-500 mb-1">Référence *</label>
           <input
             type="text"
             value={form.reference}
             onChange={(e) => setForm((f) => ({ ...f, reference: e.target.value }))}
             className={`w-full border rounded-lg px-3 py-2 text-sm ${errors.reference ? 'border-red-400' : ''}`}
-            placeholder="R\u00e9f\u00e9rence du d\u00e9p\u00f4t"
+            placeholder="Référence du dépôt"
             required
           />
           {errors.reference && <p className="text-xs text-red-500 mt-1">{errors.reference}</p>}
         </div>
         <div className="md:col-span-2">
-          <label className="block text-xs font-medium text-gray-500 mb-1">Commande associ\u00e9e (optionnel)</label>
+          <label className="block text-xs font-medium text-gray-500 mb-1">Commande associée (optionnel)</label>
           <input
             type="text"
             value={form.order_id}
             onChange={(e) => setForm((f) => ({ ...f, order_id: e.target.value }))}
             className="w-full border rounded-lg px-3 py-2 text-sm"
-            placeholder="ID ou r\u00e9f\u00e9rence de commande"
+            placeholder="ID ou référence de commande"
           />
         </div>
       </div>
@@ -134,7 +134,7 @@ function CashDepositForm({ onSubmit, onCancel }) {
         </button>
         <button type="submit" disabled={saving} className="btn-primary flex items-center gap-2">
           <Banknote size={16} />
-          {saving ? 'Enregistrement...' : 'Enregistrer le d\u00e9p\u00f4t'}
+          {saving ? 'Enregistrement...' : 'Enregistrer le dépôt'}
         </button>
       </div>
     </form>
@@ -170,7 +170,7 @@ export default function AdminPayments() {
 
   const handleReconcile = async (id) => {
     if (!reconcileRef.trim()) {
-      alert('Veuillez saisir une r\u00e9f\u00e9rence de rapprochement');
+      alert('Veuillez saisir une référence de rapprochement');
       return;
     }
     try {
@@ -203,7 +203,7 @@ export default function AdminPayments() {
         <h1 className="text-2xl font-bold text-gray-900">Paiements</h1>
         <button onClick={() => setShowCashForm(true)} className="btn-primary flex items-center gap-2">
           <Banknote size={16} />
-          D\u00e9p\u00f4t esp\u00e8ces
+          Dépôt espèces
         </button>
       </div>
 
@@ -215,7 +215,7 @@ export default function AdminPayments() {
             <span>Filtres</span>
           </div>
           <div className="min-w-[150px]">
-            <label className="block text-xs font-medium text-gray-500 mb-1">M\u00e9thode</label>
+            <label className="block text-xs font-medium text-gray-500 mb-1">Méthode</label>
             <select
               value={filters.method}
               onChange={(e) => setFilters((f) => ({ ...f, method: e.target.value }))}
@@ -258,14 +258,51 @@ export default function AdminPayments() {
         ) : payments.length === 0 ? (
           <div className="text-center py-12 text-gray-400">
             <CreditCard size={40} className="mx-auto mb-3" />
-            <p>Aucun paiement trouv\u00e9</p>
+            <p>Aucun paiement trouvé</p>
           </div>
         ) : (
-          <table className="w-full text-sm">
+          <>
+          {/* Mobile cards */}
+          <div className="md:hidden space-y-3">
+            {payments.map((p) => {
+              const status = STATUS_LABELS[p.status] || { label: p.status, color: 'bg-gray-100 text-gray-700' };
+              const methodInfo = METHOD_LABELS[p.method] || { label: p.method, icon: CreditCard };
+              const MethodIcon = methodInfo.icon;
+              return (
+                <div key={p.id} className="border rounded-lg p-4 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-1.5 text-sm"><MethodIcon size={14} className="text-gray-400" /><span>{methodInfo.label}</span></div>
+                    <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${status.color}`}>{status.label}</span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="font-semibold">{formatEur(p.amount)}</span>
+                    <span className="font-mono text-xs text-gray-500">{p.order_ref || '—'}</span>
+                  </div>
+                  <p className="text-sm font-medium">{p.user_name}</p>
+                  <p className="text-xs text-gray-500">{formatDate(p.created_at)}</p>
+                  {p.method === 'Virement' && p.status !== 'reconciled' && (
+                    <div className="pt-1">
+                      {reconcilingId === p.id ? (
+                        <div className="flex items-center gap-2">
+                          <input type="text" value={reconcileRef} onChange={(e) => setReconcileRef(e.target.value)} placeholder="Réf. bancaire" className="border rounded-lg px-2 py-1 text-xs flex-1" autoFocus />
+                          <button onClick={() => handleReconcile(p.id)} className="p-1.5 rounded-lg hover:bg-green-50 text-green-600"><Check size={16} /></button>
+                          <button onClick={() => { setReconcilingId(null); setReconcileRef(''); }} className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-400"><X size={16} /></button>
+                        </div>
+                      ) : (
+                        <button onClick={() => setReconcilingId(p.id)} className="text-xs px-3 py-1.5 rounded-lg border border-wine-200 text-wine-700 hover:bg-wine-50">Rapprocher</button>
+                      )}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+          {/* Desktop table */}
+          <table className="hidden md:table w-full text-sm">
             <thead>
               <tr className="border-b text-left text-gray-500">
-                <th className="pb-3 font-medium">R\u00e9f. commande</th>
-                <th className="pb-3 font-medium">M\u00e9thode</th>
+                <th className="pb-3 font-medium">Réf. commande</th>
+                <th className="pb-3 font-medium">Méthode</th>
                 <th className="pb-3 font-medium">Montant</th>
                 <th className="pb-3 font-medium">Statut</th>
                 <th className="pb-3 font-medium">Utilisateur</th>
@@ -280,7 +317,7 @@ export default function AdminPayments() {
                 const MethodIcon = methodInfo.icon;
                 return (
                   <tr key={p.id} className="hover:bg-gray-50">
-                    <td className="py-3 font-mono text-xs">{p.order_ref || '\u2014'}</td>
+                    <td className="py-3 font-mono text-xs">{p.order_ref || '—'}</td>
                     <td className="py-3">
                       <div className="flex items-center gap-1.5">
                         <MethodIcon size={14} className="text-gray-400" />
@@ -307,7 +344,7 @@ export default function AdminPayments() {
                                 type="text"
                                 value={reconcileRef}
                                 onChange={(e) => setReconcileRef(e.target.value)}
-                                placeholder="R\u00e9f. bancaire"
+                                placeholder="Réf. bancaire"
                                 className="border rounded-lg px-2 py-1 text-xs w-32"
                                 autoFocus
                               />
@@ -342,6 +379,7 @@ export default function AdminPayments() {
               })}
             </tbody>
           </table>
+          </>
         )}
       </div>
     </div>

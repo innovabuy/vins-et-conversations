@@ -53,13 +53,17 @@ const IDS = {
   coffret: uuidv4(),
   coteaux: uuidv4(),
   jus_pomme: uuidv4(),
+  // Suppliers
+  supplier_fruitiere: uuidv4(),
+  supplier_carillon: uuidv4(),
+  supplier_vouvray: uuidv4(),
 };
 
 exports.seed = async function (knex) {
   // Clean en ordre inverse des FK
   const tables = [
     'formation_progress', 'formation_modules',
-    'pricing_conditions', 'delivery_routes', 'notifications', 'audit_log',
+    'suppliers', 'pricing_conditions', 'delivery_routes', 'notifications', 'audit_log',
     'returns', 'delivery_notes', 'payments', 'financial_events',
     'order_items', 'orders', 'contacts',
     'stock_movements', 'campaign_products', 'products',
@@ -566,5 +570,45 @@ exports.seed = async function (knex) {
     { client_type: 'particulier', label: 'Particulier Hors Campagne', discount_pct: 0, commission_pct: 0, commission_student: null, min_order: 0, payment_terms: 'immediate', active: true },
   ]);
 
+  // ═══════════════════════════════════════════════════════
+  // FOURNISSEURS (CDC §7.4)
+  // ═══════════════════════════════════════════════════════
+  await knex.raw("CREATE TABLE IF NOT EXISTS suppliers (id UUID PRIMARY KEY DEFAULT uuid_generate_v4(), name VARCHAR(255) NOT NULL, contact_name VARCHAR(255), email VARCHAR(255), phone VARCHAR(255), address TEXT, products JSONB DEFAULT '[]', notes TEXT, active BOOLEAN DEFAULT true, created_at TIMESTAMPTZ DEFAULT NOW(), updated_at TIMESTAMPTZ DEFAULT NOW())");
+  await knex('suppliers').del();
+  await knex('suppliers').insert([
+    {
+      id: IDS.supplier_fruitiere,
+      name: 'Domaine de la Fruitière',
+      contact_name: 'Pierre Duval',
+      email: 'contact@fruitiere.fr',
+      phone: '02 41 78 90 12',
+      address: 'Château de la Fruitière, 49380 Champ-sur-Layon',
+      products: JSON.stringify([IDS.oriolus, IDS.clemence, IDS.coteaux]),
+      notes: 'Fournisseur principal — vins blancs Loire',
+      active: true,
+    },
+    {
+      id: IDS.supplier_carillon,
+      name: 'Château Carillon',
+      contact_name: 'Marie Carillon',
+      email: 'contact@chateau-carillon.fr',
+      phone: '02 41 56 34 78',
+      address: '12 Route des Vignes, 49290 Chalonnes-sur-Loire',
+      products: JSON.stringify([IDS.carillon, IDS.apertus]),
+      notes: 'Vins rouges premium — Cru Bourgeois et HVE',
+      active: true,
+    },
+    {
+      id: IDS.supplier_vouvray,
+      name: 'Cave de Vouvray',
+      contact_name: 'François Blanc',
+      email: 'caves@vouvray-vins.fr',
+      phone: '02 47 52 68 90',
+      address: '8 Rue de la Cave, 37210 Vouvray',
+      products: JSON.stringify([IDS.cremant]),
+      notes: 'Crémant de Loire — effervescents',
+      active: true,
+    },
+  ]);
   console.log('✅ Seed complet Vins & Conversations — Données CDC v4');
 };

@@ -28,6 +28,7 @@ import BTSLayout from './components/layout/BTSLayout';
 import BTSDashboard from './components/bts/BTSDashboard';
 import TeacherLayout from './components/layout/TeacherLayout';
 import TeacherDashboard from './components/teacher/TeacherDashboard';
+import InstallPrompt from './components/shared/InstallPrompt';
 
 function ProtectedRoute({ children, roles }) {
   const { user, loading } = useAuth();
@@ -133,6 +134,7 @@ export default function App() {
     <BrowserRouter>
       <AuthProvider>
         <AppRoutes />
+        <InstallPrompt />
       </AuthProvider>
     </BrowserRouter>
   );

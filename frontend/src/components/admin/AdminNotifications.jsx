@@ -5,21 +5,21 @@ import {
   ShoppingCart, CreditCard, Trophy, Package, AlertTriangle, Truck, Star,
 } from 'lucide-react';
 
-const formatDate = (d) => d ? new Date(d).toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '\u2014';
+const formatDate = (d) => d ? new Date(d).toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '—';
 
 const TYPE_CONFIG = {
   order: { label: 'Commande', icon: ShoppingCart, color: 'text-blue-600 bg-blue-50' },
   payment: { label: 'Paiement', icon: CreditCard, color: 'text-green-600 bg-green-50' },
   ranking: { label: 'Classement', icon: Trophy, color: 'text-yellow-600 bg-yellow-50' },
   stock: { label: 'Stock', icon: Package, color: 'text-orange-600 bg-orange-50' },
-  unpaid: { label: 'Impay\u00e9', icon: AlertTriangle, color: 'text-red-600 bg-red-50' },
+  unpaid: { label: 'Impayé', icon: AlertTriangle, color: 'text-red-600 bg-red-50' },
   delivery: { label: 'Livraison', icon: Truck, color: 'text-violet-600 bg-violet-50' },
   milestone: { label: 'Palier', icon: Star, color: 'text-wine-600 bg-wine-50' },
 };
 
 const TABS = [
   { key: 'notifications', label: 'Notifications', icon: Bell },
-  { key: 'settings', label: 'Param\u00e9trage', icon: Settings },
+  { key: 'settings', label: 'Paramétrage', icon: Settings },
 ];
 
 function NotificationsList() {
@@ -192,13 +192,13 @@ function NotificationSettings() {
   }
 
   if (!settings) {
-    return <p className="text-center text-gray-500 py-8">Impossible de charger les param\u00e8tres</p>;
+    return <p className="text-center text-gray-500 py-8">Impossible de charger les paramètres</p>;
   }
 
   return (
     <div className="space-y-4">
       <p className="text-sm text-gray-500">
-        Activez ou d\u00e9sactivez les notifications par type. Les modifications sont sauvegard\u00e9es automatiquement.
+        Activez ou désactivez les notifications par type. Les modifications sont sauvegardées automatiquement.
       </p>
 
       <div className="space-y-2">

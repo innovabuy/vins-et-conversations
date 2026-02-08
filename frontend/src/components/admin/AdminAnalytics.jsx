@@ -79,7 +79,8 @@ export default function AdminAnalytics() {
       {/* LineChart — CA par période */}
       <div className="card">
         <h3 className="font-semibold mb-4">CA par mois</h3>
-        <ResponsiveContainer width="100%" height={300}>
+        <div className="h-[200px] md:h-[300px]">
+        <ResponsiveContainer width="100%" height="100%">
           <LineChart data={data.caParPeriode}>
             <CartesianGrid strokeDasharray="3 3" />
             <XAxis dataKey="mois" tick={{ fontSize: 11 }} />
@@ -90,13 +91,15 @@ export default function AdminAnalytics() {
             <Line type="monotone" dataKey="ca_ht" stroke="#2563eb" strokeWidth={2} name="CA HT" dot={false} />
           </LineChart>
         </ResponsiveContainer>
+        </div>
       </div>
 
       <div className="grid lg:grid-cols-2 gap-6">
         {/* BarChart — Top vendeurs */}
         <div className="card">
           <h3 className="font-semibold mb-4">Top Vendeurs</h3>
-          <ResponsiveContainer width="100%" height={300}>
+          <div className="h-[200px] md:h-[300px]">
+          <ResponsiveContainer width="100%" height="100%">
             <BarChart data={data.topVendeurs} layout="vertical">
               <CartesianGrid strokeDasharray="3 3" />
               <XAxis type="number" tickFormatter={(v) => `${(v / 1000).toFixed(0)}k`} />
@@ -105,12 +108,14 @@ export default function AdminAnalytics() {
               <Bar dataKey="ca" fill="#ab2049" radius={[0, 4, 4, 0]} name="CA" />
             </BarChart>
           </ResponsiveContainer>
+          </div>
         </div>
 
         {/* BarChart — Top produits */}
         <div className="card">
           <h3 className="font-semibold mb-4">Top Produits</h3>
-          <ResponsiveContainer width="100%" height={300}>
+          <div className="h-[200px] md:h-[300px]">
+          <ResponsiveContainer width="100%" height="100%">
             <BarChart data={data.topProduits} layout="vertical">
               <CartesianGrid strokeDasharray="3 3" />
               <XAxis type="number" />
@@ -119,13 +124,15 @@ export default function AdminAnalytics() {
               <Bar dataKey="qty" fill="#7c3aed" radius={[0, 4, 4, 0]} name="Bouteilles" />
             </BarChart>
           </ResponsiveContainer>
+          </div>
         </div>
       </div>
 
       {/* BarChart — Comparaison campagnes */}
       <div className="card">
         <h3 className="font-semibold mb-4">Comparaison Campagnes</h3>
-        <ResponsiveContainer width="100%" height={300}>
+        <div className="h-[200px] md:h-[300px]">
+        <ResponsiveContainer width="100%" height="100%">
           <BarChart data={data.comparaisonCampagnes}>
             <CartesianGrid strokeDasharray="3 3" />
             <XAxis dataKey="name" tick={{ fontSize: 10 }} />
@@ -136,6 +143,7 @@ export default function AdminAnalytics() {
             <Bar dataKey="goal" fill="#e5e7eb" radius={[4, 4, 0, 0]} name="Objectif" />
           </BarChart>
         </ResponsiveContainer>
+        </div>
       </div>
     </div>
   );
