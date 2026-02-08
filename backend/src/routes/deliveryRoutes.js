@@ -82,13 +82,15 @@ router.get('/:id', ...adminAuth, async (req, res) => {
       const bl = await db('delivery_notes')
         .leftJoin('orders', 'delivery_notes.order_id', 'orders.id')
         .leftJoin('users', 'orders.user_id', 'users.id')
+        .leftJoin('contacts', 'orders.customer_id', 'contacts.id')
         .where('delivery_notes.id', stop.delivery_note_id)
         .select(
           'delivery_notes.id', 'delivery_notes.ref', 'delivery_notes.status as bl_status',
           'delivery_notes.recipient_name', 'delivery_notes.delivery_address',
           'delivery_notes.order_id',
           'orders.ref as order_ref', 'orders.total_ttc',
-          'users.name as user_name', 'users.phone as user_phone'
+          'users.name as user_name',
+          'contacts.phone as contact_phone'
         )
         .first();
 
@@ -106,7 +108,7 @@ router.get('/:id', ...adminAuth, async (req, res) => {
         bl_status: bl?.bl_status,
         recipient: bl?.recipient_name || bl?.user_name || stop.recipient,
         address: bl?.delivery_address || stop.address,
-        phone: bl?.user_phone || null,
+        phone: bl?.contact_phone || null,
         order_ref: bl?.order_ref || null,
         total_ttc: bl?.total_ttc || null,
         items,
@@ -343,11 +345,11 @@ router.get('/:id/pdf', ...adminAuth, async (req, res) => {
         bl = await db('delivery_notes')
           .leftJoin('orders', 'delivery_notes.order_id', 'orders.id')
           .leftJoin('users', 'orders.user_id', 'users.id')
-          .leftJoin('contacts', 'orders.contact_id', 'contacts.id')
+          .leftJoin('contacts', 'orders.customer_id', 'contacts.id')
           .where('delivery_notes.id', stop.delivery_note_id)
           .select(
             'delivery_notes.ref', 'delivery_notes.recipient_name', 'delivery_notes.delivery_address',
-            'users.name as user_name', 'users.phone as user_phone',
+            'users.name as user_name',
             'contacts.phone as contact_phone',
             'delivery_notes.order_id'
           )
@@ -363,7 +365,7 @@ router.get('/:id/pdf', ...adminAuth, async (req, res) => {
             productTotals[item.product_name] = (productTotals[item.product_name] || 0) + item.qty;
           }
         }
-        phone = bl?.contact_phone || bl?.user_phone || null;
+        phone = bl?.contact_phone || null;
       }
 
       stopsData.push({

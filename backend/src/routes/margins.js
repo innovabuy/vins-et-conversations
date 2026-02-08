@@ -148,6 +148,46 @@ router.get('/', ...adminAuth, async (req, res) => {
   }
 });
 
+// GET /api/v1/admin/margins/by-product — Margins per product
+router.get('/by-product', ...adminAuth, async (req, res) => {
+  try {
+    const filters = parseMarginFilters(req.query);
+
+    const byProductQ = db('order_items')
+      .join('products', 'order_items.product_id', 'products.id')
+      .join('orders', 'order_items.order_id', 'orders.id')
+      .whereIn('orders.status', VALID_STATUSES)
+      .groupBy('products.id', 'products.name', 'products.purchase_price')
+      .select(
+        'products.id',
+        'products.name',
+        'products.purchase_price',
+        db.raw('SUM(order_items.qty) as qty_sold'),
+        db.raw('SUM(order_items.qty * order_items.unit_price_ht) as ca_ht'),
+        db.raw('SUM(order_items.qty * products.purchase_price) as cost'),
+        db.raw('SUM(order_items.qty * (order_items.unit_price_ht - products.purchase_price)) as margin')
+      )
+      .orderBy('margin', 'desc');
+    applyMarginFilters(byProductQ, filters);
+    const byProduct = await byProductQ;
+
+    res.json({
+      data: byProduct.map((p) => ({
+        ...p,
+        purchase_price: parseFloat(p.purchase_price),
+        qty_sold: parseInt(p.qty_sold, 10),
+        ca_ht: parseFloat(p.ca_ht),
+        cost: parseFloat(p.cost),
+        margin: parseFloat(p.margin),
+        margin_pct: parseFloat(p.ca_ht) > 0
+          ? parseFloat(((parseFloat(p.margin) / parseFloat(p.ca_ht)) * 100).toFixed(1)) : 0,
+      })),
+    });
+  } catch (err) {
+    res.status(500).json({ error: 'SERVER_ERROR', message: err.message });
+  }
+});
+
 // GET /api/v1/admin/margins/by-campaign — Campaign-specific margins (campaign_id now optional)
 router.get('/by-campaign', ...adminAuth, async (req, res) => {
   try {
@@ -238,10 +278,11 @@ router.get('/by-supplier', ...adminAuth, async (req, res) => {
   try {
     const filters = parseMarginFilters(req.query);
 
+    // suppliers.products is a JSONB array of product UUIDs — join via containment
     const bySupplierQ = db('order_items')
       .join('orders', 'order_items.order_id', 'orders.id')
       .join('products', 'order_items.product_id', 'products.id')
-      .leftJoin('suppliers', 'products.supplier_id', 'suppliers.id')
+      .leftJoin('suppliers', db.raw("suppliers.products::jsonb @> to_jsonb(products.id)"))
       .whereIn('orders.status', VALID_STATUSES)
       .groupBy('suppliers.id', 'suppliers.name')
       .select(
