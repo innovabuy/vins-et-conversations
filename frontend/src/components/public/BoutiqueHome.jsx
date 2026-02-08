@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { Wine, Search, Filter, ChevronRight } from 'lucide-react';
 import api from '../../services/api';
 
@@ -22,6 +22,8 @@ const COLOR_CHIPS = [
 ];
 
 export default function BoutiqueHome() {
+  const [searchParams] = useSearchParams();
+  const campaignId = searchParams.get('campagne');
   const [products, setProducts] = useState([]);
   const [filters, setFilters] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -37,6 +39,7 @@ export default function BoutiqueHome() {
       if (search) params.search = search;
       if (color) params.color = color;
       if (region) params.region = region;
+      if (campaignId) params.campaign_id = campaignId;
       const { data } = await api.get('/public/catalog', { params });
       setProducts(data.data || []);
     } catch (err) {
@@ -50,7 +53,7 @@ export default function BoutiqueHome() {
     api.get('/public/filters').then(r => setFilters(r.data)).catch(console.error);
   }, []);
 
-  useEffect(() => { fetchProducts(); }, [search, color, region]);
+  useEffect(() => { fetchProducts(); }, [search, color, region, campaignId]);
 
   return (
     <div>

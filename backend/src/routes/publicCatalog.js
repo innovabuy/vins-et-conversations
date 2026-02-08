@@ -12,34 +12,43 @@ const router = express.Router();
 // GET /api/v1/public/catalog — Liste produits publique (filtrable)
 router.get('/catalog', async (req, res) => {
   try {
-    const query = db('products').where({ active: true });
-    if (req.query.color) query.where('color', req.query.color);
-    if (req.query.region) query.where('region', req.query.region);
-    if (req.query.category) query.where('category', req.query.category);
-    if (req.query.label) query.where('label', req.query.label);
-    if (req.query.search) query.where('name', 'ilike', `%${req.query.search}%`);
+    const campaignId = req.query.campaign_id;
+
+    // Build base query with optional campaign join
+    const applyFilters = (q) => {
+      q.where('products.active', true);
+      q.where('products.visible_boutique', true);
+      if (campaignId) {
+        q.join('campaign_products', 'products.id', 'campaign_products.product_id')
+          .where('campaign_products.campaign_id', campaignId)
+          .where('campaign_products.active', true);
+      }
+      if (req.query.color) q.where('products.color', req.query.color);
+      if (req.query.region) q.where('products.region', req.query.region);
+      if (req.query.category) q.where('products.category', req.query.category);
+      if (req.query.label) q.where('products.label', req.query.label);
+      if (req.query.search) q.where('products.name', 'ilike', `%${req.query.search}%`);
+    };
 
     const page = Math.max(1, parseInt(req.query.page, 10) || 1);
     const limit = Math.min(50, Math.max(1, parseInt(req.query.limit, 10) || 20));
     const offset = (page - 1) * limit;
 
-    const countQuery = db('products').where({ active: true });
-    if (req.query.color) countQuery.where('color', req.query.color);
-    if (req.query.region) countQuery.where('region', req.query.region);
-    if (req.query.category) countQuery.where('category', req.query.category);
-    if (req.query.label) countQuery.where('label', req.query.label);
-    if (req.query.search) countQuery.where('name', 'ilike', `%${req.query.search}%`);
+    const countQuery = db('products');
+    applyFilters(countQuery);
+    const [{ count }] = await countQuery.count('products.id as count');
 
-    const [{ count }] = await countQuery.count('id as count');
+    const query = db('products');
+    applyFilters(query);
     const products = await query
       .select(
-        'id', 'name', 'price_ttc', 'price_ht', 'tva_rate',
-        'category', 'label', 'image_url', 'description',
-        'region', 'appellation', 'color', 'vintage',
-        'grape_varieties', 'serving_temp', 'food_pairing',
-        'tasting_notes', 'winemaker_notes', 'awards', 'sort_order'
+        'products.id', 'products.name', 'products.price_ttc', 'products.price_ht', 'products.tva_rate',
+        'products.category', 'products.label', 'products.image_url', 'products.description',
+        'products.region', 'products.appellation', 'products.color', 'products.vintage',
+        'products.grape_varieties', 'products.serving_temp', 'products.food_pairing',
+        'products.tasting_notes', 'products.winemaker_notes', 'products.awards', 'products.sort_order'
       )
-      .orderBy('sort_order')
+      .orderBy('products.sort_order')
       .limit(limit)
       .offset(offset);
 

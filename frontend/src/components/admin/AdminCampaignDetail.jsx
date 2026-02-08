@@ -4,6 +4,7 @@ import { campaignsAPI } from '../../services/api';
 import {
   ArrowLeft, Users, ShoppingCart, Wine, TrendingUp, Calendar,
   Target, Package, BarChart3, Mail, CreditCard, ExternalLink,
+  Copy, Check, Store,
 } from 'lucide-react';
 import {
   ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip,
@@ -343,6 +344,7 @@ export default function AdminCampaignDetail() {
   const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState('overview');
   const [sendingReport, setSendingReport] = useState(false);
+  const [linkCopied, setLinkCopied] = useState(false);
 
   const handleSendReport = async () => {
     if (!confirm('Envoyer le rapport à tous les participants ?')) return;
@@ -417,6 +419,34 @@ export default function AdminCampaignDetail() {
         <button onClick={() => navigate('/admin/stock')} className="flex items-center gap-1.5 px-3 py-1.5 text-sm rounded-lg border border-gray-300 hover:bg-gray-50">
           <Package size={14} /> Stock
         </button>
+      </div>
+
+      {/* Boutique link */}
+      <div className="card bg-wine-50 border border-wine-200">
+        <div className="flex items-center gap-2 mb-2">
+          <Store size={18} className="text-wine-700" />
+          <h3 className="text-sm font-semibold text-wine-800">Lien boutique campagne</h3>
+        </div>
+        <div className="flex items-center gap-2">
+          <input
+            type="text"
+            readOnly
+            value={`${window.location.origin}/boutique?campagne=${id}`}
+            className="flex-1 text-sm bg-white border border-wine-200 rounded-lg px-3 py-2 text-gray-700"
+          />
+          <button
+            onClick={() => {
+              navigator.clipboard.writeText(`${window.location.origin}/boutique?campagne=${id}`);
+              setLinkCopied(true);
+              setTimeout(() => setLinkCopied(false), 2000);
+            }}
+            className="flex items-center gap-1.5 px-3 py-2 text-sm rounded-lg bg-wine-700 text-white hover:bg-wine-800"
+          >
+            {linkCopied ? <Check size={14} /> : <Copy size={14} />}
+            {linkCopied ? 'Copié' : 'Copier'}
+          </button>
+        </div>
+        <p className="text-xs text-wine-600 mt-1.5">Partagez ce lien pour afficher uniquement les vins de cette campagne dans la boutique.</p>
       </div>
 
       {/* Tabs */}

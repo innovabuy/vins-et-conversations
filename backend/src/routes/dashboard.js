@@ -263,6 +263,7 @@ router.get(
       };
 
       res.json({
+        campaignId,
         tier,
         tiers: rules.tier?.tiers || [],
         sales: { caTTC, caHT, bottles, orderCount },

@@ -3,7 +3,7 @@ import { productsAPI, catalogPdfAPI } from '../../services/api';
 import {
   RadarChart, Radar, PolarGrid, PolarAngleAxis, PolarRadiusAxis, ResponsiveContainer
 } from 'recharts';
-import { Wine, Plus, Pencil, Trash2, X, Save, ChevronLeft, Award, Thermometer, Grape, UtensilsCrossed, Download, Mail, FileText, Package } from 'lucide-react';
+import { Wine, Plus, Pencil, Trash2, X, Save, ChevronLeft, Award, Thermometer, Grape, UtensilsCrossed, Download, Mail, FileText, Package, Eye, EyeOff } from 'lucide-react';
 import { WINE_TYPE_OPTIONS, TASTING_CRITERIA, resolveWineType, getCriteriaForProduct, buildRadarData } from '../../config/tastingCriteria';
 
 const formatEur = (v) => new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR' }).format(v);
@@ -31,7 +31,7 @@ const EMPTY_PRODUCT = {
   tva_rate: 20, category: '', label: '', image_url: '', description: '', active: true,
   region: '', appellation: '', color: '', vintage: '', grape_varieties: [],
   serving_temp: '', food_pairing: [], tasting_notes: null, winemaker_notes: '', awards: [],
-  bundle_products: [],
+  visible_boutique: false, bundle_products: [],
 };
 
 function parseJsonField(val) {
@@ -182,6 +182,16 @@ function ProductForm({ product, onSave, onCancel, allProducts = [] }) {
   const wineType = resolveWineType(form.color, form.category);
   const criteria = TASTING_CRITERIA[wineType] || null;
   const isCoffret = wineType === 'coffret';
+
+  // Auto-enable tasting for new products when criteria exist
+  useEffect(() => {
+    if (criteria && !form.tasting_notes && !product?.id) {
+      const notes = {};
+      criteria.forEach(c => { notes[c.key] = 0; });
+      setForm(f => ({ ...f, tasting_notes: notes }));
+    }
+  }, [wineType]);
+
   const showTasting = !!criteria && !!form.tasting_notes;
 
   const handleChange = (field, value) => {
@@ -315,6 +325,16 @@ function ProductForm({ product, onSave, onCancel, allProducts = [] }) {
             <label className="block text-xs font-medium text-gray-500 mb-1">Description</label>
             <textarea value={form.description || ''} onChange={e => handleChange('description', e.target.value)} className="w-full border rounded-lg px-3 py-2 text-sm" rows={2} />
           </div>
+          <div className="md:col-span-2 flex items-center gap-3">
+            <button type="button" onClick={() => handleChange('visible_boutique', !form.visible_boutique)}
+              className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${form.visible_boutique ? 'bg-green-500' : 'bg-gray-300'}`}>
+              <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${form.visible_boutique ? 'translate-x-6' : 'translate-x-1'}`} />
+            </button>
+            <div>
+              <span className="text-sm font-medium text-gray-700">Visible en boutique</span>
+              <p className="text-xs text-gray-400">Ce produit sera affiché sur la vitrine publique</p>
+            </div>
+          </div>
         </div>
       </fieldset>
 
@@ -440,7 +460,7 @@ export default function AdminCatalog() {
   const [loading, setLoading] = useState(true);
   const [editing, setEditing] = useState(null);
   const [viewing, setViewing] = useState(null);
-  const [filters, setFilters] = useState({ color: '', region: '', category: '' });
+  const [filters, setFilters] = useState({ color: '', region: '', category: '', boutiqueOnly: false });
   const [emailModal, setEmailModal] = useState(false);
   const [emailForm, setEmailForm] = useState({ email: '', subject: 'Catalogue Vins & Conversations', message: '' });
   const [sending, setSending] = useState(false);
@@ -472,6 +492,13 @@ export default function AdminCatalog() {
   const handleDelete = async (id, name) => {
     if (!confirm(`Désactiver le produit "${name}" ?`)) return;
     try { await productsAPI.remove(id); fetchProducts(); } catch { alert('Erreur'); }
+  };
+
+  const toggleBoutique = async (id, current) => {
+    try {
+      await productsAPI.update(id, { visible_boutique: !current });
+      setProducts(prev => prev.map(p => p.id === id ? { ...p, visible_boutique: !current } : p));
+    } catch { alert('Erreur'); }
   };
 
   const handleDownloadPdf = (segment = 'public') => {
@@ -520,6 +547,7 @@ export default function AdminCatalog() {
 
   // Unique regions for filter
   const regions = [...new Set(products.map(p => p.region).filter(Boolean))];
+  const displayProducts = filters.boutiqueOnly ? products.filter(p => p.visible_boutique) : products;
 
   return (
     <div className="space-y-6">
@@ -606,7 +634,12 @@ export default function AdminCatalog() {
               {regions.map(r => <option key={r} value={r}>{r}</option>)}
             </select>
           </div>
-          <button onClick={() => setFilters({ color: '', region: '', category: '' })} className="text-sm text-gray-500 hover:text-gray-700 px-3 py-2">Effacer</button>
+          <button onClick={() => setFilters(f => ({ ...f, boutiqueOnly: !f.boutiqueOnly }))}
+            className={`flex items-center gap-1.5 px-3 py-2 text-sm rounded-lg border ${filters.boutiqueOnly ? 'bg-green-50 border-green-200 text-green-700' : 'border-gray-200 text-gray-500'}`}>
+            {filters.boutiqueOnly ? <Eye size={14} /> : <EyeOff size={14} />}
+            {filters.boutiqueOnly ? 'Boutique seuls' : 'Tous les produits'}
+          </button>
+          <button onClick={() => setFilters({ color: '', region: '', category: '', boutiqueOnly: false })} className="text-sm text-gray-500 hover:text-gray-700 px-3 py-2">Effacer</button>
         </div>
       </div>
 
@@ -614,13 +647,13 @@ export default function AdminCatalog() {
       <div className="card">
         {loading ? (
           <div className="flex justify-center py-12"><div className="animate-spin rounded-full h-6 w-6 border-b-2 border-wine-700" /></div>
-        ) : products.length === 0 ? (
+        ) : displayProducts.length === 0 ? (
           <div className="text-center py-12 text-gray-400"><Wine size={40} className="mx-auto mb-3" /><p>Aucun produit</p></div>
         ) : (
           <>
           {/* Mobile cards */}
           <div className="md:hidden space-y-3">
-            {products.map(p => {
+            {displayProducts.map(p => {
               const margin = p.price_ht - p.purchase_price;
               return (
                 <div key={p.id} onClick={() => setViewing(p)} className="border rounded-lg p-4 hover:bg-gray-50 cursor-pointer space-y-2">
@@ -629,7 +662,12 @@ export default function AdminCatalog() {
                       <div className="w-8 h-8 bg-wine-50 rounded-lg flex items-center justify-center"><Wine size={14} className="text-wine-600" /></div>
                       <p className="font-medium text-sm">{p.name}</p>
                     </div>
-                    {p.color && <span className={`px-2 py-0.5 rounded-full text-[10px] font-medium ${COLOR_BADGES[p.color] || 'bg-gray-100 text-gray-700'}`}>{p.color}</span>}
+                    <div className="flex items-center gap-2">
+                      {p.color && <span className={`px-2 py-0.5 rounded-full text-[10px] font-medium ${COLOR_BADGES[p.color] || 'bg-gray-100 text-gray-700'}`}>{p.color}</span>}
+                      <span onClick={e => { e.stopPropagation(); toggleBoutique(p.id, p.visible_boutique); }}>
+                        {p.visible_boutique ? <Eye size={14} className="text-green-500" /> : <EyeOff size={14} className="text-gray-300" />}
+                      </span>
+                    </div>
                   </div>
                   <div className="flex items-center justify-between text-sm">
                     <span className="font-semibold">{formatEur(p.price_ttc)}</span>
@@ -651,14 +689,14 @@ export default function AdminCatalog() {
                 <th className="pb-3 font-medium">Couleur</th>
                 <th className="pb-3 font-medium">Région</th>
                 <th className="pb-3 font-medium">Prix TTC</th>
-                <th className="pb-3 font-medium">Achat</th>
                 <th className="pb-3 font-medium">Marge</th>
+                <th className="pb-3 font-medium">Boutique</th>
                 <th className="pb-3 font-medium">Dégustation</th>
                 <th className="pb-3 font-medium text-right">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y">
-              {products.map(p => {
+              {displayProducts.map(p => {
                 const margin = p.price_ht - p.purchase_price;
                 const marginPct = p.purchase_price > 0 ? ((margin / p.purchase_price) * 100).toFixed(0) : 0;
                 const hasTasting = !!p.tasting_notes;
@@ -679,8 +717,14 @@ export default function AdminCatalog() {
                     <td className="py-3">{p.color && <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${COLOR_BADGES[p.color] || 'bg-gray-100 text-gray-700'}`}>{p.color}</span>}</td>
                     <td className="py-3 text-gray-500 text-xs">{p.region || '—'}{p.appellation ? ` · ${p.appellation}` : ''}</td>
                     <td className="py-3 font-semibold">{formatEur(p.price_ttc)}</td>
-                    <td className="py-3 text-gray-500">{formatEur(p.purchase_price)}</td>
                     <td className="py-3"><span className={`text-xs font-medium ${margin > 0 ? 'text-green-600' : 'text-red-600'}`}>{formatEur(margin)} ({marginPct}%)</span></td>
+                    <td className="py-3" onClick={e => e.stopPropagation()}>
+                      <button onClick={() => toggleBoutique(p.id, p.visible_boutique)}
+                        className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${p.visible_boutique ? 'bg-green-500' : 'bg-gray-300'}`}
+                        title={p.visible_boutique ? 'Visible en boutique' : 'Masqué en boutique'}>
+                        <span className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white transition-transform ${p.visible_boutique ? 'translate-x-4.5' : 'translate-x-0.5'}`} />
+                      </button>
+                    </td>
                     <td className="py-3">{hasTasting ? <span className="text-xs text-wine-600">★ Profil</span> : <span className="text-xs text-gray-300">—</span>}</td>
                     <td className="py-3 text-right" onClick={e => e.stopPropagation()}>
                       <div className="flex items-center justify-end gap-1">

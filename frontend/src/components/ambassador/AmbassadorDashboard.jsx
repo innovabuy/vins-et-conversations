@@ -29,7 +29,8 @@ export default function AmbassadorDashboard() {
     }
   };
 
-  const referralLink = `${window.location.origin}/ref/${data?.tier?.current?.label?.toLowerCase() || 'ambassador'}`;
+  const campaignId = data?.campaignId || data?.campaign_id;
+  const referralLink = `${window.location.origin}/boutique${campaignId ? `?campagne=${campaignId}` : ''}`;
 
   const copyLink = () => {
     navigator.clipboard.writeText(referralLink);

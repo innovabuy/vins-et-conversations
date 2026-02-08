@@ -322,7 +322,7 @@ exports.seed = async function (knex) {
   // ═══════════════════════════════════════════════════════
   await knex('products').insert([
     {
-      id: IDS.oriolus, name: 'Oriolus Blanc', description: 'Vin blanc sec et frais aux notes d\'agrumes et de fruits blancs. Idéal en apéritif ou avec des fruits de mer.', price_ht: 5.42, price_ttc: 6.50, purchase_price: 3.20, tva_rate: 20,
+      id: IDS.oriolus, name: 'Oriolus Blanc', description: 'Vin blanc sec et frais aux notes d\'agrumes et de fruits blancs. Idéal en apéritif ou avec des fruits de mer.', price_ht: 5.42, price_ttc: 6.50, purchase_price: 3.20, tva_rate: 20, visible_boutique: true,
       category: 'Blancs Secs', label: 'HVE', sort_order: 1,
       region: 'Loire', appellation: 'Anjou', color: 'blanc', vintage: 2023,
       grape_varieties: JSON.stringify(['Chenin Blanc']),
@@ -333,7 +333,7 @@ exports.seed = async function (knex) {
       awards: JSON.stringify([{ year: 2024, name: 'Médaille Argent Concours des Vins de Loire' }]),
     },
     {
-      id: IDS.clemence, name: 'Cuvée Clémence', description: 'Blanc moelleux Bio issu de vendanges tardives. Arômes de miel, coing et fruits confits pour un vin gourmand.', price_ht: 7.08, price_ttc: 8.50, purchase_price: 4.10, tva_rate: 20,
+      id: IDS.clemence, name: 'Cuvée Clémence', description: 'Blanc moelleux Bio issu de vendanges tardives. Arômes de miel, coing et fruits confits pour un vin gourmand.', price_ht: 7.08, price_ttc: 8.50, purchase_price: 4.10, tva_rate: 20, visible_boutique: true,
       category: 'Blancs Moelleux', label: 'Bio', sort_order: 2,
       region: 'Loire', appellation: 'Anjou', color: 'blanc', vintage: 2022,
       grape_varieties: JSON.stringify(['Chenin Blanc']),
@@ -344,7 +344,7 @@ exports.seed = async function (knex) {
       awards: JSON.stringify([{ year: 2023, name: 'Médaille Or Concours Général Agricole Paris' }]),
     },
     {
-      id: IDS.carillon, name: 'Carillon', description: 'Rouge de garde élevé 12 mois en fûts de chêne. Tanins élégants, fruits noirs et finale épicée.', price_ht: 10.42, price_ttc: 12.50, purchase_price: 5.80, tva_rate: 20,
+      id: IDS.carillon, name: 'Carillon', description: 'Rouge de garde élevé 12 mois en fûts de chêne. Tanins élégants, fruits noirs et finale épicée.', price_ht: 10.42, price_ttc: 12.50, purchase_price: 5.80, tva_rate: 20, visible_boutique: true,
       category: 'Rouges', label: 'Cru Bourgeois', sort_order: 3,
       region: 'Loire', appellation: 'Anjou-Villages', color: 'rouge', vintage: 2021,
       grape_varieties: JSON.stringify(['Cabernet Franc', 'Merlot']),
@@ -355,7 +355,7 @@ exports.seed = async function (knex) {
       awards: JSON.stringify([{ year: 2023, name: 'Cru Bourgeois' }, { year: 2024, name: 'Médaille Or Concours Paris' }]),
     },
     {
-      id: IDS.apertus, name: 'Apertus', description: 'Rouge gourmand HVE aux arômes de fruits rouges et poivre. Equilibré et souple, parfait pour les grillades.', price_ht: 11.25, price_ttc: 13.50, purchase_price: 6.50, tva_rate: 20,
+      id: IDS.apertus, name: 'Apertus', description: 'Rouge gourmand HVE aux arômes de fruits rouges et poivre. Equilibré et souple, parfait pour les grillades.', price_ht: 11.25, price_ttc: 13.50, purchase_price: 6.50, tva_rate: 20, visible_boutique: true,
       category: 'Rouges', label: 'HVE', sort_order: 4,
       region: 'Loire', appellation: 'Anjou', color: 'rouge', vintage: 2022,
       grape_varieties: JSON.stringify(['Cabernet Franc']),
@@ -366,7 +366,7 @@ exports.seed = async function (knex) {
       awards: JSON.stringify([]),
     },
     {
-      id: IDS.cremant, name: 'Crémant de Loire', description: 'Effervescent méthode traditionnelle, 18 mois sur lattes. Fines bulles, fraîcheur et élégance.', price_ht: 10.75, price_ttc: 12.90, purchase_price: 5.90, tva_rate: 20,
+      id: IDS.cremant, name: 'Crémant de Loire', description: 'Effervescent méthode traditionnelle, 18 mois sur lattes. Fines bulles, fraîcheur et élégance.', price_ht: 10.75, price_ttc: 12.90, purchase_price: 5.90, tva_rate: 20, visible_boutique: true,
       category: 'Effervescents', label: null, sort_order: 5,
       region: 'Loire', appellation: 'Crémant de Loire', color: 'effervescent', vintage: null,
       grape_varieties: JSON.stringify(['Chenin Blanc', 'Chardonnay']),
@@ -388,7 +388,7 @@ exports.seed = async function (knex) {
       awards: JSON.stringify([]),
     },
     {
-      id: IDS.coteaux, name: 'Coteaux du Layon', description: 'Grand moelleux du Layon aux arômes de fruits exotiques et miel d\'acacia. Idéal avec foie gras ou desserts.', price_ht: 9.17, price_ttc: 11.00, purchase_price: 5.30, tva_rate: 20,
+      id: IDS.coteaux, name: 'Coteaux du Layon', description: 'Grand moelleux du Layon aux arômes de fruits exotiques et miel d\'acacia. Idéal avec foie gras ou desserts.', price_ht: 9.17, price_ttc: 11.00, purchase_price: 5.30, tva_rate: 20, visible_boutique: true,
       category: 'Blancs Moelleux', label: 'HVE', sort_order: 7,
       region: 'Loire', appellation: 'Coteaux du Layon', color: 'blanc', vintage: 2022,
       grape_varieties: JSON.stringify(['Chenin Blanc']),
@@ -399,7 +399,7 @@ exports.seed = async function (knex) {
       awards: JSON.stringify([{ year: 2023, name: 'Médaille Or Vins de Loire' }, { year: 2024, name: 'Guide Hachette ★★' }]),
     },
     {
-      id: IDS.jus_pomme, name: 'Jus de Pomme', description: 'Pur jus de pommes Bio du Maine-et-Loire. Sans sucre ajouté, naturellement doux et rafraîchissant.', price_ht: 3.32, price_ttc: 3.50, purchase_price: 1.80, tva_rate: 5.5,
+      id: IDS.jus_pomme, name: 'Jus de Pomme', description: 'Pur jus de pommes Bio du Maine-et-Loire. Sans sucre ajouté, naturellement doux et rafraîchissant.', price_ht: 3.32, price_ttc: 3.50, purchase_price: 1.80, tva_rate: 5.5, visible_boutique: true,
       category: 'Sans Alcool', label: 'Bio', sort_order: 8,
       region: 'Loire', appellation: null, color: 'sans_alcool', vintage: null,
       grape_varieties: JSON.stringify([]),
