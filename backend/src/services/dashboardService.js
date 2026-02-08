@@ -56,6 +56,10 @@ async function getStudentDashboard(userId, campaignId) {
 
   const streak = calculateStreak(recentOrders.map((o) => o.created_at));
 
+  // Badges from participation config (CDC §4.2)
+  const config = participation.config || {};
+  const badges = config.badges || [];
+
   return {
     ca,
     orderCount,
@@ -65,6 +69,7 @@ async function getStudentDashboard(userId, campaignId) {
     classGroup: participation.class_group,
     freeBottles,
     streak,
+    badges,
     ui: rules.ui,
   };
 }

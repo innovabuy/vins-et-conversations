@@ -3,7 +3,7 @@ import { useNavigate, useSearchParams, Link } from 'react-router-dom';
 import { ordersAPI, campaignsAPI, contactsAPI, productsAPI, deliveryNotesAPI } from '../../services/api';
 import {
   ShoppingCart, Search, Plus, Check, Eye, EyeOff, FileText, Printer, Mail,
-  ChevronLeft, ChevronRight, X, Trash2, Save, Truck, ExternalLink
+  ChevronLeft, ChevronRight, X, Trash2, Save, Truck, ExternalLink, AlertTriangle
 } from 'lucide-react';
 
 const formatEur = (v) => new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR' }).format(v);
@@ -299,6 +299,7 @@ export default function AdminOrders() {
     page: 1,
   });
   const [hideDelivered, setHideDelivered] = useState(false);
+  const [showFlaggedOnly, setShowFlaggedOnly] = useState(false);
   const [selectedOrder, setSelectedOrder] = useState(searchParams.get('selected') || null);
   const [showNewForm, setShowNewForm] = useState(false);
 
@@ -331,7 +332,9 @@ export default function AdminOrders() {
 
   const handleCreated = () => { setShowNewForm(false); fetchOrders(); };
 
-  const displayOrders = hideDelivered ? orders.filter(o => o.status !== 'delivered') : orders;
+  const hasFlagged = (o) => o.flags && Array.isArray(o.flags) && o.flags.length > 0;
+  let displayOrders = hideDelivered ? orders.filter(o => o.status !== 'delivered') : orders;
+  if (showFlaggedOnly) displayOrders = displayOrders.filter(hasFlagged);
 
   if (selectedOrder) {
     return (
@@ -373,7 +376,11 @@ export default function AdminOrders() {
             {hideDelivered ? <EyeOff size={14} /> : <Eye size={14} />}
             {hideDelivered ? 'Livrées masquées' : 'Masquer livrées'}
           </button>
-          <button onClick={() => setFilters({ campaign_id: '', status: '', page: 1 })} className="text-sm text-gray-500 hover:text-gray-700 px-3 py-2">Effacer</button>
+          <button onClick={() => setShowFlaggedOnly(f => !f)} className={`flex items-center gap-1.5 px-3 py-2 text-sm rounded-lg border ${showFlaggedOnly ? 'bg-orange-50 border-orange-200 text-orange-700' : 'border-gray-200 text-gray-500'}`} title="Commandes à vérifier">
+            <AlertTriangle size={14} />
+            À vérifier
+          </button>
+          <button onClick={() => { setFilters({ campaign_id: '', status: '', user_id: '', page: 1 }); setShowFlaggedOnly(false); }} className="text-sm text-gray-500 hover:text-gray-700 px-3 py-2">Effacer</button>
         </div>
       </div>
 
@@ -395,7 +402,10 @@ export default function AdminOrders() {
                 <div key={o.id} onClick={() => setSelectedOrder(o.id)} className="border rounded-lg p-4 hover:bg-gray-50 cursor-pointer space-y-2">
                   <div className="flex items-center justify-between">
                     <span className="font-mono text-xs text-gray-500">{o.ref}</span>
-                    <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${status.color}`}>{status.label}</span>
+                    <div className="flex items-center gap-1">
+                      {hasFlagged(o) && <span className="text-orange-500" title="À vérifier"><AlertTriangle size={14} /></span>}
+                      <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${status.color}`}>{status.label}</span>
+                    </div>
                   </div>
                   <p className="font-medium text-sm">{o.user_name}</p>
                   <div className="flex items-center justify-between text-sm">
@@ -437,7 +447,10 @@ export default function AdminOrders() {
                     <td className="py-3 font-semibold">{formatEur(o.total_ttc)}</td>
                     <td className="py-3 text-gray-500 text-xs">{formatDate(o.created_at)}</td>
                     <td className="py-3">{o.total_items}</td>
-                    <td className="py-3"><span className={`px-2 py-1 rounded-full text-xs font-medium ${status.color}`}>{status.label}</span></td>
+                    <td className="py-3">
+                      <span className={`px-2 py-1 rounded-full text-xs font-medium ${status.color}`}>{status.label}</span>
+                      {hasFlagged(o) && <span className="ml-1 text-orange-500" title="À vérifier"><AlertTriangle size={14} className="inline" /></span>}
+                    </td>
                     <td className="py-3 text-right" onClick={e => e.stopPropagation()}>
                       <div className="flex items-center justify-end gap-1">
                         <button onClick={() => setSelectedOrder(o.id)} className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-500" title="Voir détail"><Eye size={16} /></button>

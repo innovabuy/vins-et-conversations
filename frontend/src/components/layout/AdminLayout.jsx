@@ -44,7 +44,7 @@ export default function AdminLayout() {
     <div className="min-h-screen bg-gray-50">
       {/* Mobile header */}
       <header className="lg:hidden bg-white border-b border-gray-200 px-4 py-3 flex items-center justify-between sticky top-0 z-30">
-        <button onClick={() => setSidebarOpen(true)}>
+        <button onClick={() => setSidebarOpen(true)} aria-label="Ouvrir le menu">
           <Menu size={24} />
         </button>
         <div className="flex items-center gap-2">
@@ -75,13 +75,13 @@ export default function AdminLayout() {
                 <p className="text-xs text-gray-500">Administration</p>
               </div>
             </div>
-            <button className="lg:hidden" onClick={() => setSidebarOpen(false)}>
+            <button className="lg:hidden" onClick={() => setSidebarOpen(false)} aria-label="Fermer le menu">
               <X size={20} />
             </button>
           </div>
         </div>
 
-        <nav className="p-2 overflow-y-auto h-[calc(100%-140px)]">
+        <nav className="p-2 overflow-y-auto h-[calc(100%-140px)]" role="navigation" aria-label="Menu principal">
           {navItems.map((item) => (
             <NavLink
               key={item.to}

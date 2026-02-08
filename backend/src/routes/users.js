@@ -227,4 +227,70 @@ router.post(
   }
 );
 
+// POST /api/v1/admin/users/:id/anonymize — RGPD Droit à l'oubli (CDC §5.4)
+const anonymizeSchema = Joi.object({
+  reason: Joi.string().min(5).required(),
+});
+
+router.post(
+  '/:id/anonymize',
+  authenticate,
+  requireRole('super_admin'),
+  validate(anonymizeSchema),
+  auditAction('users'),
+  async (req, res) => {
+    try {
+      const { id } = req.params;
+      const user = await db('users').where({ id }).first();
+      if (!user) return res.status(404).json({ error: 'USER_NOT_FOUND' });
+      if (user.email.includes('@anonymized.local')) {
+        return res.status(400).json({ error: 'ALREADY_ANONYMIZED', message: 'Utilisateur déjà anonymisé' });
+      }
+
+      const crypto = require('crypto');
+      const hash = crypto.createHash('sha256').update(user.email + Date.now()).digest('hex').substring(0, 12);
+      const anonymizedName = 'Utilisateur supprimé';
+      const anonymizedEmail = `deleted_${hash}@anonymized.local`;
+
+      await db('users').where({ id }).update({
+        name: anonymizedName,
+        email: anonymizedEmail,
+        avatar: null,
+        password_hash: 'ANONYMIZED',
+        status: 'disabled',
+        permissions: JSON.stringify({}),
+        updated_at: new Date(),
+      });
+
+      // Anonymize contacts linked to this user
+      await db('contacts').where({ source_user_id: id }).update({
+        source_user_id: null,
+        source: `deleted_${hash}`,
+      });
+
+      // Revoke all tokens
+      await db('refresh_tokens').where({ user_id: id }).update({ revoked: true });
+
+      // Audit log — financial data (orders, payments, financial_events) preserved per legal obligation (10 years)
+      await db('audit_log').insert({
+        user_id: req.user.userId,
+        action: 'user_anonymized',
+        entity: 'users',
+        entity_id: id,
+        reason: req.body.reason,
+        before: JSON.stringify({ name: user.name, email: user.email }),
+        after: JSON.stringify({ name: anonymizedName, email: anonymizedEmail }),
+        ip_address: req.ip,
+      });
+
+      req.auditEntityId = id;
+      req.auditAfter = { anonymized: true };
+
+      res.json({ message: 'Utilisateur anonymisé', anonymized: true, name: anonymizedName, email: anonymizedEmail });
+    } catch (err) {
+      res.status(500).json({ error: 'SERVER_ERROR', message: err.message });
+    }
+  }
+);
+
 module.exports = router;

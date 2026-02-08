@@ -1464,4 +1464,278 @@ describe('API Integration Tests', () => {
       expect(user.role).toBe('etudiant');
     });
   });
+
+  // ─── CDC Conformité — Anti-fraude, RGPD, Signature, Badges ──
+
+  describe('Anti-fraud — Unpaid orders limit (CDC §5.3)', () => {
+    test('User with 3+ unpaid submitted orders is blocked', async () => {
+      // Create a temporary test user with unpaid orders
+      const tempUser = await db('users').where({ email: 'phase4test@test.fr' }).first();
+      if (!tempUser) return;
+
+      // Add participation for the test user
+      const participation = await db('participations').where({ user_id: tempUser.id }).first();
+      if (!participation) {
+        await db('participations').insert({
+          user_id: tempUser.id,
+          campaign_id: campaignId,
+          config: JSON.stringify({}),
+        });
+      }
+
+      // Get a product
+      const cp = await db('campaign_products')
+        .where({ campaign_id: campaignId, active: true })
+        .first();
+      if (!cp) return;
+
+      // Login as temp user
+      // Since we created temp user with password Test1234!, login with that
+      const loginRes = await request(app)
+        .post('/api/v1/auth/login')
+        .send({ email: 'phase4test@test.fr', password: 'Test1234!' });
+      const tempToken = loginRes.body.accessToken;
+      if (!tempToken) return;
+
+      // Create 3 submitted orders (they'll be unpaid)
+      for (let i = 0; i < 3; i++) {
+        await request(app)
+          .post('/api/v1/orders')
+          .set('Authorization', `Bearer ${tempToken}`)
+          .send({
+            campaign_id: campaignId,
+            items: [{ productId: cp.product_id, qty: 1 }],
+          });
+      }
+
+      // 4th order should be blocked
+      const res = await request(app)
+        .post('/api/v1/orders')
+        .set('Authorization', `Bearer ${tempToken}`)
+        .send({
+          campaign_id: campaignId,
+          items: [{ productId: cp.product_id, qty: 1 }],
+        });
+
+      expect(res.status).toBe(403);
+      expect(res.body.error).toBe('MAX_UNPAID_ORDERS');
+
+      // Cleanup
+      await db('order_items').whereIn('order_id',
+        db('orders').where({ user_id: tempUser.id }).select('id')
+      ).delete();
+      await db('stock_movements').where('reference', 'like', 'VC-%').whereIn('product_id',
+        db('order_items').whereIn('order_id',
+          db('orders').where({ user_id: tempUser.id }).select('id')
+        ).select('product_id')
+      ).delete();
+      await db('financial_events').whereIn('order_id',
+        db('orders').where({ user_id: tempUser.id }).select('id')
+      ).delete();
+      await db('orders').where({ user_id: tempUser.id }).delete();
+      await db('participations').where({ user_id: tempUser.id }).delete();
+    });
+
+    test('Anti-fraud skips CSE/admin roles', async () => {
+      // CSE should not be blocked by antifraud even with many orders
+      let cseToken;
+      const loginRes = await request(app)
+        .post('/api/v1/auth/login')
+        .send({ email: 'cse@leroymerlin.fr', password: 'VinsConv2026!' });
+      cseToken = loginRes.body.accessToken;
+      if (!cseToken) return;
+
+      const participation = await db('participations')
+        .join('users', 'participations.user_id', 'users.id')
+        .where('users.email', 'cse@leroymerlin.fr')
+        .first();
+      if (!participation) return;
+
+      const cp = await db('campaign_products')
+        .join('products', 'campaign_products.product_id', 'products.id')
+        .where({ 'campaign_products.campaign_id': participation.campaign_id, 'campaign_products.active': true })
+        .orderBy('products.price_ttc', 'desc')
+        .first();
+      if (!cp) return;
+
+      // CSE should still get through antifraud (returns 400 MIN_ORDER or 201, not 403 MAX_UNPAID)
+      const res = await request(app)
+        .post('/api/v1/orders')
+        .set('Authorization', `Bearer ${cseToken}`)
+        .send({
+          campaign_id: participation.campaign_id,
+          items: [{ productId: cp.product_id, qty: 1 }],
+        });
+
+      // Should be 400 (MIN_ORDER_NOT_MET) not 403 (MAX_UNPAID)
+      expect(res.status).toBe(400);
+      expect(res.body.error).toBe('MIN_ORDER_NOT_MET');
+    });
+  });
+
+  describe('RGPD — Anonymization & parental consent (CDC §5.4)', () => {
+    test('Admin can anonymize a user (right to be forgotten)', async () => {
+      // Create a test user to anonymize
+      const testEmail = 'anon-test@test.fr';
+      await db('users').where({ email: testEmail }).delete();
+      const createRes = await request(app)
+        .post('/api/v1/admin/users')
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({ email: testEmail, name: 'Anon Test', role: 'etudiant', password: 'Test1234!' });
+      expect(createRes.status).toBe(201);
+      const userId = createRes.body.id;
+
+      const res = await request(app)
+        .post(`/api/v1/admin/users/${userId}/anonymize`)
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({ reason: 'RGPD request from user' });
+
+      expect(res.status).toBe(200);
+      expect(res.body.message).toContain('anonymisé');
+
+      // Verify user is anonymized
+      const user = await db('users').where({ id: userId }).first();
+      expect(user.name).toBe('Utilisateur supprimé');
+      expect(user.email).not.toBe(testEmail);
+      expect(user.email).toContain('@anonymized.local');
+      expect(user.status).toBe('disabled');
+
+      // Verify audit log
+      const audit = await db('audit_log')
+        .where({ entity: 'users', entity_id: userId, action: 'user_anonymized' })
+        .first();
+      expect(audit).toBeDefined();
+    });
+
+    test('Student register requires parental consent', async () => {
+      // Cleanup any leftover from previous runs
+      const oldUser = await db('users').where({ email: 'minor-test@test.fr' }).first();
+      if (oldUser) {
+        await db('refresh_tokens').where({ user_id: oldUser.id }).delete();
+        await db('participations').where({ user_id: oldUser.id }).delete();
+        await db('invitations').where({ used_by: oldUser.id }).update({ used_by: null });
+        await db('users').where({ id: oldUser.id }).delete();
+      }
+
+      // Create an invitation code for student role
+      const invRes = await request(app)
+        .post('/api/v1/admin/invitations')
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({ campaign_id: campaignId, role: 'etudiant', method: 'link', count: 2 });
+      const code1 = invRes.body.data[0].code;
+
+      const res = await request(app)
+        .post('/api/v1/auth/register')
+        .send({
+          code: code1,
+          email: 'minor-test@test.fr',
+          password: 'Test1234!',
+          name: 'Minor Test',
+        });
+
+      expect(res.status).toBe(400);
+      expect(res.body.error).toBe('PARENTAL_CONSENT_REQUIRED');
+
+      // Register with consent using the second code
+      const code2 = invRes.body.data[1].code;
+      const res2 = await request(app)
+        .post('/api/v1/auth/register')
+        .send({
+          code: code2,
+          email: 'minor-test@test.fr',
+          password: 'Test1234!',
+          name: 'Minor Test',
+          parental_consent: true,
+        });
+
+      expect(res2.status).toBe(201);
+      expect(res2.body.user.email).toBe('minor-test@test.fr');
+
+      // Verify parental_consent is set
+      const user = await db('users').where({ email: 'minor-test@test.fr' }).first();
+      expect(user.parental_consent).toBe(true);
+
+      // Cleanup
+      await db('refresh_tokens').where({ user_id: user.id }).delete();
+      await db('participations').where({ user_id: user.id }).delete();
+      await db('invitations').where({ used_by: user.id }).update({ used_by: null });
+      await db('users').where({ id: user.id }).delete();
+    });
+  });
+
+  describe('Digital Signature BL (CDC §4.1)', () => {
+    test('BL signature stores base64 image', async () => {
+      // Get a delivery note in delivered status
+      const bl = await db('delivery_notes').where({ status: 'delivered' }).first();
+      if (!bl) {
+        // Create one by advancing a draft BL
+        const draftBL = await db('delivery_notes').where({ status: 'draft' }).first();
+        if (!draftBL) return;
+
+        // Advance to in_transit
+        await request(app)
+          .put(`/api/v1/admin/delivery-notes/${draftBL.id}/status`)
+          .set('Authorization', `Bearer ${adminToken}`)
+          .send({ status: 'in_transit' });
+
+        // Advance to delivered
+        await request(app)
+          .put(`/api/v1/admin/delivery-notes/${draftBL.id}/status`)
+          .set('Authorization', `Bearer ${adminToken}`)
+          .send({ status: 'delivered' });
+      }
+
+      const deliveredBL = await db('delivery_notes').where({ status: 'delivered' }).first();
+      if (!deliveredBL) return;
+
+      // Sign with base64 signature
+      const fakeSignature = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==';
+      const res = await request(app)
+        .put(`/api/v1/admin/delivery-notes/${deliveredBL.id}/status`)
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({ status: 'signed', signature_url: fakeSignature });
+
+      expect(res.status).toBe(200);
+
+      // Verify signature was stored
+      const updated = await db('delivery_notes').where({ id: deliveredBL.id }).first();
+      expect(updated.status).toBe('signed');
+      expect(updated.signature_url).toContain('data:image/png;base64');
+    });
+  });
+
+  describe('Badges Gamification (CDC §4.2)', () => {
+    test('Badge definitions exist and are correct', () => {
+      const { BADGE_DEFINITIONS } = require('../services/badgeService');
+      expect(BADGE_DEFINITIONS.length).toBe(6);
+
+      const ids = BADGE_DEFINITIONS.map((b) => b.id);
+      expect(ids).toContain('top_vendeur');
+      expect(ids).toContain('streak_7');
+      expect(ids).toContain('premier_1000');
+      expect(ids).toContain('machine_vendre');
+      expect(ids).toContain('fidele');
+      expect(ids).toContain('objectif_perso');
+    });
+
+    test('Student dashboard includes badges array', async () => {
+      const res = await request(app)
+        .get('/api/v1/dashboard/student')
+        .set('Authorization', `Bearer ${studentToken}`)
+        .query({ campaign_id: campaignId });
+
+      expect(res.status).toBe(200);
+      expect(res.body).toHaveProperty('badges');
+      expect(res.body.badges).toBeInstanceOf(Array);
+    });
+
+    test('Badge evaluateBadges runs without errors', async () => {
+      const { evaluateBadges } = require('../services/badgeService');
+      const student = await db('users').where({ email: 'ackavong@eleve.sc.fr' }).first();
+      if (!student) return;
+
+      // Should not throw
+      await expect(evaluateBadges(student.id, campaignId)).resolves.not.toThrow();
+    });
+  });
 });

@@ -58,6 +58,19 @@ export default function AdminUsers() {
     }
   };
 
+  const handleAnonymize = async (id, name) => {
+    const reason = prompt(`RGPD — Anonymiser "${name}" ?\nCette action est irréversible. Saisissez la raison :`);
+    if (!reason || reason.length < 5) return;
+    if (!confirm(`Confirmer l'anonymisation définitive de "${name}" ?`)) return;
+    try {
+      await usersAPI.anonymize(id, reason);
+      alert('Utilisateur anonymisé');
+      loadData();
+    } catch (err) {
+      alert(err.response?.data?.message || 'Erreur');
+    }
+  };
+
   const copyLink = (link, id) => {
     navigator.clipboard.writeText(link);
     setCopiedId(id);
@@ -168,6 +181,15 @@ export default function AdminUsers() {
                         >
                           {u.status === 'active' ? 'Désactiver' : 'Activer'}
                         </button>
+                        {!u.email.includes('@deleted.local') && (
+                          <button
+                            onClick={() => handleAnonymize(u.id, u.name)}
+                            className="text-xs px-2 py-1 rounded bg-gray-50 text-gray-500 hover:bg-red-50 hover:text-red-600 ml-1"
+                            title="RGPD — Anonymiser"
+                          >
+                            Anonymiser
+                          </button>
+                        )}
                       </td>
                     </tr>
                   );

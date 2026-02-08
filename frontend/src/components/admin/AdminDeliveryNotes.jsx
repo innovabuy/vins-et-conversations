@@ -1,7 +1,8 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { deliveryNotesAPI, ordersAPI } from '../../services/api';
-import { Truck, FileText, Check, Eye, EyeOff, X, ChevronRight, Printer, Mail, Trash2, Pencil, Save, ExternalLink } from 'lucide-react';
+import { Truck, FileText, Check, Eye, EyeOff, X, ChevronRight, Printer, Mail, Trash2, Pencil, Save, ExternalLink, PenTool } from 'lucide-react';
+import SignaturePad from '../shared/SignaturePad';
 
 const formatEur = (v) => new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR' }).format(v);
 const formatDate = (d) => d ? new Date(d).toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit', year: 'numeric' }) : '—';
@@ -97,6 +98,7 @@ function DeliveryNoteDetail({ noteId, onClose, onUpdated }) {
   const [updating, setUpdating] = useState(false);
   const [editing, setEditing] = useState(false);
   const [editForm, setEditForm] = useState({});
+  const [showSignaturePad, setShowSignaturePad] = useState(false);
 
   const fetchNote = useCallback(async () => {
     setLoading(true);
@@ -109,11 +111,25 @@ function DeliveryNoteDetail({ noteId, onClose, onUpdated }) {
     if (!note) return;
     const nextStatus = WORKFLOW_NEXT[note.status];
     if (!nextStatus) return;
+    // Open signature pad for delivered→signed transition
+    if (nextStatus === 'signed') {
+      setShowSignaturePad(true);
+      return;
+    }
     if (!confirm(`${WORKFLOW_LABELS[note.status]} ?`)) return;
     setUpdating(true);
     try {
-      if (nextStatus === 'signed') await deliveryNotesAPI.sign(note.id, { signature_url: 'manual-sign' });
-      else await deliveryNotesAPI.update(note.id, { status: nextStatus });
+      await deliveryNotesAPI.update(note.id, { status: nextStatus });
+      await fetchNote();
+      if (onUpdated) onUpdated();
+    } catch (err) { alert(err.response?.data?.message || 'Erreur'); } finally { setUpdating(false); }
+  };
+
+  const handleSignatureConfirm = async (signatureDataUrl) => {
+    setShowSignaturePad(false);
+    setUpdating(true);
+    try {
+      await deliveryNotesAPI.sign(note.id, { signature_url: signatureDataUrl });
       await fetchNote();
       if (onUpdated) onUpdated();
     } catch (err) { alert(err.response?.data?.message || 'Erreur'); } finally { setUpdating(false); }
@@ -213,14 +229,34 @@ function DeliveryNoteDetail({ noteId, onClose, onUpdated }) {
         <div><span className="text-gray-500">Total TTC :</span> <span className="font-semibold">{formatEur(note.total_ttc)}</span></div>
       </div>
 
-      {/* Signature zone for delivered */}
+      {/* Signature zone for delivered/signed */}
       {(note.status === 'delivered' || note.status === 'signed') && (
         <div className="border-2 border-dashed border-green-300 rounded-lg p-4 bg-green-50">
-          <p className="text-sm font-medium text-green-800">
-            {note.status === 'signed' ? '✓ Signé' : 'En attente de signature'}
-          </p>
+          {note.status === 'signed' && note.signature_url && note.signature_url.startsWith('data:') ? (
+            <div>
+              <p className="text-sm font-medium text-green-800 mb-2">Signature</p>
+              <img src={note.signature_url} alt="Signature" className="max-w-[200px] h-auto border rounded bg-white" />
+            </div>
+          ) : note.status === 'signed' ? (
+            <p className="text-sm font-medium text-green-800">Signé</p>
+          ) : (
+            <div className="flex items-center justify-between">
+              <p className="text-sm font-medium text-amber-700">En attente de signature</p>
+              <button onClick={() => setShowSignaturePad(true)} className="flex items-center gap-1.5 px-3 py-1.5 text-sm bg-wine-700 text-white rounded-lg hover:bg-wine-800">
+                <PenTool size={14} /> Signer
+              </button>
+            </div>
+          )}
           {note.delivered_at && <p className="text-xs text-green-600 mt-1">Livré le {formatDate(note.delivered_at)}</p>}
         </div>
+      )}
+
+      {/* Signature Pad fullscreen overlay */}
+      {showSignaturePad && (
+        <SignaturePad
+          onConfirm={handleSignatureConfirm}
+          onClose={() => setShowSignaturePad(false)}
+        />
       )}
 
       {/* Items */}

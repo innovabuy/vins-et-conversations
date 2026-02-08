@@ -259,9 +259,19 @@ router.get('/:id/pdf', authenticate, requireRole('super_admin', 'commercial'), a
     // Signature zone
     doc.fontSize(10).fillColor('#333').text('Signature du destinataire :', 50);
     doc.moveDown(0.5);
-    doc.rect(50, doc.y, 200, 60).strokeColor('#ccc').stroke();
-    doc.moveDown(5);
-    doc.fontSize(8).fillColor('#999').text(`Date : ___/___/______          Nom : ________________________`, 50);
+    if (bl.signature_url && bl.signature_url.startsWith('data:image/png;base64,')) {
+      const base64Data = bl.signature_url.replace('data:image/png;base64,', '');
+      const sigBuffer = Buffer.from(base64Data, 'base64');
+      doc.image(sigBuffer, 50, doc.y, { width: 200, height: 60 });
+      doc.moveDown(5);
+      if (bl.delivered_at) {
+        doc.fontSize(8).fillColor('#999').text(`Signé le ${new Date(bl.delivered_at).toLocaleDateString('fr-FR')}`, 50);
+      }
+    } else {
+      doc.rect(50, doc.y, 200, 60).strokeColor('#ccc').stroke();
+      doc.moveDown(5);
+      doc.fontSize(8).fillColor('#999').text(`Date : ___/___/______          Nom : ________________________`, 50);
+    }
 
     doc.end();
   } catch (err) {

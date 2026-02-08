@@ -56,7 +56,7 @@ router.post('/login', validate(loginSchema), async (req, res) => {
 router.post('/register', validate(registerSchema), async (req, res) => {
   try {
     const result = await authService.register(
-      req.body.code, req.body.name, req.body.email, req.body.password
+      req.body.code, req.body.name, req.body.email, req.body.password, req.body.parental_consent
     );
     res.cookie('refreshToken', result.refreshToken, {
       httpOnly: true,
@@ -71,6 +71,9 @@ router.post('/register', validate(registerSchema), async (req, res) => {
     }
     if (err.message === 'EMAIL_EXISTS') {
       return res.status(409).json({ error: 'EMAIL_EXISTS', message: 'Cet email est déjà utilisé' });
+    }
+    if (err.message === 'PARENTAL_CONSENT_REQUIRED') {
+      return res.status(400).json({ error: 'PARENTAL_CONSENT_REQUIRED', message: 'Le consentement parental est obligatoire pour les étudiants mineurs' });
     }
     res.status(500).json({ error: 'SERVER_ERROR' });
   }

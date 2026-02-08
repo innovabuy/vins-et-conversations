@@ -4,6 +4,7 @@ const logger = require('../utils/logger');
 const { v4: uuidv4 } = require('uuid');
 const emailService = require('./emailService');
 const notificationService = require('./notificationService');
+const badgeService = require('./badgeService');
 
 /**
  * Génère une référence commande unique : VC-2026-0001
@@ -141,6 +142,34 @@ async function createOrder({ userId, campaignId, items, customerId, notes }) {
     }
   });
 
+  // --- Anti-fraude: Détection montant anormal (CDC §5.3) ---
+  try {
+    const avgResult = await db('orders')
+      .where({ campaign_id: campaignId })
+      .whereNot('status', 'cancelled')
+      .whereNot('id', orderId)
+      .avg('total_ttc as avg')
+      .count('id as count')
+      .first();
+    const avgOrder = parseFloat(avgResult?.avg || 0);
+    const orderCount = parseInt(avgResult?.count || 0, 10);
+    if (orderCount >= 3 && avgOrder > 0 && totalTTC > avgOrder * 2) {
+      const flags = [{ type: 'amount_anomaly', detected_at: new Date().toISOString() }];
+      await db('orders').where({ id: orderId }).update({ flags: JSON.stringify(flags) });
+      await db('audit_log').insert({
+        user_id: userId,
+        action: 'fraud_flag',
+        entity: 'orders',
+        entity_id: orderId,
+        reason: `Montant anormal: ${totalTTC.toFixed(2)}€ vs moyenne ${avgOrder.toFixed(2)}€`,
+        after: JSON.stringify({ review_needed: true, amount: totalTTC, average: avgOrder }),
+      });
+      logger.warn(`Anti-fraud flag: order ${ref} amount ${totalTTC}€ vs avg ${avgOrder.toFixed(2)}€`);
+    }
+  } catch (e) {
+    logger.error(`Anti-fraud post-check error: ${e.message}`);
+  }
+
   logger.info(`Order created: ${ref} by user ${userId} in campaign ${campaignId}`);
 
   // Send order confirmation email (fire and forget)
@@ -161,6 +190,9 @@ async function createOrder({ userId, campaignId, items, customerId, notes }) {
     }).catch((e) => logger.error(`Order confirmation email failed: ${e.message}`));
     notificationService.onNewOrder({ ref, totalTTC: parseFloat(totalTTC.toFixed(2)) }, user.name)
       .catch((e) => logger.error(`Order notification failed: ${e.message}`));
+    // Evaluate badges after order (CDC §4.2)
+    badgeService.evaluateBadges(userId, campaignId)
+      .catch((e) => logger.error(`Badge evaluation failed: ${e.message}`));
   } catch (e) {
     logger.error(`Order confirmation hook error: ${e.message}`);
   }

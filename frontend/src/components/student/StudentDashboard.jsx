@@ -1,10 +1,24 @@
 import { useState, useEffect } from 'react';
 import { dashboardAPI, productsAPI, ordersAPI } from '../../services/api';
 import { useAuth } from '../../contexts/AuthContext';
-import { Flame, Trophy, ShoppingCart, User, ChevronUp, Wine, Package, Clock } from 'lucide-react';
+import { Flame, Trophy, ShoppingCart, User, ChevronUp, Wine, Package, Clock, Award, Zap, Heart, Target, DollarSign } from 'lucide-react';
 
 const formatEur = (v) => new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR' }).format(v);
 const formatDate = (d) => new Date(d).toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit', year: 'numeric' });
+
+const BADGE_ICONS = {
+  trophy: Trophy, flame: Flame, banknote: DollarSign,
+  zap: Zap, heart: Heart, target: Target,
+};
+
+const ALL_BADGES = [
+  { id: 'top_vendeur', name: 'Top Vendeur', icon: 'trophy', description: '1er au classement' },
+  { id: 'streak_7', name: 'Série 7j', icon: 'flame', description: '7 jours consécutifs' },
+  { id: 'premier_1000', name: 'Premier 1000€', icon: 'banknote', description: 'CA >= 1000€' },
+  { id: 'machine_vendre', name: 'Machine à vendre', icon: 'zap', description: '50+ bouteilles' },
+  { id: 'fidele', name: 'Fidèle', icon: 'heart', description: '14 jours consécutifs' },
+  { id: 'objectif_perso', name: 'Objectif perso', icon: 'target', description: 'Objectif atteint' },
+];
 
 const STATUS_LABELS = {
   submitted: 'En attente',
@@ -263,12 +277,29 @@ export default function StudentDashboard() {
             </div>
             {data && (
               <div className="card">
-                <h3 className="font-semibold mb-3">Streak & Badges</h3>
-                <div className="flex items-center gap-4">
+                <h3 className="font-semibold mb-3 flex items-center gap-2"><Award size={16} /> Badges & Streak</h3>
+                <div className="flex items-center gap-4 mb-4">
                   <div className="text-center">
                     <StreakBadge streak={data.streak} />
                     <p className="text-xs text-gray-500 mt-1">Streak actuel</p>
                   </div>
+                </div>
+                <div className="grid grid-cols-3 gap-2">
+                  {ALL_BADGES.map((badge) => {
+                    const earned = data.badges?.find((b) => b.id === badge.id);
+                    const Icon = BADGE_ICONS[badge.icon] || Award;
+                    return (
+                      <div key={badge.id} className={`text-center p-2 rounded-xl transition-all ${earned ? 'bg-wine-50 ring-1 ring-wine-200' : 'bg-gray-50 opacity-40'}`}>
+                        <Icon size={24} className={earned ? 'text-wine-700 mx-auto' : 'text-gray-400 mx-auto'} />
+                        <p className="text-xs font-medium mt-1">{badge.name}</p>
+                        {earned ? (
+                          <p className="text-[10px] text-wine-600">{new Date(earned.earned_at).toLocaleDateString('fr-FR')}</p>
+                        ) : (
+                          <p className="text-[10px] text-gray-400">{badge.description}</p>
+                        )}
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
             )}
@@ -278,7 +309,7 @@ export default function StudentDashboard() {
       </div>
 
       {/* Bottom nav */}
-      <nav className="fixed bottom-0 left-0 right-0 max-w-[390px] mx-auto bg-white border-t border-gray-200">
+      <nav className="fixed bottom-0 left-0 right-0 max-w-[390px] mx-auto bg-white border-t border-gray-200" role="navigation" aria-label="Navigation principale">
         <div className="flex">
           {tabs.map((t) => (
             <button

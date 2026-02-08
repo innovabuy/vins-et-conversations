@@ -202,6 +202,7 @@ export const usersAPI = {
   update: (id, data) => api.put(`/admin/users/${id}`, data),
   toggleStatus: (id) => api.post(`/admin/users/${id}/toggle-status`),
   importCSV: (data) => api.post('/admin/users/import-csv', data),
+  anonymize: (id, reason) => api.post(`/admin/users/${id}/anonymize`, { reason }),
 };
 
 // ─── Invitations ───────────────────────────────────

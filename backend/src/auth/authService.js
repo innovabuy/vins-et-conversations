@@ -71,7 +71,7 @@ async function login(email, password) {
   };
 }
 
-async function register(code, name, email, password) {
+async function register(code, name, email, password, parentalConsent) {
   // Verify invitation code
   const invitation = await db('invitations')
     .where({ code })
@@ -89,6 +89,11 @@ async function register(code, name, email, password) {
   const userId = uuidv4();
 
   await db.transaction(async (trx) => {
+    // RGPD §5.4: Consentement parental obligatoire pour étudiants (mineurs)
+    if (invitation.role === 'etudiant' && !parentalConsent) {
+      throw new Error('PARENTAL_CONSENT_REQUIRED');
+    }
+
     await trx('users').insert({
       id: userId,
       email: email.toLowerCase().trim(),
@@ -96,6 +101,8 @@ async function register(code, name, email, password) {
       name,
       role: invitation.role,
       status: 'active',
+      parental_consent: invitation.role === 'etudiant' ? true : false,
+      parental_consent_date: invitation.role === 'etudiant' ? new Date() : null,
     });
 
     await trx('participations').insert({

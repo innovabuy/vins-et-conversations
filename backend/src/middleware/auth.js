@@ -1,4 +1,5 @@
 const authService = require('../auth/authService');
+const db = require('../config/database');
 const logger = require('../utils/logger');
 
 /**
@@ -63,11 +64,49 @@ function requireCampaignAccess(req, res, next) {
 
 /**
  * Middleware anti-fraude configurable (CDC §5.3)
+ * Vérification 1: Limite commandes impayées simultanées (BLOQUE)
+ * Vérification 2: Détection montant anormal (FLAG sans bloquer)
  */
-function antifraudCheck(req, res, next) {
-  // Phase 1 : logging uniquement, pas de blocage
-  // TODO Phase 2 : vérifications actives
-  next();
+async function antifraudCheck(req, res, next) {
+  try {
+    const userId = req.user?.userId;
+    if (!userId) return next();
+
+    // CSE/ambassadeur have different payment models (transfer 30j) — skip fraud check
+    const role = req.user?.role;
+    if (role === 'cse' || role === 'ambassadeur' || role === 'super_admin' || role === 'commercial') {
+      req.antifraudFlags = [];
+      return next();
+    }
+
+    // --- Vérification 1: Limite commandes impayées ---
+    const MAX_UNPAID = 3; // configurable via client_type config
+    const unpaidCount = await db('orders')
+      .leftJoin('payments', 'orders.id', 'payments.order_id')
+      .where('orders.user_id', userId)
+      .whereIn('orders.status', ['submitted', 'validated'])
+      .where(function () {
+        this.whereNull('payments.id')
+          .orWhereNot('payments.status', 'reconciled');
+      })
+      .countDistinct('orders.id as count')
+      .first();
+
+    if (parseInt(unpaidCount?.count || 0, 10) >= MAX_UNPAID) {
+      return res.status(403).json({
+        error: 'MAX_UNPAID_ORDERS',
+        message: 'Vous avez atteint la limite de commandes impayées',
+      });
+    }
+
+    // Store flags for post-creation check (done in orderService)
+    req.antifraudFlags = [];
+    next();
+  } catch (err) {
+    logger.error(`Antifraud check error: ${err.message}`);
+    // Don't block on antifraud errors — graceful degradation
+    next();
+  }
 }
 
 module.exports = { authenticate, requireRole, requireCampaignAccess, antifraudCheck };

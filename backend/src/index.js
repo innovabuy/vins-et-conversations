@@ -17,6 +17,18 @@ const PORT = process.env.PORT || 3001;
 // ─── Webhook route (BEFORE express.json for raw body) ─
 app.use('/api/v1/webhooks', require('./routes/webhooks'));
 
+// ─── Middleware: mesure temps de réponse (CDC §9.2) ───
+app.use((req, res, next) => {
+  const start = Date.now();
+  res.on('finish', () => {
+    const duration = Date.now() - start;
+    if (duration > 500) {
+      logger.warn(`Slow request: ${req.method} ${req.path} — ${duration}ms`);
+    }
+  });
+  next();
+});
+
 // ─── Middlewares globaux ──────────────────────────────
 app.use(helmet());
 app.use(compression());
