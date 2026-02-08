@@ -2,6 +2,8 @@ const db = require('../config/database');
 const rulesEngine = require('./rulesEngine');
 const logger = require('../utils/logger');
 const { v4: uuidv4 } = require('uuid');
+const emailService = require('./emailService');
+const notificationService = require('./notificationService');
 
 /**
  * Génère une référence commande unique : VC-2026-0001
@@ -141,6 +143,28 @@ async function createOrder({ userId, campaignId, items, customerId, notes }) {
 
   logger.info(`Order created: ${ref} by user ${userId} in campaign ${campaignId}`);
 
+  // Send order confirmation email (fire and forget)
+  try {
+    const campaign = await db('campaigns').where({ id: campaignId }).first();
+    const orderItems = await db('order_items')
+      .join('products', 'order_items.product_id', 'products.id')
+      .where('order_items.order_id', orderId)
+      .select('products.name', 'order_items.qty', 'order_items.unit_price_ttc');
+    emailService.sendOrderConfirmation({
+      email: user.email,
+      name: user.name,
+      orderRef: ref,
+      campaignName: campaign?.name,
+      totalItems,
+      totalTTC: parseFloat(totalTTC.toFixed(2)),
+      items: orderItems,
+    }).catch((e) => logger.error(`Order confirmation email failed: ${e.message}`));
+    notificationService.onNewOrder({ ref, totalTTC: parseFloat(totalTTC.toFixed(2)) }, user.name)
+      .catch((e) => logger.error(`Order notification failed: ${e.message}`));
+  } catch (e) {
+    logger.error(`Order confirmation hook error: ${e.message}`);
+  }
+
   return {
     id: orderId,
     ref,
@@ -165,6 +189,24 @@ async function validateOrder(orderId, adminUserId) {
   });
 
   logger.info(`Order ${order.ref} validated by admin ${adminUserId}`);
+
+  // Send validation email (fire and forget)
+  try {
+    const user = await db('users').where({ id: order.user_id }).first();
+    if (user) {
+      emailService.sendOrderValidated({
+        email: user.email,
+        name: user.name,
+        orderRef: order.ref,
+        totalTTC: parseFloat(order.total_ttc),
+      }).catch((e) => logger.error(`Order validated email failed: ${e.message}`));
+    }
+    notificationService.onOrderValidated(order)
+      .catch((e) => logger.error(`Order validated notification failed: ${e.message}`));
+  } catch (e) {
+    logger.error(`Order validated hook error: ${e.message}`);
+  }
+
   return { ...order, status: 'validated' };
 }
 

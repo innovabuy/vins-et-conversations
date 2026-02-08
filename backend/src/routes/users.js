@@ -5,6 +5,8 @@ const Joi = require('joi');
 const { authenticate, requireRole } = require('../middleware/auth');
 const { auditAction } = require('../middleware/audit');
 const { validate } = require('../middleware/validate');
+const emailService = require('../services/emailService');
+const logger = require('../utils/logger');
 
 const router = express.Router();
 
@@ -87,6 +89,11 @@ router.post(
 
       req.auditEntityId = user.id;
       req.auditAfter = { email, name, role, status };
+
+      // Send welcome email (fire and forget)
+      emailService.sendWelcome({ email, name, role })
+        .catch((e) => logger.error(`Welcome email failed: ${e.message}`));
+
       res.status(201).json(user);
     } catch (err) {
       res.status(500).json({ error: 'SERVER_ERROR', message: err.message });

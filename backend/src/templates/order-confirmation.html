@@ -1,0 +1,15 @@
+<h2>Commande confirmée</h2>
+<p>Bonjour {{NAME}},</p>
+<p>Votre commande <span class="highlight">{{ORDER_REF}}</span> a bien été enregistrée.</p>
+<div class="card">
+  <div class="card-row"><span class="card-label">Référence</span><span class="card-value">{{ORDER_REF}}</span></div>
+  <div class="card-row"><span class="card-label">Campagne</span><span class="card-value">{{CAMPAIGN_NAME}}</span></div>
+  <div class="card-row"><span class="card-label">Articles</span><span class="card-value">{{TOTAL_ITEMS}} bouteille(s)</span></div>
+  <div class="card-row"><span class="card-label">Total TTC</span><span class="card-value">{{TOTAL_TTC}}</span></div>
+</div>
+<table class="items">
+  <thead><tr><th>Produit</th><th>Qté</th><th>P.U. TTC</th><th>Sous-total</th></tr></thead>
+  <tbody>{{ITEMS_ROWS}}</tbody>
+</table>
+<p>Votre commande est en attente de validation par notre équipe.</p>
+<p class="muted">Vous recevrez un email de confirmation une fois la commande validée.</p>

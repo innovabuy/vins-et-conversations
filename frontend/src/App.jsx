@@ -31,6 +31,11 @@ import BTSDashboard from './components/bts/BTSDashboard';
 import TeacherLayout from './components/layout/TeacherLayout';
 import TeacherDashboard from './components/teacher/TeacherDashboard';
 import InstallPrompt from './components/shared/InstallPrompt';
+import { ToastProvider } from './components/shared/Toast';
+import PublicLayout from './components/layout/PublicLayout';
+import BoutiqueHome from './components/public/BoutiqueHome';
+import ProductDetail from './components/public/ProductDetail';
+import ContactForm from './components/public/ContactForm';
 
 function ProtectedRoute({ children, roles }) {
   const { user, loading } = useAuth();
@@ -46,6 +51,13 @@ function AppRoutes() {
   return (
     <Routes>
       <Route path="/login" element={<LoginPage />} />
+
+      {/* Public boutique */}
+      <Route path="/boutique" element={<PublicLayout />}>
+        <Route index element={<BoutiqueHome />} />
+        <Route path="vin/:id" element={<ProductDetail />} />
+        <Route path="contact" element={<ContactForm />} />
+      </Route>
 
       {/* Admin routes */}
       <Route path="/admin" element={
@@ -137,8 +149,10 @@ export default function App() {
   return (
     <BrowserRouter>
       <AuthProvider>
-        <AppRoutes />
-        <InstallPrompt />
+        <ToastProvider>
+          <AppRoutes />
+          <InstallPrompt />
+        </ToastProvider>
       </AuthProvider>
     </BrowserRouter>
   );

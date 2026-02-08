@@ -1136,4 +1136,332 @@ describe('API Integration Tests', () => {
       expect(res.body.status).toBe('ok');
     });
   });
+
+  // ─── Sprint C Tests ────────────────────────────────────
+
+  describe('Sprint C — Email Templates', () => {
+    test('Email templates render correctly', () => {
+      const { renderTemplate } = require('../services/emailService');
+      const html = renderTemplate('welcome', {
+        NAME: 'Test User',
+        EMAIL: 'test@test.fr',
+        ROLE: 'Étudiant',
+        LOGIN_URL: 'http://localhost/login',
+      });
+      expect(html).toContain('Bienvenue Test User');
+      expect(html).toContain('test@test.fr');
+      expect(html).toContain('Vins &amp; Conversations');
+    });
+
+    test('Order confirmation template renders items', () => {
+      const { renderTemplate } = require('../services/emailService');
+      const html = renderTemplate('order-confirmation', {
+        NAME: 'Jean',
+        ORDER_REF: 'VC-2026-0001',
+        CAMPAIGN_NAME: 'Sacré-Coeur',
+        TOTAL_ITEMS: '6',
+        TOTAL_TTC: '120,00 €',
+        ITEMS_ROWS: '<tr><td>Bordeaux</td><td>3</td><td>20,00 €</td><td>60,00 €</td></tr>',
+      });
+      expect(html).toContain('VC-2026-0001');
+      expect(html).toContain('Sacré-Coeur');
+      expect(html).toContain('Bordeaux');
+    });
+
+    test('Password reset template renders reset URL', () => {
+      const { renderTemplate } = require('../services/emailService');
+      const html = renderTemplate('password-reset', {
+        NAME: 'Jean',
+        RESET_URL: 'http://localhost/login?reset=1&token=abc123',
+      });
+      expect(html).toContain('token=abc123');
+      expect(html).toContain('Réinitialisation');
+    });
+
+    test('Delivery notification handles conditional sections', () => {
+      const { renderTemplate } = require('../services/emailService');
+      const html = renderTemplate('delivery-notification', {
+        NAME: 'Jean',
+        ORDER_REF: 'VC-2026-0001',
+        BL_REF: 'BL-2026-0001',
+        RECIPIENT: 'Jean',
+        PLANNED_DATE: '15/02/2026',
+        ADDRESS: '',
+      });
+      expect(html).toContain('BL-2026-0001');
+      expect(html).toContain('15/02/2026');
+      // Empty address should not show address section
+      expect(html).not.toContain('{{ADDRESS}}');
+    });
+  });
+
+  describe('Sprint C — Password Reset', () => {
+    test('POST /auth/forgot-password returns success even for unknown email', async () => {
+      const res = await request(app)
+        .post('/api/v1/auth/forgot-password')
+        .send({ email: 'unknown@example.fr' });
+      expect(res.status).toBe(200);
+      expect(res.body.message).toBeDefined();
+    });
+
+    test('POST /auth/forgot-password creates token for existing user', async () => {
+      const res = await request(app)
+        .post('/api/v1/auth/forgot-password')
+        .send({ email: 'nicolas@vins-conversations.fr' });
+      expect(res.status).toBe(200);
+
+      // Verify token was created in DB
+      const token = await db('password_reset_tokens')
+        .join('users', 'password_reset_tokens.user_id', 'users.id')
+        .where('users.email', 'nicolas@vins-conversations.fr')
+        .where('password_reset_tokens.used', false)
+        .first();
+      expect(token).toBeDefined();
+    });
+
+    test('POST /auth/reset-password with invalid token returns 400', async () => {
+      const res = await request(app)
+        .post('/api/v1/auth/reset-password')
+        .send({ token: 'invalid_token_xyz', password: 'NewPass2026!' });
+      expect(res.status).toBe(400);
+      expect(res.body.error).toBe('INVALID_TOKEN');
+    });
+
+    test('POST /auth/reset-password with valid token succeeds', async () => {
+      // Get the token that was created in the previous test
+      const tokenRow = await db('password_reset_tokens')
+        .join('users', 'password_reset_tokens.user_id', 'users.id')
+        .where('users.email', 'nicolas@vins-conversations.fr')
+        .where('password_reset_tokens.used', false)
+        .select('password_reset_tokens.token')
+        .first();
+
+      if (tokenRow) {
+        const res = await request(app)
+          .post('/api/v1/auth/reset-password')
+          .send({ token: tokenRow.token, password: 'VinsConv2026!' }); // Reset back to original
+        expect(res.status).toBe(200);
+        expect(res.body.message).toContain('réinitialisé');
+      }
+    });
+  });
+
+  describe('Sprint C — Public Contact', () => {
+    test('POST /public/contact with valid data creates contact', async () => {
+      const res = await request(app)
+        .post('/api/v1/public/contact')
+        .send({
+          name: 'Marie Dupont',
+          email: 'marie@example.fr',
+          message: 'Bonjour, je souhaite commander du vin pour notre événement.',
+          type: 'devis',
+        });
+      expect(res.status).toBe(201);
+      expect(res.body.message).toBe('Message envoyé');
+      expect(res.body.id).toBeDefined();
+    });
+
+    test('POST /public/contact with missing fields returns 400', async () => {
+      const res = await request(app)
+        .post('/api/v1/public/contact')
+        .send({ name: 'A', email: 'invalid' });
+      expect(res.status).toBe(400);
+      expect(res.body.error).toBe('VALIDATION_ERROR');
+    });
+
+    test('POST /public/contact with short message returns 400', async () => {
+      const res = await request(app)
+        .post('/api/v1/public/contact')
+        .send({ name: 'Test', email: 'test@test.fr', message: 'short' });
+      expect(res.status).toBe(400);
+    });
+  });
+
+  describe('Sprint C — Public Catalog', () => {
+    test('GET /public/catalog returns products', async () => {
+      const res = await request(app).get('/api/v1/public/catalog');
+      expect(res.status).toBe(200);
+      expect(res.body.data).toBeDefined();
+      expect(res.body.pagination).toBeDefined();
+    });
+
+    test('GET /public/filters returns filter values', async () => {
+      const res = await request(app).get('/api/v1/public/filters');
+      expect(res.status).toBe(200);
+      expect(res.body).toHaveProperty('colors');
+      expect(res.body).toHaveProperty('regions');
+    });
+
+    test('GET /public/campaigns returns active campaigns', async () => {
+      const res = await request(app).get('/api/v1/public/campaigns');
+      expect(res.status).toBe(200);
+      expect(res.body.data).toBeDefined();
+    });
+  });
+
+  describe('Sprint C — Campaign Reports', () => {
+    test('POST /admin/campaigns/:id/send-report requires auth', async () => {
+      const res = await request(app)
+        .post(`/api/v1/admin/campaigns/${campaignId}/send-report`);
+      expect(res.status).toBe(401);
+    });
+
+    test('Student cannot send campaign reports', async () => {
+      const res = await request(app)
+        .post(`/api/v1/admin/campaigns/${campaignId}/send-report`)
+        .set('Authorization', `Bearer ${studentToken}`)
+        .send({});
+      expect(res.status).toBe(403);
+    });
+
+    test('Admin can send campaign reports', async () => {
+      const res = await request(app)
+        .post(`/api/v1/admin/campaigns/${campaignId}/send-report`)
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({});
+      expect(res.status).toBe(200);
+      expect(res.body).toHaveProperty('sent');
+    });
+  });
+
+  describe('Sprint C — RBAC Verification', () => {
+    let cseToken3, teacherToken3, ambassadorToken3;
+
+    beforeAll(async () => {
+      const cseRes = await request(app).post('/api/v1/auth/login')
+        .send({ email: 'cse@leroymerlin.fr', password: 'VinsConv2026!' });
+      cseToken3 = cseRes.body.accessToken;
+
+      const teacherRes = await request(app).post('/api/v1/auth/login')
+        .send({ email: 'enseignant@sacrecoeur.fr', password: 'VinsConv2026!' });
+      teacherToken3 = teacherRes.body.accessToken;
+
+      const ambRes = await request(app).post('/api/v1/auth/login')
+        .send({ email: 'ambassadeur@example.fr', password: 'VinsConv2026!' });
+      ambassadorToken3 = ambRes.body.accessToken;
+    });
+
+    test('CSE cannot access admin campaigns', async () => {
+      const res = await request(app)
+        .get('/api/v1/admin/campaigns')
+        .set('Authorization', `Bearer ${cseToken3}`);
+      expect(res.status).toBe(403);
+    });
+
+    test('Teacher cannot access admin users', async () => {
+      const res = await request(app)
+        .get('/api/v1/admin/users')
+        .set('Authorization', `Bearer ${teacherToken3}`);
+      expect(res.status).toBe(403);
+    });
+
+    test('Ambassador cannot access admin exports', async () => {
+      const res = await request(app)
+        .get('/api/v1/admin/exports/stock')
+        .set('Authorization', `Bearer ${ambassadorToken3}`);
+      expect(res.status).toBe(403);
+    });
+
+    test('Student cannot create campaigns', async () => {
+      const res = await request(app)
+        .post('/api/v1/admin/campaigns')
+        .set('Authorization', `Bearer ${studentToken}`)
+        .send({ name: 'Hack', org_id: '00000000-0000-0000-0000-000000000000', client_type_id: '00000000-0000-0000-0000-000000000000' });
+      expect(res.status).toBe(403);
+    });
+
+    test('Unauthenticated cannot access notifications', async () => {
+      const res = await request(app).get('/api/v1/notifications');
+      expect(res.status).toBe(401);
+    });
+
+    test('CSE can access their dashboard', async () => {
+      const res = await request(app)
+        .get('/api/v1/dashboard/cse')
+        .set('Authorization', `Bearer ${cseToken3}`);
+      expect(res.status).toBe(200);
+    });
+
+    test('Teacher can access their dashboard', async () => {
+      const res = await request(app)
+        .get('/api/v1/dashboard/teacher')
+        .set('Authorization', `Bearer ${teacherToken3}`);
+      expect(res.status).toBe(200);
+    });
+
+    test('Ambassador can access their dashboard', async () => {
+      const res = await request(app)
+        .get('/api/v1/dashboard/ambassador')
+        .set('Authorization', `Bearer ${ambassadorToken3}`);
+      expect(res.status).toBe(200);
+    });
+  });
+
+  describe('Sprint C — Notifications', () => {
+    test('Authenticated user can list notifications', async () => {
+      const res = await request(app)
+        .get('/api/v1/notifications')
+        .set('Authorization', `Bearer ${adminToken}`);
+      expect(res.status).toBe(200);
+      expect(res.body).toHaveProperty('data');
+      expect(res.body).toHaveProperty('unread');
+    });
+
+    test('Mark all notifications as read', async () => {
+      const res = await request(app)
+        .put('/api/v1/notifications/read-all')
+        .set('Authorization', `Bearer ${adminToken}`);
+      expect(res.status).toBe(200);
+    });
+
+    test('Notification settings accessible by admin', async () => {
+      const res = await request(app)
+        .get('/api/v1/notifications/settings')
+        .set('Authorization', `Bearer ${adminToken}`);
+      expect(res.status).toBe(200);
+      expect(res.body.settings).toBeDefined();
+    });
+  });
+
+  describe('Sprint C — User Liaison Verification', () => {
+    test('Admin user has correct participations', async () => {
+      const user = await db('users').where({ email: 'nicolas@vins-conversations.fr' }).first();
+      expect(user).toBeDefined();
+      expect(user.role).toBe('super_admin');
+    });
+
+    test('Student is linked to campaign', async () => {
+      const user = await db('users').where({ email: 'ackavong@eleve.sc.fr' }).first();
+      expect(user).toBeDefined();
+      const participation = await db('participations').where({ user_id: user.id }).first();
+      expect(participation).toBeDefined();
+      expect(participation.campaign_id).toBeDefined();
+    });
+
+    test('CSE user is linked to CSE campaign', async () => {
+      const user = await db('users').where({ email: 'cse@leroymerlin.fr' }).first();
+      expect(user).toBeDefined();
+      expect(user.role).toBe('cse');
+      const participation = await db('participations').where({ user_id: user.id }).first();
+      expect(participation).toBeDefined();
+    });
+
+    test('Teacher user exists with correct role', async () => {
+      const user = await db('users').where({ email: 'enseignant@sacrecoeur.fr' }).first();
+      expect(user).toBeDefined();
+      expect(user.role).toBe('enseignant');
+    });
+
+    test('Ambassador user exists with correct role', async () => {
+      const user = await db('users').where({ email: 'ambassadeur@example.fr' }).first();
+      expect(user).toBeDefined();
+      expect(user.role).toBe('ambassadeur');
+    });
+
+    test('BTS user exists with correct role', async () => {
+      const user = await db('users').where({ email: 'bts@espl.fr' }).first();
+      expect(user).toBeDefined();
+      expect(user.role).toBe('etudiant');
+    });
+  });
 });

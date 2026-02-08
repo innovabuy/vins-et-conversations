@@ -84,6 +84,7 @@ export const campaignsAPI = {
   create: (data) => api.post('/admin/campaigns', data),
   update: (id, data) => api.put(`/admin/campaigns/${id}`, data),
   duplicate: (id) => api.post(`/admin/campaigns/${id}/duplicate`),
+  sendReport: (id, userIds) => api.post(`/admin/campaigns/${id}/send-report`, { user_ids: userIds }),
   resources: () => api.get('/admin/campaigns/resources'),
   listActive: () => api.get('/admin/campaigns', { params: { status: 'active' } }),
 };

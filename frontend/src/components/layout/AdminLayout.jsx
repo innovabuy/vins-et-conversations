@@ -6,6 +6,7 @@ import {
   CreditCard, BarChart3, BookOpen, Bell, Map, FileText, Settings,
   Download, Wine, LogOut, Menu, X, ChevronRight, Shield
 } from 'lucide-react';
+import NotificationBell from '../shared/NotificationBell';
 
 const navItems = [
   { to: '/admin', icon: LayoutDashboard, label: 'Cockpit', end: true },
@@ -48,6 +49,7 @@ export default function AdminLayout() {
           <Wine size={20} className="text-wine-700" />
           <span className="font-semibold">V&C Admin</span>
         </div>
+        <NotificationBell />
         <div className="w-8 h-8 rounded-full bg-wine-100 flex items-center justify-center text-wine-700 text-sm font-bold">
           {user?.name?.charAt(0)}
         </div>
@@ -107,6 +109,7 @@ export default function AdminLayout() {
               <p className="text-sm font-medium truncate">{user?.name}</p>
               <p className="text-xs text-gray-500 truncate">{user?.role}</p>
             </div>
+            <div className="hidden lg:block"><NotificationBell /></div>
             <button onClick={handleLogout} className="text-gray-400 hover:text-red-500 transition-colors">
               <LogOut size={18} />
             </button>

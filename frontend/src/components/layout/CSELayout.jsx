@@ -1,6 +1,7 @@
 import { useAuth } from '../../contexts/AuthContext';
 import { Outlet, useNavigate } from 'react-router-dom';
 import { Wine, LogOut } from 'lucide-react';
+import NotificationBell from '../shared/NotificationBell';
 
 export default function CSELayout() {
   const { user, logout } = useAuth();
@@ -27,6 +28,7 @@ export default function CSELayout() {
               <p className="text-sm font-medium">{user?.name}</p>
               <p className="text-xs text-gray-500">{user?.email}</p>
             </div>
+            <NotificationBell />
             <button onClick={handleLogout} className="text-gray-400 hover:text-red-500 transition-colors">
               <LogOut size={18} />
             </button>

@@ -1,0 +1,11 @@
+<h2>Rapport de campagne</h2>
+<p>Bonjour {{NAME}},</p>
+<p>Voici le rapport de la campagne <span class="highlight">{{CAMPAIGN_NAME}}</span>.</p>
+<div class="card">
+  <div class="card-row"><span class="card-label">Campagne</span><span class="card-value">{{CAMPAIGN_NAME}}</span></div>
+  <div class="card-row"><span class="card-label">Organisation</span><span class="card-value">{{ORG_NAME}}</span></div>
+  <div class="card-row"><span class="card-label">Période</span><span class="card-value">{{PERIOD}}</span></div>
+  <div class="card-row"><span class="card-label">Progression</span><span class="card-value">{{PROGRESS}}%</span></div>
+</div>
+{{REPORT_CONTENT}}
+<p class="muted">Ce rapport a été généré automatiquement. Un PDF détaillé est disponible en pièce jointe si applicable.</p>

@@ -1,6 +1,7 @@
 import { Outlet } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { LogOut, Wine, BookOpen } from 'lucide-react';
+import NotificationBell from '../shared/NotificationBell';
 
 export default function TeacherLayout() {
   const { user, logout } = useAuth();
@@ -17,6 +18,7 @@ export default function TeacherLayout() {
           </div>
           <div className="flex items-center gap-3">
             <span className="text-sm text-gray-600">{user?.name}</span>
+            <NotificationBell />
             <button onClick={logout} className="p-1.5 text-gray-400 hover:text-gray-600" title="Déconnexion">
               <LogOut size={18} />
             </button>

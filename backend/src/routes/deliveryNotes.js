@@ -2,6 +2,9 @@ const express = require('express');
 const db = require('../config/database');
 const { authenticate, requireRole } = require('../middleware/auth');
 const { auditAction } = require('../middleware/audit');
+const emailService = require('../services/emailService');
+const notificationService = require('../services/notificationService');
+const logger = require('../utils/logger');
 
 const router = express.Router();
 
@@ -129,6 +132,28 @@ router.put('/:id', authenticate, requireRole('super_admin', 'commercial'), audit
     // Update order status on workflow transitions
     if (update.status === 'shipped') {
       await db('orders').where({ id: updated.order_id }).update({ status: 'shipped', updated_at: new Date() });
+      // Send delivery notification email
+      try {
+        const order = await db('orders').where({ id: updated.order_id }).first();
+        const user = await db('users').where({ id: order.user_id }).first();
+        if (user) {
+          emailService.sendDeliveryNotification({
+            email: user.email,
+            name: user.name,
+            orderRef: order.ref,
+            blRef: updated.ref,
+            recipient: updated.recipient_name,
+            plannedDate: updated.planned_date,
+            address: updated.delivery_address,
+          }).catch((e) => logger.error(`Delivery email failed: ${e.message}`));
+        }
+        if (order) {
+          notificationService.onDeliveryShipped(order, updated.ref)
+            .catch((e) => logger.error(`Delivery notification failed: ${e.message}`));
+        }
+      } catch (e) {
+        logger.error(`Delivery hook error: ${e.message}`);
+      }
     }
     if (update.status === 'delivered' || update.status === 'signed') {
       await db('orders').where({ id: updated.order_id }).update({ status: 'delivered', updated_at: new Date() });

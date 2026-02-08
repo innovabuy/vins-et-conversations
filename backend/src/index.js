@@ -31,32 +31,34 @@ app.use(morgan('combined', {
 }));
 
 // Rate limiting
-const limiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
-  max: 100,
-  standardHeaders: true,
-  legacyHeaders: false,
-  message: { error: 'RATE_LIMITED', message: 'Trop de requêtes' },
-});
-app.use('/api/', limiter);
+if (process.env.NODE_ENV !== 'test' && !process.env.JEST_WORKER_ID) {
+  const limiter = rateLimit({
+    windowMs: 15 * 60 * 1000,
+    max: 100,
+    standardHeaders: true,
+    legacyHeaders: false,
+    message: { error: 'RATE_LIMITED', message: 'Trop de requêtes' },
+  });
+  app.use('/api/', limiter);
 
-// Rate limit plus strict pour l'auth
-const authLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
-  max: 20,
-  message: { error: 'RATE_LIMITED', message: 'Trop de tentatives de connexion' },
-});
-app.use('/api/v1/auth/', authLimiter);
+  // Rate limit plus strict pour l'auth
+  const authLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000,
+    max: 20,
+    message: { error: 'RATE_LIMITED', message: 'Trop de tentatives de connexion' },
+  });
+  app.use('/api/v1/auth/', authLimiter);
 
-// Rate limit API publique (30 req/min)
-const publicLimiter = rateLimit({
-  windowMs: 60 * 1000,
-  max: 30,
-  standardHeaders: true,
-  legacyHeaders: false,
-  message: { error: 'RATE_LIMITED', message: 'Limite de requêtes API publique atteinte (30/min)' },
-});
-app.use('/api/v1/public/', publicLimiter);
+  // Rate limit API publique (30 req/min)
+  const publicLimiter = rateLimit({
+    windowMs: 60 * 1000,
+    max: 30,
+    standardHeaders: true,
+    legacyHeaders: false,
+    message: { error: 'RATE_LIMITED', message: 'Limite de requêtes API publique atteinte (30/min)' },
+  });
+  app.use('/api/v1/public/', publicLimiter);
+}
 
 // ─── Swagger documentation ───────────────────────────
 app.use('/api/docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec, {

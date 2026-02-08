@@ -1,0 +1,11 @@
+<h2>Votre commande est en livraison</h2>
+<p>Bonjour {{NAME}},</p>
+<p>Votre commande <span class="highlight">{{ORDER_REF}}</span> a été expédiée !</p>
+<div class="card">
+  <div class="card-row"><span class="card-label">N° BL</span><span class="card-value">{{BL_REF}}</span></div>
+  <div class="card-row"><span class="card-label">Commande</span><span class="card-value">{{ORDER_REF}}</span></div>
+  <div class="card-row"><span class="card-label">Destinataire</span><span class="card-value">{{RECIPIENT}}</span></div>
+  {{#PLANNED_DATE}}<div class="card-row"><span class="card-label">Date prévue</span><span class="card-value">{{PLANNED_DATE}}</span></div>{{/PLANNED_DATE}}
+  {{#ADDRESS}}<div class="card-row"><span class="card-label">Adresse</span><span class="card-value">{{ADDRESS}}</span></div>{{/ADDRESS}}
+</div>
+<p>Nous vous souhaitons une excellente dégustation !</p>

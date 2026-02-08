@@ -5,6 +5,8 @@ const { v4: uuidv4 } = require('uuid');
 const { authenticate, requireRole } = require('../middleware/auth');
 const { validate } = require('../middleware/validate');
 const { auditAction } = require('../middleware/audit');
+const emailService = require('../services/emailService');
+const logger = require('../utils/logger');
 
 const router = express.Router();
 
@@ -74,7 +76,7 @@ router.get('/:id', authenticate, requireRole('super_admin', 'commercial'), async
       .join('orders', 'order_items.order_id', 'orders.id')
       .where('orders.campaign_id', campaign.id)
       .whereIn('orders.status', validStatuses)
-      .select(db.raw('COALESCE(SUM(order_items.quantity), 0) as total_bottles'))
+      .select(db.raw('COALESCE(SUM(order_items.qty), 0) as total_bottles'))
       .first();
 
     const daysRemaining = campaign.end_date
@@ -113,8 +115,8 @@ router.get('/:id', authenticate, requireRole('super_admin', 'commercial'), async
           .where('orders.campaign_id', campaign.id)
           .whereIn('orders.status', validStatuses)
           .select('order_items.product_id')
-          .sum('order_items.quantity as qty_sold')
-          .select(db.raw('SUM(order_items.quantity * order_items.unit_price_ttc) as ca_ttc'))
+          .sum('order_items.qty as qty_sold')
+          .select(db.raw('SUM(order_items.qty * order_items.unit_price_ttc) as ca_ttc'))
           .groupBy('order_items.product_id')
           .as('s'),
         's.product_id', 'products.id'
@@ -179,6 +181,150 @@ router.get('/:id', authenticate, requireRole('super_admin', 'commercial'), async
       dailyCA,
     });
   } catch (err) {
+    res.status(500).json({ error: 'SERVER_ERROR', message: err.message });
+  }
+});
+
+// POST /api/v1/admin/campaigns/:id/send-report — Rapport adapté par rôle
+router.post('/:id/send-report', authenticate, requireRole('super_admin', 'commercial'), auditAction('campaigns'), async (req, res) => {
+  try {
+    const { user_ids } = req.body; // optional: specific user IDs, else all participants
+    const campaign = await db('campaigns')
+      .where('campaigns.id', req.params.id)
+      .join('organizations', 'campaigns.org_id', 'organizations.id')
+      .select('campaigns.*', 'organizations.name as org_name')
+      .first();
+    if (!campaign) return res.status(404).json({ error: 'NOT_FOUND' });
+
+    const validStatuses = ['submitted', 'validated', 'preparing', 'shipped', 'delivered'];
+
+    // Global stats
+    const globalStats = await db('orders')
+      .where({ campaign_id: campaign.id })
+      .whereIn('status', validStatuses)
+      .select(
+        db.raw('COALESCE(SUM(total_ttc), 0) as ca_ttc'),
+        db.raw('COALESCE(SUM(total_ht), 0) as ca_ht'),
+        db.raw('COUNT(id) as orders_count')
+      ).first();
+
+    const totalBottles = await db('order_items')
+      .join('orders', 'order_items.order_id', 'orders.id')
+      .where('orders.campaign_id', campaign.id)
+      .whereIn('orders.status', validStatuses)
+      .select(db.raw('COALESCE(SUM(order_items.qty), 0) as total')).first();
+
+    const participantsCount = await db('participations')
+      .where({ campaign_id: campaign.id }).count('id as count').first();
+
+    const progress = campaign.goal > 0
+      ? Math.round((parseFloat(globalStats.ca_ttc) / campaign.goal) * 100) : 0;
+
+    const period = campaign.start_date && campaign.end_date
+      ? `${new Date(campaign.start_date).toLocaleDateString('fr-FR')} — ${new Date(campaign.end_date).toLocaleDateString('fr-FR')}`
+      : '—';
+
+    const formatEur = (v) => new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR' }).format(v);
+
+    // Determine recipients
+    let recipients;
+    if (user_ids && user_ids.length) {
+      recipients = await db('users').whereIn('id', user_ids);
+    } else {
+      recipients = await db('participations')
+        .where({ campaign_id: campaign.id })
+        .join('users', 'participations.user_id', 'users.id')
+        .select('users.*');
+    }
+
+    let sent = 0;
+    for (const user of recipients) {
+      let reportContent = '';
+
+      if (['super_admin', 'commercial', 'comptable'].includes(user.role)) {
+        // Admin: full financials
+        reportContent = `
+          <div class="card">
+            <div class="card-row"><span class="card-label">CA TTC</span><span class="card-value">${formatEur(globalStats.ca_ttc)}</span></div>
+            <div class="card-row"><span class="card-label">CA HT</span><span class="card-value">${formatEur(globalStats.ca_ht)}</span></div>
+            <div class="card-row"><span class="card-label">Commission (5% HT)</span><span class="card-value">${formatEur(parseFloat(globalStats.ca_ht) * 0.05)}</span></div>
+            <div class="card-row"><span class="card-label">Commandes</span><span class="card-value">${globalStats.orders_count}</span></div>
+            <div class="card-row"><span class="card-label">Bouteilles</span><span class="card-value">${totalBottles.total}</span></div>
+            <div class="card-row"><span class="card-label">Participants</span><span class="card-value">${participantsCount.count}</span></div>
+          </div>`;
+      } else if (user.role === 'enseignant') {
+        // Teacher: no EUR amounts
+        reportContent = `
+          <div class="card">
+            <div class="card-row"><span class="card-label">Progression</span><span class="card-value">${progress}%</span></div>
+            <div class="card-row"><span class="card-label">Commandes</span><span class="card-value">${globalStats.orders_count}</span></div>
+            <div class="card-row"><span class="card-label">Bouteilles vendues</span><span class="card-value">${totalBottles.total}</span></div>
+            <div class="card-row"><span class="card-label">Participants actifs</span><span class="card-value">${participantsCount.count}</span></div>
+          </div>`;
+      } else if (user.role === 'etudiant') {
+        // Student: personal stats
+        const userStats = await db('orders')
+          .where({ campaign_id: campaign.id, user_id: user.id })
+          .whereIn('status', validStatuses)
+          .select(
+            db.raw('COALESCE(SUM(total_ttc), 0) as my_ca'),
+            db.raw('COUNT(id) as my_orders')
+          ).first();
+        const myBottles = await db('order_items')
+          .join('orders', 'order_items.order_id', 'orders.id')
+          .where({ 'orders.campaign_id': campaign.id, 'orders.user_id': user.id })
+          .whereIn('orders.status', validStatuses)
+          .select(db.raw('COALESCE(SUM(order_items.qty), 0) as total')).first();
+        reportContent = `
+          <div class="card">
+            <div class="card-row"><span class="card-label">Mon CA</span><span class="card-value">${formatEur(userStats.my_ca)}</span></div>
+            <div class="card-row"><span class="card-label">Mes commandes</span><span class="card-value">${userStats.my_orders}</span></div>
+            <div class="card-row"><span class="card-label">Bouteilles vendues</span><span class="card-value">${myBottles.total}</span></div>
+          </div>`;
+      } else if (user.role === 'cse') {
+        // CSE: savings
+        const cseStats = await db('orders')
+          .where({ campaign_id: campaign.id, user_id: user.id })
+          .whereIn('status', validStatuses)
+          .select(db.raw('COALESCE(SUM(total_ttc), 0) as my_ca')).first();
+        const savings = parseFloat(cseStats.my_ca) * 0.10; // 10% discount
+        reportContent = `
+          <div class="card">
+            <div class="card-row"><span class="card-label">Total commandes</span><span class="card-value">${formatEur(cseStats.my_ca)}</span></div>
+            <div class="card-row"><span class="card-label">Économie réalisée (-10%)</span><span class="card-value highlight">${formatEur(savings)}</span></div>
+          </div>`;
+      } else if (user.role === 'ambassadeur') {
+        // Ambassador: tier progress
+        const ambStats = await db('orders')
+          .where({ campaign_id: campaign.id, user_id: user.id })
+          .whereIn('status', validStatuses)
+          .select(db.raw('COALESCE(SUM(total_ttc), 0) as my_ca')).first();
+        const ca = parseFloat(ambStats.my_ca);
+        const tier = ca >= 5000 ? 'Platine' : ca >= 3000 ? 'Or' : ca >= 1500 ? 'Argent' : ca >= 500 ? 'Bronze' : 'Débutant';
+        const nextTier = ca >= 5000 ? '—' : ca >= 3000 ? `${formatEur(5000 - ca)} pour Platine` : ca >= 1500 ? `${formatEur(3000 - ca)} pour Or` : ca >= 500 ? `${formatEur(1500 - ca)} pour Argent` : `${formatEur(500 - ca)} pour Bronze`;
+        reportContent = `
+          <div class="card">
+            <div class="card-row"><span class="card-label">Mon CA</span><span class="card-value">${formatEur(ca)}</span></div>
+            <div class="card-row"><span class="card-label">Niveau actuel</span><span class="card-value highlight">${tier}</span></div>
+            <div class="card-row"><span class="card-label">Prochain palier</span><span class="card-value">${nextTier}</span></div>
+          </div>`;
+      }
+
+      await emailService.sendCampaignReport({
+        email: user.email,
+        name: user.name,
+        campaignName: campaign.name,
+        orgName: campaign.org_name,
+        period,
+        progress,
+        reportContent,
+      });
+      sent++;
+    }
+
+    res.json({ message: `${sent} rapport(s) envoyé(s)`, sent });
+  } catch (err) {
+    logger.error(`Send report error: ${err.message}`);
     res.status(500).json({ error: 'SERVER_ERROR', message: err.message });
   }
 });

@@ -1,0 +1,12 @@
+<h2>Rappel de paiement</h2>
+<p>Bonjour {{NAME}},</p>
+<p>Nous vous rappelons qu'un paiement est en attente pour votre commande <span class="highlight">{{ORDER_REF}}</span>.</p>
+<div class="card">
+  <div class="card-row"><span class="card-label">Référence</span><span class="card-value">{{ORDER_REF}}</span></div>
+  <div class="card-row"><span class="card-label">Montant</span><span class="card-value highlight">{{AMOUNT}}</span></div>
+  <div class="card-row"><span class="card-label">Méthode</span><span class="card-value">{{METHOD}}</span></div>
+  <div class="card-row"><span class="card-label">Échéance</span><span class="card-value">{{DUE_DATE}}</span></div>
+</div>
+<p>Merci de procéder au règlement dans les meilleurs délais.</p>
+<p style="text-align:center"><a class="btn" href="{{DASHBOARD_URL}}">Accéder à mon espace</a></p>
+<p class="muted">Si vous avez déjà effectué le paiement, merci d'ignorer ce message.</p>
