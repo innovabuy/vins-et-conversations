@@ -4,7 +4,7 @@ import { contactsAPI, campaignsAPI } from '../../services/api';
 import {
   Users, Plus, Search, Pencil, X, Phone, Mail, MapPin,
   ChevronLeft, ChevronRight, UserPlus, GraduationCap, Building2, Award,
-  ShoppingCart, ExternalLink
+  ShoppingCart, ExternalLink, TrendingUp,
 } from 'lucide-react';
 
 const formatEur = (v) => new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR' }).format(v);
@@ -116,6 +116,15 @@ function ContactPanel({ contact, onClose }) {
               {contact.notes?.company && <div><span className="text-orange-600 font-medium">Entreprise :</span> {contact.notes.company}</div>}
               {contact.notes?.siret && <div><span className="text-orange-600 font-medium">SIRET :</span> {contact.notes.siret}</div>}
             </div>
+          )}
+
+          {contact.source_user_id && (
+            <button
+              onClick={() => { onClose(); navigate(`/admin/finance?seller_id=${contact.source_user_id}`); }}
+              className="w-full flex items-center justify-center gap-2 text-sm text-wine-700 hover:text-wine-800 bg-wine-50 hover:bg-wine-100 rounded-lg p-2.5 transition-colors"
+            >
+              <TrendingUp size={14} /> Voir le pilotage economique
+            </button>
           )}
 
           <div className="grid grid-cols-3 gap-3 text-center">

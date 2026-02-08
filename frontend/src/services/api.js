@@ -226,11 +226,12 @@ export const ambassadorAPI = {
 
 // ─── Margins ────────────────────────────────────────
 export const marginsAPI = {
-  list: () => api.get('/admin/margins'),
-  byCampaign: (campaignId) => api.get('/admin/margins/by-campaign', { params: { campaign_id: campaignId } }),
-  byClient: () => api.get('/admin/margins/by-client'),
-  bySupplier: () => api.get('/admin/margins/by-supplier'),
-  overview: () => api.get('/admin/margins/overview'),
+  list: (params) => api.get('/admin/margins', { params }),
+  byCampaign: (params) => api.get('/admin/margins/by-campaign', { params }),
+  byClient: (params) => api.get('/admin/margins/by-client', { params }),
+  bySupplier: (params) => api.get('/admin/margins/by-supplier', { params }),
+  overview: (params) => api.get('/admin/margins/overview', { params }),
+  filterOptions: () => api.get('/admin/margins/filter-options'),
 };
 
 // ─── Analytics ─────────────────────────────────────

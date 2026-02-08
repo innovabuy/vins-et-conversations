@@ -1,16 +1,17 @@
-import { useState, useEffect } from 'react';
-import { marginsAPI, campaignsAPI } from '../../services/api';
+import { useState, useEffect, useMemo } from 'react';
+import { useSearchParams } from 'react-router-dom';
+import { marginsAPI } from '../../services/api';
 import {
   PieChart, Pie, Cell, ResponsiveContainer, Legend,
   BarChart, Bar, AreaChart, Area, XAxis, YAxis, CartesianGrid,
 } from 'recharts';
-import { TrendingUp, DollarSign, BarChart3, Users, Wine, Truck, Building2 } from 'lucide-react';
+import { TrendingUp, DollarSign, BarChart3, Users, Wine, Truck, Building2, Filter, X, ChevronDown, ChevronUp } from 'lucide-react';
 import { MULTI_PALETTE, WINE_PALETTE, axisStyle, gridStyle, PremiumTooltip, ChartGradient, chartAnimation, formatEur } from '../../utils/chartTheme';
 
 const TABS = [
   { key: 'overview', label: 'Vue d\'ensemble', icon: BarChart3 },
   { key: 'products', label: 'Par vin', icon: Wine },
-  { key: 'clients', label: 'Par client', icon: Users },
+  { key: 'sellers', label: 'Par vendeur', icon: Users },
   { key: 'suppliers', label: 'Par fournisseur', icon: Truck },
   { key: 'campaigns', label: 'Par campagne', icon: Building2 },
 ];
@@ -25,6 +26,120 @@ function KPIGradient({ label, value, icon: Icon, gradient }) {
   );
 }
 
+// ─── Filter Bar ─────────────────────────────────────
+function FilterBar({ filters, setFilters, filterOptions }) {
+  const [expanded, setExpanded] = useState(false);
+
+  if (!filterOptions) return null;
+
+  const activeCount = Object.values(filters).filter(Boolean).length;
+
+  const clearAll = () => setFilters({
+    campaign_id: '', seller_id: '', product_id: '', supplier_id: '',
+    segment: '', class_group: '', date_from: '', date_to: '',
+  });
+
+  const clearOne = (key) => setFilters(prev => ({ ...prev, [key]: '' }));
+
+  const filterLabels = {
+    campaign_id: 'Campagne',
+    seller_id: 'Vendeur',
+    product_id: 'Produit',
+    supplier_id: 'Fournisseur',
+    segment: 'Segment',
+    class_group: 'Classe',
+    date_from: 'Du',
+    date_to: 'Au',
+  };
+
+  const getDisplayValue = (key, val) => {
+    if (!val) return '';
+    if (key === 'campaign_id') return filterOptions.campaigns?.find(c => c.id === val)?.name || val;
+    if (key === 'seller_id') return filterOptions.sellers?.find(s => s.id === val)?.name || val;
+    if (key === 'product_id') return filterOptions.products?.find(p => p.id === val)?.name || val;
+    if (key === 'supplier_id') return filterOptions.suppliers?.find(s => s.id === val)?.name || val;
+    if (key === 'segment') return filterOptions.segments?.find(s => s.name === val)?.label || val;
+    return val;
+  };
+
+  const sel = "input text-sm py-1.5";
+
+  return (
+    <div className="card p-4 space-y-3">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2 text-sm font-medium text-gray-700">
+          <Filter size={16} />
+          Filtres
+          {activeCount > 0 && (
+            <span className="bg-wine-100 text-wine-700 text-xs px-2 py-0.5 rounded-full font-semibold">{activeCount}</span>
+          )}
+        </div>
+        <div className="flex items-center gap-2">
+          {activeCount > 0 && (
+            <button onClick={clearAll} className="text-xs text-gray-500 hover:text-red-600 flex items-center gap-1">
+              <X size={12} /> Tout effacer
+            </button>
+          )}
+          <button onClick={() => setExpanded(!expanded)} className="text-xs text-gray-500 hover:text-gray-700 flex items-center gap-1">
+            {expanded ? <><ChevronUp size={14} /> Moins</> : <><ChevronDown size={14} /> Plus de filtres</>}
+          </button>
+        </div>
+      </div>
+
+      {/* Row 1: always visible */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+        <select value={filters.campaign_id} onChange={e => setFilters(f => ({ ...f, campaign_id: e.target.value }))} className={sel}>
+          <option value="">Toutes campagnes</option>
+          {filterOptions.campaigns?.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+        </select>
+        <div className="flex gap-2">
+          <input type="date" value={filters.date_from} onChange={e => setFilters(f => ({ ...f, date_from: e.target.value }))} className={sel + ' flex-1'} placeholder="Du" title="Date de debut" />
+          <input type="date" value={filters.date_to} onChange={e => setFilters(f => ({ ...f, date_to: e.target.value }))} className={sel + ' flex-1'} placeholder="Au" title="Date de fin" />
+        </div>
+        <select value={filters.segment} onChange={e => setFilters(f => ({ ...f, segment: e.target.value }))} className={sel}>
+          <option value="">Tous segments</option>
+          {filterOptions.segments?.map(s => <option key={s.name} value={s.name}>{s.label}</option>)}
+        </select>
+      </div>
+
+      {/* Row 2: expandable */}
+      {expanded && (
+        <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
+          <select value={filters.seller_id} onChange={e => setFilters(f => ({ ...f, seller_id: e.target.value }))} className={sel}>
+            <option value="">Tous vendeurs</option>
+            {filterOptions.sellers?.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+          </select>
+          <select value={filters.product_id} onChange={e => setFilters(f => ({ ...f, product_id: e.target.value }))} className={sel}>
+            <option value="">Tous produits</option>
+            {filterOptions.products?.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+          </select>
+          <select value={filters.supplier_id} onChange={e => setFilters(f => ({ ...f, supplier_id: e.target.value }))} className={sel}>
+            <option value="">Tous fournisseurs</option>
+            {filterOptions.suppliers?.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+          </select>
+          <select value={filters.class_group} onChange={e => setFilters(f => ({ ...f, class_group: e.target.value }))} className={sel}>
+            <option value="">Toutes classes</option>
+            {filterOptions.classes?.map(c => <option key={c} value={c}>{c}</option>)}
+          </select>
+        </div>
+      )}
+
+      {/* Active filter badges */}
+      {activeCount > 0 && (
+        <div className="flex flex-wrap gap-2">
+          {Object.entries(filters).filter(([, v]) => v).map(([key, val]) => (
+            <span key={key} className="inline-flex items-center gap-1 bg-wine-50 text-wine-700 text-xs px-2.5 py-1 rounded-full">
+              {filterLabels[key]}: {getDisplayValue(key, val)}
+              <button onClick={() => clearOne(key)} className="hover:text-red-600"><X size={12} /></button>
+            </span>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── Tab components ─────────────────────────────────
 function OverviewTab({ data }) {
   if (!data) return null;
 
@@ -32,7 +147,7 @@ function OverviewTab({ data }) {
     <div className="space-y-6">
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         <KPIGradient label="Ventes TTC" value={formatEur(data.sales.total_ttc)} icon={TrendingUp} gradient="from-wine-700 to-wine-900" />
-        <KPIGradient label="Achats (coût)" value={formatEur(data.purchases.total_cost)} icon={DollarSign} gradient="from-blue-500 to-blue-700" />
+        <KPIGradient label="Achats (cout)" value={formatEur(data.purchases.total_cost)} icon={DollarSign} gradient="from-blue-500 to-blue-700" />
         <KPIGradient label="Marge brute" value={formatEur(data.margin)} icon={BarChart3} gradient="from-emerald-500 to-emerald-700" />
         <KPIGradient label="Taux de marge" value={`${data.margin_pct}%`} icon={TrendingUp} gradient="from-purple-500 to-purple-700" />
       </div>
@@ -40,7 +155,7 @@ function OverviewTab({ data }) {
       {/* P&L chart */}
       {data.pl?.length > 0 && (
         <div className="card">
-          <h3 className="font-semibold mb-4">Compte de résultat mensuel</h3>
+          <h3 className="font-semibold mb-4">Compte de resultat mensuel</h3>
           <div className="h-[250px] md:h-[300px]">
             <ResponsiveContainer width="100%" height="100%">
               <AreaChart data={data.pl} {...chartAnimation}>
@@ -83,7 +198,7 @@ function OverviewTab({ data }) {
   );
 }
 
-function ProductsTab({ data, campaignId }) {
+function ProductsTab({ data }) {
   if (!data) return null;
   const marginColor = (pct) => pct >= 40 ? 'bg-green-100 text-green-700' : pct >= 25 ? 'bg-amber-100 text-amber-700' : 'bg-red-100 text-red-700';
 
@@ -93,7 +208,7 @@ function ProductsTab({ data, campaignId }) {
   })) || [];
 
   const barData = data.byProduct?.slice(0, 10).map(p => ({
-    name: p.name.length > 14 ? p.name.substring(0, 14) + '…' : p.name,
+    name: p.name.length > 14 ? p.name.substring(0, 14) + '...' : p.name,
     margin: p.margin,
   })) || [];
 
@@ -142,7 +257,7 @@ function ProductsTab({ data, campaignId }) {
 
       {/* Product table */}
       <div className="card">
-        <h3 className="font-semibold mb-4">Détail par produit</h3>
+        <h3 className="font-semibold mb-4">Detail par produit</h3>
         <div className="md:hidden space-y-3">
           {data.byProduct.map((p) => (
             <div key={p.id || p.name} className="p-3 bg-gray-50 rounded-xl">
@@ -161,7 +276,7 @@ function ProductsTab({ data, campaignId }) {
         <div className="hidden md:block overflow-x-auto">
           <table className="w-full text-sm">
             <thead><tr className="border-b text-left text-gray-500">
-              <th className="py-2 px-2">Produit</th><th className="py-2 px-2 text-right">Qté</th><th className="py-2 px-2 text-right">CA HT</th><th className="py-2 px-2 text-right">Coût</th><th className="py-2 px-2 text-right">Marge</th><th className="py-2 px-2 text-right">%</th>
+              <th className="py-2 px-2">Produit</th><th className="py-2 px-2 text-right">Qte</th><th className="py-2 px-2 text-right">CA HT</th><th className="py-2 px-2 text-right">Cout</th><th className="py-2 px-2 text-right">Marge</th><th className="py-2 px-2 text-right">%</th>
             </tr></thead>
             <tbody>
               {data.byProduct.map((p) => (
@@ -182,11 +297,11 @@ function ProductsTab({ data, campaignId }) {
   );
 }
 
-function ClientsTab({ data }) {
-  if (!data?.length) return <div className="text-center py-12 text-gray-400">Aucune donnée client</div>;
+function SellersTab({ data }) {
+  if (!data?.length) return <div className="text-center py-12 text-gray-400">Aucune donnee vendeur</div>;
 
   const barData = data.slice(0, 10).map(c => ({
-    name: c.name.length > 14 ? c.name.substring(0, 14) + '…' : c.name,
+    name: c.name.length > 14 ? c.name.substring(0, 14) + '...' : c.name,
     ca: c.ca_ttc,
     margin: c.margin,
   }));
@@ -195,7 +310,7 @@ function ClientsTab({ data }) {
     <div className="space-y-6">
       {barData.length > 0 && (
         <div className="card">
-          <h3 className="font-semibold mb-4">Top 10 clients (CA TTC)</h3>
+          <h3 className="font-semibold mb-4">Top 10 vendeurs (CA TTC)</h3>
           <div className="h-[280px]">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={barData} layout="vertical" {...chartAnimation}>
@@ -213,7 +328,7 @@ function ClientsTab({ data }) {
       )}
 
       <div className="card">
-        <h3 className="font-semibold mb-4">Détail par client</h3>
+        <h3 className="font-semibold mb-4">Detail par vendeur</h3>
         <div className="md:hidden space-y-3">
           {data.map(c => (
             <div key={c.id} className="p-3 bg-gray-50 rounded-xl">
@@ -230,7 +345,7 @@ function ClientsTab({ data }) {
         <div className="hidden md:block overflow-x-auto">
           <table className="w-full text-sm">
             <thead><tr className="border-b text-left text-gray-500">
-              <th className="py-2 px-2">Client</th><th className="py-2 px-2">Rôle</th><th className="py-2 px-2 text-right">Cmd</th><th className="py-2 px-2 text-right">Btl</th><th className="py-2 px-2 text-right">CA TTC</th><th className="py-2 px-2 text-right">Marge</th>
+              <th className="py-2 px-2">Vendeur</th><th className="py-2 px-2">Role</th><th className="py-2 px-2 text-right">Cmd</th><th className="py-2 px-2 text-right">Btl</th><th className="py-2 px-2 text-right">CA TTC</th><th className="py-2 px-2 text-right">Marge</th>
             </tr></thead>
             <tbody>
               {data.map(c => (
@@ -252,7 +367,7 @@ function ClientsTab({ data }) {
 }
 
 function SuppliersTab({ data }) {
-  if (!data?.length) return <div className="text-center py-12 text-gray-400">Aucune donnée fournisseur</div>;
+  if (!data?.length) return <div className="text-center py-12 text-gray-400">Aucune donnee fournisseur</div>;
   const marginColor = (pct) => pct >= 40 ? 'bg-green-100 text-green-700' : pct >= 25 ? 'bg-amber-100 text-amber-700' : 'bg-red-100 text-red-700';
 
   return (
@@ -277,7 +392,7 @@ function SuppliersTab({ data }) {
         <div className="hidden md:block overflow-x-auto">
           <table className="w-full text-sm">
             <thead><tr className="border-b text-left text-gray-500">
-              <th className="py-2 px-2">Fournisseur</th><th className="py-2 px-2 text-right">Vins</th><th className="py-2 px-2 text-right">Btl</th><th className="py-2 px-2 text-right">CA HT</th><th className="py-2 px-2 text-right">Coût</th><th className="py-2 px-2 text-right">Marge</th><th className="py-2 px-2 text-right">%</th>
+              <th className="py-2 px-2">Fournisseur</th><th className="py-2 px-2 text-right">Vins</th><th className="py-2 px-2 text-right">Btl</th><th className="py-2 px-2 text-right">CA HT</th><th className="py-2 px-2 text-right">Cout</th><th className="py-2 px-2 text-right">Marge</th><th className="py-2 px-2 text-right">%</th>
             </tr></thead>
             <tbody>
               {data.map(s => (
@@ -300,7 +415,7 @@ function SuppliersTab({ data }) {
 }
 
 function CampaignsFinanceTab({ data }) {
-  if (!data?.length) return <div className="text-center py-12 text-gray-400">Aucune donnée campagne</div>;
+  if (!data?.length) return <div className="text-center py-12 text-gray-400">Aucune donnee campagne</div>;
   return (
     <div className="space-y-6">
       <div className="card">
@@ -340,41 +455,58 @@ function CampaignsFinanceTab({ data }) {
   );
 }
 
+// ─── Main component ─────────────────────────────────
 export default function AdminFinance() {
+  const [searchParams] = useSearchParams();
   const [tab, setTab] = useState('overview');
-  const [margins, setMargins] = useState(null);
-  const [overview, setOverview] = useState(null);
-  const [clients, setClients] = useState(null);
-  const [suppliers, setSuppliers] = useState(null);
+  const [tabData, setTabData] = useState({});
   const [loading, setLoading] = useState(true);
-  const [campaigns, setCampaigns] = useState([]);
-  const [campaignId, setCampaignId] = useState('');
+  const [filterOptions, setFilterOptions] = useState(null);
 
+  // Init filters from URL params
+  const [filters, setFilters] = useState(() => ({
+    campaign_id: searchParams.get('campaign_id') || '',
+    seller_id: searchParams.get('seller_id') || '',
+    product_id: searchParams.get('product_id') || '',
+    supplier_id: searchParams.get('supplier_id') || '',
+    segment: searchParams.get('segment') || '',
+    class_group: searchParams.get('class_group') || '',
+    date_from: searchParams.get('date_from') || '',
+    date_to: searchParams.get('date_to') || '',
+  }));
+
+  // Build clean params (remove empty values)
+  const activeParams = useMemo(() => {
+    const p = {};
+    Object.entries(filters).forEach(([k, v]) => { if (v) p[k] = v; });
+    return p;
+  }, [filters]);
+
+  // Load filter options on mount
   useEffect(() => {
-    campaignsAPI.list().then(r => setCampaigns(r.data.data || [])).catch(() => {});
+    marginsAPI.filterOptions().then(r => setFilterOptions(r.data)).catch(() => {});
   }, []);
 
+  // Load tab data whenever tab or filters change
   useEffect(() => {
     setLoading(true);
     const loadTab = async () => {
       try {
         if (tab === 'overview') {
-          const r = await marginsAPI.overview();
-          setOverview(r.data);
+          const r = await marginsAPI.overview(activeParams);
+          setTabData(prev => ({ ...prev, overview: r.data }));
         } else if (tab === 'products') {
-          const r = campaignId ? await marginsAPI.byCampaign(campaignId) : await marginsAPI.list();
-          setMargins(r.data);
-        } else if (tab === 'clients') {
-          const r = await marginsAPI.byClient();
-          setClients(r.data.data);
+          const r = await marginsAPI.list(activeParams);
+          setTabData(prev => ({ ...prev, products: r.data }));
+        } else if (tab === 'sellers') {
+          const r = await marginsAPI.byClient(activeParams);
+          setTabData(prev => ({ ...prev, sellers: r.data.data }));
         } else if (tab === 'suppliers') {
-          const r = await marginsAPI.bySupplier();
-          setSuppliers(r.data.data);
+          const r = await marginsAPI.bySupplier(activeParams);
+          setTabData(prev => ({ ...prev, suppliers: r.data.data }));
         } else if (tab === 'campaigns') {
-          if (!overview) {
-            const r = await marginsAPI.overview();
-            setOverview(r.data);
-          }
+          const r = await marginsAPI.overview(activeParams);
+          setTabData(prev => ({ ...prev, campaigns: r.data }));
         }
       } catch (err) {
         console.error(err);
@@ -383,22 +515,17 @@ export default function AdminFinance() {
       }
     };
     loadTab();
-  }, [tab, campaignId]);
+  }, [tab, activeParams]);
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between flex-wrap gap-3">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">Pilotage économique</h1>
-          <p className="text-sm text-gray-500 mt-1">Achats, ventes, marges et rentabilité</p>
-        </div>
-        {tab === 'products' && (
-          <select value={campaignId} onChange={(e) => setCampaignId(e.target.value)} className="input text-sm">
-            <option value="">Toutes campagnes</option>
-            {campaigns.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-          </select>
-        )}
+      <div>
+        <h1 className="text-2xl font-bold text-gray-900">Pilotage economique</h1>
+        <p className="text-sm text-gray-500 mt-1">Achats, ventes, marges et rentabilite</p>
       </div>
+
+      {/* Filter Bar */}
+      <FilterBar filters={filters} setFilters={setFilters} filterOptions={filterOptions} />
 
       {/* Tabs */}
       <div className="flex gap-1 bg-gray-100 rounded-xl p-1 overflow-x-auto">
@@ -420,11 +547,11 @@ export default function AdminFinance() {
         <div className="flex justify-center py-20"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-wine-700" /></div>
       ) : (
         <>
-          {tab === 'overview' && <OverviewTab data={overview} />}
-          {tab === 'products' && <ProductsTab data={margins} campaignId={campaignId} />}
-          {tab === 'clients' && <ClientsTab data={clients} />}
-          {tab === 'suppliers' && <SuppliersTab data={suppliers} />}
-          {tab === 'campaigns' && <CampaignsFinanceTab data={overview?.byCampaign} />}
+          {tab === 'overview' && <OverviewTab data={tabData.overview} />}
+          {tab === 'products' && <ProductsTab data={tabData.products} />}
+          {tab === 'sellers' && <SellersTab data={tabData.sellers} />}
+          {tab === 'suppliers' && <SuppliersTab data={tabData.suppliers} />}
+          {tab === 'campaigns' && <CampaignsFinanceTab data={tabData.campaigns?.byCampaign} />}
         </>
       )}
     </div>
