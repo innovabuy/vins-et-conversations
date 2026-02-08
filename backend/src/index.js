@@ -81,6 +81,7 @@ app.use('/api/docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec, {
 // ─── Routes ───────────────────────────────────────────
 app.use('/api/v1/auth', require('./routes/auth'));
 app.use('/api/v1/products', require('./routes/products'));
+app.use('/api/v1/admin/products', require('./routes/products').adminRouter);
 app.use('/api/v1/orders', require('./routes/orders'));
 app.use('/api/v1/dashboard', require('./routes/dashboard'));
 app.use('/api/v1/admin/campaigns', require('./routes/campaigns'));

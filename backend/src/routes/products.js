@@ -6,6 +6,7 @@ const { validate } = require('../middleware/validate');
 const { auditAction } = require('../middleware/audit');
 
 const router = express.Router();
+const adminRouter = express.Router();
 
 const productSchema = Joi.object({
   name: Joi.string().min(2).max(200).required(),
@@ -92,8 +93,8 @@ router.get(
 );
 
 // POST /api/v1/admin/products — Créer un produit
-router.post(
-  '/admin/products',
+adminRouter.post(
+  '/',
   authenticate,
   requireRole('super_admin', 'commercial'),
   auditAction('products'),
@@ -114,8 +115,8 @@ router.post(
 );
 
 // PUT /api/v1/admin/products/:id — Modifier un produit
-router.put(
-  '/admin/products/:id',
+adminRouter.put(
+  '/:id',
   authenticate,
   requireRole('super_admin', 'commercial'),
   auditAction('products'),
@@ -139,8 +140,8 @@ router.put(
 );
 
 // DELETE /api/v1/admin/products/:id — Désactiver un produit
-router.delete(
-  '/admin/products/:id',
+adminRouter.delete(
+  '/:id',
   authenticate,
   requireRole('super_admin'),
   auditAction('products'),
@@ -155,3 +156,4 @@ router.delete(
 );
 
 module.exports = router;
+module.exports.adminRouter = adminRouter;
