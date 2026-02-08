@@ -26,6 +26,7 @@ router.get('/catalog', async (req, res) => {
       if (req.query.color) q.where('products.color', req.query.color);
       if (req.query.region) q.where('products.region', req.query.region);
       if (req.query.category) q.where('products.category', req.query.category);
+      if (req.query.category_id) q.where('products.category_id', req.query.category_id);
       if (req.query.label) q.where('products.label', req.query.label);
       if (req.query.search) q.where('products.name', 'ilike', `%${req.query.search}%`);
     };
@@ -40,20 +41,26 @@ router.get('/catalog', async (req, res) => {
 
     const query = db('products');
     applyFilters(query);
+    query.leftJoin('categories', 'products.category_id', 'categories.id');
     const products = await query
       .select(
         'products.id', 'products.name', 'products.price_ttc', 'products.price_ht', 'products.tva_rate',
-        'products.category', 'products.label', 'products.image_url', 'products.description',
+        'products.category', 'products.category_id', 'products.label', 'products.image_url', 'products.description',
         'products.region', 'products.appellation', 'products.color', 'products.vintage',
         'products.grape_varieties', 'products.serving_temp', 'products.food_pairing',
-        'products.tasting_notes', 'products.winemaker_notes', 'products.awards', 'products.sort_order'
+        'products.tasting_notes', 'products.winemaker_notes', 'products.awards', 'products.sort_order',
+        'categories.name as cat_name', 'categories.icon as cat_icon', 'categories.color as cat_color', 'categories.slug as cat_slug'
       )
       .orderBy('products.sort_order')
       .limit(limit)
       .offset(offset);
 
     res.json({
-      data: products,
+      data: products.map(p => ({
+        ...p,
+        category_details: p.category_id ? { id: p.category_id, name: p.cat_name, slug: p.cat_slug, icon: p.cat_icon, color: p.cat_color } : null,
+        cat_name: undefined, cat_icon: undefined, cat_color: undefined, cat_slug: undefined,
+      })),
       pagination: {
         page,
         limit,
@@ -93,7 +100,9 @@ router.get('/filters', async (req, res) => {
     const regions = await db('products').where({ active: true }).whereNotNull('region').distinct('region').pluck('region');
     const categories = await db('products').where({ active: true }).whereNotNull('category').distinct('category').pluck('category');
     const labels = await db('products').where({ active: true }).whereNotNull('label').distinct('label').pluck('label');
-    res.json({ colors, regions, categories, labels });
+    const categoryObjects = await db('categories').where({ active: true }).orderBy('sort_order')
+      .select('id', 'name', 'slug', 'icon', 'color');
+    res.json({ colors, regions, categories, labels, categoryObjects });
   } catch (err) {
     res.status(500).json({ error: 'SERVER_ERROR' });
   }

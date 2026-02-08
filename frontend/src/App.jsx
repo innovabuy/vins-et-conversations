@@ -21,6 +21,7 @@ import AdminFinance from './components/admin/AdminFinance';
 import AdminUsers from './components/admin/AdminUsers';
 import AdminAnalytics from './components/admin/AdminAnalytics';
 import AdminAuditLog from './components/admin/AdminAuditLog';
+import AdminCategories from './components/admin/AdminCategories';
 import StudentDashboard from './components/student/StudentDashboard';
 import CSELayout from './components/layout/CSELayout';
 import CSEDashboard from './components/cse/CSEDashboard';
@@ -92,6 +93,7 @@ function AppRoutes() {
         <Route path="analytics" element={<AdminAnalytics />} />
         <Route path="audit" element={<AdminAuditLog />} />
         <Route path="catalog" element={<AdminCatalog />} />
+        <Route path="categories" element={<AdminCategories />} />
         <Route path="notifications" element={<AdminNotifications />} />
         <Route path="routes" element={<AdminRoutes />} />
         <Route path="pricing" element={<AdminPricing />} />

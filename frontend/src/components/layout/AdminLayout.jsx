@@ -4,7 +4,7 @@ import { Outlet, NavLink, useNavigate } from 'react-router-dom';
 import {
   LayoutDashboard, ShoppingCart, Truck, Factory, Package, Users,
   CreditCard, BarChart3, BookOpen, Bell, Map, FileText, Settings,
-  Download, Wine, LogOut, Menu, X, ChevronRight, Shield
+  Download, Wine, LogOut, Menu, X, ChevronRight, Shield, Tag
 } from 'lucide-react';
 import NotificationBell from '../shared/NotificationBell';
 
@@ -20,6 +20,7 @@ const allNavItems = [
   { to: '/admin/payments', icon: CreditCard, label: 'Paiements' },
   { to: '/admin/analytics', icon: BarChart3, label: 'Analytics' },
   { to: '/admin/catalog', icon: Wine, label: 'Catalogue' },
+  { to: '/admin/categories', icon: Tag, label: 'Catégories' },
   { to: '/admin/notifications', icon: Bell, label: 'Notifications' },
   { to: '/admin/routes', icon: Map, label: 'Tournées' },
   { to: '/admin/pricing', icon: FileText, label: 'Conditions', adminOnly: true },

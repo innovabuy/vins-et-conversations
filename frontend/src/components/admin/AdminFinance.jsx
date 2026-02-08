@@ -353,7 +353,7 @@ function SellersTab({ data }) {
         <div className="hidden md:block overflow-x-auto">
           <table className="w-full text-sm">
             <thead><tr className="border-b text-left text-gray-500">
-              <th className="py-2 px-2">Vendeur</th><th className="py-2 px-2">Role</th><th className="py-2 px-2 text-right">Cmd</th><th className="py-2 px-2 text-right">Btl</th><th className="py-2 px-2 text-right">CA TTC</th><th className="py-2 px-2 text-right">Marge</th>
+              <th className="py-2 px-2">Vendeur</th><th className="py-2 px-2">Role</th><th className="py-2 px-2 text-right">Cmd</th><th className="py-2 px-2 text-right">Panier moy.</th><th className="py-2 px-2 text-right">CA TTC</th><th className="py-2 px-2 text-right">Marge</th><th className="py-2 px-2 text-right">Via lien</th>
             </tr></thead>
             <tbody>
               {data.map(c => (
@@ -361,9 +361,10 @@ function SellersTab({ data }) {
                   <td className="py-2 px-2"><p className="font-medium">{c.name}</p><p className="text-xs text-gray-400">{c.email}</p></td>
                   <td className="py-2 px-2"><span className="text-xs px-2 py-0.5 rounded-full bg-gray-100">{c.role}</span></td>
                   <td className="py-2 px-2 text-right">{c.orders_count}</td>
-                  <td className="py-2 px-2 text-right">{c.qty}</td>
+                  <td className="py-2 px-2 text-right">{formatEur(c.avg_basket || 0)}</td>
                   <td className="py-2 px-2 text-right font-bold text-wine-700">{formatEur(c.ca_ttc)}</td>
                   <td className="py-2 px-2 text-right font-bold text-green-700">{formatEur(c.margin)}</td>
+                  <td className="py-2 px-2 text-right">{c.referral_orders > 0 ? <span className="text-xs text-purple-700">{c.referral_orders} cmd / {formatEur(c.referral_ca_ttc)}</span> : <span className="text-gray-300">—</span>}</td>
                 </tr>
               ))}
             </tbody>
@@ -508,7 +509,7 @@ export default function AdminFinance() {
           const r = await marginsAPI.list(activeParams);
           setTabData(prev => ({ ...prev, products: r.data }));
         } else if (tab === 'sellers') {
-          const r = await marginsAPI.byClient(activeParams);
+          const r = await marginsAPI.bySeller(activeParams);
           setTabData(prev => ({ ...prev, sellers: r.data.data }));
         } else if (tab === 'suppliers') {
           const r = await marginsAPI.bySupplier(activeParams);

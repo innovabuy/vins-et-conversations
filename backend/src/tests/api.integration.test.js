@@ -2467,6 +2467,168 @@ describe('API Integration Tests', () => {
     });
   });
 
+  // ─── Sprint D — Categories, By-Seller, Public Catalog Categories ──
+
+  describe('Sprint D — Categories CRUD', () => {
+    let testCatId;
+
+    test('Public categories returns active categories with product counts', async () => {
+      const res = await request(app).get('/api/v1/categories');
+      expect(res.status).toBe(200);
+      expect(res.body.data).toBeInstanceOf(Array);
+      expect(res.body.data.length).toBeGreaterThan(0);
+      expect(res.body.data[0]).toHaveProperty('name');
+      expect(res.body.data[0]).toHaveProperty('slug');
+      expect(res.body.data[0]).toHaveProperty('product_count');
+    });
+
+    test('Admin categories returns all categories', async () => {
+      const res = await request(app)
+        .get('/api/v1/admin/categories')
+        .set('Authorization', `Bearer ${adminToken}`);
+      expect(res.status).toBe(200);
+      expect(res.body.data).toBeInstanceOf(Array);
+      expect(res.body.data.length).toBeGreaterThanOrEqual(7);
+    });
+
+    test('Admin creates a category', async () => {
+      const res = await request(app)
+        .post('/api/v1/admin/categories')
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({ name: 'Test Sprint D', color: '#ff0000', icon: '🧪' });
+      expect(res.status).toBe(201);
+      expect(res.body.name).toBe('Test Sprint D');
+      expect(res.body.slug).toBe('test-sprint-d');
+      testCatId = res.body.id;
+    });
+
+    test('Duplicate category name returns 409', async () => {
+      const res = await request(app)
+        .post('/api/v1/admin/categories')
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({ name: 'Test Sprint D' });
+      expect(res.status).toBe(409);
+      expect(res.body.error).toBe('CATEGORY_EXISTS');
+    });
+
+    test('Admin updates a category', async () => {
+      if (!testCatId) return;
+      const res = await request(app)
+        .put(`/api/v1/admin/categories/${testCatId}`)
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({ name: 'Test Sprint D Updated', color: '#00ff00' });
+      expect(res.status).toBe(200);
+      expect(res.body.name).toBe('Test Sprint D Updated');
+    });
+
+    test('Delete category with no products succeeds', async () => {
+      if (!testCatId) return;
+      const res = await request(app)
+        .delete(`/api/v1/admin/categories/${testCatId}`)
+        .set('Authorization', `Bearer ${adminToken}`);
+      expect(res.status).toBe(200);
+      expect(res.body.message).toContain('supprimée');
+    });
+
+    test('Delete category with products returns 409', async () => {
+      // Find a category that has products
+      const cat = await db('categories')
+        .join('products', 'categories.id', 'products.category_id')
+        .where('products.active', true)
+        .select('categories.id')
+        .first();
+      if (!cat) return;
+
+      const res = await request(app)
+        .delete(`/api/v1/admin/categories/${cat.id}`)
+        .set('Authorization', `Bearer ${adminToken}`);
+      expect(res.status).toBe(409);
+      expect(res.body.error).toBe('CATEGORY_HAS_PRODUCTS');
+    });
+
+    test('Student cannot access admin categories', async () => {
+      const res = await request(app)
+        .get('/api/v1/admin/categories')
+        .set('Authorization', `Bearer ${studentToken}`);
+      expect(res.status).toBe(403);
+    });
+  });
+
+  describe('Sprint D — Categories retrocompat on products', () => {
+    test('Products list includes category_details from categories table', async () => {
+      const res = await request(app)
+        .get('/api/v1/products')
+        .set('Authorization', `Bearer ${adminToken}`)
+        .query({ campaign_id: campaignId });
+      expect(res.status).toBe(200);
+      if (res.body.data && res.body.data.length > 0) {
+        const withCat = res.body.data.find(p => p.category_details);
+        if (withCat) {
+          expect(withCat.category_details).toHaveProperty('id');
+          expect(withCat.category_details).toHaveProperty('name');
+          expect(withCat.category_details).toHaveProperty('color');
+        }
+      }
+    });
+
+    test('Public catalog includes category_details and supports category_id filter', async () => {
+      const cat = await db('categories').where({ active: true }).first();
+      if (!cat) return;
+
+      const res = await request(app)
+        .get('/api/v1/public/catalog')
+        .query({ category_id: cat.id });
+      expect(res.status).toBe(200);
+      expect(res.body.data).toBeInstanceOf(Array);
+    });
+
+    test('Public filters include categoryObjects', async () => {
+      const res = await request(app).get('/api/v1/public/filters');
+      expect(res.status).toBe(200);
+      expect(res.body).toHaveProperty('categoryObjects');
+      expect(res.body.categoryObjects).toBeInstanceOf(Array);
+      if (res.body.categoryObjects.length > 0) {
+        expect(res.body.categoryObjects[0]).toHaveProperty('id');
+        expect(res.body.categoryObjects[0]).toHaveProperty('name');
+        expect(res.body.categoryObjects[0]).toHaveProperty('color');
+      }
+    });
+  });
+
+  describe('Sprint D — Margins by-seller', () => {
+    test('Admin can get margins by seller', async () => {
+      const res = await request(app)
+        .get('/api/v1/admin/margins/by-seller')
+        .set('Authorization', `Bearer ${adminToken}`);
+      expect(res.status).toBe(200);
+      expect(res.body).toHaveProperty('data');
+      expect(res.body.data).toBeInstanceOf(Array);
+      if (res.body.data.length > 0) {
+        const seller = res.body.data[0];
+        expect(seller).toHaveProperty('name');
+        expect(seller).toHaveProperty('orders_count');
+        expect(seller).toHaveProperty('ca_ttc');
+        expect(seller).toHaveProperty('margin');
+      }
+    });
+
+    test('By-seller supports campaign filter', async () => {
+      const res = await request(app)
+        .get('/api/v1/admin/margins/by-seller')
+        .set('Authorization', `Bearer ${adminToken}`)
+        .query({ campaign_id: campaignId });
+      expect(res.status).toBe(200);
+      expect(res.body.data).toBeInstanceOf(Array);
+    });
+
+    test('Student cannot access margins by-seller', async () => {
+      const res = await request(app)
+        .get('/api/v1/admin/margins/by-seller')
+        .set('Authorization', `Bearer ${studentToken}`);
+      expect(res.status).toBe(403);
+    });
+  });
+
   describe('Tournées — Edition, suppression, PDF, workflow', () => {
     let routeId;
     let blId;

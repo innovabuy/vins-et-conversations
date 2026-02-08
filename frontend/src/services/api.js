@@ -236,6 +236,7 @@ export const marginsAPI = {
   byCampaign: (params) => api.get('/admin/margins/by-campaign', { params }),
   byClient: (params) => api.get('/admin/margins/by-client', { params }),
   bySupplier: (params) => api.get('/admin/margins/by-supplier', { params }),
+  bySeller: (params) => api.get('/admin/margins/by-seller', { params }),
   overview: (params) => api.get('/admin/margins/overview', { params }),
   filterOptions: () => api.get('/admin/margins/filter-options'),
 };
@@ -243,6 +244,16 @@ export const marginsAPI = {
 // ─── Analytics ─────────────────────────────────────
 export const analyticsAPI = {
   get: (params) => api.get('/admin/analytics', { params }),
+};
+
+// ─── Categories ───────────────────────────────────
+export const categoriesAPI = {
+  listPublic: () => api.get('/categories'),
+  list: () => api.get('/admin/categories'),
+  create: (data) => api.post('/admin/categories', data),
+  update: (id, data) => api.put(`/admin/categories/${id}`, data),
+  delete: (id) => api.delete(`/admin/categories/${id}`),
+  reorder: (order) => api.put('/admin/categories/reorder', { order }),
 };
 
 // ─── Audit Log ─────────────────────────────────────

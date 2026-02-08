@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { productsAPI, catalogPdfAPI } from '../../services/api';
+import { productsAPI, catalogPdfAPI, categoriesAPI } from '../../services/api';
 import {
   RadarChart, Radar, PolarGrid, PolarAngleAxis, PolarRadiusAxis, ResponsiveContainer
 } from 'recharts';
@@ -166,7 +166,7 @@ function ProductDetail({ product, onClose, onEdit }) {
 }
 
 // ─── Product Form (enriched) ─────────────────────────
-function ProductForm({ product, onSave, onCancel, allProducts = [] }) {
+function ProductForm({ product, onSave, onCancel, allProducts = [], categoriesList = [] }) {
   const initial = product ? {
     ...product,
     grape_varieties: parseJsonField(product.grape_varieties),
@@ -299,7 +299,10 @@ function ProductForm({ product, onSave, onCancel, allProducts = [] }) {
           </div>
           <div>
             <label className="block text-xs font-medium text-gray-500 mb-1">Catégorie</label>
-            <input value={form.category || ''} onChange={e => handleChange('category', e.target.value)} className="w-full border rounded-lg px-3 py-2 text-sm" />
+            <select value={form.category_id || ''} onChange={e => { handleChange('category_id', e.target.value || null); const cat = categoriesList.find(c => c.id === e.target.value); if (cat) handleChange('category', cat.name); }} className="w-full border rounded-lg px-3 py-2 text-sm">
+              <option value="">— Aucune —</option>
+              {categoriesList.filter(c => c.active).map(c => <option key={c.id} value={c.id}>{c.icon} {c.name}</option>)}
+            </select>
           </div>
           <div>
             <label className="block text-xs font-medium text-gray-500 mb-1">Région</label>
@@ -466,6 +469,11 @@ export default function AdminCatalog() {
   const [sending, setSending] = useState(false);
   const [pdfModal, setPdfModal] = useState(false);
   const [pdfSegment, setPdfSegment] = useState('public');
+  const [categoriesList, setCategoriesList] = useState([]);
+
+  useEffect(() => {
+    categoriesAPI.list().then(r => setCategoriesList(r.data.data || [])).catch(() => {});
+  }, []);
 
   const fetchProducts = useCallback(async () => {
     setLoading(true);
@@ -540,7 +548,7 @@ export default function AdminCatalog() {
   if (editing) {
     return (
       <div className="card">
-        <ProductForm product={editing === 'new' ? null : editing} onSave={handleSave} onCancel={() => setEditing(null)} allProducts={products} />
+        <ProductForm product={editing === 'new' ? null : editing} onSave={handleSave} onCancel={() => setEditing(null)} allProducts={products} categoriesList={categoriesList} />
       </div>
     );
   }

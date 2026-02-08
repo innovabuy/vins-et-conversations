@@ -386,4 +386,66 @@ router.get('/overview', ...adminAuth, async (req, res) => {
   }
 });
 
+// GET /api/v1/admin/margins/by-seller — Margins by seller (student/ambassador)
+router.get('/by-seller', ...adminAuth, async (req, res) => {
+  try {
+    const filters = parseMarginFilters(req.query);
+
+    // Direct sales: orders placed by the seller
+    const directQ = db('order_items')
+      .join('orders', 'order_items.order_id', 'orders.id')
+      .join('products', 'order_items.product_id', 'products.id')
+      .join('users', 'orders.user_id', 'users.id')
+      .whereIn('orders.status', VALID_STATUSES)
+      .groupBy('users.id', 'users.name', 'users.email', 'users.role')
+      .select(
+        'users.id', 'users.name', 'users.email', 'users.role',
+        db.raw('COUNT(DISTINCT orders.id) as orders_count'),
+        db.raw('SUM(order_items.qty * order_items.unit_price_ttc) as ca_ttc'),
+        db.raw('SUM(order_items.qty * order_items.unit_price_ht) as ca_ht'),
+        db.raw('SUM(order_items.qty * (order_items.unit_price_ht - products.purchase_price)) as margin')
+      )
+      .orderBy('ca_ttc', 'desc');
+    applyMarginFilters(directQ, filters);
+    const directSellers = await directQ;
+
+    // Referral sales: orders with referred_by
+    const referralQ = db('order_items')
+      .join('orders', 'order_items.order_id', 'orders.id')
+      .join('products', 'order_items.product_id', 'products.id')
+      .join('users', 'orders.referred_by', 'users.id')
+      .whereIn('orders.status', VALID_STATUSES)
+      .whereNotNull('orders.referred_by')
+      .groupBy('users.id', 'users.name', 'users.email', 'users.role')
+      .select(
+        'users.id', 'users.name', 'users.email', 'users.role',
+        db.raw('COUNT(DISTINCT orders.id) as referral_orders'),
+        db.raw('SUM(order_items.qty * order_items.unit_price_ttc) as referral_ca_ttc')
+      );
+    applyMarginFilters(referralQ, filters);
+    const referralSellers = await referralQ;
+
+    // Merge
+    const refMap = {};
+    for (const r of referralSellers) {
+      refMap[r.id] = { referral_orders: parseInt(r.referral_orders, 10), referral_ca_ttc: parseFloat(r.referral_ca_ttc) };
+    }
+
+    const data = directSellers.map(s => ({
+      id: s.id, name: s.name, email: s.email, role: s.role,
+      orders_count: parseInt(s.orders_count, 10),
+      ca_ttc: parseFloat(s.ca_ttc),
+      ca_ht: parseFloat(s.ca_ht),
+      margin: parseFloat(s.margin),
+      avg_basket: parseInt(s.orders_count, 10) > 0 ? parseFloat(s.ca_ttc) / parseInt(s.orders_count, 10) : 0,
+      referral_orders: refMap[s.id]?.referral_orders || 0,
+      referral_ca_ttc: refMap[s.id]?.referral_ca_ttc || 0,
+    }));
+
+    res.json({ data });
+  } catch (err) {
+    res.status(500).json({ error: 'SERVER_ERROR', message: err.message });
+  }
+});
+
 module.exports = router;

@@ -105,6 +105,8 @@ app.use('/api/v1/admin/invitations', require('./routes/invitations'));
 app.use('/api/v1/public', require('./routes/publicCatalog'));
 app.use('/api/v1/public', require('./routes/boutiqueAPI'));
 app.use('/api/v1/admin/catalog', require('./routes/catalogPdf'));
+app.use('/api/v1/categories', require('./routes/categories'));
+app.use('/api/v1/admin/categories', require('./routes/categories').adminRouter);
 
 // ─── Health check ─────────────────────────────────────
 app.get('/api/health', async (req, res) => {

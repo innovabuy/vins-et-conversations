@@ -31,9 +31,21 @@ export default function BoutiqueHome() {
   const [search, setSearch] = useState('');
   const [color, setColor] = useState('');
   const [region, setRegion] = useState('');
+  const [categoryId, setCategoryId] = useState('');
   const [showFilters, setShowFilters] = useState(false);
   const [addedId, setAddedId] = useState(null);
-  const { addToCart } = useCart();
+  const [ambassadorName, setAmbassadorName] = useState(null);
+  const { addToCart, getReferralCode } = useCart();
+
+  // Detect ambassador referral
+  useEffect(() => {
+    const code = getReferralCode();
+    if (code && !ambassadorName) {
+      api.get(`/public/ambassador/${code}`)
+        .then(r => setAmbassadorName(r.data.name))
+        .catch(() => {});
+    }
+  }, []);
 
   const fetchProducts = async () => {
     setLoading(true);
@@ -42,6 +54,7 @@ export default function BoutiqueHome() {
       if (search) params.search = search;
       if (color) params.color = color;
       if (region) params.region = region;
+      if (categoryId) params.category_id = categoryId;
       if (campaignId) params.campaign_id = campaignId;
       const { data } = await api.get('/public/catalog', { params });
       setProducts(data.data || []);
@@ -56,7 +69,7 @@ export default function BoutiqueHome() {
     api.get('/public/filters').then(r => setFilters(r.data)).catch(console.error);
   }, []);
 
-  useEffect(() => { fetchProducts(); }, [search, color, region, campaignId]);
+  useEffect(() => { fetchProducts(); }, [search, color, region, categoryId, campaignId]);
 
   return (
     <div>
@@ -79,6 +92,15 @@ export default function BoutiqueHome() {
           </a>
         </div>
       </section>
+
+      {/* Ambassador banner */}
+      {ambassadorName && (
+        <div className="bg-gradient-to-r from-indigo-50 to-purple-50 border-b border-indigo-100">
+          <div className="max-w-7xl mx-auto px-4 py-2.5 text-center text-sm text-indigo-700">
+            Recommandé par <span className="font-semibold">{ambassadorName}</span>
+          </div>
+        </div>
+      )}
 
       {/* Catalog */}
       <section id="catalog" className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
@@ -124,6 +146,20 @@ export default function BoutiqueHome() {
           ))}
         </div>
 
+        {/* Category filter buttons */}
+        {filters?.categoryObjects?.length > 0 && (
+          <div className="flex flex-wrap gap-2 mb-6">
+            <button onClick={() => setCategoryId('')} className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium transition-all ${!categoryId ? 'bg-wine-700 text-white shadow-sm' : 'bg-white border border-gray-200 text-gray-600 hover:border-gray-300'}`}>
+              Toutes catégories
+            </button>
+            {filters.categoryObjects.map(cat => (
+              <button key={cat.id} onClick={() => setCategoryId(categoryId === cat.id ? '' : cat.id)} className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium transition-all ${categoryId === cat.id ? 'text-white shadow-sm' : 'bg-white border border-gray-200 text-gray-600 hover:border-gray-300'}`} style={categoryId === cat.id ? { backgroundColor: cat.color || '#7a1c3b' } : {}}>
+                <span>{cat.icon}</span> {cat.name}
+              </button>
+            ))}
+          </div>
+        )}
+
         {showFilters && filters && (
           <div className="flex flex-wrap gap-3 mb-6 p-4 bg-gray-50 rounded-xl">
             <select value={region} onChange={(e) => setRegion(e.target.value)} className="border rounded-lg px-3 py-2 text-sm">
@@ -163,7 +199,11 @@ export default function BoutiqueHome() {
                 </div>
                 <div className="p-4">
                   <div className="flex items-center gap-2 mb-2">
-                    {p.color && <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${COLOR_MAP[p.color?.toLowerCase()] || 'bg-gray-100 text-gray-600'}`}>{p.color}</span>}
+                    {p.category_details ? (
+                      <span className="px-2 py-0.5 rounded-full text-xs font-medium text-white" style={{ backgroundColor: p.category_details.color || '#666' }}>{p.category_details.icon} {p.category_details.name}</span>
+                    ) : p.color ? (
+                      <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${COLOR_MAP[p.color?.toLowerCase()] || 'bg-gray-100 text-gray-600'}`}>{p.color}</span>
+                    ) : null}
                     {p.region && <span className="text-xs text-gray-400">{p.region}</span>}
                   </div>
                   <h3 className="font-semibold text-gray-900 group-hover:text-wine-700 transition-colors">{p.name}</h3>

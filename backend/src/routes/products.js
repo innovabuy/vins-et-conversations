@@ -15,6 +15,7 @@ const productSchema = Joi.object({
   purchase_price: Joi.number().positive().required(),
   tva_rate: Joi.number().valid(5.5, 20).required(),
   category: Joi.string().max(100).allow(null, ''),
+  category_id: Joi.string().uuid().allow(null),
   label: Joi.string().max(100).allow(null, ''),
   image_url: Joi.string().uri().allow(null, ''),
   description: Joi.string().allow(null, ''),
@@ -49,13 +50,26 @@ const productSchema = Joi.object({
 // GET /api/v1/products — Catalogue (with filters)
 router.get('/', async (req, res) => {
   try {
-    const query = db('products').where({ active: true });
-    if (req.query.color) query.where('color', req.query.color);
-    if (req.query.region) query.where('region', req.query.region);
-    if (req.query.label) query.where('label', req.query.label);
-    if (req.query.category) query.where('category', req.query.category);
-    const products = await query.orderBy('sort_order');
-    res.json({ data: products });
+    const query = db('products')
+      .leftJoin('categories', 'products.category_id', 'categories.id')
+      .where('products.active', true)
+      .select('products.*',
+        'categories.id as cat_id', 'categories.name as cat_name',
+        'categories.slug as cat_slug', 'categories.icon as cat_icon',
+        'categories.color as cat_color');
+    if (req.query.color) query.where('products.color', req.query.color);
+    if (req.query.region) query.where('products.region', req.query.region);
+    if (req.query.label) query.where('products.label', req.query.label);
+    if (req.query.category) query.where('products.category', req.query.category);
+    if (req.query.category_id) query.where('products.category_id', req.query.category_id);
+    const products = await query.orderBy('products.sort_order');
+    res.json({
+      data: products.map(p => ({
+        ...p,
+        category_details: p.cat_id ? { id: p.cat_id, name: p.cat_name, slug: p.cat_slug, icon: p.cat_icon, color: p.cat_color } : null,
+        cat_id: undefined, cat_name: undefined, cat_slug: undefined, cat_icon: undefined, cat_color: undefined,
+      })),
+    });
   } catch (err) {
     res.status(500).json({ error: 'SERVER_ERROR' });
   }
@@ -106,6 +120,11 @@ adminRouter.post(
       if (Array.isArray(body.food_pairing)) body.food_pairing = JSON.stringify(body.food_pairing);
       if (Array.isArray(body.awards)) body.awards = JSON.stringify(body.awards);
       if (body.tasting_notes && typeof body.tasting_notes === 'object') body.tasting_notes = JSON.stringify(body.tasting_notes);
+      // Auto-sync category string from category_id
+      if (body.category_id) {
+        const cat = await db('categories').where({ id: body.category_id }).first();
+        if (cat) body.category = cat.name;
+      }
       const [product] = await db('products').insert(body).returning('*');
       res.status(201).json(product);
     } catch (err) {
@@ -127,6 +146,11 @@ adminRouter.put(
       if (Array.isArray(body.food_pairing)) body.food_pairing = JSON.stringify(body.food_pairing);
       if (Array.isArray(body.awards)) body.awards = JSON.stringify(body.awards);
       if (body.tasting_notes && typeof body.tasting_notes === 'object') body.tasting_notes = JSON.stringify(body.tasting_notes);
+      // Auto-sync category string from category_id
+      if (body.category_id) {
+        const cat = await db('categories').where({ id: body.category_id }).first();
+        if (cat) body.category = cat.name;
+      }
       const [product] = await db('products')
         .where({ id: req.params.id })
         .update(body)
