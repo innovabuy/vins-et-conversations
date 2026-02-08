@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { Wine, Eye, EyeOff, ArrowRight, KeyRound } from 'lucide-react';
-import WineBottleAnimation from '../components/shared/WineBottleAnimation';
+import WineWavesAnimation from '../components/shared/WineWavesAnimation';
 import api from '../services/api';
 
 export default function LoginPage() {
@@ -81,35 +81,37 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-wine-900 via-wine-800 to-wine-950 flex items-center justify-center p-4">
-      <div className="w-full max-w-4xl grid grid-cols-1 lg:grid-cols-2 gap-8 items-center">
-        {/* Left: Wine bottle animation */}
-        <div className="hidden lg:block">
-          <WineBottleAnimation />
-          <p className="text-center text-wine-300/60 text-sm mt-6 italic">
-            Déplacez votre souris pour interagir
-          </p>
-        </div>
+    <div className="relative min-h-screen overflow-hidden" style={{ background: 'linear-gradient(to bottom, #44091c 0%, #5a0f25 100%)' }}>
+      {/* Wine waves ocean */}
+      <WineWavesAnimation />
 
-        {/* Right: Form */}
-        <div>
-          <div className="text-center mb-8">
-            <div className="inline-flex items-center justify-center w-16 h-16 bg-white/10 backdrop-blur rounded-2xl mb-4 lg:hidden">
-              <Wine className="w-8 h-8 text-white" />
+      {/* Form container */}
+      <div className="relative z-10 min-h-screen flex items-center justify-center p-4 sm:items-center">
+        <div
+          className="w-full max-w-sm"
+          style={{
+            animation: 'loginFadeIn 0.8s ease-out 0.5s both',
+          }}
+        >
+          {/* Logo + title */}
+          <div className="text-center mb-6">
+            <div className="inline-flex items-center justify-center w-14 h-14 bg-white/10 backdrop-blur-sm rounded-2xl mb-3">
+              <Wine className="w-7 h-7 text-white" />
             </div>
-            <h1 className="text-3xl font-bold text-white">Vins & Conversations</h1>
-            <p className="text-wine-200 mt-1">Plateforme de gestion des ventes</p>
+            <h1 className="text-2xl sm:text-3xl font-bold text-white">Vins & Conversations</h1>
+            <p className="text-wine-300 text-sm mt-1">Plateforme de gestion des ventes</p>
           </div>
 
+          {/* Card */}
           {resetToken ? (
-            <form onSubmit={handleReset} className="card">
+            <div className="bg-white rounded-2xl shadow-2xl p-6">
               <div className="flex items-center gap-2 mb-6">
                 <KeyRound size={20} className="text-wine-700" />
                 <h2 className="text-xl font-semibold">Nouveau mot de passe</h2>
               </div>
               {error && <div className="bg-red-50 text-red-700 px-4 py-3 rounded-lg mb-4 text-sm">{error}</div>}
               {success && <div className="bg-green-50 text-green-700 px-4 py-3 rounded-lg mb-4 text-sm">{success}</div>}
-              <div className="space-y-4">
+              <form onSubmit={handleReset} className="space-y-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Nouveau mot de passe</label>
                   <input type="password" className="input" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} placeholder="Min. 8 caractères" required minLength={8} />
@@ -117,15 +119,15 @@ export default function LoginPage() {
                 <button type="submit" disabled={loading} className="btn-primary w-full disabled:opacity-50 flex items-center justify-center gap-2">
                   {loading ? 'Enregistrement...' : <>Réinitialiser <ArrowRight size={16} /></>}
                 </button>
-              </div>
-            </form>
+              </form>
+            </div>
           ) : mode === 'forgot' ? (
-            <form onSubmit={handleForgot} className="card">
+            <div className="bg-white rounded-2xl shadow-2xl p-6">
               <h2 className="text-xl font-semibold mb-2">Mot de passe oublié</h2>
               <p className="text-sm text-gray-500 mb-6">Entrez votre email pour recevoir un lien de réinitialisation.</p>
               {error && <div className="bg-red-50 text-red-700 px-4 py-3 rounded-lg mb-4 text-sm">{error}</div>}
               {success && <div className="bg-green-50 text-green-700 px-4 py-3 rounded-lg mb-4 text-sm">{success}</div>}
-              <div className="space-y-4">
+              <form onSubmit={handleForgot} className="space-y-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
                   <input type="email" className="input" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="votre@email.fr" required />
@@ -136,14 +138,14 @@ export default function LoginPage() {
                 <button type="button" onClick={() => { setMode('login'); setError(''); setSuccess(''); }} className="text-sm text-wine-700 hover:underline w-full text-center">
                   Retour à la connexion
                 </button>
-              </div>
-            </form>
+              </form>
+            </div>
           ) : (
-            <form onSubmit={handleLogin} className="card">
+            <div className="bg-white rounded-2xl shadow-2xl p-6">
               <h2 className="text-xl font-semibold mb-6">Connexion</h2>
               {error && <div className="bg-red-50 text-red-700 px-4 py-3 rounded-lg mb-4 text-sm">{error}</div>}
               {success && <div className="bg-green-50 text-green-700 px-4 py-3 rounded-lg mb-4 text-sm">{success}</div>}
-              <div className="space-y-4">
+              <form onSubmit={handleLogin} className="space-y-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
                   <input type="email" className="input" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="votre@email.fr" required />
@@ -165,23 +167,31 @@ export default function LoginPage() {
                 <button type="submit" disabled={loading} className="btn-primary w-full disabled:opacity-50 flex items-center justify-center gap-2">
                   {loading ? 'Connexion...' : <>Se connecter <ArrowRight size={16} /></>}
                 </button>
-              </div>
+              </form>
               <div className="mt-4 p-3 bg-gray-50 rounded-lg text-xs text-gray-500">
                 <p className="font-medium mb-1">Comptes de démonstration :</p>
                 <p>Admin : nicolas@vins-conversations.fr</p>
                 <p>Élève : ackavong@eleve.sc.fr</p>
                 <p>Mot de passe : VinsConv2026!</p>
               </div>
-            </form>
+            </div>
           )}
 
-          <p className="text-center mt-6">
+          <p className="text-center mt-5">
             <Link to="/boutique" className="text-wine-300 hover:text-white text-sm transition-colors">
               Découvrir nos vins →
             </Link>
           </p>
         </div>
       </div>
+
+      {/* Keyframe for form entrance */}
+      <style>{`
+        @keyframes loginFadeIn {
+          from { opacity: 0; transform: translateY(20px); }
+          to   { opacity: 1; transform: translateY(0); }
+        }
+      `}</style>
     </div>
   );
 }
