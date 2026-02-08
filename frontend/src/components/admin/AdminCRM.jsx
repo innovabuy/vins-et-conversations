@@ -1,8 +1,10 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { contactsAPI, campaignsAPI } from '../../services/api';
 import {
   Users, Plus, Search, Pencil, X, Phone, Mail, MapPin,
-  ChevronLeft, ChevronRight, UserPlus, GraduationCap, Building2, Award
+  ChevronLeft, ChevronRight, UserPlus, GraduationCap, Building2, Award,
+  ShoppingCart, ExternalLink
 } from 'lucide-react';
 
 const formatEur = (v) => new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR' }).format(v);
@@ -34,6 +36,7 @@ const EMPTY_FORM = {
 
 // ─── Order History + Campaign Panel ─────────────────
 function ContactPanel({ contact, onClose }) {
+  const navigate = useNavigate();
   const [orders, setOrders] = useState([]);
   const [campaigns, setCampaigns] = useState([]);
   const [allCampaigns, setAllCampaigns] = useState([]);
@@ -154,7 +157,12 @@ function ContactPanel({ contact, onClose }) {
             )}
           </div>
 
-          <h3 className="font-semibold text-sm pt-2">Historique des commandes</h3>
+          <div className="flex items-center justify-between pt-2">
+            <h3 className="font-semibold text-sm">Historique des commandes</h3>
+            <button onClick={() => { onClose(); navigate('/admin/orders'); }} className="flex items-center gap-1 text-xs text-wine-700 hover:text-wine-800">
+              <ShoppingCart size={14} /> Nouvelle commande
+            </button>
+          </div>
           {loading ? (
             <div className="flex justify-center py-8"><div className="animate-spin rounded-full h-6 w-6 border-b-2 border-wine-700" /></div>
           ) : orders.length === 0 ? (
@@ -162,9 +170,9 @@ function ContactPanel({ contact, onClose }) {
           ) : (
             <div className="border rounded-lg divide-y">
               {orders.map(order => (
-                <div key={order.id} className="flex items-center justify-between p-3 text-sm">
+                <div key={order.id} onClick={() => { onClose(); navigate(`/admin/orders?selected=${order.id}`); }} className="flex items-center justify-between p-3 text-sm cursor-pointer hover:bg-gray-50 transition-colors">
                   <div>
-                    <p className="font-medium">{order.ref || `#${order.id}`}</p>
+                    <p className="font-medium text-wine-700 inline-flex items-center gap-1">{order.ref || `#${order.id}`} <ExternalLink size={10} /></p>
                     <p className="text-xs text-gray-500">{formatDate(order.created_at)}</p>
                   </div>
                   <div className="text-right">

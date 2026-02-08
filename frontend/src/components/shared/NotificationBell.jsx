@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Bell, Check, CheckCheck } from 'lucide-react';
 import { notificationsAPI } from '../../services/api';
 
@@ -11,7 +12,17 @@ const TYPE_ICONS = {
   contact: '📩',
 };
 
+const ENTITY_ROUTES = {
+  order: (id) => `/admin/orders?selected=${id}`,
+  payment: () => '/admin/payments',
+  stock: () => '/admin/stock',
+  delivery: () => '/admin/delivery',
+  campaign: (id) => `/admin/campaigns/${id}`,
+  contact: () => '/admin/crm',
+};
+
 export default function NotificationBell() {
+  const navigate = useNavigate();
   const [notifications, setNotifications] = useState([]);
   const [unread, setUnread] = useState(0);
   const [open, setOpen] = useState(false);
@@ -94,7 +105,14 @@ export default function NotificationBell() {
                 <div
                   key={n.id}
                   className={`flex items-start gap-3 px-4 py-3 border-b last:border-b-0 cursor-pointer hover:bg-gray-50 transition-colors ${!n.read ? 'bg-wine-50/50' : ''}`}
-                  onClick={() => !n.read && markRead(n.id)}
+                  onClick={() => {
+                    if (!n.read) markRead(n.id);
+                    const routeFn = ENTITY_ROUTES[n.entity] || ENTITY_ROUTES[n.type];
+                    if (routeFn) {
+                      navigate(routeFn(n.entity_id));
+                      setOpen(false);
+                    }
+                  }}
                 >
                   <span className="text-lg flex-shrink-0 mt-0.5">{TYPE_ICONS[n.type] || '🔔'}</span>
                   <div className="flex-1 min-w-0">

@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { dashboardAPI } from '../../services/api';
 import { BarChart, Bar, XAxis, YAxis, ResponsiveContainer, CartesianGrid } from 'recharts';
 import {
@@ -8,6 +9,7 @@ import {
 import { WINE_PALETTE, axisStyle, gridStyle, PremiumTooltip, ChartGradient, chartAnimation, formatEur } from '../../utils/chartTheme';
 
 export default function AdminCockpit() {
+  const navigate = useNavigate();
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
 
@@ -22,12 +24,12 @@ export default function AdminCockpit() {
   if (!data) return <div className="text-center py-20 text-gray-500">Erreur de chargement</div>;
 
   const actionCards = [
-    { label: 'Commandes à valider', value: data.actions.pendingOrders, icon: ShoppingCart, color: 'bg-blue-50 text-blue-700' },
-    { label: 'Paiements reçus', value: formatEur(data.actions.unreconciledPayments), icon: CreditCard, color: 'bg-green-50 text-green-700' },
-    { label: 'BL à préparer', value: data.actions.readyBL, icon: Truck, color: 'bg-purple-50 text-purple-700' },
-    { label: 'Relances impayés', value: data.actions.unpaidOrders, icon: AlertTriangle, color: 'bg-red-50 text-red-700' },
-    { label: 'Stock bas', value: data.actions.lowStock, icon: Package, color: 'bg-orange-50 text-orange-700' },
-    { label: 'Espèces à rapprocher', value: formatEur(data.actions.cashToReconcile), icon: Banknote, color: 'bg-amber-50 text-amber-700' },
+    { label: 'Commandes à valider', value: data.actions.pendingOrders, icon: ShoppingCart, color: 'bg-blue-50 text-blue-700', to: '/admin/orders?status=submitted' },
+    { label: 'Paiements reçus', value: formatEur(data.actions.unreconciledPayments), icon: CreditCard, color: 'bg-green-50 text-green-700', to: '/admin/payments?status=pending' },
+    { label: 'BL à préparer', value: data.actions.readyBL, icon: Truck, color: 'bg-purple-50 text-purple-700', to: '/admin/delivery?status=ready' },
+    { label: 'Relances impayés', value: data.actions.unpaidOrders, icon: AlertTriangle, color: 'bg-red-50 text-red-700', to: '/admin/payments?status=unpaid' },
+    { label: 'Stock bas', value: data.actions.lowStock, icon: Package, color: 'bg-orange-50 text-orange-700', to: '/admin/stock' },
+    { label: 'Espèces à rapprocher', value: formatEur(data.actions.cashToReconcile), icon: Banknote, color: 'bg-amber-50 text-amber-700', to: '/admin/payments?method=Esp%C3%A8ces' },
   ];
 
   return (
@@ -58,7 +60,7 @@ export default function AdminCockpit() {
       {/* Cartes d'action */}
       <div className="grid grid-cols-2 lg:grid-cols-3 gap-3">
         {actionCards.map((card) => (
-          <button key={card.label} className={`${card.color} rounded-xl p-4 text-left hover:opacity-80 transition-opacity`}>
+          <button key={card.label} onClick={() => navigate(card.to)} className={`${card.color} rounded-xl p-4 text-left hover:opacity-80 transition-opacity`}>
             <div className="flex items-start justify-between">
               <card.icon size={20} />
               <ArrowRight size={16} className="opacity-50" />
@@ -75,7 +77,7 @@ export default function AdminCockpit() {
           <h3 className="font-semibold mb-4">Classement étudiants</h3>
           <div className="space-y-2">
             {data.topStudents.map((s, i) => (
-              <div key={s.user_id} className={`flex items-center gap-3 p-2 rounded-lg ${i < 3 ? 'bg-wine-50' : ''}`}>
+              <div key={s.user_id} onClick={() => navigate(`/admin/orders?user_id=${s.user_id}`)} className={`flex items-center gap-3 p-2 rounded-lg cursor-pointer hover:ring-1 hover:ring-wine-200 transition-all ${i < 3 ? 'bg-wine-50' : ''}`}>
                 <span className={`w-7 h-7 rounded-full flex items-center justify-center text-sm font-bold ${
                   i === 0 ? 'bg-yellow-400 text-yellow-900' :
                   i === 1 ? 'bg-gray-300 text-gray-700' :
@@ -88,7 +90,10 @@ export default function AdminCockpit() {
                   <p className="font-medium text-sm truncate">{s.name}</p>
                   <p className="text-xs text-gray-500">{s.class_group} · {s.orders_count} cmd</p>
                 </div>
-                <span className="font-semibold text-sm">{formatEur(s.ca)}</span>
+                <div className="flex items-center gap-2">
+                  <span className="font-semibold text-sm">{formatEur(s.ca)}</span>
+                  <ArrowRight size={14} className="text-gray-300" />
+                </div>
               </div>
             ))}
           </div>
@@ -120,7 +125,7 @@ export default function AdminCockpit() {
         <h3 className="font-semibold mb-4">Top 3 Produits</h3>
         <div className="grid sm:grid-cols-3 gap-4">
           {data.topProducts.map((p, i) => (
-            <div key={p.id} className={`flex items-center gap-3 p-4 rounded-xl border ${
+            <div key={p.id} onClick={() => navigate('/admin/catalog')} className={`flex items-center gap-3 p-4 rounded-xl border cursor-pointer hover:shadow-md transition-shadow ${
               i === 0 ? 'bg-gradient-to-r from-yellow-50 to-amber-50 border-yellow-200' :
               i === 1 ? 'bg-gradient-to-r from-gray-50 to-slate-50 border-gray-200' :
               'bg-gradient-to-r from-orange-50 to-amber-50 border-orange-200'

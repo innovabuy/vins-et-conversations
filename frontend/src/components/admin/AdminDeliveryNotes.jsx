@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { deliveryNotesAPI, ordersAPI } from '../../services/api';
-import { Truck, FileText, Check, Eye, EyeOff, X, ChevronRight, Printer, Mail, Trash2, Pencil, Save } from 'lucide-react';
+import { Truck, FileText, Check, Eye, EyeOff, X, ChevronRight, Printer, Mail, Trash2, Pencil, Save, ExternalLink } from 'lucide-react';
 
 const formatEur = (v) => new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR' }).format(v);
 const formatDate = (d) => d ? new Date(d).toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit', year: 'numeric' }) : '—';
@@ -90,6 +91,7 @@ function GenerateBLModal({ onClose, onCreated }) {
 }
 
 function DeliveryNoteDetail({ noteId, onClose, onUpdated }) {
+  const navigate = useNavigate();
   const [note, setNote] = useState(null);
   const [loading, setLoading] = useState(true);
   const [updating, setUpdating] = useState(false);
@@ -204,7 +206,7 @@ function DeliveryNoteDetail({ noteId, onClose, onUpdated }) {
 
       {/* Info */}
       <div className="grid grid-cols-2 gap-4 text-sm">
-        <div><span className="text-gray-500">Commande :</span> {note.order_ref || '—'}</div>
+        <div><span className="text-gray-500">Commande :</span> {note.order_ref ? <button onClick={() => navigate(`/admin/orders?selected=${note.order_id}`)} className="text-wine-700 hover:underline inline-flex items-center gap-1 font-medium">{note.order_ref} <ExternalLink size={12} /></button> : '—'}</div>
         <div><span className="text-gray-500">Destinataire :</span> {note.recipient_name}</div>
         <div className="col-span-2"><span className="text-gray-500">Adresse :</span> {note.delivery_address || '—'}</div>
         <div><span className="text-gray-500">Date prévue :</span> {formatDate(note.planned_date)}</div>
@@ -240,9 +242,10 @@ function DeliveryNoteDetail({ noteId, onClose, onUpdated }) {
 }
 
 export default function AdminDeliveryNotes() {
+  const [searchParams] = useSearchParams();
   const [notes, setNotes] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [statusFilter, setStatusFilter] = useState('');
+  const [statusFilter, setStatusFilter] = useState(searchParams.get('status') || '');
   const [hideDelivered, setHideDelivered] = useState(false);
   const [selectedNote, setSelectedNote] = useState(null);
   const [showGenerateModal, setShowGenerateModal] = useState(false);

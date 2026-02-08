@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import { cseDashboardAPI, ordersAPI, invoicesAPI } from '../../services/api';
-import { ShoppingCart, Package, FileText, Truck, AlertTriangle } from 'lucide-react';
+import { ShoppingCart, Package, FileText, Truck, AlertTriangle, RefreshCw } from 'lucide-react';
 
 export default function CSEDashboard() {
   const { user } = useAuth();
@@ -67,6 +67,19 @@ export default function CSEDashboard() {
       setError(err.response?.data?.message || 'Erreur lors de la commande');
     } finally {
       setOrdering(false);
+    }
+  };
+
+  const reorder = (order) => {
+    if (!order.items?.length || !data?.products) return;
+    const newCart = [];
+    for (const item of order.items) {
+      const product = data.products.find((p) => p.id === item.product_id);
+      if (product) newCart.push({ ...product, qty: item.qty });
+    }
+    if (newCart.length) {
+      setCart(newCart);
+      setActiveTab('cart');
     }
   };
 
@@ -220,7 +233,10 @@ export default function CSEDashboard() {
                       order.status === 'shipped' ? 'bg-blue-100 text-blue-700' :
                       'bg-gray-100 text-gray-600'
                     }`}>{order.status}</span>
-                    <button onClick={() => downloadInvoice(order.id)} className="text-wine-600 hover:text-wine-800">
+                    <button onClick={() => reorder(order)} className="text-wine-600 hover:text-wine-800" title="Recommander">
+                      <RefreshCw size={16} />
+                    </button>
+                    <button onClick={() => downloadInvoice(order.id)} className="text-wine-600 hover:text-wine-800" title="Facture">
                       <FileText size={16} />
                     </button>
                   </div>

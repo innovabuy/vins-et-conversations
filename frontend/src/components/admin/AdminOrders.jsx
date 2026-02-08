@@ -1,8 +1,9 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { ordersAPI, campaignsAPI, contactsAPI, productsAPI } from '../../services/api';
+import { useNavigate, useSearchParams, Link } from 'react-router-dom';
+import { ordersAPI, campaignsAPI, contactsAPI, productsAPI, deliveryNotesAPI } from '../../services/api';
 import {
   ShoppingCart, Search, Plus, Check, Eye, EyeOff, FileText, Printer, Mail,
-  ChevronLeft, ChevronRight, X, Trash2, Save
+  ChevronLeft, ChevronRight, X, Trash2, Save, Truck, ExternalLink
 } from 'lucide-react';
 
 const formatEur = (v) => new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR' }).format(v);
@@ -168,8 +169,10 @@ function NewOrderForm({ onClose, onCreated }) {
 
 // ─── Order Detail ─────────────────────────────────────
 function OrderDetail({ orderId, onClose, onUpdated }) {
+  const navigate = useNavigate();
   const [order, setOrder] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [creatingBL, setCreatingBL] = useState(false);
 
   useEffect(() => {
     ordersAPI.get(orderId)
@@ -177,6 +180,22 @@ function OrderDetail({ orderId, onClose, onUpdated }) {
       .catch(console.error)
       .finally(() => setLoading(false));
   }, [orderId]);
+
+  const handleCreateBL = async () => {
+    setCreatingBL(true);
+    try {
+      await deliveryNotesAPI.create({
+        order_id: orderId,
+        recipient_name: order.user_name || '',
+      });
+      alert('Bon de livraison créé !');
+      navigate('/admin/delivery');
+    } catch (err) {
+      alert(err.response?.data?.message || 'Erreur lors de la création du BL');
+    } finally {
+      setCreatingBL(false);
+    }
+  };
 
   const handleValidate = async () => {
     if (!confirm('Valider cette commande ?')) return;
@@ -215,12 +234,13 @@ function OrderDetail({ orderId, onClose, onUpdated }) {
         <button onClick={onClose} className="text-gray-400 hover:text-gray-600"><X size={20} /></button>
       </div>
       <div className="grid grid-cols-2 md:grid-cols-3 gap-4 text-sm">
-        <div><span className="text-gray-500">Client :</span> {order.user_name}</div>
+        <div><span className="text-gray-500">Client :</span> <button onClick={() => navigate('/admin/crm')} className="text-wine-700 hover:underline font-medium">{order.user_name}</button></div>
         <div><span className="text-gray-500">Statut :</span> <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${status.color}`}>{status.label}</span></div>
         <div><span className="text-gray-500">Date :</span> {formatDate(order.created_at)}</div>
         <div><span className="text-gray-500">Total TTC :</span> <span className="font-semibold">{formatEur(order.total_ttc)}</span></div>
         <div><span className="text-gray-500">Total HT :</span> {formatEur(order.total_ht)}</div>
         <div><span className="text-gray-500">Articles :</span> {order.total_items}</div>
+        {order.campaign_id && <div><span className="text-gray-500">Campagne :</span> <Link to={`/admin/campaigns/${order.campaign_id}`} className="text-wine-700 hover:underline font-medium inline-flex items-center gap-1">{order.campaign_name || 'Voir'} <ExternalLink size={12} /></Link></div>}
       </div>
       {order.notes && <div className="text-sm"><span className="text-gray-500">Notes :</span> {order.notes}</div>}
 
@@ -229,6 +249,11 @@ function OrderDetail({ orderId, onClose, onUpdated }) {
         {order.status === 'submitted' && (
           <button onClick={handleValidate} className="flex items-center gap-1.5 px-3 py-1.5 text-sm rounded-lg bg-green-600 text-white hover:bg-green-700">
             <Check size={14} /> Valider
+          </button>
+        )}
+        {order.status === 'validated' && (
+          <button onClick={handleCreateBL} disabled={creatingBL} className="flex items-center gap-1.5 px-3 py-1.5 text-sm rounded-lg bg-purple-600 text-white hover:bg-purple-700 disabled:opacity-50">
+            <Truck size={14} /> {creatingBL ? 'Création...' : 'Générer BL'}
           </button>
         )}
         {canEdit && (
@@ -262,13 +287,19 @@ function OrderDetail({ orderId, onClose, onUpdated }) {
 
 // ─── Main Component ─────────────────────────────────
 export default function AdminOrders() {
+  const [searchParams, setSearchParams] = useSearchParams();
   const [orders, setOrders] = useState([]);
   const [campaigns, setCampaigns] = useState([]);
   const [pagination, setPagination] = useState({ page: 1, pages: 1, total: 0 });
   const [loading, setLoading] = useState(true);
-  const [filters, setFilters] = useState({ campaign_id: '', status: '', page: 1 });
+  const [filters, setFilters] = useState({
+    campaign_id: searchParams.get('campaign_id') || '',
+    status: searchParams.get('status') || '',
+    user_id: searchParams.get('user_id') || '',
+    page: 1,
+  });
   const [hideDelivered, setHideDelivered] = useState(false);
-  const [selectedOrder, setSelectedOrder] = useState(null);
+  const [selectedOrder, setSelectedOrder] = useState(searchParams.get('selected') || null);
   const [showNewForm, setShowNewForm] = useState(false);
 
   const fetchOrders = useCallback(async () => {
@@ -277,6 +308,7 @@ export default function AdminOrders() {
       const params = {};
       if (filters.campaign_id) params.campaign_id = filters.campaign_id;
       if (filters.status) params.status = filters.status;
+      if (filters.user_id) params.user_id = filters.user_id;
       params.page = filters.page;
       params.limit = 20;
       const { data } = await ordersAPI.list(params);

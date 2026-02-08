@@ -231,9 +231,9 @@ export default function StudentDashboard() {
                   <p className="font-semibold text-wine-700">{formatEur(p.custom_price || p.price_ttc)}</p>
                 </div>
                 <div className="flex items-center gap-2">
-                  <button onClick={() => updateCart(p.id, -1)} className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center font-bold">−</button>
+                  <button onClick={() => updateCart(p.id, -1)} className="w-11 h-11 rounded-full bg-gray-100 flex items-center justify-center font-bold text-lg">−</button>
                   <span className="w-6 text-center font-medium">{cart[p.id] || 0}</span>
-                  <button onClick={() => updateCart(p.id, 1)} className="w-8 h-8 rounded-full bg-wine-100 text-wine-700 flex items-center justify-center font-bold">+</button>
+                  <button onClick={() => updateCart(p.id, 1)} className="w-11 h-11 rounded-full bg-wine-100 text-wine-700 flex items-center justify-center font-bold text-lg">+</button>
                 </div>
               </div>
             ))}

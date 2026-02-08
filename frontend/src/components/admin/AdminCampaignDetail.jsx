@@ -1,9 +1,9 @@
 import { useState, useEffect } from 'react';
-import { useParams, Link } from 'react-router-dom';
+import { useParams, Link, useNavigate } from 'react-router-dom';
 import { campaignsAPI } from '../../services/api';
 import {
   ArrowLeft, Users, ShoppingCart, Wine, TrendingUp, Calendar,
-  Target, Package, BarChart3, Mail,
+  Target, Package, BarChart3, Mail, CreditCard, ExternalLink,
 } from 'lucide-react';
 import {
   ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip,
@@ -131,7 +131,8 @@ function OverviewTab({ data }) {
   );
 }
 
-function ParticipantsTab({ participants }) {
+function ParticipantsTab({ participants, campaignId }) {
+  const navigate = useNavigate();
   return (
     <div className="space-y-4">
       <p className="text-sm text-gray-500">{participants.length} participant(s)</p>
@@ -139,7 +140,7 @@ function ParticipantsTab({ participants }) {
       {/* Mobile cards */}
       <div className="md:hidden space-y-3">
         {participants.map((p) => (
-          <div key={p.id} className="card">
+          <div key={p.id} onClick={() => navigate(`/admin/orders?campaign_id=${campaignId}&user_id=${p.id}`)} className="card cursor-pointer hover:ring-1 hover:ring-wine-200 transition-all">
             <div className="flex justify-between items-start">
               <div>
                 <p className="font-semibold text-sm">{p.name}</p>
@@ -171,9 +172,9 @@ function ParticipantsTab({ participants }) {
           </thead>
           <tbody className="divide-y">
             {participants.map((p, i) => (
-              <tr key={p.id} className="hover:bg-gray-50">
+              <tr key={p.id} onClick={() => navigate(`/admin/orders?campaign_id=${campaignId}&user_id=${p.id}`)} className="hover:bg-gray-50 cursor-pointer">
                 <td className="px-4 py-3 font-medium text-gray-400">{i + 1}</td>
-                <td className="px-4 py-3 font-medium">{p.name}</td>
+                <td className="px-4 py-3 font-medium text-wine-700">{p.name} <ExternalLink size={12} className="inline text-gray-300" /></td>
                 <td className="px-4 py-3 text-gray-500">{p.email}</td>
                 <td className="px-4 py-3"><span className="px-2 py-0.5 rounded-full text-xs bg-gray-100">{p.role}</span></td>
                 <td className="px-4 py-3 text-right font-bold text-wine-700">{formatEur(parseFloat(p.ca))}</td>
@@ -337,6 +338,7 @@ function ClassesTab({ classes }) {
 
 export default function AdminCampaignDetail() {
   const { id } = useParams();
+  const navigate = useNavigate();
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState('overview');
@@ -404,6 +406,19 @@ export default function AdminCampaignDetail() {
         )}
       </div>
 
+      {/* Quick actions */}
+      <div className="flex flex-wrap gap-2">
+        <button onClick={() => navigate(`/admin/orders?campaign_id=${id}`)} className="flex items-center gap-1.5 px-3 py-1.5 text-sm rounded-lg border border-gray-300 hover:bg-gray-50">
+          <ShoppingCart size={14} /> Commandes
+        </button>
+        <button onClick={() => navigate(`/admin/payments?campaign_id=${id}`)} className="flex items-center gap-1.5 px-3 py-1.5 text-sm rounded-lg border border-gray-300 hover:bg-gray-50">
+          <CreditCard size={14} /> Paiements
+        </button>
+        <button onClick={() => navigate('/admin/stock')} className="flex items-center gap-1.5 px-3 py-1.5 text-sm rounded-lg border border-gray-300 hover:bg-gray-50">
+          <Package size={14} /> Stock
+        </button>
+      </div>
+
       {/* Tabs */}
       <div className="flex gap-1 bg-gray-100 rounded-xl p-1 overflow-x-auto">
         {TABS.map(({ key, label, icon: Icon }) => (
@@ -422,7 +437,7 @@ export default function AdminCampaignDetail() {
 
       {/* Tab content */}
       {tab === 'overview' && <OverviewTab data={data} />}
-      {tab === 'participants' && <ParticipantsTab participants={data.participants} />}
+      {tab === 'participants' && <ParticipantsTab participants={data.participants} campaignId={id} />}
       {tab === 'products' && <ProductsTab products={data.products} />}
       {tab === 'classes' && <ClassesTab classes={data.classes} />}
     </div>

@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { paymentsAPI } from '../../services/api';
-import { CreditCard, Banknote, Check, Filter, X } from 'lucide-react';
+import { CreditCard, Banknote, Check, Filter, X, Mail, Clock, ExternalLink } from 'lucide-react';
 
 const formatEur = (v) => new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR' }).format(v);
 const formatDate = (d) => d ? new Date(d).toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '—';
@@ -141,10 +142,22 @@ function CashDepositForm({ onSubmit, onCancel }) {
   );
 }
 
+function daysOverdue(createdAt) {
+  const created = new Date(createdAt);
+  const now = new Date();
+  const diff = Math.floor((now - created) / (1000 * 60 * 60 * 24));
+  return diff;
+}
+
 export default function AdminPayments() {
+  const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const [payments, setPayments] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [filters, setFilters] = useState({ method: '', status: '' });
+  const [filters, setFilters] = useState({
+    method: searchParams.get('method') || '',
+    status: searchParams.get('status') || '',
+  });
   const [showCashForm, setShowCashForm] = useState(false);
   const [reconcilingId, setReconcilingId] = useState(null);
   const [reconcileRef, setReconcileRef] = useState('');
@@ -317,7 +330,7 @@ export default function AdminPayments() {
                 const MethodIcon = methodInfo.icon;
                 return (
                   <tr key={p.id} className="hover:bg-gray-50">
-                    <td className="py-3 font-mono text-xs">{p.order_ref || '—'}</td>
+                    <td className="py-3 font-mono text-xs">{p.order_ref ? <button onClick={() => navigate(`/admin/orders?selected=${p.order_id}`)} className="text-wine-700 hover:underline inline-flex items-center gap-1">{p.order_ref} <ExternalLink size={10} /></button> : '—'}</td>
                     <td className="py-3">
                       <div className="flex items-center gap-1.5">
                         <MethodIcon size={14} className="text-gray-400" />
@@ -329,6 +342,11 @@ export default function AdminPayments() {
                       <span className={`px-2 py-1 rounded-full text-xs font-medium ${status.color}`}>
                         {status.label}
                       </span>
+                      {p.status === 'unpaid' && (
+                        <span className="ml-1 inline-flex items-center gap-0.5 text-[10px] text-red-500 font-medium">
+                          <Clock size={10} /> {daysOverdue(p.created_at)}j
+                        </span>
+                      )}
                     </td>
                     <td className="py-3">
                       <p className="font-medium">{p.user_name}</p>
@@ -336,6 +354,14 @@ export default function AdminPayments() {
                     </td>
                     <td className="py-3 text-gray-500 text-xs">{formatDate(p.created_at)}</td>
                     <td className="py-3 text-right">
+                      {p.status === 'unpaid' && (
+                        <button
+                          onClick={() => { if (p.user_email) window.location.href = `mailto:${p.user_email}?subject=Relance paiement ${p.order_ref || ''}&body=Bonjour, nous vous contactons concernant un paiement en attente.`; else alert('Email du client non disponible'); }}
+                          className="text-xs px-3 py-1.5 rounded-lg border border-red-200 text-red-700 hover:bg-red-50 mr-2 inline-flex items-center gap-1"
+                        >
+                          <Mail size={12} /> Relancer
+                        </button>
+                      )}
                       {p.method === 'Virement' && p.status !== 'reconciled' && (
                         <>
                           {reconcilingId === p.id ? (

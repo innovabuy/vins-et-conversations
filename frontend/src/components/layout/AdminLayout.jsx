@@ -8,7 +8,7 @@ import {
 } from 'lucide-react';
 import NotificationBell from '../shared/NotificationBell';
 
-const navItems = [
+const allNavItems = [
   { to: '/admin', icon: LayoutDashboard, label: 'Cockpit', end: true },
   { to: '/admin/campaigns', icon: BookOpen, label: 'Campagnes' },
   { to: '/admin/orders', icon: ShoppingCart, label: 'Commandes' },
@@ -16,22 +16,24 @@ const navItems = [
   { to: '/admin/suppliers', icon: Factory, label: 'Fournisseurs' },
   { to: '/admin/stock', icon: Package, label: 'Stock' },
   { to: '/admin/crm', icon: Users, label: 'Contacts / CRM' },
-  { to: '/admin/finance', icon: CreditCard, label: 'Finance & Marges' },
+  { to: '/admin/finance', icon: CreditCard, label: 'Finance & Marges', adminOnly: true },
   { to: '/admin/payments', icon: CreditCard, label: 'Paiements' },
   { to: '/admin/analytics', icon: BarChart3, label: 'Analytics' },
   { to: '/admin/catalog', icon: Wine, label: 'Catalogue' },
   { to: '/admin/notifications', icon: Bell, label: 'Notifications' },
   { to: '/admin/routes', icon: Map, label: 'Tournées' },
-  { to: '/admin/pricing', icon: FileText, label: 'Conditions' },
-  { to: '/admin/exports', icon: Download, label: 'Exports' },
-  { to: '/admin/users', icon: Settings, label: 'Utilisateurs' },
-  { to: '/admin/audit', icon: Shield, label: 'Audit' },
+  { to: '/admin/pricing', icon: FileText, label: 'Conditions', adminOnly: true },
+  { to: '/admin/exports', icon: Download, label: 'Exports', adminOnly: true },
+  { to: '/admin/users', icon: Settings, label: 'Utilisateurs', adminOnly: true },
+  { to: '/admin/audit', icon: Shield, label: 'Audit', adminOnly: true },
 ];
 
 export default function AdminLayout() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const { user, logout } = useAuth();
   const navigate = useNavigate();
+  const isAdmin = user?.role === 'super_admin';
+  const navItems = allNavItems.filter((item) => !item.adminOnly || isAdmin);
 
   const handleLogout = async () => {
     await logout();
