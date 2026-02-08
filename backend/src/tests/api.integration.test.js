@@ -2466,4 +2466,180 @@ describe('API Integration Tests', () => {
       await db('contacts').where({ email: 'track.test@example.fr' }).delete();
     });
   });
+
+  describe('Tournées — Edition, suppression, PDF, workflow', () => {
+    let routeId;
+    let blId;
+
+    test('Create a delivery route', async () => {
+      const res = await request(app)
+        .post('/api/v1/admin/delivery-routes')
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({
+          date: '2026-03-15',
+          driver: 'Jean Dupont',
+          zone: 'Zone 49',
+          stops: [],
+          km: 45,
+        });
+
+      expect(res.status).toBe(201);
+      expect(res.body.status).toBe('draft');
+      expect(res.body.driver).toBe('Jean Dupont');
+      routeId = res.body.id;
+    });
+
+    test('Edit the route (change driver, add notes)', async () => {
+      if (!routeId) return;
+
+      const res = await request(app)
+        .put(`/api/v1/admin/delivery-routes/${routeId}`)
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({ driver: 'Pierre Martin', notes: 'Attention chien méchant' });
+
+      expect(res.status).toBe(200);
+      expect(res.body.driver).toBe('Pierre Martin');
+      expect(res.body.notes).toBe('Attention chien méchant');
+    });
+
+    test('Add a stop via add-stop endpoint', async () => {
+      if (!routeId) return;
+
+      // Find a delivery note to add
+      const bl = await db('delivery_notes').first();
+      if (!bl) return;
+      blId = bl.id;
+
+      const res = await request(app)
+        .post(`/api/v1/admin/delivery-routes/${routeId}/add-stop`)
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({ delivery_note_id: blId });
+
+      expect(res.status).toBe(200);
+      const stops = typeof res.body.stops === 'string' ? JSON.parse(res.body.stops) : res.body.stops;
+      expect(stops.length).toBe(1);
+      expect(stops[0].delivery_note_id).toBe(blId);
+    });
+
+    test('Remove a stop via remove-stop endpoint', async () => {
+      if (!routeId || !blId) return;
+
+      const res = await request(app)
+        .delete(`/api/v1/admin/delivery-routes/${routeId}/remove-stop/${blId}`)
+        .set('Authorization', `Bearer ${adminToken}`);
+
+      expect(res.status).toBe(200);
+      const stops = typeof res.body.stops === 'string' ? JSON.parse(res.body.stops) : res.body.stops;
+      expect(stops.length).toBe(0);
+    });
+
+    test('Status workflow: draft → planned → in_progress → delivered', async () => {
+      if (!routeId) return;
+
+      // draft → planned
+      let res = await request(app)
+        .put(`/api/v1/admin/delivery-routes/${routeId}/status`)
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({ status: 'planned' });
+      expect(res.status).toBe(200);
+      expect(res.body.status).toBe('planned');
+
+      // planned → in_progress
+      res = await request(app)
+        .put(`/api/v1/admin/delivery-routes/${routeId}/status`)
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({ status: 'in_progress' });
+      expect(res.status).toBe(200);
+      expect(res.body.status).toBe('in_progress');
+      expect(res.body.departed_at).toBeTruthy();
+
+      // in_progress → delivered
+      res = await request(app)
+        .put(`/api/v1/admin/delivery-routes/${routeId}/status`)
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({ status: 'delivered' });
+      expect(res.status).toBe(200);
+      expect(res.body.status).toBe('delivered');
+      expect(res.body.completed_at).toBeTruthy();
+      expect(res.body.duration_minutes).toBeDefined();
+    });
+
+    test('Cannot edit a delivered route', async () => {
+      if (!routeId) return;
+
+      const res = await request(app)
+        .put(`/api/v1/admin/delivery-routes/${routeId}`)
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({ driver: 'Nouveau chauffeur' });
+
+      expect(res.status).toBe(400);
+      expect(res.body.error).toBe('ROUTE_DELIVERED');
+    });
+
+    test('Cannot delete a delivered route', async () => {
+      if (!routeId) return;
+
+      const res = await request(app)
+        .delete(`/api/v1/admin/delivery-routes/${routeId}`)
+        .set('Authorization', `Bearer ${adminToken}`);
+
+      expect(res.status).toBe(400);
+      expect(res.body.error).toBe('CANNOT_DELETE');
+    });
+
+    test('GET /:id returns full route details', async () => {
+      if (!routeId) return;
+
+      const res = await request(app)
+        .get(`/api/v1/admin/delivery-routes/${routeId}`)
+        .set('Authorization', `Bearer ${adminToken}`);
+
+      expect(res.status).toBe(200);
+      expect(res.body.id).toBe(routeId);
+      expect(res.body.status).toBe('delivered');
+      expect(res.body.stops).toBeInstanceOf(Array);
+    });
+
+    test('PDF generation returns application/pdf', async () => {
+      if (!routeId) return;
+
+      const res = await request(app)
+        .get(`/api/v1/admin/delivery-routes/${routeId}/pdf`)
+        .set('Authorization', `Bearer ${adminToken}`);
+
+      expect(res.status).toBe(200);
+      expect(res.headers['content-type']).toContain('application/pdf');
+    });
+
+    test('Delete a draft route succeeds', async () => {
+      // Create a fresh draft route to delete
+      const createRes = await request(app)
+        .post('/api/v1/admin/delivery-routes')
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({ date: '2026-04-01', driver: 'À supprimer' });
+
+      expect(createRes.status).toBe(201);
+      const newId = createRes.body.id;
+
+      const delRes = await request(app)
+        .delete(`/api/v1/admin/delivery-routes/${newId}`)
+        .set('Authorization', `Bearer ${adminToken}`);
+
+      expect(delRes.status).toBe(200);
+      expect(delRes.body.message).toContain('supprimée');
+
+      // Verify it's gone
+      const getRes = await request(app)
+        .get(`/api/v1/admin/delivery-routes/${newId}`)
+        .set('Authorization', `Bearer ${adminToken}`);
+      expect(getRes.status).toBe(404);
+    });
+
+    // Cleanup the delivered route
+    afterAll(async () => {
+      if (routeId) {
+        await db('delivery_routes').where({ id: routeId }).delete();
+      }
+    });
+  });
 });

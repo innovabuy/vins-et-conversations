@@ -141,8 +141,14 @@ export const paymentsAPI = {
 // ─── Delivery Routes ─────────────────────────────────
 export const deliveryRoutesAPI = {
   list: (params) => api.get('/admin/delivery-routes', { params }),
+  get: (id) => api.get(`/admin/delivery-routes/${id}`),
   create: (data) => api.post('/admin/delivery-routes', data),
   update: (id, data) => api.put(`/admin/delivery-routes/${id}`, data),
+  delete: (id) => api.delete(`/admin/delivery-routes/${id}`),
+  updateStatus: (id, data) => api.put(`/admin/delivery-routes/${id}/status`, data),
+  addStop: (id, data) => api.post(`/admin/delivery-routes/${id}/add-stop`, data),
+  removeStop: (id, blId) => api.delete(`/admin/delivery-routes/${id}/remove-stop/${blId}`),
+  pdf: (id) => `${api.defaults.baseURL}/admin/delivery-routes/${id}/pdf`,
 };
 
 // ─── Notifications ───────────────────────────────────
