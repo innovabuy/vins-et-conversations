@@ -7,6 +7,7 @@ const { auditAction } = require('../middleware/audit');
 
 const router = express.Router();
 const adminRouter = express.Router();
+const campaignProductsRouter = express.Router();
 
 const productSchema = Joi.object({
   name: Joi.string().min(2).max(200).required(),
@@ -87,8 +88,9 @@ router.get('/:id', async (req, res) => {
 });
 
 // GET /api/v1/campaigns/:campaignId/products — Produits d'une campagne
-router.get(
-  '/campaigns/:campaignId/products',
+// Mounted at /api/v1/campaigns via campaignProductsRouter
+campaignProductsRouter.get(
+  '/:campaignId/products',
   authenticate,
   requireCampaignAccess,
   async (req, res) => {
@@ -340,3 +342,4 @@ adminRouter.delete(
 
 module.exports = router;
 module.exports.adminRouter = adminRouter;
+module.exports.campaignProductsRouter = campaignProductsRouter;

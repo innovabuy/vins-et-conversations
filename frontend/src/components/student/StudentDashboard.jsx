@@ -126,13 +126,13 @@ export default function StudentDashboard() {
 
   useEffect(() => {
     if (!campaignId) return;
-    Promise.all([
+    Promise.allSettled([
       dashboardAPI.student(campaignId),
       productsAPI.byCampaign(campaignId),
     ]).then(([dashRes, prodRes]) => {
-      setData(dashRes.data);
-      setProducts(prodRes.data.data || []);
-    }).catch(console.error).finally(() => setLoading(false));
+      if (dashRes.status === 'fulfilled') setData(dashRes.value.data);
+      if (prodRes.status === 'fulfilled') setProducts(prodRes.value.data.data || []);
+    }).finally(() => setLoading(false));
   }, [campaignId]);
 
   const updateCart = (productId, delta) => {
