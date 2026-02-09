@@ -32,6 +32,7 @@ import BTSDashboard from './components/bts/BTSDashboard';
 import TeacherLayout from './components/layout/TeacherLayout';
 import TeacherDashboard from './components/teacher/TeacherDashboard';
 import InstallPrompt from './components/shared/InstallPrompt';
+import InstallGuide from './components/shared/InstallGuide';
 import { ToastProvider } from './components/shared/Toast';
 import PublicLayout from './components/layout/PublicLayout';
 import BoutiqueHome from './components/public/BoutiqueHome';
@@ -59,6 +60,7 @@ function AppRoutes() {
   return (
     <Routes>
       <Route path="/login" element={<LoginPage />} />
+      <Route path="/installer" element={<InstallGuide />} />
 
       {/* Public boutique */}
       <Route path="/boutique" element={<CartProvider><PublicLayout /></CartProvider>}>

@@ -48,6 +48,7 @@ export const authAPI = {
 export const dashboardAPI = {
   student: (campaignId) => api.get('/dashboard/student', { params: { campaign_id: campaignId } }),
   studentRanking: (campaignId) => api.get('/dashboard/student/ranking', { params: { campaign_id: campaignId } }),
+  studentLeaderboard: (campaignId, params) => api.get('/dashboard/student/leaderboard', { params: { campaign_id: campaignId, ...params } }),
   studentOrders: (campaignId) => api.get('/dashboard/student/orders', { params: { campaign_id: campaignId } }),
   adminCockpit: (campaignIds) => api.get('/dashboard/admin/cockpit', { params: { campaign_ids: campaignIds?.join(',') } }),
   teacher: (campaignId) => api.get('/dashboard/teacher', { params: { campaign_id: campaignId } }),
@@ -76,6 +77,7 @@ export const ordersAPI = {
   cancel: (id) => api.delete(`/orders/admin/${id}`),
   pdf: (id) => `${api.defaults.baseURL}/orders/${id}/pdf`,
   sendEmail: (id) => api.post(`/orders/${id}/send-email`),
+  myCustomers: () => api.get('/orders/my-customers'),
 };
 
 // ─── Campaigns ────────────────────────────────────────

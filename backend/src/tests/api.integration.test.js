@@ -128,6 +128,8 @@ describe('API Integration Tests', () => {
         .send({
           campaign_id: campaignId,
           items: [{ productId: cpRes.product_id, qty: 2 }],
+          customer_name: 'Client Test',
+          payment_method: 'cash',
         });
 
       expect(res.status).toBe(201);
@@ -2802,6 +2804,187 @@ describe('API Integration Tests', () => {
       if (routeId) {
         await db('delivery_routes').where({ id: routeId }).delete();
       }
+    });
+  });
+
+  describe('Student Customer Capture & Payment Method', () => {
+    let studentCustomerOrderId;
+
+    test('Student order with customer_name + payment_method returns 201 + contact created', async () => {
+      const cpRes = await db('campaign_products')
+        .where({ campaign_id: campaignId, active: true })
+        .first();
+      if (!cpRes) return;
+
+      // Clear previous orders to avoid anti-fraud
+      const student = await db('users').where({ email: 'ackavong@eleve.sc.fr' }).first();
+      if (student) {
+        await db('orders')
+          .where({ user_id: student.id })
+          .whereIn('status', ['submitted', 'validated'])
+          .update({ status: 'delivered' });
+      }
+
+      const res = await request(app)
+        .post('/api/v1/orders')
+        .set('Authorization', `Bearer ${studentToken}`)
+        .send({
+          campaign_id: campaignId,
+          items: [{ productId: cpRes.product_id, qty: 1 }],
+          customer_name: 'Mme Dupont',
+          customer_phone: '0612345678',
+          customer_email: 'dupont@example.fr',
+          payment_method: 'cash',
+        });
+
+      expect(res.status).toBe(201);
+      expect(res.body.paymentMethod).toBe('cash');
+      expect(res.body.customerName).toBe('Mme Dupont');
+      studentCustomerOrderId = res.body.id;
+
+      // Verify contact was created
+      const contact = await db('contacts').where({ name: 'Mme Dupont', source_user_id: student.id }).first();
+      expect(contact).toBeDefined();
+      expect(contact.phone).toBe('0612345678');
+    });
+
+    test('Student order without customer_name returns 400', async () => {
+      const cpRes = await db('campaign_products')
+        .where({ campaign_id: campaignId, active: true })
+        .first();
+      if (!cpRes) return;
+
+      const res = await request(app)
+        .post('/api/v1/orders')
+        .set('Authorization', `Bearer ${studentToken}`)
+        .send({
+          campaign_id: campaignId,
+          items: [{ productId: cpRes.product_id, qty: 1 }],
+          payment_method: 'cash',
+        });
+
+      expect(res.status).toBe(400);
+      expect(res.body.error).toBe('CUSTOMER_NAME_REQUIRED');
+    });
+
+    test('Student order without payment_method returns 400', async () => {
+      const cpRes = await db('campaign_products')
+        .where({ campaign_id: campaignId, active: true })
+        .first();
+      if (!cpRes) return;
+
+      const res = await request(app)
+        .post('/api/v1/orders')
+        .set('Authorization', `Bearer ${studentToken}`)
+        .send({
+          campaign_id: campaignId,
+          items: [{ productId: cpRes.product_id, qty: 1 }],
+          customer_name: 'M. Martin',
+        });
+
+      expect(res.status).toBe(400);
+      expect(res.body.error).toBe('PAYMENT_METHOD_REQUIRED');
+    });
+
+    test('GET /orders/my-customers returns customer list', async () => {
+      const res = await request(app)
+        .get('/api/v1/orders/my-customers')
+        .set('Authorization', `Bearer ${studentToken}`);
+
+      expect(res.status).toBe(200);
+      expect(res.body.data).toBeInstanceOf(Array);
+      if (res.body.data.length > 0) {
+        expect(res.body.data[0]).toHaveProperty('name');
+        expect(res.body.data[0]).toHaveProperty('order_count');
+      }
+    });
+
+    // Cleanup
+    afterAll(async () => {
+      if (studentCustomerOrderId) {
+        await db('orders').where({ id: studentCustomerOrderId }).update({ status: 'delivered' });
+      }
+    });
+  });
+
+  describe('Enriched Student Dashboard & Leaderboard', () => {
+    test('GET /dashboard/student returns campaign + relative + leaderboard_preview + class_ranking + recent_orders', async () => {
+      const res = await request(app)
+        .get('/api/v1/dashboard/student')
+        .set('Authorization', `Bearer ${studentToken}`)
+        .query({ campaign_id: campaignId });
+
+      expect(res.status).toBe(200);
+      expect(res.body).toHaveProperty('campaign');
+      expect(res.body.campaign).toHaveProperty('name');
+      expect(res.body.campaign).toHaveProperty('goal');
+      expect(res.body.campaign).toHaveProperty('total_ca');
+      expect(res.body.campaign).toHaveProperty('progress_pct');
+      expect(res.body.campaign).toHaveProperty('days_remaining');
+      expect(res.body.campaign).toHaveProperty('total_bottles');
+      expect(res.body.campaign).toHaveProperty('active_participants');
+      expect(res.body.campaign).toHaveProperty('avg_ca_per_student');
+
+      expect(res.body).toHaveProperty('relative');
+      expect(res.body.relative).toHaveProperty('vs_average_pct');
+      expect(res.body.relative).toHaveProperty('vs_average_text');
+
+      expect(res.body).toHaveProperty('leaderboard_preview');
+      expect(res.body.leaderboard_preview).toBeInstanceOf(Array);
+
+      expect(res.body).toHaveProperty('class_ranking');
+      expect(res.body.class_ranking).toHaveProperty('enabled');
+
+      expect(res.body).toHaveProperty('recent_orders');
+      expect(res.body.recent_orders).toBeInstanceOf(Array);
+    });
+
+    test('GET /dashboard/student/leaderboard?period=week returns filtered ranking', async () => {
+      const res = await request(app)
+        .get('/api/v1/dashboard/student/leaderboard')
+        .set('Authorization', `Bearer ${studentToken}`)
+        .query({ campaign_id: campaignId, period: 'week' });
+
+      expect(res.status).toBe(200);
+      expect(res.body).toHaveProperty('myPosition');
+      expect(res.body).toHaveProperty('ranking');
+      expect(res.body).toHaveProperty('campaignHeader');
+      expect(res.body).toHaveProperty('period', 'week');
+      expect(res.body.ranking).toBeInstanceOf(Array);
+    });
+
+    test('GET /dashboard/student/leaderboard?class=GA returns class-filtered ranking', async () => {
+      const res = await request(app)
+        .get('/api/v1/dashboard/student/leaderboard')
+        .set('Authorization', `Bearer ${studentToken}`)
+        .query({ campaign_id: campaignId, class: 'GA' });
+
+      expect(res.status).toBe(200);
+      expect(res.body).toHaveProperty('classFilter', 'GA');
+      expect(res.body.ranking).toBeInstanceOf(Array);
+    });
+
+    test('GET /dashboard/teacher returns ZERO financial fields', async () => {
+      // Login as teacher
+      const teacherRes = await request(app)
+        .post('/api/v1/auth/login')
+        .send({ email: 'enseignant@sacrecoeur.fr', password: 'VinsConv2026!' });
+
+      if (teacherRes.status !== 200) return;
+
+      const res = await request(app)
+        .get('/api/v1/dashboard/teacher')
+        .set('Authorization', `Bearer ${teacherRes.body.accessToken}`)
+        .query({ campaign_id: campaignId });
+
+      expect(res.status).toBe(200);
+      const body = JSON.stringify(res.body);
+      // Verify NO euro amounts anywhere in the teacher response
+      expect(body).not.toMatch(/"ca":/);
+      expect(body).not.toMatch(/"total_ttc":/);
+      expect(body).not.toMatch(/"total_ht":/);
+      expect(body).not.toMatch(/"amount":/);
+      expect(body).not.toMatch(/"marge":/);
     });
   });
 });

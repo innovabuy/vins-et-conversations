@@ -18,8 +18,41 @@ const createOrderSchema = Joi.object({
     })
   ).min(1).required(),
   customer_id: Joi.string().uuid().allow(null),
+  customer_name: Joi.string().max(200).allow(null, ''),
+  customer_phone: Joi.string().max(30).allow(null, ''),
+  customer_email: Joi.string().email().allow(null, ''),
+  customer_notes: Joi.string().max(500).allow(null, ''),
+  payment_method: Joi.string().valid('cash', 'check', 'card', 'transfer', 'pending').allow(null),
   notes: Joi.string().allow(null, ''),
 });
+
+// GET /api/v1/orders/my-customers — Liste clients de l'étudiant (MUST be before /:id)
+router.get(
+  '/my-customers',
+  authenticate,
+  async (req, res) => {
+    try {
+      const customers = await db('contacts')
+        .leftJoin('orders', 'contacts.id', 'orders.customer_id')
+        .where('contacts.source_user_id', req.user.userId)
+        .groupBy('contacts.id', 'contacts.name', 'contacts.phone', 'contacts.email', 'contacts.notes')
+        .select(
+          'contacts.id',
+          'contacts.name',
+          'contacts.phone',
+          'contacts.email',
+          'contacts.notes',
+          db.raw('COUNT(orders.id) as order_count'),
+          db.raw('MAX(orders.created_at) as last_order_at')
+        )
+        .orderBy('last_order_at', 'desc');
+
+      res.json({ data: customers });
+    } catch (err) {
+      res.status(500).json({ error: 'SERVER_ERROR', message: err.message });
+    }
+  }
+);
 
 // POST /api/v1/orders — Créer une commande
 router.post(
@@ -29,11 +62,26 @@ router.post(
   validate(createOrderSchema),
   async (req, res) => {
     try {
+      // Student validation: customer_name and payment_method required
+      if (req.user.role === 'etudiant') {
+        if (!req.body.customer_name) {
+          return res.status(400).json({ error: 'CUSTOMER_NAME_REQUIRED', message: 'Le nom du client est obligatoire' });
+        }
+        if (!req.body.payment_method) {
+          return res.status(400).json({ error: 'PAYMENT_METHOD_REQUIRED', message: 'Le moyen de paiement est obligatoire' });
+        }
+      }
+
       const order = await orderService.createOrder({
         userId: req.user.userId,
         campaignId: req.body.campaign_id,
         items: req.body.items,
         customerId: req.body.customer_id,
+        customerName: req.body.customer_name,
+        customerPhone: req.body.customer_phone,
+        customerEmail: req.body.customer_email,
+        customerNotes: req.body.customer_notes,
+        paymentMethod: req.body.payment_method,
         notes: req.body.notes,
       });
       res.status(201).json(order);

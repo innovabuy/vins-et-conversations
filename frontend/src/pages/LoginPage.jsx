@@ -27,6 +27,15 @@ export default function LoginPage() {
     setLoading(true);
     try {
       const user = await login(email, password);
+
+      // First connection + not standalone + student → redirect to install guide
+      const isStandalone = window.matchMedia('(display-mode: standalone)').matches;
+      const shownGuide = localStorage.getItem('vc-shown-install-guide');
+      if (user.role === 'etudiant' && !isStandalone && !shownGuide) {
+        navigate('/installer');
+        return;
+      }
+
       switch (user.role) {
         case 'super_admin':
         case 'commercial':

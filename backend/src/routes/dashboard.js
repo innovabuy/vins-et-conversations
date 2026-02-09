@@ -62,6 +62,30 @@ router.get(
   }
 );
 
+// GET /api/v1/dashboard/student/leaderboard?campaign_id=xxx&period=week&class=GA
+router.get(
+  '/student/leaderboard',
+  authenticate,
+  requireRole('etudiant', 'super_admin'),
+  async (req, res) => {
+    try {
+      const campaignId = req.query.campaign_id || req.user.campaign_ids[0];
+      if (!campaignId) return res.status(400).json({ error: 'CAMPAIGN_REQUIRED' });
+
+      const data = await dashboardService.getStudentLeaderboard(req.user.userId, campaignId, {
+        period: req.query.period || 'all',
+        classFilter: req.query.class || 'all',
+      });
+      res.json(data);
+    } catch (err) {
+      if (err.message === 'NOT_PARTICIPANT') {
+        return res.status(403).json({ error: 'NOT_PARTICIPANT' });
+      }
+      res.status(500).json({ error: 'SERVER_ERROR', message: err.message });
+    }
+  }
+);
+
 // GET /api/v1/dashboard/student/orders?campaign_id=xxx
 router.get(
   '/student/orders',
@@ -72,11 +96,11 @@ router.get(
       const campaignId = req.query.campaign_id || req.user.campaign_ids[0];
       if (!campaignId) return res.status(400).json({ error: 'CAMPAIGN_REQUIRED' });
 
-      const db = require('../config/database');
       const orders = await db('orders')
-        .where({ user_id: req.user.userId, campaign_id: campaignId })
-        .orderBy('created_at', 'desc')
-        .select('id', 'ref', 'status', 'total_ttc', 'total_items', 'created_at');
+        .leftJoin('contacts', 'orders.customer_id', 'contacts.id')
+        .where({ 'orders.user_id': req.user.userId, 'orders.campaign_id': campaignId })
+        .orderBy('orders.created_at', 'desc')
+        .select('orders.id', 'orders.ref', 'orders.status', 'orders.total_ttc', 'orders.total_items', 'orders.created_at', 'orders.payment_method', 'contacts.name as customer_name');
 
       res.json({ data: orders });
     } catch (err) {

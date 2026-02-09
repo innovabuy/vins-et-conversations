@@ -1,15 +1,34 @@
 import { useState, useEffect } from 'react';
 import { X, Download, Share } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 
 export default function InstallPrompt() {
   const [show, setShow] = useState(false);
   const [deferredPrompt, setDeferredPrompt] = useState(null);
   const [platform, setPlatform] = useState('desktop');
+  const navigate = useNavigate();
 
   useEffect(() => {
-    // Don't show if already dismissed or installed
-    if (localStorage.getItem('vc-install-dismissed')) return;
+    // Already in standalone mode
     if (window.matchMedia('(display-mode: standalone)').matches) return;
+
+    // Track visit count
+    const visitCount = parseInt(localStorage.getItem('vc-pwa-visit-count') || '0', 10) + 1;
+    localStorage.setItem('vc-pwa-visit-count', String(visitCount));
+
+    // Dismissed permanently
+    const dismissed = localStorage.getItem('vc-install-dismissed');
+    if (dismissed === 'permanent') return;
+
+    // Dismissed temporarily — re-show on 3rd visit (only once)
+    if (dismissed === 'true') {
+      if (visitCount >= 3 && !localStorage.getItem('vc-install-reshown')) {
+        localStorage.setItem('vc-install-reshown', 'true');
+        // Will fall through to show logic below
+      } else {
+        return;
+      }
+    }
 
     // Detect platform
     const ua = navigator.userAgent;
@@ -49,7 +68,18 @@ export default function InstallPrompt() {
 
   const handleDismiss = () => {
     setShow(false);
-    localStorage.setItem('vc-install-dismissed', 'true');
+    // First dismiss is temporary (will re-show on 3rd visit), second is permanent
+    const current = localStorage.getItem('vc-install-dismissed');
+    if (current) {
+      localStorage.setItem('vc-install-dismissed', 'permanent');
+    } else {
+      localStorage.setItem('vc-install-dismissed', 'true');
+    }
+  };
+
+  const handleGuide = () => {
+    setShow(false);
+    navigate('/installer');
   };
 
   if (!show) return null;
@@ -70,7 +100,7 @@ export default function InstallPrompt() {
         </div>
 
         <h2 className="text-lg font-bold text-gray-900 mb-1">Vins & Conversations</h2>
-        <p className="text-sm text-gray-500 mb-4">Installer l'application pour un accès rapide</p>
+        <p className="text-sm text-gray-500 mb-4">Installer l'application pour un acces rapide</p>
 
         {platform === 'ios' ? (
           <div className="bg-gray-50 rounded-lg p-4 text-sm text-gray-600 mb-4">
@@ -78,7 +108,7 @@ export default function InstallPrompt() {
               <Share size={16} className="text-blue-500" />
               Appuyez sur <strong>Partager</strong>
             </p>
-            <p>puis <strong>Ajouter à l'écran d'accueil</strong></p>
+            <p>puis <strong>Ajouter a l'ecran d'accueil</strong></p>
           </div>
         ) : platform === 'android' || deferredPrompt ? (
           <button onClick={handleInstall} className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-wine-700 text-white rounded-lg hover:bg-wine-800 font-medium mb-4">
@@ -86,11 +116,15 @@ export default function InstallPrompt() {
           </button>
         ) : (
           <div className="bg-gray-50 rounded-lg p-4 text-sm text-gray-600 mb-4">
-            <p>Ajoutez cette page à vos favoris pour un accès rapide</p>
+            <p>Ajoutez cette page a vos favoris pour un acces rapide</p>
           </div>
         )}
 
-        <button onClick={handleDismiss} className="text-sm text-gray-500 hover:text-gray-700">Plus tard</button>
+        <div className="flex items-center justify-center gap-4">
+          <button onClick={handleGuide} className="text-sm text-wine-700 hover:underline">Voir comment faire</button>
+          <span className="text-gray-300">|</span>
+          <button onClick={handleDismiss} className="text-sm text-gray-500 hover:text-gray-700">Plus tard</button>
+        </div>
       </div>
     </div>
   );

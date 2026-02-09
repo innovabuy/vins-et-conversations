@@ -60,6 +60,114 @@ async function getStudentDashboard(userId, campaignId) {
   const config = participation.config || {};
   const badges = config.badges || [];
 
+  // --- Campaign collective stats ---
+  const campaign = await db('campaigns').where({ id: campaignId }).first();
+  const campaignGoal = parseFloat(campaign?.goal || 0);
+  const totalCaResult = await db('orders')
+    .where({ campaign_id: campaignId })
+    .whereIn('status', ['submitted', 'validated', 'preparing', 'shipped', 'delivered'])
+    .sum('total_ttc as total')
+    .sum('total_items as bottles')
+    .first();
+  const totalCa = parseFloat(totalCaResult?.total || 0);
+  const totalBottles = parseInt(totalCaResult?.bottles || 0, 10);
+  const progressPct = campaignGoal > 0 ? Math.round((totalCa / campaignGoal) * 100) : 0;
+
+  // Days remaining
+  const campaignEnd = campaign?.end_date ? new Date(campaign.end_date) : null;
+  const now = new Date();
+  const daysRemaining = campaignEnd ? Math.max(0, Math.ceil((campaignEnd - now) / (1000 * 60 * 60 * 24))) : null;
+  const dailyTarget = (daysRemaining && daysRemaining > 0 && campaignGoal > totalCa)
+    ? parseFloat(((campaignGoal - totalCa) / daysRemaining).toFixed(2)) : 0;
+
+  // Active participants (at least 1 order)
+  const activeParticipantsResult = await db('orders')
+    .where({ campaign_id: campaignId })
+    .whereIn('status', ['submitted', 'validated', 'preparing', 'shipped', 'delivered'])
+    .countDistinct('user_id as count')
+    .first();
+  const activeParticipants = parseInt(activeParticipantsResult?.count || 0, 10);
+
+  // Average CA per student
+  const avgCaPerStudent = totalParticipants > 0 ? parseFloat((totalCa / totalParticipants).toFixed(2)) : 0;
+
+  // Record today (highest single order today)
+  const todayStart = new Date();
+  todayStart.setHours(0, 0, 0, 0);
+  const recordTodayResult = await db('orders')
+    .where({ campaign_id: campaignId })
+    .whereIn('status', ['submitted', 'validated', 'preparing', 'shipped', 'delivered'])
+    .where('created_at', '>=', todayStart)
+    .max('total_ttc as max')
+    .first();
+  const recordToday = parseFloat(recordTodayResult?.max || 0);
+
+  // Relative: vs average
+  const vsAveragePct = avgCaPerStudent > 0 ? Math.round(((ca - avgCaPerStudent) / avgCaPerStudent) * 100) : 0;
+  const vsAverageText = vsAveragePct > 0 ? 'above' : vsAveragePct < 0 ? 'below' : 'equal';
+  const gapToAverage = parseFloat((ca - avgCaPerStudent).toFixed(2));
+
+  // Leaderboard preview: top 3 + self if not in top 3
+  const leaderboardPreview = ranking.slice(0, 3).map((r, i) => ({
+    rank: i + 1,
+    userId: r.user_id,
+    name: null, // populated below
+    ca: parseFloat(r.ca),
+    isMe: r.user_id === userId,
+  }));
+  // Get names
+  const previewUserIds = leaderboardPreview.map((r) => r.userId);
+  if (position > 3) previewUserIds.push(userId);
+  const userNames = await db('users').whereIn('id', previewUserIds).select('id', 'name');
+  const nameMap = {};
+  userNames.forEach((u) => { nameMap[u.id] = u.name; });
+  leaderboardPreview.forEach((r) => { r.name = nameMap[r.userId]; });
+  if (position > 3) {
+    leaderboardPreview.push({
+      rank: position,
+      userId,
+      name: nameMap[userId],
+      ca,
+      isMe: true,
+    });
+  }
+
+  // Class ranking
+  const campConfig = typeof campaign?.config === 'string' ? JSON.parse(campaign.config) : (campaign?.config || {});
+  const classGroups = campConfig.classes || [];
+  let classRanking = { enabled: classGroups.length > 0, myClass: participation.class_group, classes: [] };
+  if (classGroups.length > 0) {
+    const allParticipants = await db('participations')
+      .join('users', 'participations.user_id', 'users.id')
+      .where({ campaign_id: campaignId, role_in_campaign: 'student' })
+      .select('users.id', 'participations.class_group');
+
+    for (const cg of classGroups) {
+      const studentIds = allParticipants.filter((s) => s.class_group === cg).map((s) => s.id);
+      if (!studentIds.length) {
+        classRanking.classes.push({ name: cg, ca: 0, students: 0 });
+        continue;
+      }
+      const cgResult = await db('orders')
+        .where({ campaign_id: campaignId })
+        .whereIn('user_id', studentIds)
+        .whereIn('status', ['submitted', 'validated', 'preparing', 'shipped', 'delivered'])
+        .sum('total_ttc as ca')
+        .first();
+      classRanking.classes.push({ name: cg, ca: parseFloat(cgResult?.ca || 0), students: studentIds.length });
+    }
+    classRanking.classes.sort((a, b) => b.ca - a.ca);
+  }
+
+  // Recent orders (3 latest with customer_name, payment_method)
+  const recentOrdersData = await db('orders')
+    .leftJoin('contacts', 'orders.customer_id', 'contacts.id')
+    .where({ 'orders.user_id': userId, 'orders.campaign_id': campaignId })
+    .whereIn('orders.status', ['submitted', 'validated', 'preparing', 'shipped', 'delivered'])
+    .orderBy('orders.created_at', 'desc')
+    .limit(3)
+    .select('orders.id', 'orders.ref', 'orders.total_ttc', 'orders.total_items', 'orders.created_at', 'orders.payment_method', 'contacts.name as customer_name');
+
   return {
     ca,
     orderCount,
@@ -71,6 +179,35 @@ async function getStudentDashboard(userId, campaignId) {
     streak,
     badges,
     ui: rules.ui,
+    campaign: {
+      name: campaign?.name,
+      goal: campaignGoal,
+      total_ca: totalCa,
+      progress_pct: progressPct,
+      days_remaining: daysRemaining,
+      daily_target: dailyTarget,
+      total_bottles: totalBottles,
+      active_participants: activeParticipants,
+      total_participants: totalParticipants,
+      avg_ca_per_student: avgCaPerStudent,
+      record_today: recordToday,
+    },
+    relative: {
+      vs_average_pct: vsAveragePct,
+      vs_average_text: vsAverageText,
+      gap_to_average: gapToAverage,
+    },
+    leaderboard_preview: leaderboardPreview,
+    class_ranking: classRanking,
+    recent_orders: recentOrdersData.map((o) => ({
+      id: o.id,
+      ref: o.ref,
+      total_ttc: parseFloat(o.total_ttc),
+      total_items: parseInt(o.total_items, 10),
+      created_at: o.created_at,
+      payment_method: o.payment_method,
+      customer_name: o.customer_name,
+    })),
   };
 }
 
@@ -398,4 +535,93 @@ function calculateStreak(dates) {
   return streak;
 }
 
-module.exports = { getStudentDashboard, getStudentRanking, getAdminCockpit, getTeacherDashboard };
+/**
+ * Leaderboard filtré étudiant (CDC §4.2 — Classement enrichi)
+ * @param {string} userId
+ * @param {string} campaignId
+ * @param {Object} filters - { period: 'week'|'month'|'all', classFilter: string|'all' }
+ */
+async function getStudentLeaderboard(userId, campaignId, { period = 'all', classFilter = 'all' } = {}) {
+  const participation = await db('participations')
+    .where({ user_id: userId, campaign_id: campaignId })
+    .first();
+  if (!participation) throw new Error('NOT_PARTICIPANT');
+
+  let query = db('orders')
+    .join('users', 'orders.user_id', 'users.id')
+    .join('participations', function () {
+      this.on('participations.user_id', 'orders.user_id')
+        .andOn('participations.campaign_id', 'orders.campaign_id');
+    })
+    .where('orders.campaign_id', campaignId)
+    .where('users.role', 'etudiant')
+    .whereIn('orders.status', ['submitted', 'validated', 'preparing', 'shipped', 'delivered']);
+
+  // Period filter
+  if (period === 'week') {
+    const weekAgo = new Date();
+    weekAgo.setDate(weekAgo.getDate() - 7);
+    query = query.where('orders.created_at', '>=', weekAgo);
+  } else if (period === 'month') {
+    const monthAgo = new Date();
+    monthAgo.setMonth(monthAgo.getMonth() - 1);
+    query = query.where('orders.created_at', '>=', monthAgo);
+  }
+
+  // Class filter
+  if (classFilter && classFilter !== 'all') {
+    query = query.where('participations.class_group', classFilter);
+  }
+
+  const ranking = await query
+    .groupBy('orders.user_id', 'users.name', 'participations.class_group')
+    .select(
+      'orders.user_id',
+      'users.name',
+      'participations.class_group',
+      db.raw('SUM(orders.total_ttc) as ca'),
+      db.raw('SUM(orders.total_items) as bottles'),
+      db.raw('COUNT(orders.id) as orders_count')
+    )
+    .orderBy('ca', 'desc');
+
+  const myPosition = ranking.findIndex((r) => r.user_id === userId) + 1;
+
+  // Campaign header
+  const campaign = await db('campaigns').where({ id: campaignId }).first();
+  const totalCaResult = await db('orders')
+    .where({ campaign_id: campaignId })
+    .whereIn('status', ['submitted', 'validated', 'preparing', 'shipped', 'delivered'])
+    .sum('total_ttc as total')
+    .first();
+  const totalCa = parseFloat(totalCaResult?.total || 0);
+  const campaignGoal = parseFloat(campaign?.goal || 0);
+  const campaignEnd = campaign?.end_date ? new Date(campaign.end_date) : null;
+  const now = new Date();
+  const daysRemaining = campaignEnd ? Math.max(0, Math.ceil((campaignEnd - now) / (1000 * 60 * 60 * 24))) : null;
+
+  return {
+    myPosition,
+    totalParticipants: ranking.length,
+    period,
+    classFilter,
+    campaignHeader: {
+      name: campaign?.name,
+      goal: campaignGoal,
+      total_ca: totalCa,
+      progress_pct: campaignGoal > 0 ? Math.round((totalCa / campaignGoal) * 100) : 0,
+      days_remaining: daysRemaining,
+    },
+    ranking: ranking.map((r, i) => ({
+      rank: i + 1,
+      name: r.name,
+      classGroup: r.class_group,
+      ca: parseFloat(r.ca),
+      bottles: parseInt(r.bottles, 10),
+      ordersCount: parseInt(r.orders_count, 10),
+      isMe: r.user_id === userId,
+    })),
+  };
+}
+
+module.exports = { getStudentDashboard, getStudentRanking, getStudentLeaderboard, getAdminCockpit, getTeacherDashboard };

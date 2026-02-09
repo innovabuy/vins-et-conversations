@@ -2,7 +2,7 @@
   "name": "Vins & Conversations",
   "short_name": "V&C",
   "description": "Plateforme de gestion des ventes de vin",
-  "start_url": "/",
+  "start_url": "/login",
   "display": "standalone",
   "background_color": "#7a1c3b",
   "theme_color": "#7a1c3b",

@@ -26,9 +26,9 @@ async function generateOrderRef() {
 
 /**
  * Créer une commande (CDC §Commandes)
- * @param {Object} params - { userId, campaignId, items: [{ productId, qty }], customerId?, notes? }
+ * @param {Object} params - { userId, campaignId, items: [{ productId, qty }], customerId?, notes?, customerName?, customerPhone?, customerEmail?, customerNotes?, paymentMethod? }
  */
-async function createOrder({ userId, campaignId, items, customerId, notes }) {
+async function createOrder({ userId, campaignId, items, customerId, notes, customerName, customerPhone, customerEmail, customerNotes, paymentMethod }) {
   // Charger les règles de la campagne
   const rules = await rulesEngine.loadRulesForCampaign(campaignId);
 
@@ -49,6 +49,42 @@ async function createOrder({ userId, campaignId, items, customerId, notes }) {
 
   if (products.length !== productIds.length) {
     throw new Error('INVALID_PRODUCTS');
+  }
+
+  // Contact upsert: if customer_name provided and no customer_id, find or create contact
+  let resolvedCustomerId = customerId || null;
+  if (customerName && !customerId) {
+    // Look for existing contact by (source_user_id, name, phone)
+    let existingContact = await db('contacts')
+      .where({ source_user_id: userId, name: customerName })
+      .modify((qb) => {
+        if (customerPhone) qb.where('phone', customerPhone);
+      })
+      .first();
+
+    if (existingContact) {
+      // Update missing info
+      const updates = {};
+      if (customerPhone && !existingContact.phone) updates.phone = customerPhone;
+      if (customerEmail && !existingContact.email) updates.email = customerEmail;
+      if (customerNotes) updates.notes = JSON.stringify({ ...(typeof existingContact.notes === 'string' ? JSON.parse(existingContact.notes || '{}') : (existingContact.notes || {})), student_notes: customerNotes });
+      if (Object.keys(updates).length) {
+        await db('contacts').where({ id: existingContact.id }).update(updates);
+      }
+      resolvedCustomerId = existingContact.id;
+    } else {
+      // Create new contact
+      const [newContact] = await db('contacts').insert({
+        name: customerName,
+        phone: customerPhone || null,
+        email: customerEmail || null,
+        type: 'particulier',
+        source: `etudiant`,
+        source_user_id: userId,
+        notes: customerNotes ? JSON.stringify({ student_notes: customerNotes }) : null,
+      }).returning('*');
+      resolvedCustomerId = newContact.id;
+    }
   }
 
   const ref = await generateOrderRef();
@@ -99,13 +135,14 @@ async function createOrder({ userId, campaignId, items, customerId, notes }) {
       ref,
       campaign_id: campaignId,
       user_id: userId,
-      customer_id: customerId || null,
+      customer_id: resolvedCustomerId,
       status: 'submitted',
       items: JSON.stringify(items), // snapshot
       total_ht: parseFloat(totalHT.toFixed(2)),
       total_ttc: parseFloat(totalTTC.toFixed(2)),
       total_items: totalItems,
       notes,
+      payment_method: paymentMethod || null,
     });
 
     // Insérer les lignes
@@ -204,6 +241,8 @@ async function createOrder({ userId, campaignId, items, customerId, notes }) {
     totalTTC: parseFloat(totalTTC.toFixed(2)),
     totalItems,
     status: 'submitted',
+    paymentMethod: paymentMethod || null,
+    customerName: customerName || null,
   };
 }
 
