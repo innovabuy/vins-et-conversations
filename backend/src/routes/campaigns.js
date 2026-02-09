@@ -45,6 +45,19 @@ router.get('/', authenticate, requireRole('super_admin', 'commercial'), async (r
   }
 });
 
+// GET /api/v1/admin/campaigns/resources — Lookup data for wizard (MUST be before /:id)
+router.get('/resources', authenticate, requireRole('super_admin', 'commercial'), async (req, res) => {
+  try {
+    const organizations = await db('organizations').orderBy('name');
+    const clientTypes = await db('client_types').orderBy('label');
+    const products = await db('products').where({ active: true }).orderBy('sort_order');
+    const users = await db('users').where({ status: 'active' }).select('id', 'name', 'email', 'role').orderBy('name');
+    res.json({ organizations, clientTypes, products, users });
+  } catch (err) {
+    res.status(500).json({ error: 'SERVER_ERROR', message: err.message });
+  }
+});
+
 // GET /api/v1/admin/campaigns/:id — Détail campagne + stats complètes
 router.get('/:id', authenticate, requireRole('super_admin', 'commercial'), async (req, res) => {
   try {
@@ -634,19 +647,6 @@ const campaignSchema = Joi.object({
     sort_order: Joi.number().integer().default(0),
   })).default([]),
   participants: Joi.array().items(Joi.string().uuid()).default([]),
-});
-
-// GET /api/v1/admin/campaigns/resources — Lookup data for wizard
-router.get('/resources', authenticate, requireRole('super_admin', 'commercial'), async (req, res) => {
-  try {
-    const organizations = await db('organizations').orderBy('name');
-    const clientTypes = await db('client_types').orderBy('label');
-    const products = await db('products').where({ active: true }).orderBy('sort_order');
-    const users = await db('users').where({ active: true }).select('id', 'name', 'email', 'role').orderBy('name');
-    res.json({ organizations, clientTypes, products, users });
-  } catch (err) {
-    res.status(500).json({ error: 'SERVER_ERROR', message: err.message });
-  }
 });
 
 // POST /api/v1/admin/campaigns — Create campaign (full wizard)

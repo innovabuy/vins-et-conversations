@@ -81,6 +81,23 @@ adminRouter.post('/', authenticate, requireRole('super_admin', 'commercial'), au
   }
 });
 
+// PUT /api/v1/admin/categories/reorder — Reorder (MUST be before /:id)
+adminRouter.put('/reorder', authenticate, requireRole('super_admin', 'commercial'), async (req, res) => {
+  try {
+    const { order } = req.body;
+    if (!Array.isArray(order)) return res.status(400).json({ error: 'VALIDATION_ERROR', message: 'order must be an array' });
+
+    for (const item of order) {
+      await db('categories').where({ id: item.id }).update({ sort_order: item.sort_order });
+    }
+
+    const cats = await db('categories').orderBy('sort_order');
+    res.json({ data: cats });
+  } catch (err) {
+    res.status(500).json({ error: 'SERVER_ERROR', message: err.message });
+  }
+});
+
 // PUT /api/v1/admin/categories/:id — Update
 adminRouter.put('/:id', authenticate, requireRole('super_admin', 'commercial'), auditAction('categories'), async (req, res) => {
   try {
@@ -121,23 +138,6 @@ adminRouter.delete('/:id', authenticate, requireRole('super_admin'), auditAction
 
     await db('categories').where({ id: req.params.id }).del();
     res.json({ message: 'Catégorie supprimée' });
-  } catch (err) {
-    res.status(500).json({ error: 'SERVER_ERROR', message: err.message });
-  }
-});
-
-// PUT /api/v1/admin/categories/reorder — Reorder
-adminRouter.put('/reorder', authenticate, requireRole('super_admin', 'commercial'), async (req, res) => {
-  try {
-    const { order } = req.body;
-    if (!Array.isArray(order)) return res.status(400).json({ error: 'VALIDATION_ERROR', message: 'order must be an array' });
-
-    for (const item of order) {
-      await db('categories').where({ id: item.id }).update({ sort_order: item.sort_order });
-    }
-
-    const cats = await db('categories').orderBy('sort_order');
-    res.json({ data: cats });
   } catch (err) {
     res.status(500).json({ error: 'SERVER_ERROR', message: err.message });
   }

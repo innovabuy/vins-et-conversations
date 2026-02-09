@@ -46,6 +46,9 @@ function applyMarginFilters(qb, filters, opts = {}) {
     if (!opts.hasCampaignsJoin) {
       qb.join('campaigns as _fc', 'orders.campaign_id', '_fc.id');
       qb.join('client_types as _fct', '_fc.client_type_id', '_fct.id');
+    } else if (!opts.hasClientTypesJoin) {
+      const campAlias = opts.campaignsAlias || 'campaigns';
+      qb.join('client_types as _fct', `${campAlias}.client_type_id`, '_fct.id');
     }
     const ctTable = opts.hasClientTypesJoin ? 'client_types' : '_fct';
     qb.where(`${ctTable}.name`, filters.segment);
@@ -84,6 +87,9 @@ function applyOrderOnlyFilters(qb, filters, opts = {}) {
     if (!opts.hasCampaignsJoin) {
       qb.join('campaigns as _fc', 'orders.campaign_id', '_fc.id');
       qb.join('client_types as _fct', '_fc.client_type_id', '_fct.id');
+    } else if (!opts.hasClientTypesJoin) {
+      const campAlias = opts.campaignsAlias || 'campaigns';
+      qb.join('client_types as _fct', `${campAlias}.client_type_id`, '_fct.id');
     }
     const ctTable = opts.hasClientTypesJoin ? 'client_types' : '_fct';
     qb.where(`${ctTable}.name`, filters.segment);
