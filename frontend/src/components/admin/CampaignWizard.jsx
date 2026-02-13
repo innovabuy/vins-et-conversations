@@ -1,12 +1,15 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { campaignsAPI } from '../../services/api';
-import { ChevronLeft, ChevronRight, Check, Building2, Users, Wine, Settings, FileText, Rocket } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Check, Building2, Users, Wine, Settings, FileText, Rocket, Image } from 'lucide-react';
+import { organizationsAPI } from '../../services/api';
+import { useAppSettings } from '../../contexts/AppSettingsContext';
 import { formatEur } from '../../utils/chartTheme';
 
 const STEPS = [
   { key: 'type', label: 'Type', icon: Settings, desc: 'Type de client' },
   { key: 'org', label: 'Organisation', icon: Building2, desc: 'École ou entreprise' },
+  { key: 'branding', label: 'Identité', icon: Image, desc: 'Logo partenaire' },
   { key: 'details', label: 'Détails', icon: FileText, desc: 'Nom, dates, objectif' },
   { key: 'products', label: 'Produits', icon: Wine, desc: 'Sélection des vins' },
   { key: 'participants', label: 'Participants', icon: Users, desc: 'Élèves ou contacts' },
@@ -20,6 +23,7 @@ const STATUS_OPTIONS = [
 
 export default function CampaignWizard() {
   const navigate = useNavigate();
+  const appSettings = useAppSettings();
   const [step, setStep] = useState(0);
   const [resources, setResources] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -28,6 +32,7 @@ export default function CampaignWizard() {
   const [form, setForm] = useState({
     client_type_id: '',
     org_id: '',
+    partner_logo_url: '',
     name: '',
     status: 'draft',
     goal: 0,
@@ -50,19 +55,25 @@ export default function CampaignWizard() {
   const canNext = () => {
     if (step === 0) return !!form.client_type_id;
     if (step === 1) return !!form.org_id;
-    if (step === 2) return form.name.length >= 3;
+    if (step === 2) return true; // branding — optional
+    if (step === 3) return form.name.length >= 3;
     return true;
   };
 
   const handleCreate = async () => {
     setSaving(true);
     try {
+      // Save partner logo to organization if provided
+      if (form.partner_logo_url && form.org_id) {
+        await organizationsAPI.update(form.org_id, { logo_url: form.partner_logo_url }).catch(() => {});
+      }
+      const { partner_logo_url, ...rest } = form;
       const payload = {
-        ...form,
-        goal: parseFloat(form.goal) || 0,
-        start_date: form.start_date || null,
-        end_date: form.end_date || null,
-        products: form.products.map((p, i) => ({ product_id: p.id, custom_price: p.custom_price || null, sort_order: i })),
+        ...rest,
+        goal: parseFloat(rest.goal) || 0,
+        start_date: rest.start_date || null,
+        end_date: rest.end_date || null,
+        products: rest.products.map((p, i) => ({ product_id: p.id, custom_price: p.custom_price || null, sort_order: i })),
       };
       const { data } = await campaignsAPI.create(payload);
       navigate(`/admin/campaigns/${data.id}`);
@@ -150,6 +161,49 @@ export default function CampaignWizard() {
 
         {step === 2 && (
           <div className="space-y-4">
+            <h2 className="font-bold text-lg">Identité visuelle</h2>
+            <p className="text-sm text-gray-500">Ajoutez le logo du partenaire pour cette campagne.</p>
+            <div>
+              <label className="block text-sm font-medium mb-1">Logo partenaire (URL)</label>
+              <input
+                type="url"
+                value={form.partner_logo_url}
+                onChange={(e) => updateForm('partner_logo_url', e.target.value)}
+                className="w-full border rounded-lg px-3 py-2"
+                placeholder="https://example.com/logo-partenaire.png"
+              />
+            </div>
+            <div className="p-4 bg-gray-50 rounded-xl">
+              <p className="text-xs text-gray-500 mb-3">Aperçu des logos</p>
+              <div className="flex items-center justify-center gap-6">
+                {appSettings.app_logo_url ? (
+                  <img src={appSettings.app_logo_url} alt="Logo V&C" className="h-12 w-auto object-contain" />
+                ) : (
+                  <div className="flex items-center gap-2">
+                    <Wine size={24} className="text-wine-700" />
+                    <span className="font-bold text-sm">{appSettings.app_name}</span>
+                  </div>
+                )}
+                {form.partner_logo_url ? (
+                  <>
+                    <span className="text-gray-300 text-lg">+</span>
+                    <img
+                      src={form.partner_logo_url}
+                      alt="Logo partenaire"
+                      className="h-12 w-auto object-contain"
+                      onError={(e) => { e.target.style.display = 'none'; }}
+                    />
+                  </>
+                ) : (
+                  <span className="text-xs text-gray-400 italic">Aucun logo partenaire</span>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {step === 3 && (
+          <div className="space-y-4">
             <h2 className="font-bold text-lg">Détails campagne</h2>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="sm:col-span-2">
@@ -178,7 +232,7 @@ export default function CampaignWizard() {
           </div>
         )}
 
-        {step === 3 && (
+        {step === 4 && (
           <div className="space-y-4">
             <h2 className="font-bold text-lg">Sélection des produits</h2>
             <p className="text-sm text-gray-500">{form.products.length} produit(s) sélectionné(s)</p>
@@ -211,7 +265,7 @@ export default function CampaignWizard() {
           </div>
         )}
 
-        {step === 4 && (
+        {step === 5 && (
           <div className="space-y-4">
             <h2 className="font-bold text-lg">Participants</h2>
             <p className="text-sm text-gray-500">{form.participants.length} participant(s) sélectionné(s)</p>
@@ -244,7 +298,7 @@ export default function CampaignWizard() {
           </div>
         )}
 
-        {step === 5 && (
+        {step === 6 && (
           <div className="space-y-6">
             <h2 className="font-bold text-lg">Récapitulatif</h2>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -301,7 +355,7 @@ export default function CampaignWizard() {
           {step === 0 ? 'Annuler' : 'Précédent'}
         </button>
 
-        {step < 5 ? (
+        {step < 6 ? (
           <button
             onClick={() => setStep(step + 1)}
             disabled={!canNext()}

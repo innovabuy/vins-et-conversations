@@ -267,6 +267,18 @@ export const auditLogAPI = {
   entities: () => api.get('/admin/audit-log/entities'),
 };
 
+// ─── App Settings ─────────────────────────────────
+export const appSettingsAPI = {
+  getPublic: () => api.get('/settings/public'),
+  getAdmin: () => api.get('/admin/settings'),
+  update: (data) => api.put('/admin/settings', data),
+};
+
+// ─── Organizations ────────────────────────────────
+export const organizationsAPI = {
+  update: (id, data) => api.put(`/admin/settings/organizations/${id}`, data),
+};
+
 // ─── Boutique E-commerce ──────────────────────────
 export const boutiqueAPI = {
   getCart: (sessionId) => api.get(`/public/cart/${sessionId}`),

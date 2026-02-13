@@ -80,11 +80,18 @@ exports.seed = async function (knex) {
     'order_items', 'orders', 'contacts',
     'stock_movements', 'campaign_products', 'products', 'product_categories',
     'invitations', 'participations', 'campaigns', 'client_types', 'organizations',
-    'refresh_tokens', 'users',
+    'refresh_tokens', 'users', 'app_settings',
   ];
   for (const table of tables) {
     await knex(table).del();
   }
+
+  // App settings defaults
+  await knex('app_settings').insert([
+    { key: 'app_logo_url', value: '' },
+    { key: 'app_name', value: 'Vins & Conversations' },
+    { key: 'app_primary_color', value: '#722F37' },
+  ]);
 
   const hash = await bcrypt.hash('VinsConv2026!', 12);
 

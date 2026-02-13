@@ -2,6 +2,7 @@ import { Outlet, Link, NavLink } from 'react-router-dom';
 import { Wine, Mail, Phone, Menu, X, ShoppingCart, Gift } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { boutiqueAPI } from '../../services/api';
+import { useAppSettings } from '../../contexts/AppSettingsContext';
 
 function useCartBadge() {
   try {
@@ -30,6 +31,7 @@ export default function PublicLayout() {
   const [menuOpen, setMenuOpen] = useState(false);
   const cartCount = useCartBadge();
   const ambassador = useReferral();
+  const { app_logo_url, app_name } = useAppSettings();
 
   return (
     <div className="min-h-screen flex flex-col bg-white">
@@ -38,10 +40,14 @@ export default function PublicLayout() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between h-16">
             <Link to="/boutique" className="flex items-center gap-2">
-              <div className="bg-wine-700 p-1.5 rounded-lg">
-                <Wine size={20} className="text-white" />
-              </div>
-              <span className="text-lg font-bold text-gray-900">Vins & Conversations</span>
+              {app_logo_url ? (
+                <img src={app_logo_url} alt={app_name} className="h-8 w-auto object-contain" />
+              ) : (
+                <div className="bg-wine-700 p-1.5 rounded-lg">
+                  <Wine size={20} className="text-white" />
+                </div>
+              )}
+              <span className="text-lg font-bold text-gray-900">{app_name}</span>
             </Link>
 
             {/* Desktop nav */}
@@ -104,8 +110,12 @@ export default function PublicLayout() {
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
             <div>
               <div className="flex items-center gap-2 mb-4">
-                <div className="bg-wine-700 p-1.5 rounded-lg"><Wine size={18} className="text-white" /></div>
-                <span className="font-bold">Vins & Conversations</span>
+                {app_logo_url ? (
+                  <img src={app_logo_url} alt={app_name} className="h-7 w-auto object-contain" />
+                ) : (
+                  <div className="bg-wine-700 p-1.5 rounded-lg"><Wine size={18} className="text-white" /></div>
+                )}
+                <span className="font-bold">{app_name}</span>
               </div>
               <p className="text-sm text-gray-400 leading-relaxed">
                 Nicolas Froment — Angers<br />
@@ -135,7 +145,7 @@ export default function PublicLayout() {
             </div>
           </div>
           <div className="border-t border-gray-800 mt-8 pt-8 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-gray-500">
-            <span>&copy; {new Date().getFullYear()} Vins & Conversations. Tous droits réservés.</span>
+            <span>&copy; {new Date().getFullYear()} {app_name}. Tous droits réservés.</span>
             <div className="flex items-center gap-4">
               <Link to="/boutique/cgv" className="hover:text-white">CGV</Link>
               <Link to="/boutique/mentions-legales" className="hover:text-white">Mentions légales</Link>

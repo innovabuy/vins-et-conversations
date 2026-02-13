@@ -108,6 +108,8 @@ app.use('/api/v1/public', require('./routes/boutiqueAPI'));
 app.use('/api/v1/admin/catalog', require('./routes/catalogPdf'));
 app.use('/api/v1/categories', require('./routes/categories'));
 app.use('/api/v1/admin/categories', require('./routes/categories').adminRouter);
+app.use('/api/v1/admin/settings', require('./routes/appSettings'));
+app.use('/api/v1/settings', require('./routes/appSettings').publicRouter);
 
 // ─── Health check ─────────────────────────────────────
 app.get('/api/health', async (req, res) => {

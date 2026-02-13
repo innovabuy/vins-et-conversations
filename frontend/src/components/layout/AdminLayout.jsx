@@ -7,6 +7,7 @@ import {
   Download, Wine, LogOut, Menu, X, ChevronRight, Shield, Tag
 } from 'lucide-react';
 import NotificationBell from '../shared/NotificationBell';
+import { useAppSettings } from '../../contexts/AppSettingsContext';
 
 const allNavItems = [
   { to: '/admin', icon: LayoutDashboard, label: 'Cockpit', end: true },
@@ -27,12 +28,14 @@ const allNavItems = [
   { to: '/admin/exports', icon: Download, label: 'Exports', adminOnly: true },
   { to: '/admin/users', icon: Settings, label: 'Utilisateurs', adminOnly: true },
   { to: '/admin/audit', icon: Shield, label: 'Audit', adminOnly: true },
+  { to: '/admin/settings', icon: Settings, label: 'Paramètres', adminOnly: true },
 ];
 
 export default function AdminLayout() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const { user, logout } = useAuth();
   const navigate = useNavigate();
+  const { app_logo_url, app_name } = useAppSettings();
   const isAdmin = user?.role === 'super_admin';
   const navItems = allNavItems.filter((item) => !item.adminOnly || isAdmin);
 
@@ -49,8 +52,12 @@ export default function AdminLayout() {
           <Menu size={24} />
         </button>
         <div className="flex items-center gap-2">
-          <Wine size={20} className="text-wine-700" />
-          <span className="font-semibold">V&C Admin</span>
+          {app_logo_url ? (
+            <img src={app_logo_url} alt={app_name} className="h-6 w-auto object-contain" />
+          ) : (
+            <Wine size={20} className="text-wine-700" />
+          )}
+          <span className="font-semibold">{app_name?.split(' ')[0] || 'V&C'} Admin</span>
         </div>
         <NotificationBell />
         <div className="w-8 h-8 rounded-full bg-wine-100 flex items-center justify-center text-wine-700 text-sm font-bold">
@@ -70,9 +77,13 @@ export default function AdminLayout() {
         <div className="p-4 border-b border-gray-100">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <Wine size={24} className="text-wine-700" />
+              {app_logo_url ? (
+                <img src={app_logo_url} alt={app_name} className="h-7 w-auto object-contain" />
+              ) : (
+                <Wine size={24} className="text-wine-700" />
+              )}
               <div>
-                <h2 className="font-bold text-sm">Vins & Conversations</h2>
+                <h2 className="font-bold text-sm">{app_name}</h2>
                 <p className="text-xs text-gray-500">Administration</p>
               </div>
             </div>

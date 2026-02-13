@@ -22,6 +22,7 @@ import AdminUsers from './components/admin/AdminUsers';
 import AdminAnalytics from './components/admin/AdminAnalytics';
 import AdminAuditLog from './components/admin/AdminAuditLog';
 import AdminCategories from './components/admin/AdminCategories';
+import AppSettings from './components/admin/AppSettings';
 import StudentDashboard from './components/student/StudentDashboard';
 import CSELayout from './components/layout/CSELayout';
 import CSEDashboard from './components/cse/CSEDashboard';
@@ -45,6 +46,7 @@ import OrderTrackingPage from './components/public/OrderTrackingPage';
 import CGVPage from './components/public/CGVPage';
 import MentionsLegalesPage from './components/public/MentionsLegalesPage';
 import { CartProvider } from './contexts/CartContext';
+import { AppSettingsProvider } from './contexts/AppSettingsContext';
 
 function ProtectedRoute({ children, roles }) {
   const { user, loading } = useAuth();
@@ -101,6 +103,7 @@ function AppRoutes() {
         <Route path="pricing" element={<AdminPricing />} />
         <Route path="exports" element={<AdminExports />} />
         <Route path="users" element={<AdminUsers />} />
+        <Route path="settings" element={<AppSettings />} />
       </Route>
 
       {/* CSE routes */}
@@ -165,12 +168,14 @@ function AppRoutes() {
 export default function App() {
   return (
     <BrowserRouter>
-      <AuthProvider>
-        <ToastProvider>
-          <AppRoutes />
-          <InstallPrompt />
-        </ToastProvider>
-      </AuthProvider>
+      <AppSettingsProvider>
+        <AuthProvider>
+          <ToastProvider>
+            <AppRoutes />
+            <InstallPrompt />
+          </ToastProvider>
+        </AuthProvider>
+      </AppSettingsProvider>
     </BrowserRouter>
   );
 }

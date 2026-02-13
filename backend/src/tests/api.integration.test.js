@@ -3199,4 +3199,101 @@ describe('API Integration Tests', () => {
       expect(res.body.error).toBe('MIN_ORDER_NOT_MET');
     });
   });
+
+  // ═══════════════════════════════════════════════════════
+  // APP SETTINGS — Logos paramétrables (V4.1)
+  // ═══════════════════════════════════════════════════════
+  describe('App Settings — Logos paramétrables', () => {
+    test('GET /settings/public returns 3 public keys (no auth)', async () => {
+      const res = await request(app).get('/api/v1/settings/public');
+      expect(res.status).toBe(200);
+      expect(res.body).toHaveProperty('app_logo_url');
+      expect(res.body).toHaveProperty('app_name');
+      expect(res.body).toHaveProperty('app_primary_color');
+      expect(res.body.app_name).toBe('Vins & Conversations');
+      expect(res.body.app_primary_color).toBe('#722F37');
+    });
+
+    test('GET /admin/settings requires admin auth', async () => {
+      const res = await request(app).get('/api/v1/admin/settings');
+      expect(res.status).toBe(401);
+    });
+
+    test('GET /admin/settings returns all settings for admin', async () => {
+      const res = await request(app)
+        .get('/api/v1/admin/settings')
+        .set('Authorization', `Bearer ${adminToken}`);
+      expect(res.status).toBe(200);
+      expect(res.body).toHaveProperty('app_logo_url');
+      expect(res.body).toHaveProperty('app_name');
+      expect(res.body).toHaveProperty('app_primary_color');
+    });
+
+    test('PUT /admin/settings updates a value and persists', async () => {
+      const res = await request(app)
+        .put('/api/v1/admin/settings')
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({ app_name: 'V&C Test' });
+      expect(res.status).toBe(200);
+      expect(res.body.app_name).toBe('V&C Test');
+
+      // Verify persistence
+      const check = await request(app).get('/api/v1/settings/public');
+      expect(check.body.app_name).toBe('V&C Test');
+
+      // Restore original
+      await request(app)
+        .put('/api/v1/admin/settings')
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({ app_name: 'Vins & Conversations' });
+    });
+
+    test('PUT /admin/settings rejects unknown keys silently', async () => {
+      const res = await request(app)
+        .put('/api/v1/admin/settings')
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({ unknown_key: 'value', app_primary_color: '#FF0000' });
+      expect(res.status).toBe(200);
+      expect(res.body.app_primary_color).toBe('#FF0000');
+      expect(res.body).not.toHaveProperty('unknown_key');
+
+      // Restore
+      await request(app)
+        .put('/api/v1/admin/settings')
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({ app_primary_color: '#722F37' });
+    });
+
+    test('PUT /admin/settings/organizations/:id updates logo_url', async () => {
+      const org = await db('organizations').first();
+      const res = await request(app)
+        .put(`/api/v1/admin/settings/organizations/${org.id}`)
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({ logo_url: 'https://example.com/logo.png' });
+      expect(res.status).toBe(200);
+      expect(res.body.logo_url).toBe('https://example.com/logo.png');
+
+      // Verify in DB
+      const updated = await db('organizations').where({ id: org.id }).first();
+      expect(updated.logo_url).toBe('https://example.com/logo.png');
+
+      // Cleanup
+      await db('organizations').where({ id: org.id }).update({ logo_url: null });
+    });
+
+    test('Student cannot access admin settings', async () => {
+      const res = await request(app)
+        .get('/api/v1/admin/settings')
+        .set('Authorization', `Bearer ${studentToken}`);
+      expect(res.status).toBe(403);
+    });
+
+    test('Student cannot update settings', async () => {
+      const res = await request(app)
+        .put('/api/v1/admin/settings')
+        .set('Authorization', `Bearer ${studentToken}`)
+        .send({ app_name: 'Hacked' });
+      expect(res.status).toBe(403);
+    });
+  });
 });

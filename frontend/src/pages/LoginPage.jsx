@@ -4,6 +4,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { Wine, Eye, EyeOff, ArrowRight, KeyRound } from 'lucide-react';
 import WineWavesAnimation from '../components/shared/WineWavesAnimation';
 import api from '../services/api';
+import { useAppSettings } from '../contexts/AppSettingsContext';
 
 export default function LoginPage() {
   const [mode, setMode] = useState('login'); // login | forgot | reset
@@ -15,6 +16,7 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false);
   const { login } = useAuth();
   const navigate = useNavigate();
+  const { app_logo_url, app_name } = useAppSettings();
 
   // Parse URL params for reset token
   const params = new URLSearchParams(window.location.search);
@@ -105,9 +107,13 @@ export default function LoginPage() {
           {/* Logo + title */}
           <div className="text-center mb-6">
             <div className="inline-flex items-center justify-center w-14 h-14 bg-white/10 backdrop-blur-sm rounded-2xl mb-3">
-              <Wine className="w-7 h-7 text-white" />
+              {app_logo_url ? (
+                <img src={app_logo_url} alt={app_name} className="w-10 h-10 object-contain" />
+              ) : (
+                <Wine className="w-7 h-7 text-white" />
+              )}
             </div>
-            <h1 className="text-2xl sm:text-3xl font-bold text-white">Vins & Conversations</h1>
+            <h1 className="text-2xl sm:text-3xl font-bold text-white">{app_name}</h1>
             <p className="text-wine-300 text-sm mt-1">Plateforme de gestion des ventes</p>
           </div>
 
