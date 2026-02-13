@@ -100,11 +100,18 @@ export function getCriteriaForProduct(color, category) {
 /**
  * Build radar data array from tasting_notes object + product type.
  * Only includes axes relevant to the wine type.
+ * @param {Object} tastingNotes - product.tasting_notes
+ * @param {string} color - product.color
+ * @param {string} category - product.category (string)
+ * @param {Array|null} dynamicAxes - tasting_axes from product_categories (overrides hardcoded)
  */
-export function buildRadarData(tastingNotes, color, category) {
+export function buildRadarData(tastingNotes, color, category, dynamicAxes) {
   if (!tastingNotes) return null;
   const notes = typeof tastingNotes === 'string' ? JSON.parse(tastingNotes) : tastingNotes;
-  const criteria = getCriteriaForProduct(color, category);
+  const axes = dynamicAxes
+    ? (typeof dynamicAxes === 'string' ? JSON.parse(dynamicAxes) : dynamicAxes)
+    : null;
+  const criteria = axes && axes.length > 0 ? axes : getCriteriaForProduct(color, category);
   if (!criteria) return null;
   const data = criteria.map(c => ({ axis: c.label, value: notes[c.key] || 0 }));
   return data.some(d => d.value > 0) ? data : null;

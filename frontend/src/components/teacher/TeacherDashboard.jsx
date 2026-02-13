@@ -109,7 +109,7 @@ export default function TeacherDashboard() {
             <h3 className="font-semibold text-amber-800">Alertes inactivité</h3>
             <span className="text-xs bg-amber-200 text-amber-800 px-2 py-0.5 rounded-full">{inactiveStudents.length}</span>
           </div>
-          <p className="text-sm text-amber-700 mb-2">Ces élèves n'ont pas vendu depuis plus de 7 jours :</p>
+          <p className="text-sm text-amber-700 mb-2">Ces élèves n'ont pas vendu depuis plus de {data.inactivityThreshold || 7} jours :</p>
           <div className="flex flex-wrap gap-2">
             {inactiveStudents.map((name) => (
               <span key={name} className="text-xs bg-amber-100 text-amber-700 px-2 py-1 rounded">{name}</span>

@@ -41,7 +41,7 @@ router.get('/catalog', async (req, res) => {
 
     const query = db('products');
     applyFilters(query);
-    query.leftJoin('categories', 'products.category_id', 'categories.id');
+    query.leftJoin('product_categories', 'products.category_id', 'product_categories.id');
     const products = await query
       .select(
         'products.id', 'products.name', 'products.price_ttc', 'products.price_ht', 'products.tva_rate',
@@ -49,7 +49,7 @@ router.get('/catalog', async (req, res) => {
         'products.region', 'products.appellation', 'products.color', 'products.vintage',
         'products.grape_varieties', 'products.serving_temp', 'products.food_pairing',
         'products.tasting_notes', 'products.winemaker_notes', 'products.awards', 'products.sort_order',
-        'categories.name as cat_name', 'categories.icon as cat_icon', 'categories.color as cat_color', 'categories.slug as cat_slug'
+        'product_categories.name as cat_name', 'product_categories.icon as cat_icon', 'product_categories.color as cat_color', 'product_categories.slug as cat_slug'
       )
       .orderBy('products.sort_order')
       .limit(limit)
@@ -77,13 +77,18 @@ router.get('/catalog', async (req, res) => {
 router.get('/catalog/:id', async (req, res) => {
   try {
     const product = await db('products')
-      .where({ id: req.params.id, active: true })
+      .leftJoin('product_categories', 'products.category_id', 'product_categories.id')
+      .where({ 'products.id': req.params.id, 'products.active': true })
       .select(
-        'id', 'name', 'price_ttc', 'price_ht', 'tva_rate',
-        'category', 'label', 'image_url', 'description',
-        'region', 'appellation', 'color', 'vintage',
-        'grape_varieties', 'serving_temp', 'food_pairing',
-        'tasting_notes', 'winemaker_notes', 'awards'
+        'products.id', 'products.name', 'products.price_ttc', 'products.price_ht', 'products.tva_rate',
+        'products.category', 'products.category_id', 'products.label', 'products.image_url', 'products.description',
+        'products.region', 'products.appellation', 'products.color', 'products.vintage',
+        'products.grape_varieties', 'products.serving_temp', 'products.food_pairing',
+        'products.tasting_notes', 'products.winemaker_notes', 'products.awards',
+        'product_categories.name as category_name', 'product_categories.type as category_type',
+        'product_categories.has_tasting_profile as category_has_tasting',
+        'product_categories.tasting_axes as category_tasting_axes',
+        'product_categories.icon as category_icon', 'product_categories.color as category_color'
       )
       .first();
     if (!product) return res.status(404).json({ error: 'NOT_FOUND' });
@@ -100,8 +105,8 @@ router.get('/filters', async (req, res) => {
     const regions = await db('products').where({ active: true }).whereNotNull('region').distinct('region').pluck('region');
     const categories = await db('products').where({ active: true }).whereNotNull('category').distinct('category').pluck('category');
     const labels = await db('products').where({ active: true }).whereNotNull('label').distinct('label').pluck('label');
-    const categoryObjects = await db('categories').where({ active: true }).orderBy('sort_order')
-      .select('id', 'name', 'slug', 'icon', 'color');
+    const categoryObjects = await db('product_categories').where({ active: true }).orderBy('sort_order')
+      .select('id', 'name', 'slug', 'icon', 'color', 'type', 'has_tasting_profile');
     res.json({ colors, regions, categories, labels, categoryObjects });
   } catch (err) {
     res.status(500).json({ error: 'SERVER_ERROR' });

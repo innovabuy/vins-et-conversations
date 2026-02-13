@@ -95,11 +95,16 @@ function RankingTab({ campaignId }) {
             <button key={v} onClick={() => setPeriod(v)} className={`flex-1 py-1.5 px-2 rounded-md transition-colors ${period === v ? 'bg-white shadow text-wine-700 font-medium' : 'text-gray-500'}`}>{l}</button>
           ))}
         </div>
-        <div className="flex bg-gray-100 rounded-lg p-0.5 text-xs">
-          {[['all', 'Tous'], ['GA', 'GA'], ['GB', 'GB']].map(([v, l]) => (
-            <button key={v} onClick={() => setClassFilter(v)} className={`py-1.5 px-3 rounded-md transition-colors ${classFilter === v ? 'bg-white shadow text-wine-700 font-medium' : 'text-gray-500'}`}>{l}</button>
-          ))}
-        </div>
+        {data?.ranking && (() => {
+          const groups = [...new Set(data.ranking.map(r => r.classGroup).filter(Boolean))].sort();
+          return groups.length > 1 ? (
+            <div className="flex bg-gray-100 rounded-lg p-0.5 text-xs">
+              {[['all', 'Tous'], ...groups.map(g => [g, g])].map(([v, l]) => (
+                <button key={v} onClick={() => setClassFilter(v)} className={`py-1.5 px-3 rounded-md transition-colors ${classFilter === v ? 'bg-white shadow text-wine-700 font-medium' : 'text-gray-500'}`}>{l}</button>
+              ))}
+            </div>
+          ) : null;
+        })()}
       </div>
 
       <p className="text-sm text-gray-500">

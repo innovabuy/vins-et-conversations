@@ -4,6 +4,7 @@ services:
   postgres:
     image: postgres:16-alpine
     container_name: vc-postgres
+    restart: always
     environment:
       POSTGRES_DB: vins_conversations
       POSTGRES_USER: vc_admin
@@ -21,6 +22,7 @@ services:
   redis:
     image: redis:7-alpine
     container_name: vc-redis
+    restart: always
     ports:
       - "6379:6379"
     healthcheck:
@@ -34,6 +36,7 @@ services:
       context: ./backend
       dockerfile: Dockerfile
     container_name: vc-api
+    restart: always
     environment:
       NODE_ENV: development
       PORT: 3001
@@ -59,6 +62,7 @@ services:
       context: ./frontend
       dockerfile: Dockerfile
     container_name: vc-frontend
+    restart: always
     ports:
       - "5173:5173"
     volumes:

@@ -2534,10 +2534,10 @@ describe('API Integration Tests', () => {
 
     test('Delete category with products returns 409', async () => {
       // Find a category that has products
-      const cat = await db('categories')
-        .join('products', 'categories.id', 'products.category_id')
+      const cat = await db('product_categories')
+        .join('products', 'product_categories.id', 'products.category_id')
         .where('products.active', true)
-        .select('categories.id')
+        .select('product_categories.id')
         .first();
       if (!cat) return;
 
@@ -2557,7 +2557,7 @@ describe('API Integration Tests', () => {
   });
 
   describe('Sprint D — Categories retrocompat on products', () => {
-    test('Products list includes category_details from categories table', async () => {
+    test('Products list includes category_details from product_categories table', async () => {
       const res = await request(app)
         .get('/api/v1/products')
         .set('Authorization', `Bearer ${adminToken}`)
@@ -2574,7 +2574,7 @@ describe('API Integration Tests', () => {
     });
 
     test('Public catalog includes category_details and supports category_id filter', async () => {
-      const cat = await db('categories').where({ active: true }).first();
+      const cat = await db('product_categories').where({ active: true }).first();
       if (!cat) return;
 
       const res = await request(app)
@@ -2594,6 +2594,87 @@ describe('API Integration Tests', () => {
         expect(res.body.categoryObjects[0]).toHaveProperty('name');
         expect(res.body.categoryObjects[0]).toHaveProperty('color');
       }
+    });
+  });
+
+  describe('Product Categories — Dynamic type + tasting_axes', () => {
+    test('GET /categories returns type, has_tasting_profile, tasting_axes', async () => {
+      const res = await request(app).get('/api/v1/categories');
+      expect(res.status).toBe(200);
+      expect(res.body.data).toBeInstanceOf(Array);
+      const wine = res.body.data.find(c => c.type === 'wine');
+      expect(wine).toBeDefined();
+      expect(wine.has_tasting_profile).toBe(true);
+      expect(wine.tasting_axes).toBeDefined();
+      const axes = typeof wine.tasting_axes === 'string' ? JSON.parse(wine.tasting_axes) : wine.tasting_axes;
+      expect(axes.length).toBeGreaterThan(0);
+      expect(axes[0]).toHaveProperty('key');
+      expect(axes[0]).toHaveProperty('label');
+    });
+
+    test('GET /categories includes non_alcoholic and bundle types', async () => {
+      const res = await request(app).get('/api/v1/categories');
+      const types = res.body.data.map(c => c.type);
+      expect(types).toContain('wine');
+      expect(types).toContain('non_alcoholic');
+      expect(types).toContain('bundle');
+    });
+
+    test('GET /products returns category_id + category_name + category string', async () => {
+      const res = await request(app).get('/api/v1/products');
+      expect(res.status).toBe(200);
+      const product = res.body.data.find(p => p.category_id);
+      if (!product) return;
+      expect(product.category).toBeDefined(); // backward compat string
+      expect(product.category_name).toBeDefined(); // new field
+      expect(product.category_details).toBeDefined(); // enriched object
+      expect(product.category_details.type).toBeDefined();
+      expect(product.category_details.tasting_axes).toBeDefined();
+    });
+
+    test('GET /products?category_id= filters correctly', async () => {
+      const cat = await db('product_categories').where({ name: 'Rouges' }).first();
+      if (!cat) return;
+      const res = await request(app).get('/api/v1/products').query({ category_id: cat.id });
+      expect(res.status).toBe(200);
+      expect(res.body.data.length).toBeGreaterThan(0);
+      res.body.data.forEach(p => {
+        expect(p.category_id).toBe(cat.id);
+      });
+    });
+
+    test('Migration mapped all existing products to category_id', async () => {
+      const products = await db('products').select('name', 'category', 'category_id');
+      for (const p of products) {
+        expect(p.category_id).toBeTruthy();
+      }
+    });
+
+    test('Admin creates category with type + tasting_axes', async () => {
+      const res = await request(app)
+        .post('/api/v1/admin/categories')
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({
+          name: 'Test Wine Category',
+          type: 'wine',
+          has_tasting_profile: true,
+          tasting_axes: [{ key: 'fruite', label: 'Fruité' }, { key: 'acidite', label: 'Acidité' }],
+        });
+      expect(res.status).toBe(201);
+      expect(res.body.type).toBe('wine');
+      expect(res.body.has_tasting_profile).toBe(true);
+
+      // Cleanup
+      await request(app).delete(`/api/v1/admin/categories/${res.body.id}`).set('Authorization', `Bearer ${adminToken}`);
+    });
+
+    test('Public catalog /:id returns category_tasting_axes', async () => {
+      const product = await db('products').where({ active: true }).whereNotNull('category_id').first();
+      if (!product) return;
+      const res = await request(app).get(`/api/v1/public/catalog/${product.id}`);
+      expect(res.status).toBe(200);
+      expect(res.body.category_type).toBeDefined();
+      expect(res.body.category_name).toBeDefined();
     });
   });
 
@@ -2985,6 +3066,137 @@ describe('API Integration Tests', () => {
       expect(body).not.toMatch(/"total_ht":/);
       expect(body).not.toMatch(/"amount":/);
       expect(body).not.toMatch(/"marge":/);
+    });
+  });
+
+  // ─── Bug Fix — min_order sync from pricing_conditions → client_types ─────
+
+  describe('Pricing Conditions — min_order propagation to CSE', () => {
+    let cseToken;
+    let cseCampaignId;
+    let csePricingConditionId;
+    let originalMinOrder;
+
+    beforeAll(async () => {
+      const res = await request(app)
+        .post('/api/v1/auth/login')
+        .send({ email: 'cse@leroymerlin.fr', password: 'VinsConv2026!' });
+      cseToken = res.body.accessToken;
+
+      const participation = await db('participations')
+        .join('users', 'participations.user_id', 'users.id')
+        .where('users.email', 'cse@leroymerlin.fr')
+        .first();
+      cseCampaignId = participation?.campaign_id;
+
+      // Find the CSE pricing condition
+      const pc = await db('pricing_conditions').where({ client_type: 'cse' }).first();
+      csePricingConditionId = pc?.id;
+      originalMinOrder = pc ? parseFloat(pc.min_order) : 200;
+    });
+
+    afterAll(async () => {
+      // Restore original min_order
+      if (csePricingConditionId) {
+        await request(app)
+          .put(`/api/v1/admin/pricing-conditions/${csePricingConditionId}`)
+          .set('Authorization', `Bearer ${adminToken}`)
+          .send({
+            client_type: 'cse', label: 'CSE Standard', discount_pct: 10,
+            commission_pct: 0, min_order: originalMinOrder, payment_terms: '30_days', active: true,
+          });
+      }
+    });
+
+    test('Admin updates min_order=0 → CSE dashboard reflects minOrder=0', async () => {
+      if (!adminToken || !csePricingConditionId || !cseToken || !cseCampaignId) return;
+
+      // Set min_order to 0 via admin API
+      const updateRes = await request(app)
+        .put(`/api/v1/admin/pricing-conditions/${csePricingConditionId}`)
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({
+          client_type: 'cse', label: 'CSE Standard', discount_pct: 10,
+          commission_pct: 0, min_order: 0, payment_terms: '30_days', active: true,
+        });
+
+      expect(updateRes.status).toBe(200);
+      expect(parseFloat(updateRes.body.min_order)).toBe(0);
+
+      // Verify client_types.pricing_rules was synced
+      const ct = await db('client_types').where({ name: 'cse' }).first();
+      const rules = typeof ct.pricing_rules === 'string' ? JSON.parse(ct.pricing_rules) : ct.pricing_rules;
+      expect(rules.min_order).toBe(0);
+
+      // Verify CSE dashboard returns minOrder=0
+      const dashRes = await request(app)
+        .get('/api/v1/dashboard/cse')
+        .set('Authorization', `Bearer ${cseToken}`)
+        .query({ campaign_id: cseCampaignId });
+
+      expect(dashRes.status).toBe(200);
+      expect(dashRes.body.minOrder).toBe(0);
+    });
+
+    test('CSE order with min_order=0 → accepts any amount', async () => {
+      if (!cseToken || !cseCampaignId || !csePricingConditionId) return;
+
+      // Ensure min_order is 0
+      await request(app)
+        .put(`/api/v1/admin/pricing-conditions/${csePricingConditionId}`)
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({
+          client_type: 'cse', label: 'CSE Standard', discount_pct: 10,
+          commission_pct: 0, min_order: 0, payment_terms: '30_days', active: true,
+        });
+
+      // Order just 1 cheap product (< 200 EUR)
+      const cp = await db('campaign_products')
+        .where({ campaign_id: cseCampaignId, active: true })
+        .first();
+      if (!cp) return;
+
+      const res = await request(app)
+        .post('/api/v1/orders')
+        .set('Authorization', `Bearer ${cseToken}`)
+        .send({
+          campaign_id: cseCampaignId,
+          items: [{ productId: cp.product_id, qty: 1 }],
+        });
+
+      expect(res.status).toBe(201);
+    });
+
+    test('Admin sets min_order=50 → CSE order below 50 EUR rejected', async () => {
+      if (!cseToken || !cseCampaignId || !csePricingConditionId) return;
+
+      // Set min_order to 50
+      await request(app)
+        .put(`/api/v1/admin/pricing-conditions/${csePricingConditionId}`)
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({
+          client_type: 'cse', label: 'CSE Standard', discount_pct: 10,
+          commission_pct: 0, min_order: 50, payment_terms: '30_days', active: true,
+        });
+
+      // Order 1 cheap product (should be < 50 EUR)
+      const cp = await db('campaign_products')
+        .join('products', 'campaign_products.product_id', 'products.id')
+        .where({ 'campaign_products.campaign_id': cseCampaignId, 'campaign_products.active': true })
+        .orderBy('products.price_ttc', 'asc')
+        .first();
+      if (!cp) return;
+
+      const res = await request(app)
+        .post('/api/v1/orders')
+        .set('Authorization', `Bearer ${cseToken}`)
+        .send({
+          campaign_id: cseCampaignId,
+          items: [{ productId: cp.product_id, qty: 1 }],
+        });
+
+      expect(res.status).toBe(400);
+      expect(res.body.error).toBe('MIN_ORDER_NOT_MET');
     });
   });
 });

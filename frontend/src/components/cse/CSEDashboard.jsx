@@ -206,7 +206,7 @@ export default function CSEDashboard() {
                 >
                   {ordering ? 'Commande en cours...' : 'Commander'}
                 </button>
-                <p className="text-xs text-gray-500 mt-2 text-center">Paiement par virement sous 30 jours</p>
+                <p className="text-xs text-gray-500 mt-2 text-center">Paiement par virement{data?.paymentTerms ? ` sous ${data.paymentTerms}` : ''}</p>
               </div>
             </>
           )}

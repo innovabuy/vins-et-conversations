@@ -32,8 +32,8 @@ export default function ProductDetail() {
   if (loading) return <div className="flex justify-center py-20"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-wine-700" /></div>;
   if (!product) return <div className="text-center py-20 text-gray-400">Vin introuvable</div>;
 
-  const radarData = buildRadarData(product.tasting_notes, product.color, product.category);
-  const hasRadar = !!radarData;
+  const radarData = buildRadarData(product.tasting_notes, product.color, product.category, product.category_tasting_axes);
+  const hasRadar = !!radarData && product.category_type !== 'bundle';
 
   const grapes = product.grape_varieties || [];
   const foodPairing = product.food_pairing || [];

@@ -6,8 +6,9 @@ export default function AdminCategories() {
   const [categories, setCategories] = useState([]);
   const [loading, setLoading] = useState(true);
   const [editing, setEditing] = useState(null);
-  const [form, setForm] = useState({ name: '', description: '', icon: '', color: '#7a1c3b', sort_order: 0 });
+  const [form, setForm] = useState({ name: '', description: '', icon: '', color: '#7a1c3b', sort_order: 0, type: 'wine', has_tasting_profile: true, tasting_axes: [] });
   const [saving, setSaving] = useState(false);
+  const [axeInput, setAxeInput] = useState('');
 
   const fetchCategories = useCallback(async () => {
     setLoading(true);
@@ -20,13 +21,28 @@ export default function AdminCategories() {
   useEffect(() => { fetchCategories(); }, [fetchCategories]);
 
   const openNew = () => {
-    setForm({ name: '', description: '', icon: '', color: '#7a1c3b', sort_order: categories.length + 1 });
+    setForm({ name: '', description: '', icon: '', color: '#7a1c3b', sort_order: categories.length + 1, type: 'wine', has_tasting_profile: true, tasting_axes: [] });
+    setAxeInput('');
     setEditing('new');
   };
 
   const openEdit = (cat) => {
-    setForm({ name: cat.name, description: cat.description || '', icon: cat.icon || '', color: cat.color || '#7a1c3b', sort_order: cat.sort_order });
+    const axes = typeof cat.tasting_axes === 'string' ? JSON.parse(cat.tasting_axes) : (cat.tasting_axes || []);
+    setForm({ name: cat.name, description: cat.description || '', icon: cat.icon || '', color: cat.color || '#7a1c3b', sort_order: cat.sort_order, type: cat.type || 'wine', has_tasting_profile: cat.has_tasting_profile ?? true, tasting_axes: axes });
+    setAxeInput('');
     setEditing(cat.id);
+  };
+
+  const addAxe = () => {
+    if (!axeInput.trim()) return;
+    const key = axeInput.trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, '_');
+    if (form.tasting_axes.some(a => a.key === key)) return;
+    setForm(f => ({ ...f, tasting_axes: [...f.tasting_axes, { key, label: axeInput.trim() }] }));
+    setAxeInput('');
+  };
+
+  const removeAxe = (key) => {
+    setForm(f => ({ ...f, tasting_axes: f.tasting_axes.filter(a => a.key !== key) }));
   };
 
   const handleSave = async () => {
@@ -110,6 +126,39 @@ export default function AdminCategories() {
                   </div>
                 </div>
               </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-medium text-gray-500 mb-1">Type</label>
+                  <select value={form.type} onChange={e => setForm(f => ({ ...f, type: e.target.value, has_tasting_profile: e.target.value === 'wine' }))} className="w-full border rounded-lg px-3 py-2 text-sm">
+                    <option value="wine">Vin</option>
+                    <option value="non_alcoholic">Sans alcool</option>
+                    <option value="bundle">Coffret</option>
+                  </select>
+                </div>
+                <div className="flex items-end">
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input type="checkbox" checked={form.has_tasting_profile} onChange={e => setForm(f => ({ ...f, has_tasting_profile: e.target.checked }))} className="rounded text-wine-700" />
+                    <span className="text-sm">Profil de degustation</span>
+                  </label>
+                </div>
+              </div>
+              {form.has_tasting_profile && (
+                <div>
+                  <label className="block text-xs font-medium text-gray-500 mb-1">Axes de degustation</label>
+                  <div className="flex flex-wrap gap-1.5 mb-2">
+                    {form.tasting_axes.map(a => (
+                      <span key={a.key} className="inline-flex items-center gap-1 bg-wine-50 text-wine-700 text-xs px-2 py-1 rounded-full">
+                        {a.label}
+                        <button type="button" onClick={() => removeAxe(a.key)} className="hover:text-red-500"><X size={12} /></button>
+                      </span>
+                    ))}
+                  </div>
+                  <div className="flex gap-2">
+                    <input type="text" value={axeInput} onChange={e => setAxeInput(e.target.value)} onKeyDown={e => e.key === 'Enter' && (e.preventDefault(), addAxe())} className="flex-1 border rounded-lg px-3 py-1.5 text-sm" placeholder="Ex: Fruité, Acidité..." />
+                    <button type="button" onClick={addAxe} className="text-sm px-3 py-1.5 bg-gray-100 hover:bg-gray-200 rounded-lg"><Plus size={14} /></button>
+                  </div>
+                </div>
+              )}
             </div>
             <div className="flex justify-end gap-2 p-4 border-t">
               <button onClick={() => setEditing(null)} className="px-4 py-2 text-sm text-gray-600 hover:bg-gray-100 rounded-lg">Annuler</button>
@@ -138,7 +187,12 @@ export default function AdminCategories() {
                 <span className="text-2xl w-8 text-center">{cat.icon || '📦'}</span>
                 <div className="w-4 h-4 rounded-full flex-shrink-0" style={{ backgroundColor: cat.color || '#999' }} />
                 <div className="flex-1 min-w-0">
-                  <p className="font-medium text-sm">{cat.name}</p>
+                  <div className="flex items-center gap-2">
+                    <p className="font-medium text-sm">{cat.name}</p>
+                    <span className={`text-[10px] px-1.5 py-0.5 rounded-full ${cat.type === 'wine' ? 'bg-purple-100 text-purple-700' : cat.type === 'bundle' ? 'bg-amber-100 text-amber-700' : 'bg-green-100 text-green-700'}`}>
+                      {cat.type === 'wine' ? 'Vin' : cat.type === 'bundle' ? 'Coffret' : 'Sans alcool'}
+                    </span>
+                  </div>
                   {cat.description && <p className="text-xs text-gray-400 truncate">{cat.description}</p>}
                 </div>
                 <span className="text-xs text-gray-500 bg-gray-100 px-2 py-1 rounded-full">{cat.product_count || 0} produit{(cat.product_count || 0) !== 1 ? 's' : ''}</span>

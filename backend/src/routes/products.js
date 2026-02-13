@@ -52,12 +52,14 @@ const productSchema = Joi.object({
 router.get('/', async (req, res) => {
   try {
     const query = db('products')
-      .leftJoin('categories', 'products.category_id', 'categories.id')
+      .leftJoin('product_categories', 'products.category_id', 'product_categories.id')
       .where('products.active', true)
       .select('products.*',
-        'categories.id as cat_id', 'categories.name as cat_name',
-        'categories.slug as cat_slug', 'categories.icon as cat_icon',
-        'categories.color as cat_color');
+        'product_categories.id as cat_id', 'product_categories.name as cat_name',
+        'product_categories.slug as cat_slug', 'product_categories.icon as cat_icon',
+        'product_categories.color as cat_color', 'product_categories.type as cat_type',
+        'product_categories.has_tasting_profile as cat_has_tasting',
+        'product_categories.tasting_axes as cat_tasting_axes');
     if (req.query.color) query.where('products.color', req.query.color);
     if (req.query.region) query.where('products.region', req.query.region);
     if (req.query.label) query.where('products.label', req.query.label);
@@ -67,8 +69,9 @@ router.get('/', async (req, res) => {
     res.json({
       data: products.map(p => ({
         ...p,
-        category_details: p.cat_id ? { id: p.cat_id, name: p.cat_name, slug: p.cat_slug, icon: p.cat_icon, color: p.cat_color } : null,
-        cat_id: undefined, cat_name: undefined, cat_slug: undefined, cat_icon: undefined, cat_color: undefined,
+        category_name: p.cat_name || p.category,
+        category_details: p.cat_id ? { id: p.cat_id, name: p.cat_name, slug: p.cat_slug, icon: p.cat_icon, color: p.cat_color, type: p.cat_type, has_tasting_profile: p.cat_has_tasting, tasting_axes: p.cat_tasting_axes } : null,
+        cat_id: undefined, cat_name: undefined, cat_slug: undefined, cat_icon: undefined, cat_color: undefined, cat_type: undefined, cat_has_tasting: undefined, cat_tasting_axes: undefined,
       })),
     });
   } catch (err) {
@@ -95,12 +98,17 @@ campaignProductsRouter.get(
   requireCampaignAccess,
   async (req, res) => {
     try {
-      const products = await db('products')
+      let query = db('products')
         .join('campaign_products', 'products.id', 'campaign_products.product_id')
+        .leftJoin('product_categories', 'products.category_id', 'product_categories.id')
         .where('campaign_products.campaign_id', req.params.campaignId)
         .where('campaign_products.active', true)
-        .select('products.*', 'campaign_products.custom_price', 'campaign_products.sort_order as campaign_sort')
-        .orderBy('campaign_products.sort_order');
+        .select('products.*', 'campaign_products.custom_price', 'campaign_products.sort_order as campaign_sort',
+          'product_categories.name as category_name', 'product_categories.type as category_type',
+          'product_categories.tasting_axes as category_tasting_axes',
+          'product_categories.has_tasting_profile as category_has_tasting');
+      if (req.query.category_id) query = query.where('products.category_id', req.query.category_id);
+      const products = await query.orderBy('campaign_products.sort_order');
       res.json({ data: products });
     } catch (err) {
       res.status(500).json({ error: 'SERVER_ERROR' });
@@ -283,7 +291,7 @@ adminRouter.post(
       if (body.tasting_notes && typeof body.tasting_notes === 'object') body.tasting_notes = JSON.stringify(body.tasting_notes);
       // Auto-sync category string from category_id
       if (body.category_id) {
-        const cat = await db('categories').where({ id: body.category_id }).first();
+        const cat = await db('product_categories').where({ id: body.category_id }).first();
         if (cat) body.category = cat.name;
       }
       const [product] = await db('products').insert(body).returning('*');
@@ -309,7 +317,7 @@ adminRouter.put(
       if (body.tasting_notes && typeof body.tasting_notes === 'object') body.tasting_notes = JSON.stringify(body.tasting_notes);
       // Auto-sync category string from category_id
       if (body.category_id) {
-        const cat = await db('categories').where({ id: body.category_id }).first();
+        const cat = await db('product_categories').where({ id: body.category_id }).first();
         if (cat) body.category = cat.name;
       }
       const [product] = await db('products')

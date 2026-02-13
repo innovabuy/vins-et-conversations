@@ -213,11 +213,15 @@ router.get(
         )
         .orderBy('orders.created_at', 'desc');
 
+      const campConfig = typeof campaign.config === 'string' ? JSON.parse(campaign.config) : (campaign.config || {});
+      const paymentTerms = campConfig.payment_terms || pricingRules?.payment_terms || null;
+
       res.json({
         products: productsWithCSE,
         orders,
         minOrder,
         discountPct,
+        paymentTerms,
       });
     } catch (err) {
       res.status(500).json({ error: 'SERVER_ERROR', message: err.message });

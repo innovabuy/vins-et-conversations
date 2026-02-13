@@ -3,6 +3,7 @@ const Joi = require('joi');
 const db = require('../config/database');
 const { authenticate, requireRole } = require('../middleware/auth');
 const { auditAction } = require('../middleware/audit');
+const { invalidateCache } = require('../middleware/cache');
 
 const router = express.Router();
 const adminRouter = express.Router();
@@ -12,6 +13,10 @@ const categorySchema = Joi.object({
   description: Joi.string().allow('', null),
   color: Joi.string().max(20).allow('', null),
   icon: Joi.string().max(10).allow('', null),
+  type: Joi.string().valid('wine', 'non_alcoholic', 'bundle').default('wine'),
+  has_tasting_profile: Joi.boolean().default(true),
+  tasting_axes: Joi.array().items(Joi.object({ key: Joi.string(), label: Joi.string() })).allow(null),
+  icon_url: Joi.string().max(500).allow('', null),
   sort_order: Joi.number().integer().min(0),
   active: Joi.boolean(),
 });
@@ -26,12 +31,12 @@ function toSlug(name) {
 // GET /api/v1/categories — Public: active categories
 router.get('/', async (req, res) => {
   try {
-    const cats = await db('categories')
+    const cats = await db('product_categories')
       .where({ active: true })
       .orderBy('sort_order')
-      .select('id', 'name', 'slug', 'description', 'color', 'icon', 'sort_order');
+      .select('id', 'name', 'slug', 'description', 'color', 'icon', 'type',
+        'has_tasting_profile', 'tasting_axes', 'icon_url', 'sort_order');
 
-    // Count products per category
     const counts = await db('products')
       .where('products.active', true)
       .whereNotNull('products.category_id')
@@ -49,9 +54,8 @@ router.get('/', async (req, res) => {
 // GET /api/v1/admin/categories — All categories with counts
 adminRouter.get('/', authenticate, requireRole('super_admin', 'commercial'), async (req, res) => {
   try {
-    const cats = await db('categories').orderBy('sort_order');
+    const cats = await db('product_categories').orderBy('sort_order');
     const counts = await db('products')
-      .where('products.active', true)
       .whereNotNull('products.category_id')
       .groupBy('products.category_id')
       .select('products.category_id', db.raw('COUNT(*) as count'));
@@ -65,16 +69,23 @@ adminRouter.get('/', authenticate, requireRole('super_admin', 'commercial'), asy
 });
 
 // POST /api/v1/admin/categories — Create
-adminRouter.post('/', authenticate, requireRole('super_admin', 'commercial'), auditAction('categories'), async (req, res) => {
+adminRouter.post('/', authenticate, requireRole('super_admin', 'commercial'), auditAction('product_categories'), async (req, res) => {
   try {
     const { error, value } = categorySchema.validate(req.body);
     if (error) return res.status(400).json({ error: 'VALIDATION_ERROR', message: error.message });
 
     const slug = toSlug(value.name);
-    const exists = await db('categories').where({ name: value.name }).orWhere({ slug }).first();
+    const exists = await db('product_categories').where({ name: value.name }).orWhere({ slug }).first();
     if (exists) return res.status(409).json({ error: 'CATEGORY_EXISTS', message: 'Une catégorie avec ce nom existe déjà' });
 
-    const [cat] = await db('categories').insert({ ...value, slug }).returning('*');
+    const insertData = {
+      ...value,
+      slug,
+      tasting_axes: value.tasting_axes ? JSON.stringify(value.tasting_axes) : null,
+    };
+
+    const [cat] = await db('product_categories').insert(insertData).returning('*');
+    await invalidateCache('vc:cache:*');
     res.status(201).json(cat);
   } catch (err) {
     res.status(500).json({ error: 'SERVER_ERROR', message: err.message });
@@ -88,10 +99,11 @@ adminRouter.put('/reorder', authenticate, requireRole('super_admin', 'commercial
     if (!Array.isArray(order)) return res.status(400).json({ error: 'VALIDATION_ERROR', message: 'order must be an array' });
 
     for (const item of order) {
-      await db('categories').where({ id: item.id }).update({ sort_order: item.sort_order });
+      await db('product_categories').where({ id: item.id }).update({ sort_order: item.sort_order });
     }
 
-    const cats = await db('categories').orderBy('sort_order');
+    const cats = await db('product_categories').orderBy('sort_order');
+    await invalidateCache('vc:cache:*');
     res.json({ data: cats });
   } catch (err) {
     res.status(500).json({ error: 'SERVER_ERROR', message: err.message });
@@ -99,14 +111,15 @@ adminRouter.put('/reorder', authenticate, requireRole('super_admin', 'commercial
 });
 
 // PUT /api/v1/admin/categories/:id — Update
-adminRouter.put('/:id', authenticate, requireRole('super_admin', 'commercial'), auditAction('categories'), async (req, res) => {
+adminRouter.put('/:id', authenticate, requireRole('super_admin', 'commercial'), auditAction('product_categories'), async (req, res) => {
   try {
     const { error, value } = categorySchema.validate(req.body);
     if (error) return res.status(400).json({ error: 'VALIDATION_ERROR', message: error.message });
 
     if (value.name) value.slug = toSlug(value.name);
+    if (value.tasting_axes) value.tasting_axes = JSON.stringify(value.tasting_axes);
 
-    const [cat] = await db('categories').where({ id: req.params.id }).update(value).returning('*');
+    const [cat] = await db('product_categories').where({ id: req.params.id }).update(value).returning('*');
     if (!cat) return res.status(404).json({ error: 'NOT_FOUND' });
 
     // Update category string on products to keep retrocompat
@@ -114,6 +127,7 @@ adminRouter.put('/:id', authenticate, requireRole('super_admin', 'commercial'), 
       await db('products').where({ category_id: req.params.id }).update({ category: value.name });
     }
 
+    await invalidateCache('vc:cache:*');
     res.json(cat);
   } catch (err) {
     res.status(500).json({ error: 'SERVER_ERROR', message: err.message });
@@ -121,12 +135,12 @@ adminRouter.put('/:id', authenticate, requireRole('super_admin', 'commercial'), 
 });
 
 // DELETE /api/v1/admin/categories/:id — Delete (blocked if products attached)
-adminRouter.delete('/:id', authenticate, requireRole('super_admin'), auditAction('categories'), async (req, res) => {
+adminRouter.delete('/:id', authenticate, requireRole('super_admin'), auditAction('product_categories'), async (req, res) => {
   try {
-    const cat = await db('categories').where({ id: req.params.id }).first();
+    const cat = await db('product_categories').where({ id: req.params.id }).first();
     if (!cat) return res.status(404).json({ error: 'NOT_FOUND' });
 
-    const count = await db('products').where({ category_id: req.params.id, active: true }).count('* as c').first();
+    const count = await db('products').where({ category_id: req.params.id }).count('* as c').first();
     const productCount = parseInt(count.c, 10);
     if (productCount > 0) {
       return res.status(409).json({
@@ -136,7 +150,8 @@ adminRouter.delete('/:id', authenticate, requireRole('super_admin'), auditAction
       });
     }
 
-    await db('categories').where({ id: req.params.id }).del();
+    await db('product_categories').where({ id: req.params.id }).del();
+    await invalidateCache('vc:cache:*');
     res.json({ message: 'Catégorie supprimée' });
   } catch (err) {
     res.status(500).json({ error: 'SERVER_ERROR', message: err.message });

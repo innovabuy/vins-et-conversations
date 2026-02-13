@@ -286,15 +286,15 @@ router.get(
     try {
       const segment = req.query.segment || 'public';
 
-      const query = db('products').where({ active: true });
-      if (req.query.color) query.where('color', req.query.color);
+      const query = db('products').where('products.active', true);
+      if (req.query.color) query.where('products.color', req.query.color);
       if (req.query.campaign_id) {
         query.join('campaign_products', 'products.id', 'campaign_products.product_id')
           .where('campaign_products.campaign_id', req.query.campaign_id)
           .where('campaign_products.active', true)
           .select('products.*');
       }
-      const products = await query.orderBy('sort_order');
+      const products = await query.orderBy('products.sort_order');
 
       // Load pricing rules for segment
       let pricingRules = null;

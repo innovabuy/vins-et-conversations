@@ -501,6 +501,7 @@ async function getTeacherDashboard(userId, campaignId) {
       // PAS de champ ca, amount, total, etc.
     })),
     inactiveStudents: inactiveStudents.map((s) => s.name),
+    inactivityThreshold,
   };
 }
 

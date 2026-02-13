@@ -53,6 +53,18 @@ const IDS = {
   coffret: uuidv4(),
   coteaux: uuidv4(),
   jus_pomme: uuidv4(),
+  // Product categories
+  cat_rouges: uuidv4(),
+  cat_blancs_secs: uuidv4(),
+  cat_blancs_moelleux: uuidv4(),
+  cat_roses: uuidv4(),
+  cat_effervescents: uuidv4(),
+  cat_coffrets: uuidv4(),
+  cat_jus_softs: uuidv4(),
+  // Boutique Web
+  org_boutique: uuidv4(),
+  ct_boutique: uuidv4(),
+  camp_boutique: uuidv4(),
   // Suppliers
   supplier_fruitiere: uuidv4(),
   supplier_carillon: uuidv4(),
@@ -66,7 +78,7 @@ exports.seed = async function (knex) {
     'suppliers', 'pricing_conditions', 'delivery_routes', 'notifications', 'audit_log',
     'returns', 'delivery_notes', 'payments', 'financial_events',
     'order_items', 'orders', 'contacts',
-    'stock_movements', 'campaign_products', 'products',
+    'stock_movements', 'campaign_products', 'products', 'product_categories',
     'invitations', 'participations', 'campaigns', 'client_types', 'organizations',
     'refresh_tokens', 'users',
   ];
@@ -159,6 +171,7 @@ exports.seed = async function (knex) {
     { id: IDS.leroy_merlin, name: 'Leroy Merlin', type: 'company', address: 'Angers, 49' },
     { id: IDS.reseau_loire, name: 'Réseau Ambassadeurs Loire', type: 'network', address: 'Loire Valley' },
     { id: IDS.espl_angers, name: 'ESPL Angers', type: 'school', address: 'Angers, 49' },
+    { id: IDS.org_boutique, name: 'Boutique V&C', type: 'boutique', address: 'Angers, 49' },
   ]);
 
   // ═══════════════════════════════════════════════════════
@@ -254,6 +267,16 @@ exports.seed = async function (knex) {
         mobile_width: 400,
       }),
     },
+    {
+      id: IDS.ct_boutique,
+      name: 'boutique_web',
+      label: 'Boutique en ligne',
+      pricing_rules: JSON.stringify({ type: 'standard', value: 0, applies_to: 'all' }),
+      commission_rules: JSON.stringify({}),
+      free_bottle_rules: JSON.stringify({}),
+      tier_rules: JSON.stringify({ tiers: [] }),
+      ui_config: JSON.stringify({}),
+    },
   ]);
 
   // ═══════════════════════════════════════════════════════
@@ -315,6 +338,30 @@ exports.seed = async function (knex) {
       end_date: '2026-06-30',
       config: JSON.stringify({ classes: ['NDRC1'], project: 'Projet BTS NDRC', show_formation: true, max_unpaid_orders: 3, inactivity_threshold: 7, badge_config: { premier_1000_threshold: 1000, machine_vendre_threshold: 50, streak_7_days: 7, fidele_days: 14 } }),
     },
+    {
+      id: IDS.camp_boutique,
+      org_id: IDS.org_boutique,
+      client_type_id: IDS.ct_boutique,
+      name: 'Boutique Web',
+      status: 'active',
+      goal: 50000,
+      start_date: '2025-01-01',
+      end_date: '2027-12-31',
+      config: JSON.stringify({ type: 'boutique_web', permanent: true }),
+    },
+  ]);
+
+  // ═══════════════════════════════════════════════════════
+  // CATÉGORIES PRODUITS (CDC Avenant V4.1)
+  // ═══════════════════════════════════════════════════════
+  await knex('product_categories').insert([
+    { id: IDS.cat_rouges, name: 'Rouges', slug: 'rouges', description: 'Vins rouges de caractère', color: '#7a1c3b', icon: '🍷', sort_order: 1, type: 'wine', has_tasting_profile: true, tasting_axes: JSON.stringify([{ key: 'fruite', label: 'Fruité' }, { key: 'mineralite', label: 'Minéral' }, { key: 'rondeur', label: 'Rondeur' }, { key: 'acidite', label: 'Acidité' }, { key: 'tanins', label: 'Tanins' }, { key: 'boise', label: 'Boisé' }, { key: 'longueur', label: 'Longueur' }, { key: 'puissance', label: 'Puissance' }]) },
+    { id: IDS.cat_blancs_secs, name: 'Blancs Secs', slug: 'blancs-secs', description: 'Vins blancs secs et minéraux', color: '#C4A35A', icon: '🥂', sort_order: 2, type: 'wine', has_tasting_profile: true, tasting_axes: JSON.stringify([{ key: 'fruite', label: 'Fruité' }, { key: 'mineralite', label: 'Minéral' }, { key: 'rondeur', label: 'Rondeur' }, { key: 'acidite', label: 'Acidité' }, { key: 'boise', label: 'Boisé' }, { key: 'longueur', label: 'Longueur' }, { key: 'puissance', label: 'Puissance' }]) },
+    { id: IDS.cat_blancs_moelleux, name: 'Blancs Moelleux', slug: 'blancs-moelleux', description: 'Vins blancs moelleux et liquoreux', color: '#d4a017', icon: '🍯', sort_order: 3, type: 'wine', has_tasting_profile: true, tasting_axes: JSON.stringify([{ key: 'fruite', label: 'Fruité' }, { key: 'douceur', label: 'Douceur' }, { key: 'rondeur', label: 'Rondeur' }, { key: 'acidite', label: 'Acidité' }, { key: 'boise', label: 'Boisé' }, { key: 'longueur', label: 'Longueur' }, { key: 'puissance', label: 'Puissance' }]) },
+    { id: IDS.cat_roses, name: 'Rosés', slug: 'roses', description: 'Vins rosés frais et fruités', color: '#e88ca5', icon: '🌸', sort_order: 4, type: 'wine', has_tasting_profile: true, tasting_axes: JSON.stringify([{ key: 'fruite', label: 'Fruité' }, { key: 'mineralite', label: 'Minéral' }, { key: 'rondeur', label: 'Rondeur' }, { key: 'acidite', label: 'Acidité' }, { key: 'longueur', label: 'Longueur' }, { key: 'puissance', label: 'Puissance' }]) },
+    { id: IDS.cat_effervescents, name: 'Effervescents', slug: 'effervescents', description: 'Crémants et vins pétillants', color: '#59a9d4', icon: '🫧', sort_order: 5, type: 'wine', has_tasting_profile: true, tasting_axes: JSON.stringify([{ key: 'fruite', label: 'Fruité' }, { key: 'finesse_bulles', label: 'Bulles' }, { key: 'fraicheur', label: 'Fraîcheur' }, { key: 'rondeur', label: 'Rondeur' }, { key: 'longueur', label: 'Longueur' }, { key: 'puissance', label: 'Puissance' }]) },
+    { id: IDS.cat_coffrets, name: 'Coffrets', slug: 'coffrets', description: 'Coffrets découverte et cadeaux', color: '#9333ea', icon: '🎁', sort_order: 6, type: 'bundle', has_tasting_profile: false, tasting_axes: null },
+    { id: IDS.cat_jus_softs, name: 'Jus & Softs', slug: 'jus-softs', description: 'Jus de fruits et boissons sans alcool', color: '#059669', icon: '🍎', sort_order: 7, type: 'non_alcoholic', has_tasting_profile: false, tasting_axes: JSON.stringify([{ key: 'fruite', label: 'Fruité' }, { key: 'acidite', label: 'Acidité' }, { key: 'douceur', label: 'Douceur' }, { key: 'longueur', label: 'Longueur' }]) },
   ]);
 
   // ═══════════════════════════════════════════════════════
@@ -323,7 +370,7 @@ exports.seed = async function (knex) {
   await knex('products').insert([
     {
       id: IDS.oriolus, name: 'Oriolus Blanc', description: 'Vin blanc sec et frais aux notes d\'agrumes et de fruits blancs. Idéal en apéritif ou avec des fruits de mer.', price_ht: 5.42, price_ttc: 6.50, purchase_price: 3.20, tva_rate: 20, visible_boutique: true,
-      category: 'Blancs Secs', label: 'HVE', sort_order: 1,
+      category: 'Blancs Secs', category_id: IDS.cat_blancs_secs, label: 'HVE', sort_order: 1,
       region: 'Loire', appellation: 'Anjou', color: 'blanc', vintage: 2023,
       grape_varieties: JSON.stringify(['Chenin Blanc']),
       serving_temp: '8-10°C',
@@ -334,7 +381,7 @@ exports.seed = async function (knex) {
     },
     {
       id: IDS.clemence, name: 'Cuvée Clémence', description: 'Blanc moelleux Bio issu de vendanges tardives. Arômes de miel, coing et fruits confits pour un vin gourmand.', price_ht: 7.08, price_ttc: 8.50, purchase_price: 4.10, tva_rate: 20, visible_boutique: true,
-      category: 'Blancs Moelleux', label: 'Bio', sort_order: 2,
+      category: 'Blancs Moelleux', category_id: IDS.cat_blancs_moelleux, label: 'Bio', sort_order: 2,
       region: 'Loire', appellation: 'Anjou', color: 'blanc', vintage: 2022,
       grape_varieties: JSON.stringify(['Chenin Blanc']),
       serving_temp: '8-10°C',
@@ -345,7 +392,7 @@ exports.seed = async function (knex) {
     },
     {
       id: IDS.carillon, name: 'Carillon', description: 'Rouge de garde élevé 12 mois en fûts de chêne. Tanins élégants, fruits noirs et finale épicée.', price_ht: 10.42, price_ttc: 12.50, purchase_price: 5.80, tva_rate: 20, visible_boutique: true,
-      category: 'Rouges', label: 'Cru Bourgeois', sort_order: 3,
+      category: 'Rouges', category_id: IDS.cat_rouges, label: 'Cru Bourgeois', sort_order: 3,
       region: 'Loire', appellation: 'Anjou-Villages', color: 'rouge', vintage: 2021,
       grape_varieties: JSON.stringify(['Cabernet Franc', 'Merlot']),
       serving_temp: '16-18°C',
@@ -356,7 +403,7 @@ exports.seed = async function (knex) {
     },
     {
       id: IDS.apertus, name: 'Apertus', description: 'Rouge gourmand HVE aux arômes de fruits rouges et poivre. Equilibré et souple, parfait pour les grillades.', price_ht: 11.25, price_ttc: 13.50, purchase_price: 6.50, tva_rate: 20, visible_boutique: true,
-      category: 'Rouges', label: 'HVE', sort_order: 4,
+      category: 'Rouges', category_id: IDS.cat_rouges, label: 'HVE', sort_order: 4,
       region: 'Loire', appellation: 'Anjou', color: 'rouge', vintage: 2022,
       grape_varieties: JSON.stringify(['Cabernet Franc']),
       serving_temp: '15-17°C',
@@ -367,7 +414,7 @@ exports.seed = async function (knex) {
     },
     {
       id: IDS.cremant, name: 'Crémant de Loire', description: 'Effervescent méthode traditionnelle, 18 mois sur lattes. Fines bulles, fraîcheur et élégance.', price_ht: 10.75, price_ttc: 12.90, purchase_price: 5.90, tva_rate: 20, visible_boutique: true,
-      category: 'Effervescents', label: null, sort_order: 5,
+      category: 'Effervescents', category_id: IDS.cat_effervescents, label: null, sort_order: 5,
       region: 'Loire', appellation: 'Crémant de Loire', color: 'effervescent', vintage: null,
       grape_varieties: JSON.stringify(['Chenin Blanc', 'Chardonnay']),
       serving_temp: '6-8°C',
@@ -378,7 +425,7 @@ exports.seed = async function (knex) {
     },
     {
       id: IDS.coffret, name: 'Coffret Découverte 3bt', description: 'Coffret de 3 bouteilles pour découvrir notre gamme : 1 blanc, 1 rouge et 1 effervescent.', price_ht: 26.67, price_ttc: 32.00, purchase_price: 14.00, tva_rate: 20,
-      category: 'Coffrets', label: null, sort_order: 6,
+      category: 'Coffrets', category_id: IDS.cat_coffrets, label: null, sort_order: 6,
       region: 'Loire', appellation: null, color: null, vintage: null,
       grape_varieties: JSON.stringify([]),
       serving_temp: null,
@@ -389,7 +436,7 @@ exports.seed = async function (knex) {
     },
     {
       id: IDS.coteaux, name: 'Coteaux du Layon', description: 'Grand moelleux du Layon aux arômes de fruits exotiques et miel d\'acacia. Idéal avec foie gras ou desserts.', price_ht: 9.17, price_ttc: 11.00, purchase_price: 5.30, tva_rate: 20, visible_boutique: true,
-      category: 'Blancs Moelleux', label: 'HVE', sort_order: 7,
+      category: 'Blancs Moelleux', category_id: IDS.cat_blancs_moelleux, label: 'HVE', sort_order: 7,
       region: 'Loire', appellation: 'Coteaux du Layon', color: 'blanc', vintage: 2022,
       grape_varieties: JSON.stringify(['Chenin Blanc']),
       serving_temp: '8-10°C',
@@ -400,7 +447,7 @@ exports.seed = async function (knex) {
     },
     {
       id: IDS.jus_pomme, name: 'Jus de Pomme', description: 'Pur jus de pommes Bio du Maine-et-Loire. Sans sucre ajouté, naturellement doux et rafraîchissant.', price_ht: 3.32, price_ttc: 3.50, purchase_price: 1.80, tva_rate: 5.5, visible_boutique: true,
-      category: 'Sans Alcool', label: 'Bio', sort_order: 8,
+      category: 'Sans Alcool', category_id: IDS.cat_jus_softs, label: 'Bio', sort_order: 8,
       region: 'Loire', appellation: null, color: 'sans_alcool', vintage: null,
       grape_varieties: JSON.stringify([]),
       serving_temp: '6-8°C',
@@ -423,7 +470,7 @@ exports.seed = async function (knex) {
   );
 
   // Idem pour les autres campagnes
-  for (const campId of [IDS.camp_cse_leroy, IDS.camp_ambassadeurs, IDS.camp_espl, IDS.camp_bts_espl]) {
+  for (const campId of [IDS.camp_cse_leroy, IDS.camp_ambassadeurs, IDS.camp_espl, IDS.camp_bts_espl, IDS.camp_boutique]) {
     await knex('campaign_products').insert(
       allProductIds.map((pid, i) => ({
         campaign_id: campId,
@@ -492,7 +539,7 @@ exports.seed = async function (knex) {
   });
 
   // Admin/commercial participent à toutes les campagnes
-  for (const campId of [IDS.camp_sacre_coeur, IDS.camp_cse_leroy, IDS.camp_ambassadeurs, IDS.camp_espl, IDS.camp_bts_espl]) {
+  for (const campId of [IDS.camp_sacre_coeur, IDS.camp_cse_leroy, IDS.camp_ambassadeurs, IDS.camp_espl, IDS.camp_bts_espl, IDS.camp_boutique]) {
     await knex('participations').insert([
       { user_id: IDS.nicolas, campaign_id: campId, role_in_campaign: 'admin' },
       { user_id: IDS.matheo, campaign_id: campId, role_in_campaign: 'commercial' },
