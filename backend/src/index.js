@@ -110,6 +110,8 @@ app.use('/api/v1/categories', require('./routes/categories'));
 app.use('/api/v1/admin/categories', require('./routes/categories').adminRouter);
 app.use('/api/v1/admin/settings', require('./routes/appSettings'));
 app.use('/api/v1/settings', require('./routes/appSettings').publicRouter);
+app.use('/api/v1/shipping', require('./routes/shipping').router);
+app.use('/api/v1/admin', require('./routes/shipping').adminRouter);
 
 // ─── Health check ─────────────────────────────────────
 app.get('/api/health', async (req, res) => {

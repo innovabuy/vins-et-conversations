@@ -3396,4 +3396,179 @@ describe('API Integration Tests', () => {
       expect(result.fund_individual).toBeNull();
     });
   });
+
+  // ─── Shipping (V4.1 Tâche 5) ─────────────────────────
+  describe('Shipping — POST /api/v1/shipping/calculate', () => {
+    test('Dept 49 (Loire Valley) qty=24 returns forfait rate with surcharges', async () => {
+      const res = await request(app)
+        .post('/api/v1/shipping/calculate')
+        .send({ dept_code: '49', qty: 24, date: '2026-03-15' });
+
+      expect(res.status).toBe(200);
+      expect(res.body.pricing_type).toBe('forfait');
+      expect(res.body.zone_name).toContain('49');
+      // Loire rate for 24-35: 21.80€ + sûreté 2€ + transition 0.15€ = 23.95 HT
+      expect(res.body.price_ht).toBeCloseTo(23.95, 1);
+      expect(res.body.breakdown.base_price).toBeCloseTo(21.80, 1);
+      expect(res.body.surcharges.length).toBe(2); // sûreté + transition
+      expect(res.body.price_ttc).toBeCloseTo(res.body.price_ht * 1.20, 1);
+    });
+
+    test('Dept 49 qty=100 returns par_colis rate', async () => {
+      const res = await request(app)
+        .post('/api/v1/shipping/calculate')
+        .send({ dept_code: '49', qty: 100, date: '2026-03-15' });
+
+      expect(res.status).toBe(200);
+      expect(res.body.pricing_type).toBe('par_colis');
+      // Loire 60-119: 0.280€/u → 100 × 0.280 = 28.00 + 2 + 0.15 = 30.15 HT
+      expect(res.body.breakdown.base_price).toBeCloseTo(28.00, 1);
+      expect(res.body.price_ht).toBeCloseTo(30.15, 1);
+    });
+
+    test('Dept 20 (Corse) includes surcharge Corse', async () => {
+      const res = await request(app)
+        .post('/api/v1/shipping/calculate')
+        .send({ dept_code: '20', qty: 24, date: '2026-03-15' });
+
+      expect(res.status).toBe(200);
+      // Standard rate 24-35: 28.20 + sûreté 2 + transition 0.15 + Corse 15 = 45.35 HT
+      expect(res.body.price_ht).toBeCloseTo(45.35, 1);
+      const corsSurcharge = res.body.surcharges.find((s) => s.label.includes('Corse'));
+      expect(corsSurcharge).toBeDefined();
+      expect(corsSurcharge.amount).toBe(15);
+    });
+
+    test('Dept 13 seasonal surcharge applies in June', async () => {
+      const res = await request(app)
+        .post('/api/v1/shipping/calculate')
+        .send({ dept_code: '13', qty: 12, date: '2026-06-15' });
+
+      expect(res.status).toBe(200);
+      // Standard 1-12: 21.51 + 2 + 0.15 = 23.66, seasonal +25% = 5.915 → total 29.575
+      const seasonal = res.body.surcharges.find((s) => s.label.includes('Saisonnier'));
+      expect(seasonal).toBeDefined();
+      expect(seasonal.amount).toBeGreaterThan(0);
+      // Should be ~25% more than without seasonal
+      expect(res.body.price_ht).toBeCloseTo(29.58, 0);
+    });
+
+    test('Dept 13 no seasonal surcharge in February', async () => {
+      const res = await request(app)
+        .post('/api/v1/shipping/calculate')
+        .send({ dept_code: '13', qty: 12, date: '2026-02-15' });
+
+      expect(res.status).toBe(200);
+      // Standard 1-12: 21.51 + 2 + 0.15 = 23.66 HT, no seasonal
+      expect(res.body.price_ht).toBeCloseTo(23.66, 1);
+      const seasonal = res.body.surcharges.find((s) => s.label.includes('Saisonnier'));
+      expect(seasonal).toBeUndefined();
+    });
+
+    test('Unknown department returns 404 ZONE_NOT_FOUND', async () => {
+      const res = await request(app)
+        .post('/api/v1/shipping/calculate')
+        .send({ dept_code: '99', qty: 10, date: '2026-03-15' });
+
+      expect(res.status).toBe(404);
+      expect(res.body.code).toBe('ZONE_NOT_FOUND');
+    });
+
+    test('Missing params returns 400', async () => {
+      const res = await request(app)
+        .post('/api/v1/shipping/calculate')
+        .send({});
+
+      expect(res.status).toBe(400);
+      expect(res.body.code).toBe('INVALID_PARAMS');
+    });
+
+    test('Invalid qty returns 400', async () => {
+      const res = await request(app)
+        .post('/api/v1/shipping/calculate')
+        .send({ dept_code: '49', qty: -5 });
+
+      expect(res.status).toBe(400);
+      expect(res.body.code).toBe('INVALID_QTY');
+    });
+  });
+
+  describe('Shipping Admin — GET /api/v1/admin/shipping-zones', () => {
+    test('Admin can list shipping zones', async () => {
+      const res = await request(app)
+        .get('/api/v1/admin/shipping-zones')
+        .set('Authorization', `Bearer ${adminToken}`);
+
+      expect(res.status).toBe(200);
+      expect(res.body.data).toBeDefined();
+      expect(res.body.data.length).toBeGreaterThan(90);
+    });
+
+    test('Student cannot access admin shipping zones', async () => {
+      const res = await request(app)
+        .get('/api/v1/admin/shipping-zones')
+        .set('Authorization', `Bearer ${studentToken}`);
+
+      expect(res.status).toBe(403);
+    });
+
+    test('Admin can list shipping rates', async () => {
+      const res = await request(app)
+        .get('/api/v1/admin/shipping-rates')
+        .set('Authorization', `Bearer ${adminToken}`);
+
+      expect(res.status).toBe(200);
+      expect(res.body.data).toBeDefined();
+      expect(res.body.data.length).toBeGreaterThan(100);
+    });
+
+    test('Admin can filter rates by dept_code', async () => {
+      const res = await request(app)
+        .get('/api/v1/admin/shipping-rates')
+        .set('Authorization', `Bearer ${adminToken}`)
+        .query({ dept_code: '49' });
+
+      expect(res.status).toBe(200);
+      expect(res.body.data.length).toBe(10); // 10 qty ranges for dept 49
+      res.body.data.forEach((r) => expect(r.dept_code).toBe('49'));
+    });
+  });
+
+  describe('Boutique Order — shipping integration', () => {
+    test('Boutique order includes shipping in total when postal_code provided', async () => {
+      const boutiqueOrderService = require('../services/boutiqueOrderService');
+      const product = await db('products').where({ active: true }).first();
+
+      const result = await boutiqueOrderService.createBoutiqueOrder({
+        cartItems: [{ product_id: product.id, qty: 6 }],
+        customer: {
+          name: 'Test Shipping',
+          email: 'test-shipping@example.com',
+          phone: '0600000000',
+          address: '1 rue Test',
+          city: 'Angers',
+          postal_code: '49000',
+        },
+        referralCode: null,
+      });
+
+      expect(result.status).toBe('pending_payment');
+      expect(result.shipping_ht).toBeGreaterThan(0);
+      expect(result.shipping_ttc).toBeGreaterThan(0);
+      // Total should include product + shipping
+      expect(result.total_ttc).toBeGreaterThan(result.shipping_ttc);
+
+      // Check order_items include shipping line
+      const items = await db('order_items').where({ order_id: result.id });
+      const shippingItem = items.find((i) => i.type === 'shipping');
+      expect(shippingItem).toBeDefined();
+      expect(shippingItem.product_id).toBeNull();
+      expect(parseFloat(shippingItem.unit_price_ht)).toBe(result.shipping_ht);
+
+      // Cleanup
+      await db('financial_events').where({ order_id: result.id }).del();
+      await db('order_items').where({ order_id: result.id }).del();
+      await db('orders').where({ id: result.id }).del();
+    });
+  });
 });

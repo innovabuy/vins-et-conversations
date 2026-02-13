@@ -24,6 +24,7 @@ const allNavItems = [
   { to: '/admin/categories', icon: Tag, label: 'Catégories' },
   { to: '/admin/notifications', icon: Bell, label: 'Notifications' },
   { to: '/admin/routes', icon: Map, label: 'Tournées' },
+  { to: '/admin/shipping', icon: Truck, label: 'Transport', adminOnly: true },
   { to: '/admin/pricing', icon: FileText, label: 'Conditions', adminOnly: true },
   { to: '/admin/exports', icon: Download, label: 'Exports', adminOnly: true },
   { to: '/admin/users', icon: Settings, label: 'Utilisateurs', adminOnly: true },

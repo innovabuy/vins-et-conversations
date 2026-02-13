@@ -80,6 +80,7 @@ exports.seed = async function (knex) {
     'order_items', 'orders', 'contacts',
     'stock_movements', 'campaign_products', 'products', 'product_categories',
     'invitations', 'participations', 'campaigns', 'client_types', 'organizations',
+    'shipping_rates', 'shipping_zones',
     'refresh_tokens', 'users', 'app_settings',
   ];
   for (const table of tables) {
@@ -746,5 +747,10 @@ exports.seed = async function (knex) {
       active: true,
     },
   ]);
+  // ─── Shipping grid import ────────────────────────────
+  const { importShippingGrid } = require('../scripts/import-shipping-grid');
+  const shippingResult = await importShippingGrid(knex);
+  console.log(`✅ Grille transport: ${shippingResult.zones} zones, ${shippingResult.rates} tarifs`);
+
   console.log('✅ Seed complet Vins & Conversations — Données CDC v4');
 };

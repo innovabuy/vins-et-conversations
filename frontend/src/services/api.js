@@ -289,4 +289,14 @@ export const boutiqueAPI = {
   resolveAmbassador: (code) => api.get(`/public/ambassador/${code}`),
 };
 
+// ─── Shipping ────────────────────────────────────
+export const shippingAPI = {
+  calculate: (data) => api.post('/shipping/calculate', data),
+  zones: () => api.get('/admin/shipping-zones'),
+  updateZone: (id, data) => api.put(`/admin/shipping-zones/${id}`, data),
+  rates: (params) => api.get('/admin/shipping-rates', { params }),
+  updateRate: (id, data) => api.put(`/admin/shipping-rates/${id}`, data),
+  importGrid: () => api.post('/admin/shipping-rates/import'),
+};
+
 export default api;

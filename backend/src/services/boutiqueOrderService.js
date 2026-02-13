@@ -123,6 +123,55 @@ async function createBoutiqueOrder({ cartItems, customer, referralCode }) {
     });
   }
 
+  // ─── Shipping calculation (V4.1) ─────────────────────
+  let shippingHT = 0;
+  let shippingTTC = 0;
+  let shippingBreakdown = null;
+
+  if (customer.postal_code) {
+    const deptCode = customer.postal_code.substring(0, 2);
+    const calcDate = new Date().toISOString().slice(0, 10);
+
+    const zone = await db('shipping_zones')
+      .where({ dept_code: deptCode, difficulty: 'standard', active: true })
+      .first();
+
+    if (zone) {
+      const rate = await db('shipping_rates')
+        .where({ zone_id: zone.id })
+        .where('min_qty', '<=', totalItems)
+        .where('max_qty', '>=', totalItems)
+        .where('valid_from', '<=', calcDate)
+        .where('valid_to', '>=', calcDate)
+        .first();
+
+      if (rate) {
+        const priceHt = parseFloat(rate.price_ht);
+        let basePrice = rate.pricing_type === 'forfait' ? priceHt : parseFloat((priceHt * totalItems).toFixed(2));
+        let surcharges = 2.00 + 0.15; // sûreté + transition
+        const surCorse = parseFloat(zone.surcharge_corse || 0);
+        surcharges += surCorse;
+        let subtotal = basePrice + surcharges;
+
+        // Seasonal
+        const d = new Date(calcDate);
+        const month = d.getMonth() + 1;
+        if (zone.seasonal_eligible && month >= 5 && month <= 8) {
+          const pct = parseFloat(zone.surcharge_seasonal_pct || 0);
+          subtotal += subtotal * pct / 100;
+        }
+
+        shippingHT = parseFloat(subtotal.toFixed(2));
+        shippingTTC = parseFloat((shippingHT * 1.20).toFixed(2));
+        shippingBreakdown = { zone: zone.dept_name, base: basePrice, surcharges, total_ht: shippingHT, total_ttc: shippingTTC };
+      }
+    }
+  }
+
+  // Add shipping to totals
+  totalHT += shippingHT;
+  totalTTC += shippingTTC;
+
   await db.transaction(async (trx) => {
     await trx('orders').insert({
       id: orderId,
@@ -140,7 +189,21 @@ async function createBoutiqueOrder({ cartItems, customer, referralCode }) {
       total_items: totalItems,
     });
 
-    await trx('order_items').insert(orderItems);
+    // Insert product items
+    await trx('order_items').insert(orderItems.map((oi) => ({ ...oi, type: 'product' })));
+
+    // Insert shipping item if applicable
+    if (shippingHT > 0) {
+      await trx('order_items').insert({
+        order_id: orderId,
+        product_id: null,
+        qty: 1,
+        unit_price_ht: shippingHT,
+        unit_price_ttc: shippingTTC,
+        free_qty: 0,
+        type: 'shipping',
+      });
+    }
 
     await trx('financial_events').insert({
       order_id: orderId,
@@ -159,6 +222,9 @@ async function createBoutiqueOrder({ cartItems, customer, referralCode }) {
     total_ht: parseFloat(totalHT.toFixed(2)),
     total_ttc: parseFloat(totalTTC.toFixed(2)),
     total_items: totalItems,
+    shipping_ht: shippingHT,
+    shipping_ttc: shippingTTC,
+    shipping: shippingBreakdown,
     status: 'pending_payment',
     source,
     customer_email: contact.email,
@@ -188,8 +254,8 @@ async function confirmBoutiqueOrder(orderId, paymentIntentId) {
     reconciled_at: new Date(),
   });
 
-  // Stock movements
-  const items = await db('order_items').where({ order_id: orderId }).select('product_id', 'qty');
+  // Stock movements (only product items, not shipping)
+  const items = await db('order_items').where({ order_id: orderId }).whereNotNull('product_id').select('product_id', 'qty');
   if (items.length > 0) {
     await db('stock_movements').insert(
       items.map((item) => ({
@@ -243,9 +309,14 @@ async function getOrderByRefAndEmail(ref, email) {
   if (!order) return null;
 
   const items = await db('order_items')
-    .join('products', 'order_items.product_id', 'products.id')
+    .leftJoin('products', 'order_items.product_id', 'products.id')
     .where('order_items.order_id', order.id)
-    .select('products.name', 'order_items.qty', 'order_items.unit_price_ttc');
+    .select(
+      db.raw("COALESCE(products.name, 'Frais de port') as name"),
+      'order_items.qty',
+      'order_items.unit_price_ttc',
+      'order_items.type'
+    );
 
   return { ...order, items };
 }

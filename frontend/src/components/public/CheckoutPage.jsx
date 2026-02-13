@@ -1,8 +1,8 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useCart } from '../../contexts/CartContext';
-import { boutiqueAPI } from '../../services/api';
-import { ArrowLeft, Lock, ShoppingCart } from 'lucide-react';
+import { boutiqueAPI, shippingAPI } from '../../services/api';
+import { ArrowLeft, Lock, ShoppingCart, Truck, Loader2 } from 'lucide-react';
 
 const formatEur = (v) => new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR' }).format(v);
 
@@ -15,6 +15,34 @@ export default function CheckoutPage() {
   const [errors, setErrors] = useState({});
   const [submitting, setSubmitting] = useState(false);
   const [orderError, setOrderError] = useState('');
+  const [shipping, setShipping] = useState(null);
+  const [shippingLoading, setShippingLoading] = useState(false);
+  const [shippingError, setShippingError] = useState('');
+
+  // Fetch shipping when postal code is 5 digits
+  useEffect(() => {
+    if (!/^\d{5}$/.test(form.postal_code) || cart.total_items === 0) {
+      setShipping(null);
+      setShippingError('');
+      return;
+    }
+    const deptCode = form.postal_code.substring(0, 2);
+    setShippingLoading(true);
+    setShippingError('');
+    shippingAPI.calculate({ dept_code: deptCode, qty: cart.total_items })
+      .then((res) => setShipping(res.data))
+      .catch((err) => {
+        setShipping(null);
+        if (err.response?.data?.code === 'ZONE_NOT_FOUND') {
+          setShippingError('Livraison non disponible pour votre département — contactez-nous');
+        } else {
+          setShippingError('Impossible de calculer les frais de livraison');
+        }
+      })
+      .finally(() => setShippingLoading(false));
+  }, [form.postal_code, cart.total_items]);
+
+  const grandTotalTTC = cart.total_ttc + (shipping?.price_ttc || 0);
 
   if (cart.items.length === 0) {
     return (
@@ -56,14 +84,11 @@ export default function CheckoutPage() {
       // If Stripe is configured, we'd integrate payment here.
       // For now, auto-confirm (simulates payment success)
       if (res.data.client_secret) {
-        // TODO: Integrate Stripe PaymentElement when in production
-        // For dev/demo, auto-confirm
         await boutiqueAPI.confirmCheckout({
           order_id: res.data.order_id,
           payment_intent_id: 'pi_demo_' + Date.now(),
         });
       } else {
-        // No Stripe configured — auto-confirm
         await boutiqueAPI.confirmCheckout({
           order_id: res.data.order_id,
           payment_intent_id: 'pi_demo_' + Date.now(),
@@ -144,11 +169,11 @@ export default function CheckoutPage() {
             </p>
             <button
               type="submit"
-              disabled={submitting}
+              disabled={submitting || !!shippingError}
               className="btn-primary w-full flex items-center justify-center gap-2 py-3 disabled:opacity-50"
             >
               <Lock size={16} />
-              {submitting ? 'Traitement...' : `Payer ${formatEur(cart.total_ttc)}`}
+              {submitting ? 'Traitement...' : `Payer ${formatEur(grandTotalTTC)}`}
             </button>
           </div>
         </form>
@@ -168,9 +193,59 @@ export default function CheckoutPage() {
                 </div>
               ))}
             </div>
+
+            {/* Sous-total produits */}
+            <div className="border-t pt-3 flex justify-between text-sm">
+              <span className="text-gray-600">Sous-total produits</span>
+              <span className="font-medium">{formatEur(cart.total_ttc)}</span>
+            </div>
+
+            {/* Shipping */}
+            <div className="flex justify-between text-sm">
+              <span className="text-gray-600 flex items-center gap-1">
+                <Truck size={14} /> Livraison
+              </span>
+              {shippingLoading ? (
+                <span className="text-gray-400 flex items-center gap-1">
+                  <Loader2 size={14} className="animate-spin" /> Calcul...
+                </span>
+              ) : shippingError ? (
+                <span className="text-red-500 text-xs">{shippingError}</span>
+              ) : shipping ? (
+                <span className="font-medium">{formatEur(shipping.price_ttc)}</span>
+              ) : (
+                <span className="text-gray-400 text-xs">Renseignez le code postal</span>
+              )}
+            </div>
+
+            {/* Shipping breakdown */}
+            {shipping && shipping.surcharges && (
+              <div className="bg-white rounded-lg p-3 text-xs text-gray-500 space-y-1">
+                <div className="flex justify-between">
+                  <span>{shipping.zone_name} ({shipping.pricing_type === 'forfait' ? 'forfait' : 'par colis'})</span>
+                  <span>{formatEur(shipping.breakdown.base_price)}</span>
+                </div>
+                {shipping.surcharges.map((s, i) => (
+                  <div key={i} className="flex justify-between">
+                    <span>{s.label}</span>
+                    <span>+{formatEur(s.amount)}</span>
+                  </div>
+                ))}
+                <div className="flex justify-between font-medium text-gray-700 pt-1 border-t">
+                  <span>Transport HT</span>
+                  <span>{formatEur(shipping.price_ht)}</span>
+                </div>
+                <div className="flex justify-between text-gray-400">
+                  <span>TVA 20%</span>
+                  <span>{formatEur(shipping.price_ttc - shipping.price_ht)}</span>
+                </div>
+              </div>
+            )}
+
+            {/* Grand total */}
             <div className="border-t pt-3 flex justify-between font-bold text-lg">
               <span>Total TTC</span>
-              <span className="text-wine-700">{formatEur(cart.total_ttc)}</span>
+              <span className="text-wine-700">{formatEur(grandTotalTTC)}</span>
             </div>
           </div>
         </div>
