@@ -98,6 +98,61 @@ async function calculateAssociationCommission(campaignId, commissionRules) {
   };
 }
 
+// ─── §3.2b Double cagnotte (V4.1) ────────────────────
+
+/**
+ * Calcule les cagnottes collective et individuelle
+ * Backward compat: si seul "association" existe, il est traité comme fund_collective
+ * @param {string} campaignId
+ * @param {string} userId - Student user ID (for individual fund)
+ * @param {Object} commissionRules - Rules JSONB
+ * @returns {Object} { fund_collective, fund_individual }
+ */
+async function calculateFunds(campaignId, userId, commissionRules) {
+  if (!commissionRules) return { fund_collective: null, fund_individual: null };
+
+  // Backward compat: old format uses "association", new format uses "fund_collective"
+  const collectiveRule = commissionRules.fund_collective || commissionRules.association || null;
+  const individualRule = commissionRules.fund_individual || null;
+
+  let fund_collective = null;
+  let fund_individual = null;
+
+  if (collectiveRule && collectiveRule.type === 'percentage') {
+    const totalHT = await db('orders')
+      .where({ campaign_id: campaignId })
+      .whereIn('status', ['validated', 'preparing', 'shipped', 'delivered'])
+      .sum('total_ht as total')
+      .first();
+    const base = parseFloat(totalHT?.total || 0);
+    const rate = collectiveRule.value / 100;
+    fund_collective = {
+      amount: parseFloat((base * rate).toFixed(2)),
+      rate: collectiveRule.value,
+      base_amount: base,
+      label: collectiveRule.label || 'Cagnotte collective',
+    };
+  }
+
+  if (individualRule && individualRule.type === 'percentage') {
+    const studentHT = await db('orders')
+      .where({ user_id: userId, campaign_id: campaignId })
+      .whereIn('status', ['submitted', 'validated', 'preparing', 'shipped', 'delivered'])
+      .sum('total_ht as total')
+      .first();
+    const base = parseFloat(studentHT?.total || 0);
+    const rate = individualRule.value / 100;
+    fund_individual = {
+      amount: parseFloat((base * rate).toFixed(2)),
+      rate: individualRule.value,
+      base_amount: base,
+      label: individualRule.label || 'Cagnotte individuelle',
+    };
+  }
+
+  return { fund_collective, fund_individual };
+}
+
 // ─── §3.3 Bouteilles gratuites ───────────────────────
 
 /**
@@ -197,29 +252,49 @@ async function loadRulesForCampaign(campaignId) {
       'client_types.commission_rules',
       'client_types.free_bottle_rules',
       'client_types.tier_rules',
-      'client_types.ui_config'
+      'client_types.ui_config',
+      'campaigns.config as campaign_config'
     )
     .first();
 
   if (!campaign) throw new Error('CAMPAIGN_NOT_FOUND');
 
+  const parse = (v) => typeof v === 'string' ? JSON.parse(v) : (v || {});
+
+  let commission = parse(campaign.commission_rules);
+  const campConfig = parse(campaign.campaign_config);
+
+  // Merge campaign-level commission overrides (V4.1 — per-campaign rates)
+  if (campConfig.fund_collective_pct != null) {
+    commission.fund_collective = {
+      type: 'percentage',
+      value: campConfig.fund_collective_pct,
+      base: 'ca_ht_global',
+      label: commission.fund_collective?.label || 'Cagnotte collective',
+    };
+  }
+  if (campConfig.fund_individual_pct != null) {
+    commission.fund_individual = {
+      type: 'percentage',
+      value: campConfig.fund_individual_pct,
+      base: 'ca_ht_student',
+      label: commission.fund_individual?.label || 'Cagnotte individuelle',
+    };
+  }
+
   return {
-    pricing: typeof campaign.pricing_rules === 'string'
-      ? JSON.parse(campaign.pricing_rules) : campaign.pricing_rules,
-    commission: typeof campaign.commission_rules === 'string'
-      ? JSON.parse(campaign.commission_rules) : campaign.commission_rules,
-    freeBottle: typeof campaign.free_bottle_rules === 'string'
-      ? JSON.parse(campaign.free_bottle_rules) : campaign.free_bottle_rules,
-    tier: typeof campaign.tier_rules === 'string'
-      ? JSON.parse(campaign.tier_rules) : campaign.tier_rules,
-    ui: typeof campaign.ui_config === 'string'
-      ? JSON.parse(campaign.ui_config) : campaign.ui_config,
+    pricing: parse(campaign.pricing_rules),
+    commission,
+    freeBottle: parse(campaign.free_bottle_rules),
+    tier: parse(campaign.tier_rules),
+    ui: parse(campaign.ui_config),
   };
 }
 
 module.exports = {
   applyPricingRules,
   calculateAssociationCommission,
+  calculateFunds,
   calculateFreeBottles,
   calculateTier,
   loadRulesForCampaign,

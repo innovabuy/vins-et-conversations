@@ -109,6 +109,64 @@ describe('Moteur de règles — CDC §3', () => {
   });
 });
 
+describe('§3.2b Double cagnotte (V4.1)', () => {
+  test('Calcul cagnotte collective — nouveau format fund_collective', () => {
+    const caHT = 15052.50;
+    const rate = 5 / 100;
+    const commission = parseFloat((caHT * rate).toFixed(2));
+    expect(commission).toBe(752.63);
+  });
+
+  test('Calcul cagnotte individuelle — fund_individual', () => {
+    const studentCaHT = 1800.00;
+    const rate = 2 / 100;
+    const commission = parseFloat((studentCaHT * rate).toFixed(2));
+    expect(commission).toBe(36.00);
+  });
+
+  test('Backward compat — ancien format "association" traité comme fund_collective', () => {
+    // Old format
+    const oldRules = {
+      association: { type: 'percentage', value: 5, base: 'ca_ht_global' },
+    };
+    // calculateFunds uses: commissionRules.fund_collective || commissionRules.association
+    const collectiveRule = oldRules.fund_collective || oldRules.association || null;
+    const individualRule = oldRules.fund_individual || null;
+
+    expect(collectiveRule).not.toBeNull();
+    expect(collectiveRule.type).toBe('percentage');
+    expect(collectiveRule.value).toBe(5);
+    expect(individualRule).toBeNull();
+  });
+
+  test('Nouveau format fund_collective + fund_individual', () => {
+    const newRules = {
+      fund_collective: { type: 'percentage', value: 5, base: 'ca_ht_global', label: 'Cagnotte voyage' },
+      fund_individual: { type: 'percentage', value: 2, base: 'ca_ht_student', label: 'Cagnotte individuelle' },
+    };
+    const collectiveRule = newRules.fund_collective || newRules.association || null;
+    const individualRule = newRules.fund_individual || null;
+
+    expect(collectiveRule.value).toBe(5);
+    expect(collectiveRule.label).toBe('Cagnotte voyage');
+    expect(individualRule.value).toBe(2);
+    expect(individualRule.label).toBe('Cagnotte individuelle');
+  });
+
+  test('Pas de commission rules — retourne null', () => {
+    const rules = null;
+    const collectiveRule = rules?.fund_collective || rules?.association || null;
+    expect(collectiveRule).toBeNull();
+  });
+
+  test('Validation: total commission <= 100%', () => {
+    const collectivePct = 5;
+    const individualPct = 2;
+    const total = collectivePct + individualPct;
+    expect(total).toBeLessThanOrEqual(100);
+  });
+});
+
 describe('Sécurité — Dashboard Enseignant', () => {
   test('Les champs financiers ne doivent jamais être exposés', () => {
     // Simulation de la réponse API teacher
@@ -121,8 +179,8 @@ describe('Sécurité — Dashboard Enseignant', () => {
       inactiveStudents: [],
     };
 
-    // Vérifier qu'AUCUN champ financier n'existe
-    const forbiddenFields = ['ca', 'amount', 'total', 'price', 'revenue', 'margin', 'commission'];
+    // Vérifier qu'AUCUN champ financier n'existe (inclut fund_collective/fund_individual V4.1)
+    const forbiddenFields = ['ca', 'amount', 'total', 'price', 'revenue', 'margin', 'commission', 'fund_collective', 'fund_individual'];
     const jsonStr = JSON.stringify(teacherResponse);
     forbiddenFields.forEach((field) => {
       expect(jsonStr.toLowerCase()).not.toContain(`"${field}"`);

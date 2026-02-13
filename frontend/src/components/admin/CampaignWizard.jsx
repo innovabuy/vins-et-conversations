@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { campaignsAPI } from '../../services/api';
-import { ChevronLeft, ChevronRight, Check, Building2, Users, Wine, Settings, FileText, Rocket, Image } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Check, Building2, Users, Wine, Settings, FileText, Rocket, Image, PiggyBank } from 'lucide-react';
 import { organizationsAPI } from '../../services/api';
 import { useAppSettings } from '../../contexts/AppSettingsContext';
 import { formatEur } from '../../utils/chartTheme';
@@ -39,6 +39,8 @@ export default function CampaignWizard() {
     start_date: '',
     end_date: '',
     config: {},
+    fund_collective_pct: '',
+    fund_individual_pct: '',
     products: [],
     participants: [],
   });
@@ -67,9 +69,13 @@ export default function CampaignWizard() {
       if (form.partner_logo_url && form.org_id) {
         await organizationsAPI.update(form.org_id, { logo_url: form.partner_logo_url }).catch(() => {});
       }
-      const { partner_logo_url, ...rest } = form;
+      const { partner_logo_url, fund_collective_pct, fund_individual_pct, ...rest } = form;
+      const configWithFunds = { ...rest.config };
+      if (fund_collective_pct !== '' && fund_collective_pct != null) configWithFunds.fund_collective_pct = parseFloat(fund_collective_pct);
+      if (fund_individual_pct !== '' && fund_individual_pct != null) configWithFunds.fund_individual_pct = parseFloat(fund_individual_pct);
       const payload = {
         ...rest,
+        config: configWithFunds,
         goal: parseFloat(rest.goal) || 0,
         start_date: rest.start_date || null,
         end_date: rest.end_date || null,
@@ -229,6 +235,56 @@ export default function CampaignWizard() {
                 <input type="date" value={form.end_date} onChange={(e) => updateForm('end_date', e.target.value)} className="w-full border rounded-lg px-3 py-2" />
               </div>
             </div>
+
+            {/* Commission % inputs — visible for types with commission rules */}
+            {selectedType && ['scolaire', 'bts_ndrc'].includes(selectedType.name) && (
+              <div className="mt-6 p-4 bg-wine-50 rounded-xl space-y-4">
+                <div className="flex items-center gap-2 mb-1">
+                  <PiggyBank size={18} className="text-wine-700" />
+                  <h3 className="font-semibold text-sm text-wine-800">Cagnottes (commissions)</h3>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium mb-1">% Cagnotte collective</label>
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="number"
+                        min="0" max="100" step="0.5"
+                        value={form.fund_collective_pct}
+                        onChange={(e) => updateForm('fund_collective_pct', e.target.value)}
+                        className="w-full border rounded-lg px-3 py-2"
+                        placeholder="5"
+                      />
+                      <span className="text-sm text-gray-500 font-medium">%</span>
+                    </div>
+                    <p className="text-xs text-gray-500 mt-1">Sur le CA HT global de la campagne</p>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium mb-1">% Cagnotte individuelle</label>
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="number"
+                        min="0" max="100" step="0.5"
+                        value={form.fund_individual_pct}
+                        onChange={(e) => updateForm('fund_individual_pct', e.target.value)}
+                        className="w-full border rounded-lg px-3 py-2"
+                        placeholder="2"
+                      />
+                      <span className="text-sm text-gray-500 font-medium">%</span>
+                    </div>
+                    <p className="text-xs text-gray-500 mt-1">Sur le CA HT personnel de l'eleve</p>
+                  </div>
+                </div>
+                {(() => {
+                  const total = (parseFloat(form.fund_collective_pct) || 0) + (parseFloat(form.fund_individual_pct) || 0);
+                  return total > 100 ? (
+                    <p className="text-xs text-red-600 font-medium">Total des commissions ({total}%) depasse 100%</p>
+                  ) : total > 0 ? (
+                    <p className="text-xs text-wine-600">Total commissions : {total}%</p>
+                  ) : null;
+                })()}
+              </div>
+            )}
           </div>
         )}
 

@@ -3296,4 +3296,104 @@ describe('API Integration Tests', () => {
       expect(res.status).toBe(403);
     });
   });
+
+  describe('Double cagnotte — V4.1', () => {
+    let tchToken;
+
+    beforeAll(async () => {
+      const res = await request(app)
+        .post('/api/v1/auth/login')
+        .send({ email: 'enseignant@sacrecoeur.fr', password: 'VinsConv2026!' });
+      tchToken = res.body.accessToken;
+    });
+
+    test('Student dashboard returns fund_collective and fund_individual', async () => {
+      const res = await request(app)
+        .get('/api/v1/dashboard/student')
+        .set('Authorization', `Bearer ${studentToken}`)
+        .query({ campaign_id: campaignId });
+
+      expect(res.status).toBe(200);
+      // fund_collective should be present (scolaire type has it in seed)
+      expect(res.body).toHaveProperty('fund_collective');
+      if (res.body.fund_collective) {
+        expect(res.body.fund_collective).toHaveProperty('amount');
+        expect(res.body.fund_collective).toHaveProperty('rate');
+        expect(res.body.fund_collective).toHaveProperty('base_amount');
+        expect(res.body.fund_collective).toHaveProperty('label');
+        expect(typeof res.body.fund_collective.amount).toBe('number');
+        expect(typeof res.body.fund_collective.rate).toBe('number');
+      }
+      // fund_individual should be present (scolaire type now has it)
+      expect(res.body).toHaveProperty('fund_individual');
+      if (res.body.fund_individual) {
+        expect(res.body.fund_individual).toHaveProperty('amount');
+        expect(res.body.fund_individual).toHaveProperty('rate');
+        expect(res.body.fund_individual).toHaveProperty('label');
+      }
+    });
+
+    test('Teacher dashboard has NO monetary fields including funds', async () => {
+      if (!tchToken) return;
+
+      const res = await request(app)
+        .get('/api/v1/dashboard/teacher')
+        .set('Authorization', `Bearer ${tchToken}`)
+        .query({ campaign_id: campaignId });
+
+      expect(res.status).toBe(200);
+      const json = JSON.stringify(res.body);
+      const forbidden = ['fund_collective', 'fund_individual', '"amount"', '"commission"', '"revenue"', '"margin"'];
+      forbidden.forEach((field) => {
+        expect(json.toLowerCase()).not.toContain(field.toLowerCase());
+      });
+    });
+
+    test('Commissions CSV export uses dynamic rates (not hardcoded 5%)', async () => {
+      const res = await request(app)
+        .get('/api/v1/admin/exports/commissions')
+        .set('Authorization', `Bearer ${adminToken}`);
+
+      expect(res.status).toBe(200);
+      expect(res.headers['content-type']).toContain('text/csv');
+      const csv = res.text;
+      // New format has taux_collectif and taux_individuel columns
+      expect(csv).toContain('taux_collectif');
+      expect(csv).toContain('commission_collective');
+      expect(csv).toContain('taux_individuel');
+      expect(csv).toContain('commission_individuelle');
+      // Old hardcoded 5% column should not exist
+      expect(csv).not.toContain('"taux"');
+    });
+
+    test('rulesEngine.calculateFunds is exported', () => {
+      const rulesEngine = require('../services/rulesEngine');
+      expect(typeof rulesEngine.calculateFunds).toBe('function');
+    });
+
+    test('Backward compat: old association format works with calculateFunds', async () => {
+      const rulesEngine = require('../services/rulesEngine');
+      // Old format with association key only
+      const oldRules = { association: { type: 'percentage', value: 5, base: 'ca_ht_global' } };
+      // Use the shared campaignId and a student user
+      const student = await db('users').where({ role: 'etudiant' }).first();
+      const result = await rulesEngine.calculateFunds(campaignId, student.id, oldRules);
+
+      expect(result).toHaveProperty('fund_collective');
+      expect(result).toHaveProperty('fund_individual');
+      // fund_collective should be calculated (from association fallback)
+      if (result.fund_collective) {
+        expect(result.fund_collective.rate).toBe(5);
+      }
+      // fund_individual should be null (no individual rule in old format)
+      expect(result.fund_individual).toBeNull();
+    });
+
+    test('calculateFunds with null rules returns nulls', async () => {
+      const rulesEngine = require('../services/rulesEngine');
+      const result = await rulesEngine.calculateFunds('fake-id', 'fake-user', null);
+      expect(result.fund_collective).toBeNull();
+      expect(result.fund_individual).toBeNull();
+    });
+  });
 });

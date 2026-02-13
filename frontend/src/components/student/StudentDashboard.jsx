@@ -1,7 +1,8 @@
 import { useState, useEffect, useMemo } from 'react';
 import { dashboardAPI, productsAPI, ordersAPI } from '../../services/api';
 import { useAuth } from '../../contexts/AuthContext';
-import { Flame, Trophy, ShoppingCart, User, ChevronUp, Wine, Package, Clock, Award, Zap, Heart, Target, DollarSign, ArrowLeft, ArrowRight, Check, Phone, Mail, FileText, CreditCard, Banknote, Building, HelpCircle, Users, TrendingUp, TrendingDown, Minus, BarChart3 } from 'lucide-react';
+import { Flame, Trophy, ShoppingCart, User, ChevronUp, Wine, Package, Clock, Award, Zap, Heart, Target, DollarSign, ArrowLeft, ArrowRight, Check, Phone, Mail, FileText, CreditCard, Banknote, Building, HelpCircle, Users, TrendingUp, TrendingDown, Minus, BarChart3, PiggyBank } from 'lucide-react';
+import WinePiggyBank from '../shared/WinePiggyBank';
 
 const formatEur = (v) => new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR' }).format(v);
 const formatDate = (d) => new Date(d).toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit', year: 'numeric' });
@@ -495,6 +496,37 @@ export default function StudentDashboard() {
                 Encore {data.freeBottles.nextIn} bouteille(s) avant la prochaine gratuite
               </p>
             </div>
+
+            {/* Piggy banks — Cagnottes (V4.1) */}
+            {(data.fund_collective || data.fund_individual) && (
+              <div className="card">
+                <h3 className="font-semibold text-sm mb-3 flex items-center gap-2">
+                  <PiggyBank size={16} className="text-wine-700" /> Mes cagnottes
+                </h3>
+                <div className={`grid gap-4 ${data.fund_collective && data.fund_individual ? 'grid-cols-2' : 'grid-cols-1'}`}>
+                  {data.fund_collective && (
+                    <WinePiggyBank
+                      amount={data.fund_collective.amount}
+                      label={data.fund_collective.label}
+                      fillPct={campaign?.goal > 0 ? Math.min(95, (data.fund_collective.base_amount / campaign.goal) * 100) : 50}
+                      color="#722F37"
+                    />
+                  )}
+                  {data.fund_individual && (
+                    <WinePiggyBank
+                      amount={data.fund_individual.amount}
+                      label={data.fund_individual.label}
+                      fillPct={data.fund_individual.base_amount > 0 ? Math.min(95, (data.ca / (campaign?.avg_ca_per_student || data.ca)) * 50 + 20) : 10}
+                      color="#8B5E3C"
+                    />
+                  )}
+                </div>
+                <div className="mt-2 text-center">
+                  {data.fund_collective && <p className="text-[10px] text-gray-400">{data.fund_collective.rate}% du CA HT collectif</p>}
+                  {data.fund_individual && <p className="text-[10px] text-gray-400">{data.fund_individual.rate}% de ton CA HT perso</p>}
+                </div>
+              </div>
+            )}
 
             {/* Campaign collective stats */}
             {campaign && (

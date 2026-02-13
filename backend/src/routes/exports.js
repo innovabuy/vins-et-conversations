@@ -125,11 +125,14 @@ router.get('/commissions', async (req, res) => {
 
     let query = db('orders')
       .join('campaigns', 'orders.campaign_id', 'campaigns.id')
+      .join('client_types', 'campaigns.client_type_id', 'client_types.id')
       .whereIn('orders.status', ['validated', 'preparing', 'shipped', 'delivered'])
-      .groupBy('campaigns.id', 'campaigns.name')
+      .groupBy('campaigns.id', 'campaigns.name', 'client_types.commission_rules', 'campaigns.config')
       .select(
         'campaigns.id',
         'campaigns.name',
+        'client_types.commission_rules',
+        'campaigns.config as campaign_config',
         db.raw('SUM(orders.total_ht) as ca_ht')
       );
 
@@ -139,17 +142,26 @@ router.get('/commissions', async (req, res) => {
 
     const rows = campaigns.map((c) => {
       const caHT = parseFloat(c.ca_ht);
+      const rules = typeof c.commission_rules === 'string' ? JSON.parse(c.commission_rules) : (c.commission_rules || {});
+      const campConfig = typeof c.campaign_config === 'string' ? JSON.parse(c.campaign_config) : (c.campaign_config || {});
+
+      // Resolve collective rate: campaign override > fund_collective > association > 0
+      const collectivePct = campConfig.fund_collective_pct ?? rules.fund_collective?.value ?? rules.association?.value ?? 0;
+      const individualPct = campConfig.fund_individual_pct ?? rules.fund_individual?.value ?? 0;
+
       return {
         campaign: c.name,
         ca_ht: caHT.toFixed(2),
-        taux: '5%',
-        commission: (caHT * 0.05).toFixed(2),
+        taux_collectif: `${collectivePct}%`,
+        commission_collective: (caHT * collectivePct / 100).toFixed(2),
+        taux_individuel: `${individualPct}%`,
+        commission_individuelle: (caHT * individualPct / 100).toFixed(2),
       };
     });
 
     const csv = '\uFEFF' + stringify(rows, {
       header: true,
-      columns: ['campaign', 'ca_ht', 'taux', 'commission'],
+      columns: ['campaign', 'ca_ht', 'taux_collectif', 'commission_collective', 'taux_individuel', 'commission_individuelle'],
     });
 
     res.setHeader('Content-Type', 'text/csv; charset=utf-8');

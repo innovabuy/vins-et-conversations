@@ -191,7 +191,8 @@ exports.seed = async function (knex) {
       label: 'Financement Projet Scolaire',
       pricing_rules: JSON.stringify({ type: 'standard', value: 0, applies_to: 'all' }),
       commission_rules: JSON.stringify({
-        association: { type: 'percentage', value: 5, base: 'ca_ht_global' },
+        fund_collective: { type: 'percentage', value: 5, base: 'ca_ht_global', label: 'Cagnotte voyage' },
+        fund_individual: { type: 'percentage', value: 2, base: 'ca_ht_student', label: 'Cagnotte individuelle' },
         student: { type: 'free_bottle', trigger: 'every_n_sold', n: 12 },
       }),
       free_bottle_rules: JSON.stringify({
@@ -255,7 +256,8 @@ exports.seed = async function (knex) {
       label: 'BTS NDRC',
       pricing_rules: JSON.stringify({ type: 'standard', value: 0, applies_to: 'all' }),
       commission_rules: JSON.stringify({
-        association: { type: 'percentage', value: 5, base: 'ca_ht_global' },
+        fund_collective: { type: 'percentage', value: 5, base: 'ca_ht_global', label: 'Cagnotte projet' },
+        fund_individual: { type: 'percentage', value: 2, base: 'ca_ht_student', label: 'Cagnotte individuelle' },
         student: { type: 'free_bottle', trigger: 'every_n_sold', n: 12 },
       }),
       free_bottle_rules: JSON.stringify({

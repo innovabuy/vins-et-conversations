@@ -42,9 +42,10 @@ async function getStudentDashboard(userId, campaignId) {
   const position = ranking.findIndex((r) => r.user_id === userId) + 1;
   const totalParticipants = ranking.length;
 
-  // Règles bouteilles gratuites
+  // Règles bouteilles gratuites + cagnottes (V4.1)
   const rules = await rulesEngine.loadRulesForCampaign(campaignId);
   const freeBottles = await rulesEngine.calculateFreeBottles(userId, campaignId, rules.freeBottle);
+  const funds = await rulesEngine.calculateFunds(campaignId, userId, rules.commission);
 
   // Streak (simplifié — calculé depuis les dates de commandes)
   const recentOrders = await db('orders')
@@ -176,6 +177,8 @@ async function getStudentDashboard(userId, campaignId) {
     totalParticipants,
     classGroup: participation.class_group,
     freeBottles,
+    fund_collective: funds.fund_collective,
+    fund_individual: funds.fund_individual,
     streak,
     badges,
     ui: rules.ui,
