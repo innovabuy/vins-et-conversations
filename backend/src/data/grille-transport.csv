@@ -1,0 +1,1555 @@
+dept_code,dept_name,difficulty,min_qty,max_qty,price_ht,pricing_type,valid_from,valid_to
+1,Ain,standard,1,12,42.819,forfait,2026-02-01,2026-11-30
+1,Ain,standard,13,18,45.99,forfait,2026-02-01,2026-11-30
+1,Ain,standard,19,24,48.552,forfait,2026-02-01,2026-11-30
+1,Ain,standard,25,30,50.8095,forfait,2026-02-01,2026-11-30
+1,Ain,standard,31,36,52.5525,forfait,2026-02-01,2026-11-30
+1,Ain,standard,37,42,53.9385,forfait,2026-02-01,2026-11-30
+1,Ain,standard,43,48,55.3875,forfait,2026-02-01,2026-11-30
+1,Ain,standard,49,54,56.8155,forfait,2026-02-01,2026-11-30
+1,Ain,standard,55,59,58.2435,forfait,2026-02-01,2026-11-30
+1,Ain,standard,60,119,0.693,par_colis,2026-02-01,2026-11-30
+1,Ain,standard,120,299,0.483,par_colis,2026-02-01,2026-11-30
+1,Ain,standard,300,599,0.4515,par_colis,2026-02-01,2026-11-30
+1,Ain,standard,600,799,0.378,par_colis,2026-02-01,2026-11-30
+1,Ain,standard,800,1200,0.3255,par_colis,2026-02-01,2026-11-30
+2,Aisne,standard,1,12,35.721,forfait,2026-02-01,2026-11-30
+2,Aisne,standard,13,18,38.325,forfait,2026-02-01,2026-11-30
+2,Aisne,standard,19,24,40.467,forfait,2026-02-01,2026-11-30
+2,Aisne,standard,25,30,42.399,forfait,2026-02-01,2026-11-30
+2,Aisne,standard,31,36,43.8165,forfait,2026-02-01,2026-11-30
+2,Aisne,standard,37,42,44.982,forfait,2026-02-01,2026-11-30
+2,Aisne,standard,43,48,46.1685,forfait,2026-02-01,2026-11-30
+2,Aisne,standard,49,54,47.3865,forfait,2026-02-01,2026-11-30
+2,Aisne,standard,55,59,48.573,forfait,2026-02-01,2026-11-30
+2,Aisne,standard,60,119,0.546,par_colis,2026-02-01,2026-11-30
+2,Aisne,standard,120,299,0.378,par_colis,2026-02-01,2026-11-30
+2,Aisne,standard,300,599,0.3885,par_colis,2026-02-01,2026-11-30
+2,Aisne,standard,600,799,0.3045,par_colis,2026-02-01,2026-11-30
+2,Aisne,standard,800,1200,0.273,par_colis,2026-02-01,2026-11-30
+3,Allier,standard,1,12,28.6125,forfait,2026-02-01,2026-11-30
+3,Allier,standard,13,18,30.702,forfait,2026-02-01,2026-11-30
+3,Allier,standard,19,24,32.445,forfait,2026-02-01,2026-11-30
+3,Allier,standard,25,30,33.9465,forfait,2026-02-01,2026-11-30
+3,Allier,standard,31,36,35.091,forfait,2026-02-01,2026-11-30
+3,Allier,standard,37,42,36.078,forfait,2026-02-01,2026-11-30
+3,Allier,standard,43,48,37.002,forfait,2026-02-01,2026-11-30
+3,Allier,standard,49,54,37.968,forfait,2026-02-01,2026-11-30
+3,Allier,standard,55,59,38.934,forfait,2026-02-01,2026-11-30
+3,Allier,standard,60,119,0.483,par_colis,2026-02-01,2026-11-30
+3,Allier,standard,120,299,0.3255,par_colis,2026-02-01,2026-11-30
+3,Allier,standard,300,599,0.315,par_colis,2026-02-01,2026-11-30
+3,Allier,standard,600,799,0.252,par_colis,2026-02-01,2026-11-30
+3,Allier,standard,800,1200,0.231,par_colis,2026-02-01,2026-11-30
+4,Alpes-de-Haute-Provence,standard,1,12,47.355,forfait,2026-02-01,2026-11-30
+4,Alpes-de-Haute-Provence,standard,13,18,50.8095,forfait,2026-02-01,2026-11-30
+4,Alpes-de-Haute-Provence,standard,19,24,53.634,forfait,2026-02-01,2026-11-30
+4,Alpes-de-Haute-Provence,standard,25,30,56.1855,forfait,2026-02-01,2026-11-30
+4,Alpes-de-Haute-Provence,standard,31,36,58.0755,forfait,2026-02-01,2026-11-30
+4,Alpes-de-Haute-Provence,standard,37,42,59.6715,forfait,2026-02-01,2026-11-30
+4,Alpes-de-Haute-Provence,standard,43,48,61.2255,forfait,2026-02-01,2026-11-30
+4,Alpes-de-Haute-Provence,standard,49,54,62.8005,forfait,2026-02-01,2026-11-30
+4,Alpes-de-Haute-Provence,standard,55,59,64.3755,forfait,2026-02-01,2026-11-30
+4,Alpes-de-Haute-Provence,standard,60,119,0.7455,par_colis,2026-02-01,2026-11-30
+4,Alpes-de-Haute-Provence,standard,120,299,0.504,par_colis,2026-02-01,2026-11-30
+4,Alpes-de-Haute-Provence,standard,300,599,0.504,par_colis,2026-02-01,2026-11-30
+4,Alpes-de-Haute-Provence,standard,600,799,0.399,par_colis,2026-02-01,2026-11-30
+4,Alpes-de-Haute-Provence,standard,800,1200,0.357,par_colis,2026-02-01,2026-11-30
+4,Alpes-de-Haute-Provence,Haute montagne,1,12,56.8155,forfait,2026-02-01,2026-11-30
+4,Alpes-de-Haute-Provence,Haute montagne,13,18,60.9525,forfait,2026-02-01,2026-11-30
+4,Alpes-de-Haute-Provence,Haute montagne,19,24,64.3755,forfait,2026-02-01,2026-11-30
+4,Alpes-de-Haute-Provence,Haute montagne,25,30,67.4205,forfait,2026-02-01,2026-11-30
+4,Alpes-de-Haute-Provence,Haute montagne,31,36,69.6885,forfait,2026-02-01,2026-11-30
+4,Alpes-de-Haute-Provence,Haute montagne,37,42,71.589,forfait,2026-02-01,2026-11-30
+4,Alpes-de-Haute-Provence,Haute montagne,43,48,73.479,forfait,2026-02-01,2026-11-30
+4,Alpes-de-Haute-Provence,Haute montagne,49,54,75.39,forfait,2026-02-01,2026-11-30
+4,Alpes-de-Haute-Provence,Haute montagne,55,59,77.2695,forfait,2026-02-01,2026-11-30
+4,Alpes-de-Haute-Provence,Haute montagne,60,119,0.882,par_colis,2026-02-01,2026-11-30
+4,Alpes-de-Haute-Provence,Haute montagne,120,299,0.609,par_colis,2026-02-01,2026-11-30
+4,Alpes-de-Haute-Provence,Haute montagne,300,599,0.63,par_colis,2026-02-01,2026-11-30
+4,Alpes-de-Haute-Provence,Haute montagne,600,799,0.483,par_colis,2026-02-01,2026-11-30
+4,Alpes-de-Haute-Provence,Haute montagne,800,1200,0.42,par_colis,2026-02-01,2026-11-30
+5,Hautes-Alpes,standard,1,12,47.355,forfait,2026-02-01,2026-11-30
+5,Hautes-Alpes,standard,13,18,50.8095,forfait,2026-02-01,2026-11-30
+5,Hautes-Alpes,standard,19,24,53.634,forfait,2026-02-01,2026-11-30
+5,Hautes-Alpes,standard,25,30,56.1855,forfait,2026-02-01,2026-11-30
+5,Hautes-Alpes,standard,31,36,58.0755,forfait,2026-02-01,2026-11-30
+5,Hautes-Alpes,standard,37,42,59.6715,forfait,2026-02-01,2026-11-30
+5,Hautes-Alpes,standard,43,48,61.2255,forfait,2026-02-01,2026-11-30
+5,Hautes-Alpes,standard,49,54,62.8005,forfait,2026-02-01,2026-11-30
+5,Hautes-Alpes,standard,55,59,64.3755,forfait,2026-02-01,2026-11-30
+5,Hautes-Alpes,standard,60,119,0.7455,par_colis,2026-02-01,2026-11-30
+5,Hautes-Alpes,standard,120,299,0.504,par_colis,2026-02-01,2026-11-30
+5,Hautes-Alpes,standard,300,599,0.504,par_colis,2026-02-01,2026-11-30
+5,Hautes-Alpes,standard,600,799,0.399,par_colis,2026-02-01,2026-11-30
+5,Hautes-Alpes,standard,800,1200,0.357,par_colis,2026-02-01,2026-11-30
+5,Hautes-Alpes,Haute montagne,1,12,56.8155,forfait,2026-02-01,2026-11-30
+5,Hautes-Alpes,Haute montagne,13,18,60.9525,forfait,2026-02-01,2026-11-30
+5,Hautes-Alpes,Haute montagne,19,24,64.3755,forfait,2026-02-01,2026-11-30
+5,Hautes-Alpes,Haute montagne,25,30,67.4205,forfait,2026-02-01,2026-11-30
+5,Hautes-Alpes,Haute montagne,31,36,69.6885,forfait,2026-02-01,2026-11-30
+5,Hautes-Alpes,Haute montagne,37,42,71.589,forfait,2026-02-01,2026-11-30
+5,Hautes-Alpes,Haute montagne,43,48,73.479,forfait,2026-02-01,2026-11-30
+5,Hautes-Alpes,Haute montagne,49,54,75.39,forfait,2026-02-01,2026-11-30
+5,Hautes-Alpes,Haute montagne,55,59,77.2695,forfait,2026-02-01,2026-11-30
+5,Hautes-Alpes,Haute montagne,60,119,0.882,par_colis,2026-02-01,2026-11-30
+5,Hautes-Alpes,Haute montagne,120,299,0.609,par_colis,2026-02-01,2026-11-30
+5,Hautes-Alpes,Haute montagne,300,599,0.63,par_colis,2026-02-01,2026-11-30
+5,Hautes-Alpes,Haute montagne,600,799,0.483,par_colis,2026-02-01,2026-11-30
+5,Hautes-Alpes,Haute montagne,800,1200,0.42,par_colis,2026-02-01,2026-11-30
+6,Alpes-Maritimes,standard,1,12,47.355,forfait,2026-02-01,2026-11-30
+6,Alpes-Maritimes,standard,13,18,50.8095,forfait,2026-02-01,2026-11-30
+6,Alpes-Maritimes,standard,19,24,53.634,forfait,2026-02-01,2026-11-30
+6,Alpes-Maritimes,standard,25,30,56.1855,forfait,2026-02-01,2026-11-30
+6,Alpes-Maritimes,standard,31,36,58.0755,forfait,2026-02-01,2026-11-30
+6,Alpes-Maritimes,standard,37,42,59.6715,forfait,2026-02-01,2026-11-30
+6,Alpes-Maritimes,standard,43,48,61.2255,forfait,2026-02-01,2026-11-30
+6,Alpes-Maritimes,standard,49,54,62.8005,forfait,2026-02-01,2026-11-30
+6,Alpes-Maritimes,standard,55,59,64.3755,forfait,2026-02-01,2026-11-30
+6,Alpes-Maritimes,standard,60,119,0.7455,par_colis,2026-02-01,2026-11-30
+6,Alpes-Maritimes,standard,120,299,0.504,par_colis,2026-02-01,2026-11-30
+6,Alpes-Maritimes,standard,300,599,0.504,par_colis,2026-02-01,2026-11-30
+6,Alpes-Maritimes,standard,600,799,0.399,par_colis,2026-02-01,2026-11-30
+6,Alpes-Maritimes,standard,800,1200,0.357,par_colis,2026-02-01,2026-11-30
+6,Alpes-Maritimes,Haute montagne,1,12,56.8155,forfait,2026-02-01,2026-11-30
+6,Alpes-Maritimes,Haute montagne,13,18,60.9525,forfait,2026-02-01,2026-11-30
+6,Alpes-Maritimes,Haute montagne,19,24,64.3755,forfait,2026-02-01,2026-11-30
+6,Alpes-Maritimes,Haute montagne,25,30,67.4205,forfait,2026-02-01,2026-11-30
+6,Alpes-Maritimes,Haute montagne,31,36,69.6885,forfait,2026-02-01,2026-11-30
+6,Alpes-Maritimes,Haute montagne,37,42,71.589,forfait,2026-02-01,2026-11-30
+6,Alpes-Maritimes,Haute montagne,43,48,73.479,forfait,2026-02-01,2026-11-30
+6,Alpes-Maritimes,Haute montagne,49,54,75.39,forfait,2026-02-01,2026-11-30
+6,Alpes-Maritimes,Haute montagne,55,59,77.2695,forfait,2026-02-01,2026-11-30
+6,Alpes-Maritimes,Haute montagne,60,119,0.882,par_colis,2026-02-01,2026-11-30
+6,Alpes-Maritimes,Haute montagne,120,299,0.609,par_colis,2026-02-01,2026-11-30
+6,Alpes-Maritimes,Haute montagne,300,599,0.63,par_colis,2026-02-01,2026-11-30
+6,Alpes-Maritimes,Haute montagne,600,799,0.483,par_colis,2026-02-01,2026-11-30
+6,Alpes-Maritimes,Haute montagne,800,1200,0.42,par_colis,2026-02-01,2026-11-30
+7,Ardeche,standard,1,12,42.819,forfait,2026-02-01,2026-11-30
+7,Ardeche,standard,13,18,45.99,forfait,2026-02-01,2026-11-30
+7,Ardeche,standard,19,24,48.552,forfait,2026-02-01,2026-11-30
+7,Ardeche,standard,25,30,50.8095,forfait,2026-02-01,2026-11-30
+7,Ardeche,standard,31,36,52.5525,forfait,2026-02-01,2026-11-30
+7,Ardeche,standard,37,42,53.9385,forfait,2026-02-01,2026-11-30
+7,Ardeche,standard,43,48,55.3875,forfait,2026-02-01,2026-11-30
+7,Ardeche,standard,49,54,56.8155,forfait,2026-02-01,2026-11-30
+7,Ardeche,standard,55,59,58.2435,forfait,2026-02-01,2026-11-30
+7,Ardeche,standard,60,119,0.693,par_colis,2026-02-01,2026-11-30
+7,Ardeche,standard,120,299,0.483,par_colis,2026-02-01,2026-11-30
+7,Ardeche,standard,300,599,0.4515,par_colis,2026-02-01,2026-11-30
+7,Ardeche,standard,600,799,0.378,par_colis,2026-02-01,2026-11-30
+7,Ardeche,standard,800,1200,0.3255,par_colis,2026-02-01,2026-11-30
+8,Ardennes,standard,1,12,35.721,forfait,2026-02-01,2026-11-30
+8,Ardennes,standard,13,18,38.325,forfait,2026-02-01,2026-11-30
+8,Ardennes,standard,19,24,40.467,forfait,2026-02-01,2026-11-30
+8,Ardennes,standard,25,30,42.399,forfait,2026-02-01,2026-11-30
+8,Ardennes,standard,31,36,43.8165,forfait,2026-02-01,2026-11-30
+8,Ardennes,standard,37,42,44.982,forfait,2026-02-01,2026-11-30
+8,Ardennes,standard,43,48,46.1685,forfait,2026-02-01,2026-11-30
+8,Ardennes,standard,49,54,47.3865,forfait,2026-02-01,2026-11-30
+8,Ardennes,standard,55,59,48.573,forfait,2026-02-01,2026-11-30
+8,Ardennes,standard,60,119,0.546,par_colis,2026-02-01,2026-11-30
+8,Ardennes,standard,120,299,0.378,par_colis,2026-02-01,2026-11-30
+8,Ardennes,standard,300,599,0.3885,par_colis,2026-02-01,2026-11-30
+8,Ardennes,standard,600,799,0.3045,par_colis,2026-02-01,2026-11-30
+8,Ardennes,standard,800,1200,0.273,par_colis,2026-02-01,2026-11-30
+9,Ariege,standard,1,12,47.355,forfait,2026-02-01,2026-11-30
+9,Ariege,standard,13,18,50.8095,forfait,2026-02-01,2026-11-30
+9,Ariege,standard,19,24,53.634,forfait,2026-02-01,2026-11-30
+9,Ariege,standard,25,30,56.1855,forfait,2026-02-01,2026-11-30
+9,Ariege,standard,31,36,58.0755,forfait,2026-02-01,2026-11-30
+9,Ariege,standard,37,42,59.6715,forfait,2026-02-01,2026-11-30
+9,Ariege,standard,43,48,61.2255,forfait,2026-02-01,2026-11-30
+9,Ariege,standard,49,54,62.8005,forfait,2026-02-01,2026-11-30
+9,Ariege,standard,55,59,64.3755,forfait,2026-02-01,2026-11-30
+9,Ariege,standard,60,119,0.7455,par_colis,2026-02-01,2026-11-30
+9,Ariege,standard,120,299,0.504,par_colis,2026-02-01,2026-11-30
+9,Ariege,standard,300,599,0.504,par_colis,2026-02-01,2026-11-30
+9,Ariege,standard,600,799,0.399,par_colis,2026-02-01,2026-11-30
+9,Ariege,standard,800,1200,0.357,par_colis,2026-02-01,2026-11-30
+9,Ariege,Haute montagne,1,12,56.8155,forfait,2026-02-01,2026-11-30
+9,Ariege,Haute montagne,13,18,60.9525,forfait,2026-02-01,2026-11-30
+9,Ariege,Haute montagne,19,24,64.3755,forfait,2026-02-01,2026-11-30
+9,Ariege,Haute montagne,25,30,67.4205,forfait,2026-02-01,2026-11-30
+9,Ariege,Haute montagne,31,36,69.6885,forfait,2026-02-01,2026-11-30
+9,Ariege,Haute montagne,37,42,71.589,forfait,2026-02-01,2026-11-30
+9,Ariege,Haute montagne,43,48,73.479,forfait,2026-02-01,2026-11-30
+9,Ariege,Haute montagne,49,54,75.39,forfait,2026-02-01,2026-11-30
+9,Ariege,Haute montagne,55,59,77.2695,forfait,2026-02-01,2026-11-30
+9,Ariege,Haute montagne,60,119,0.882,par_colis,2026-02-01,2026-11-30
+9,Ariege,Haute montagne,120,299,0.609,par_colis,2026-02-01,2026-11-30
+9,Ariege,Haute montagne,300,599,0.63,par_colis,2026-02-01,2026-11-30
+9,Ariege,Haute montagne,600,799,0.483,par_colis,2026-02-01,2026-11-30
+9,Ariege,Haute montagne,800,1200,0.42,par_colis,2026-02-01,2026-11-30
+10,Aube,standard,1,12,35.721,forfait,2026-02-01,2026-11-30
+10,Aube,standard,13,18,38.325,forfait,2026-02-01,2026-11-30
+10,Aube,standard,19,24,40.467,forfait,2026-02-01,2026-11-30
+10,Aube,standard,25,30,42.399,forfait,2026-02-01,2026-11-30
+10,Aube,standard,31,36,43.8165,forfait,2026-02-01,2026-11-30
+10,Aube,standard,37,42,44.982,forfait,2026-02-01,2026-11-30
+10,Aube,standard,43,48,46.1685,forfait,2026-02-01,2026-11-30
+10,Aube,standard,49,54,47.3865,forfait,2026-02-01,2026-11-30
+10,Aube,standard,55,59,48.573,forfait,2026-02-01,2026-11-30
+10,Aube,standard,60,119,0.546,par_colis,2026-02-01,2026-11-30
+10,Aube,standard,120,299,0.378,par_colis,2026-02-01,2026-11-30
+10,Aube,standard,300,599,0.3885,par_colis,2026-02-01,2026-11-30
+10,Aube,standard,600,799,0.3045,par_colis,2026-02-01,2026-11-30
+10,Aube,standard,800,1200,0.273,par_colis,2026-02-01,2026-11-30
+11,Aude,standard,1,12,47.355,forfait,2026-02-01,2026-11-30
+11,Aude,standard,13,18,50.8095,forfait,2026-02-01,2026-11-30
+11,Aude,standard,19,24,53.634,forfait,2026-02-01,2026-11-30
+11,Aude,standard,25,30,56.1855,forfait,2026-02-01,2026-11-30
+11,Aude,standard,31,36,58.0755,forfait,2026-02-01,2026-11-30
+11,Aude,standard,37,42,59.6715,forfait,2026-02-01,2026-11-30
+11,Aude,standard,43,48,61.2255,forfait,2026-02-01,2026-11-30
+11,Aude,standard,49,54,62.8005,forfait,2026-02-01,2026-11-30
+11,Aude,standard,55,59,64.3755,forfait,2026-02-01,2026-11-30
+11,Aude,standard,60,119,0.7455,par_colis,2026-02-01,2026-11-30
+11,Aude,standard,120,299,0.504,par_colis,2026-02-01,2026-11-30
+11,Aude,standard,300,599,0.504,par_colis,2026-02-01,2026-11-30
+11,Aude,standard,600,799,0.399,par_colis,2026-02-01,2026-11-30
+11,Aude,standard,800,1200,0.357,par_colis,2026-02-01,2026-11-30
+12,Aveyron,standard,1,12,42.819,forfait,2026-02-01,2026-11-30
+12,Aveyron,standard,13,18,45.99,forfait,2026-02-01,2026-11-30
+12,Aveyron,standard,19,24,48.552,forfait,2026-02-01,2026-11-30
+12,Aveyron,standard,25,30,50.8095,forfait,2026-02-01,2026-11-30
+12,Aveyron,standard,31,36,52.5525,forfait,2026-02-01,2026-11-30
+12,Aveyron,standard,37,42,53.9385,forfait,2026-02-01,2026-11-30
+12,Aveyron,standard,43,48,55.3875,forfait,2026-02-01,2026-11-30
+12,Aveyron,standard,49,54,56.8155,forfait,2026-02-01,2026-11-30
+12,Aveyron,standard,55,59,58.2435,forfait,2026-02-01,2026-11-30
+12,Aveyron,standard,60,119,0.693,par_colis,2026-02-01,2026-11-30
+12,Aveyron,standard,120,299,0.483,par_colis,2026-02-01,2026-11-30
+12,Aveyron,standard,300,599,0.4515,par_colis,2026-02-01,2026-11-30
+12,Aveyron,standard,600,799,0.378,par_colis,2026-02-01,2026-11-30
+12,Aveyron,standard,800,1200,0.3255,par_colis,2026-02-01,2026-11-30
+13,Bouches-du-Rhone,standard,1,12,47.355,forfait,2026-02-01,2026-11-30
+13,Bouches-du-Rhone,standard,13,18,50.8095,forfait,2026-02-01,2026-11-30
+13,Bouches-du-Rhone,standard,19,24,53.634,forfait,2026-02-01,2026-11-30
+13,Bouches-du-Rhone,standard,25,30,56.1855,forfait,2026-02-01,2026-11-30
+13,Bouches-du-Rhone,standard,31,36,58.0755,forfait,2026-02-01,2026-11-30
+13,Bouches-du-Rhone,standard,37,42,59.6715,forfait,2026-02-01,2026-11-30
+13,Bouches-du-Rhone,standard,43,48,61.2255,forfait,2026-02-01,2026-11-30
+13,Bouches-du-Rhone,standard,49,54,62.8005,forfait,2026-02-01,2026-11-30
+13,Bouches-du-Rhone,standard,55,59,64.3755,forfait,2026-02-01,2026-11-30
+13,Bouches-du-Rhone,standard,60,119,0.7455,par_colis,2026-02-01,2026-11-30
+13,Bouches-du-Rhone,standard,120,299,0.504,par_colis,2026-02-01,2026-11-30
+13,Bouches-du-Rhone,standard,300,599,0.504,par_colis,2026-02-01,2026-11-30
+13,Bouches-du-Rhone,standard,600,799,0.399,par_colis,2026-02-01,2026-11-30
+13,Bouches-du-Rhone,standard,800,1200,0.357,par_colis,2026-02-01,2026-11-30
+14,Calvados,standard,1,12,28.6125,forfait,2026-02-01,2026-11-30
+14,Calvados,standard,13,18,30.702,forfait,2026-02-01,2026-11-30
+14,Calvados,standard,19,24,32.445,forfait,2026-02-01,2026-11-30
+14,Calvados,standard,25,30,33.9465,forfait,2026-02-01,2026-11-30
+14,Calvados,standard,31,36,35.091,forfait,2026-02-01,2026-11-30
+14,Calvados,standard,37,42,36.078,forfait,2026-02-01,2026-11-30
+14,Calvados,standard,43,48,37.002,forfait,2026-02-01,2026-11-30
+14,Calvados,standard,49,54,37.968,forfait,2026-02-01,2026-11-30
+14,Calvados,standard,55,59,38.934,forfait,2026-02-01,2026-11-30
+14,Calvados,standard,60,119,0.441,par_colis,2026-02-01,2026-11-30
+14,Calvados,standard,120,299,0.3255,par_colis,2026-02-01,2026-11-30
+14,Calvados,standard,300,599,0.315,par_colis,2026-02-01,2026-11-30
+14,Calvados,standard,600,799,0.252,par_colis,2026-02-01,2026-11-30
+14,Calvados,standard,800,1200,0.231,par_colis,2026-02-01,2026-11-30
+15,Cantal,standard,1,12,35.721,forfait,2026-02-01,2026-11-30
+15,Cantal,standard,13,18,38.325,forfait,2026-02-01,2026-11-30
+15,Cantal,standard,19,24,40.467,forfait,2026-02-01,2026-11-30
+15,Cantal,standard,25,30,42.399,forfait,2026-02-01,2026-11-30
+15,Cantal,standard,31,36,43.8165,forfait,2026-02-01,2026-11-30
+15,Cantal,standard,37,42,44.982,forfait,2026-02-01,2026-11-30
+15,Cantal,standard,43,48,46.1685,forfait,2026-02-01,2026-11-30
+15,Cantal,standard,49,54,47.3865,forfait,2026-02-01,2026-11-30
+15,Cantal,standard,55,59,48.573,forfait,2026-02-01,2026-11-30
+15,Cantal,standard,60,119,0.546,par_colis,2026-02-01,2026-11-30
+15,Cantal,standard,120,299,0.378,par_colis,2026-02-01,2026-11-30
+15,Cantal,standard,300,599,0.3885,par_colis,2026-02-01,2026-11-30
+15,Cantal,standard,600,799,0.3045,par_colis,2026-02-01,2026-11-30
+15,Cantal,standard,800,1200,0.273,par_colis,2026-02-01,2026-11-30
+16,Charente,standard,1,12,28.6125,forfait,2026-02-01,2026-11-30
+16,Charente,standard,13,18,30.702,forfait,2026-02-01,2026-11-30
+16,Charente,standard,19,24,32.445,forfait,2026-02-01,2026-11-30
+16,Charente,standard,25,30,33.9465,forfait,2026-02-01,2026-11-30
+16,Charente,standard,31,36,35.091,forfait,2026-02-01,2026-11-30
+16,Charente,standard,37,42,36.078,forfait,2026-02-01,2026-11-30
+16,Charente,standard,43,48,37.002,forfait,2026-02-01,2026-11-30
+16,Charente,standard,49,54,37.968,forfait,2026-02-01,2026-11-30
+16,Charente,standard,55,59,38.934,forfait,2026-02-01,2026-11-30
+16,Charente,standard,60,119,0.441,par_colis,2026-02-01,2026-11-30
+16,Charente,standard,120,299,0.3255,par_colis,2026-02-01,2026-11-30
+16,Charente,standard,300,599,0.315,par_colis,2026-02-01,2026-11-30
+16,Charente,standard,600,799,0.252,par_colis,2026-02-01,2026-11-30
+16,Charente,standard,800,1200,0.231,par_colis,2026-02-01,2026-11-30
+17,Charente-Maritime,standard,1,12,28.6125,forfait,2026-02-01,2026-11-30
+17,Charente-Maritime,standard,13,18,30.702,forfait,2026-02-01,2026-11-30
+17,Charente-Maritime,standard,19,24,32.445,forfait,2026-02-01,2026-11-30
+17,Charente-Maritime,standard,25,30,33.9465,forfait,2026-02-01,2026-11-30
+17,Charente-Maritime,standard,31,36,35.091,forfait,2026-02-01,2026-11-30
+17,Charente-Maritime,standard,37,42,36.078,forfait,2026-02-01,2026-11-30
+17,Charente-Maritime,standard,43,48,37.002,forfait,2026-02-01,2026-11-30
+17,Charente-Maritime,standard,49,54,37.968,forfait,2026-02-01,2026-11-30
+17,Charente-Maritime,standard,55,59,38.934,forfait,2026-02-01,2026-11-30
+17,Charente-Maritime,standard,60,119,0.441,par_colis,2026-02-01,2026-11-30
+17,Charente-Maritime,standard,120,299,0.3255,par_colis,2026-02-01,2026-11-30
+17,Charente-Maritime,standard,300,599,0.315,par_colis,2026-02-01,2026-11-30
+17,Charente-Maritime,standard,600,799,0.252,par_colis,2026-02-01,2026-11-30
+17,Charente-Maritime,standard,800,1200,0.231,par_colis,2026-02-01,2026-11-30
+17,Charente-Maritime,Ile,1,12,34.3455,forfait,2026-02-01,2026-11-30
+17,Charente-Maritime,Ile,13,18,36.855,forfait,2026-02-01,2026-11-30
+17,Charente-Maritime,Ile,19,24,38.934,forfait,2026-02-01,2026-11-30
+17,Charente-Maritime,Ile,25,30,40.74,forfait,2026-02-01,2026-11-30
+17,Charente-Maritime,Ile,31,36,42.105,forfait,2026-02-01,2026-11-30
+17,Charente-Maritime,Ile,37,42,43.302,forfait,2026-02-01,2026-11-30
+17,Charente-Maritime,Ile,43,48,44.394,forfait,2026-02-01,2026-11-30
+17,Charente-Maritime,Ile,49,54,45.5385,forfait,2026-02-01,2026-11-30
+17,Charente-Maritime,Ile,55,59,46.6935,forfait,2026-02-01,2026-11-30
+17,Charente-Maritime,Ile,60,119,0.525,par_colis,2026-02-01,2026-11-30
+17,Charente-Maritime,Ile,120,299,0.357,par_colis,2026-02-01,2026-11-30
+17,Charente-Maritime,Ile,300,599,0.3885,par_colis,2026-02-01,2026-11-30
+17,Charente-Maritime,Ile,600,799,0.3045,par_colis,2026-02-01,2026-11-30
+17,Charente-Maritime,Ile,800,1200,0.252,par_colis,2026-02-01,2026-11-30
+18,Cher,standard,1,12,28.6125,forfait,2026-02-01,2026-11-30
+18,Cher,standard,13,18,30.702,forfait,2026-02-01,2026-11-30
+18,Cher,standard,19,24,32.445,forfait,2026-02-01,2026-11-30
+18,Cher,standard,25,30,33.9465,forfait,2026-02-01,2026-11-30
+18,Cher,standard,31,36,35.091,forfait,2026-02-01,2026-11-30
+18,Cher,standard,37,42,36.078,forfait,2026-02-01,2026-11-30
+18,Cher,standard,43,48,37.002,forfait,2026-02-01,2026-11-30
+18,Cher,standard,49,54,37.968,forfait,2026-02-01,2026-11-30
+18,Cher,standard,55,59,38.934,forfait,2026-02-01,2026-11-30
+18,Cher,standard,60,119,0.441,par_colis,2026-02-01,2026-11-30
+18,Cher,standard,120,299,0.3255,par_colis,2026-02-01,2026-11-30
+18,Cher,standard,300,599,0.315,par_colis,2026-02-01,2026-11-30
+18,Cher,standard,600,799,0.252,par_colis,2026-02-01,2026-11-30
+18,Cher,standard,800,1200,0.231,par_colis,2026-02-01,2026-11-30
+19,Correze,standard,1,12,35.721,forfait,2026-02-01,2026-11-30
+19,Correze,standard,13,18,38.325,forfait,2026-02-01,2026-11-30
+19,Correze,standard,19,24,40.467,forfait,2026-02-01,2026-11-30
+19,Correze,standard,25,30,42.399,forfait,2026-02-01,2026-11-30
+19,Correze,standard,31,36,43.8165,forfait,2026-02-01,2026-11-30
+19,Correze,standard,37,42,44.982,forfait,2026-02-01,2026-11-30
+19,Correze,standard,43,48,46.1685,forfait,2026-02-01,2026-11-30
+19,Correze,standard,49,54,47.3865,forfait,2026-02-01,2026-11-30
+19,Correze,standard,55,59,48.573,forfait,2026-02-01,2026-11-30
+19,Correze,standard,60,119,0.546,par_colis,2026-02-01,2026-11-30
+19,Correze,standard,120,299,0.378,par_colis,2026-02-01,2026-11-30
+19,Correze,standard,300,599,0.3885,par_colis,2026-02-01,2026-11-30
+19,Correze,standard,600,799,0.3045,par_colis,2026-02-01,2026-11-30
+19,Correze,standard,800,1200,0.273,par_colis,2026-02-01,2026-11-30
+20,Corse,standard,1,12,94.689,forfait,2026-02-01,2026-11-30
+20,Corse,standard,13,18,101.6295,forfait,2026-02-01,2026-11-30
+20,Corse,standard,19,24,107.3205,forfait,2026-02-01,2026-11-30
+20,Corse,standard,25,30,112.3605,forfait,2026-02-01,2026-11-30
+20,Corse,standard,31,36,116.1405,forfait,2026-02-01,2026-11-30
+20,Corse,standard,37,42,119.2905,forfait,2026-02-01,2026-11-30
+20,Corse,standard,43,48,122.451,forfait,2026-02-01,2026-11-30
+20,Corse,standard,49,54,125.601,forfait,2026-02-01,2026-11-30
+20,Corse,standard,55,59,128.7615,forfait,2026-02-01,2026-11-30
+20,Corse,standard,60,119,1.4805,par_colis,2026-02-01,2026-11-30
+20,Corse,standard,120,299,1.0185,par_colis,2026-02-01,2026-11-30
+20,Corse,standard,300,599,1.0185,par_colis,2026-02-01,2026-11-30
+20,Corse,standard,600,799,0.798,par_colis,2026-02-01,2026-11-30
+20,Corse,standard,800,1200,0.714,par_colis,2026-02-01,2026-11-30
+21,Cote-d'Or,standard,1,12,35.721,forfait,2026-02-01,2026-11-30
+21,Cote-d'Or,standard,13,18,38.325,forfait,2026-02-01,2026-11-30
+21,Cote-d'Or,standard,19,24,40.467,forfait,2026-02-01,2026-11-30
+21,Cote-d'Or,standard,25,30,42.399,forfait,2026-02-01,2026-11-30
+21,Cote-d'Or,standard,31,36,43.8165,forfait,2026-02-01,2026-11-30
+21,Cote-d'Or,standard,37,42,44.982,forfait,2026-02-01,2026-11-30
+21,Cote-d'Or,standard,43,48,46.1685,forfait,2026-02-01,2026-11-30
+21,Cote-d'Or,standard,49,54,47.3865,forfait,2026-02-01,2026-11-30
+21,Cote-d'Or,standard,55,59,48.573,forfait,2026-02-01,2026-11-30
+21,Cote-d'Or,standard,60,119,0.546,par_colis,2026-02-01,2026-11-30
+21,Cote-d'Or,standard,120,299,0.378,par_colis,2026-02-01,2026-11-30
+21,Cote-d'Or,standard,300,599,0.3885,par_colis,2026-02-01,2026-11-30
+21,Cote-d'Or,standard,600,799,0.3045,par_colis,2026-02-01,2026-11-30
+21,Cote-d'Or,standard,800,1200,0.273,par_colis,2026-02-01,2026-11-30
+22,Cotes d'Armor,standard,1,12,28.6125,forfait,2026-02-01,2026-11-30
+22,Cotes d'Armor,standard,13,18,30.702,forfait,2026-02-01,2026-11-30
+22,Cotes d'Armor,standard,19,24,32.445,forfait,2026-02-01,2026-11-30
+22,Cotes d'Armor,standard,25,30,33.9465,forfait,2026-02-01,2026-11-30
+22,Cotes d'Armor,standard,31,36,35.091,forfait,2026-02-01,2026-11-30
+22,Cotes d'Armor,standard,37,42,36.078,forfait,2026-02-01,2026-11-30
+22,Cotes d'Armor,standard,43,48,37.002,forfait,2026-02-01,2026-11-30
+22,Cotes d'Armor,standard,49,54,37.968,forfait,2026-02-01,2026-11-30
+22,Cotes d'Armor,standard,55,59,38.934,forfait,2026-02-01,2026-11-30
+22,Cotes d'Armor,standard,60,119,0.441,par_colis,2026-02-01,2026-11-30
+22,Cotes d'Armor,standard,120,299,0.3255,par_colis,2026-02-01,2026-11-30
+22,Cotes d'Armor,standard,300,599,0.315,par_colis,2026-02-01,2026-11-30
+22,Cotes d'Armor,standard,600,799,0.252,par_colis,2026-02-01,2026-11-30
+22,Cotes d'Armor,standard,800,1200,0.231,par_colis,2026-02-01,2026-11-30
+22,Cotes d'Armor,Ile,1,12,34.3455,forfait,2026-02-01,2026-11-30
+22,Cotes d'Armor,Ile,13,18,36.855,forfait,2026-02-01,2026-11-30
+22,Cotes d'Armor,Ile,19,24,38.934,forfait,2026-02-01,2026-11-30
+22,Cotes d'Armor,Ile,25,30,40.74,forfait,2026-02-01,2026-11-30
+22,Cotes d'Armor,Ile,31,36,42.105,forfait,2026-02-01,2026-11-30
+22,Cotes d'Armor,Ile,37,42,43.302,forfait,2026-02-01,2026-11-30
+22,Cotes d'Armor,Ile,43,48,44.394,forfait,2026-02-01,2026-11-30
+22,Cotes d'Armor,Ile,49,54,45.5385,forfait,2026-02-01,2026-11-30
+22,Cotes d'Armor,Ile,55,59,46.6935,forfait,2026-02-01,2026-11-30
+22,Cotes d'Armor,Ile,60,119,0.525,par_colis,2026-02-01,2026-11-30
+22,Cotes d'Armor,Ile,120,299,0.357,par_colis,2026-02-01,2026-11-30
+22,Cotes d'Armor,Ile,300,599,0.3885,par_colis,2026-02-01,2026-11-30
+22,Cotes d'Armor,Ile,600,799,0.3045,par_colis,2026-02-01,2026-11-30
+22,Cotes d'Armor,Ile,800,1200,0.252,par_colis,2026-02-01,2026-11-30
+23,Creuse,standard,1,12,30.0405,forfait,2026-02-01,2026-11-30
+23,Creuse,standard,13,18,32.2455,forfait,2026-02-01,2026-11-30
+23,Creuse,standard,19,24,34.0515,forfait,2026-02-01,2026-11-30
+23,Creuse,standard,25,30,35.6475,forfait,2026-02-01,2026-11-30
+23,Creuse,standard,31,36,36.855,forfait,2026-02-01,2026-11-30
+23,Creuse,standard,37,42,37.8735,forfait,2026-02-01,2026-11-30
+23,Creuse,standard,43,48,38.829,forfait,2026-02-01,2026-11-30
+23,Creuse,standard,49,54,39.8685,forfait,2026-02-01,2026-11-30
+23,Creuse,standard,55,59,40.8765,forfait,2026-02-01,2026-11-30
+23,Creuse,standard,60,119,0.4515,par_colis,2026-02-01,2026-11-30
+23,Creuse,standard,120,299,0.3465,par_colis,2026-02-01,2026-11-30
+23,Creuse,standard,300,599,0.3255,par_colis,2026-02-01,2026-11-30
+23,Creuse,standard,600,799,0.2625,par_colis,2026-02-01,2026-11-30
+23,Creuse,standard,800,1200,0.2415,par_colis,2026-02-01,2026-11-30
+24,Dordogne,standard,1,12,35.721,forfait,2026-02-01,2026-11-30
+24,Dordogne,standard,13,18,38.325,forfait,2026-02-01,2026-11-30
+24,Dordogne,standard,19,24,40.467,forfait,2026-02-01,2026-11-30
+24,Dordogne,standard,25,30,42.399,forfait,2026-02-01,2026-11-30
+24,Dordogne,standard,31,36,43.8165,forfait,2026-02-01,2026-11-30
+24,Dordogne,standard,37,42,44.982,forfait,2026-02-01,2026-11-30
+24,Dordogne,standard,43,48,46.1685,forfait,2026-02-01,2026-11-30
+24,Dordogne,standard,49,54,47.3865,forfait,2026-02-01,2026-11-30
+24,Dordogne,standard,55,59,48.573,forfait,2026-02-01,2026-11-30
+24,Dordogne,standard,60,119,0.546,par_colis,2026-02-01,2026-11-30
+24,Dordogne,standard,120,299,0.378,par_colis,2026-02-01,2026-11-30
+24,Dordogne,standard,300,599,0.3885,par_colis,2026-02-01,2026-11-30
+24,Dordogne,standard,600,799,0.3045,par_colis,2026-02-01,2026-11-30
+24,Dordogne,standard,800,1200,0.273,par_colis,2026-02-01,2026-11-30
+25,Doubs,standard,1,12,42.819,forfait,2026-02-01,2026-11-30
+25,Doubs,standard,13,18,45.99,forfait,2026-02-01,2026-11-30
+25,Doubs,standard,19,24,48.552,forfait,2026-02-01,2026-11-30
+25,Doubs,standard,25,30,50.8095,forfait,2026-02-01,2026-11-30
+25,Doubs,standard,31,36,52.5525,forfait,2026-02-01,2026-11-30
+25,Doubs,standard,37,42,53.9385,forfait,2026-02-01,2026-11-30
+25,Doubs,standard,43,48,55.3875,forfait,2026-02-01,2026-11-30
+25,Doubs,standard,49,54,56.8155,forfait,2026-02-01,2026-11-30
+25,Doubs,standard,55,59,58.2435,forfait,2026-02-01,2026-11-30
+25,Doubs,standard,60,119,0.693,par_colis,2026-02-01,2026-11-30
+25,Doubs,standard,120,299,0.483,par_colis,2026-02-01,2026-11-30
+25,Doubs,standard,300,599,0.4515,par_colis,2026-02-01,2026-11-30
+25,Doubs,standard,600,799,0.378,par_colis,2026-02-01,2026-11-30
+25,Doubs,standard,800,1200,0.3255,par_colis,2026-02-01,2026-11-30
+26,Drome,standard,1,12,42.819,forfait,2026-02-01,2026-11-30
+26,Drome,standard,13,18,45.99,forfait,2026-02-01,2026-11-30
+26,Drome,standard,19,24,48.552,forfait,2026-02-01,2026-11-30
+26,Drome,standard,25,30,50.8095,forfait,2026-02-01,2026-11-30
+26,Drome,standard,31,36,52.5525,forfait,2026-02-01,2026-11-30
+26,Drome,standard,37,42,53.9385,forfait,2026-02-01,2026-11-30
+26,Drome,standard,43,48,55.3875,forfait,2026-02-01,2026-11-30
+26,Drome,standard,49,54,56.8155,forfait,2026-02-01,2026-11-30
+26,Drome,standard,55,59,58.2435,forfait,2026-02-01,2026-11-30
+26,Drome,standard,60,119,0.693,par_colis,2026-02-01,2026-11-30
+26,Drome,standard,120,299,0.483,par_colis,2026-02-01,2026-11-30
+26,Drome,standard,300,599,0.4515,par_colis,2026-02-01,2026-11-30
+26,Drome,standard,600,799,0.378,par_colis,2026-02-01,2026-11-30
+26,Drome,standard,800,1200,0.3255,par_colis,2026-02-01,2026-11-30
+27,Eure,standard,1,12,28.6125,forfait,2026-02-01,2026-11-30
+27,Eure,standard,13,18,30.702,forfait,2026-02-01,2026-11-30
+27,Eure,standard,19,24,32.445,forfait,2026-02-01,2026-11-30
+27,Eure,standard,25,30,33.9465,forfait,2026-02-01,2026-11-30
+27,Eure,standard,31,36,35.091,forfait,2026-02-01,2026-11-30
+27,Eure,standard,37,42,36.078,forfait,2026-02-01,2026-11-30
+27,Eure,standard,43,48,37.002,forfait,2026-02-01,2026-11-30
+27,Eure,standard,49,54,37.968,forfait,2026-02-01,2026-11-30
+27,Eure,standard,55,59,38.934,forfait,2026-02-01,2026-11-30
+27,Eure,standard,60,119,0.441,par_colis,2026-02-01,2026-11-30
+27,Eure,standard,120,299,0.3255,par_colis,2026-02-01,2026-11-30
+27,Eure,standard,300,599,0.315,par_colis,2026-02-01,2026-11-30
+27,Eure,standard,600,799,0.252,par_colis,2026-02-01,2026-11-30
+27,Eure,standard,800,1200,0.231,par_colis,2026-02-01,2026-11-30
+28,Eure-et-Loir,standard,1,12,23.6565,forfait,2026-02-01,2026-11-30
+28,Eure-et-Loir,standard,13,18,25.431,forfait,2026-02-01,2026-11-30
+28,Eure-et-Loir,standard,19,24,26.8275,forfait,2026-02-01,2026-11-30
+28,Eure-et-Loir,standard,25,30,28.077,forfait,2026-02-01,2026-11-30
+28,Eure-et-Loir,standard,31,36,29.0325,forfait,2026-02-01,2026-11-30
+28,Eure-et-Loir,standard,37,42,29.8305,forfait,2026-02-01,2026-11-30
+28,Eure-et-Loir,standard,43,48,30.6075,forfait,2026-02-01,2026-11-30
+28,Eure-et-Loir,standard,49,54,31.395,forfait,2026-02-01,2026-11-30
+28,Eure-et-Loir,standard,55,59,32.2035,forfait,2026-02-01,2026-11-30
+28,Eure-et-Loir,standard,60,119,0.357,par_colis,2026-02-01,2026-11-30
+28,Eure-et-Loir,standard,120,299,0.252,par_colis,2026-02-01,2026-11-30
+28,Eure-et-Loir,standard,300,599,0.2625,par_colis,2026-02-01,2026-11-30
+28,Eure-et-Loir,standard,600,799,0.231,par_colis,2026-02-01,2026-11-30
+28,Eure-et-Loir,standard,800,1200,0.189,par_colis,2026-02-01,2026-11-30
+29,Finistere,standard,1,12,35.721,forfait,2026-02-01,2026-11-30
+29,Finistere,standard,13,18,38.325,forfait,2026-02-01,2026-11-30
+29,Finistere,standard,19,24,40.467,forfait,2026-02-01,2026-11-30
+29,Finistere,standard,25,30,42.399,forfait,2026-02-01,2026-11-30
+29,Finistere,standard,31,36,43.8165,forfait,2026-02-01,2026-11-30
+29,Finistere,standard,37,42,44.982,forfait,2026-02-01,2026-11-30
+29,Finistere,standard,43,48,46.1685,forfait,2026-02-01,2026-11-30
+29,Finistere,standard,49,54,47.3865,forfait,2026-02-01,2026-11-30
+29,Finistere,standard,55,59,48.573,forfait,2026-02-01,2026-11-30
+29,Finistere,standard,60,119,0.546,par_colis,2026-02-01,2026-11-30
+29,Finistere,standard,120,299,0.378,par_colis,2026-02-01,2026-11-30
+29,Finistere,standard,300,599,0.3885,par_colis,2026-02-01,2026-11-30
+29,Finistere,standard,600,799,0.3045,par_colis,2026-02-01,2026-11-30
+29,Finistere,standard,800,1200,0.273,par_colis,2026-02-01,2026-11-30
+29,Finistere,Ile,1,12,42.8505,forfait,2026-02-01,2026-11-30
+29,Finistere,Ile,13,18,46.032,forfait,2026-02-01,2026-11-30
+29,Finistere,Ile,19,24,48.573,forfait,2026-02-01,2026-11-30
+29,Finistere,Ile,25,30,50.8515,forfait,2026-02-01,2026-11-30
+29,Finistere,Ile,31,36,52.584,forfait,2026-02-01,2026-11-30
+29,Finistere,Ile,37,42,53.97,forfait,2026-02-01,2026-11-30
+29,Finistere,Ile,43,48,55.4085,forfait,2026-02-01,2026-11-30
+29,Finistere,Ile,49,54,56.868,forfait,2026-02-01,2026-11-30
+29,Finistere,Ile,55,59,58.3065,forfait,2026-02-01,2026-11-30
+29,Finistere,Ile,60,119,0.6825,par_colis,2026-02-01,2026-11-30
+29,Finistere,Ile,120,299,0.483,par_colis,2026-02-01,2026-11-30
+29,Finistere,Ile,300,599,0.4515,par_colis,2026-02-01,2026-11-30
+29,Finistere,Ile,600,799,0.378,par_colis,2026-02-01,2026-11-30
+29,Finistere,Ile,800,1200,0.3255,par_colis,2026-02-01,2026-11-30
+30,Gard,standard,1,12,47.355,forfait,2026-02-01,2026-11-30
+30,Gard,standard,13,18,50.8095,forfait,2026-02-01,2026-11-30
+30,Gard,standard,19,24,53.634,forfait,2026-02-01,2026-11-30
+30,Gard,standard,25,30,56.1855,forfait,2026-02-01,2026-11-30
+30,Gard,standard,31,36,58.0755,forfait,2026-02-01,2026-11-30
+30,Gard,standard,37,42,59.6715,forfait,2026-02-01,2026-11-30
+30,Gard,standard,43,48,61.2255,forfait,2026-02-01,2026-11-30
+30,Gard,standard,49,54,62.8005,forfait,2026-02-01,2026-11-30
+30,Gard,standard,55,59,64.3755,forfait,2026-02-01,2026-11-30
+30,Gard,standard,60,119,0.7455,par_colis,2026-02-01,2026-11-30
+30,Gard,standard,120,299,0.504,par_colis,2026-02-01,2026-11-30
+30,Gard,standard,300,599,0.504,par_colis,2026-02-01,2026-11-30
+30,Gard,standard,600,799,0.399,par_colis,2026-02-01,2026-11-30
+30,Gard,standard,800,1200,0.357,par_colis,2026-02-01,2026-11-30
+31,Haute-Garonne,standard,1,12,42.819,forfait,2026-02-01,2026-11-30
+31,Haute-Garonne,standard,13,18,45.99,forfait,2026-02-01,2026-11-30
+31,Haute-Garonne,standard,19,24,48.552,forfait,2026-02-01,2026-11-30
+31,Haute-Garonne,standard,25,30,50.8095,forfait,2026-02-01,2026-11-30
+31,Haute-Garonne,standard,31,36,52.5525,forfait,2026-02-01,2026-11-30
+31,Haute-Garonne,standard,37,42,53.9385,forfait,2026-02-01,2026-11-30
+31,Haute-Garonne,standard,43,48,55.3875,forfait,2026-02-01,2026-11-30
+31,Haute-Garonne,standard,49,54,56.8155,forfait,2026-02-01,2026-11-30
+31,Haute-Garonne,standard,55,59,58.2435,forfait,2026-02-01,2026-11-30
+31,Haute-Garonne,standard,60,119,0.693,par_colis,2026-02-01,2026-11-30
+31,Haute-Garonne,standard,120,299,0.483,par_colis,2026-02-01,2026-11-30
+31,Haute-Garonne,standard,300,599,0.4515,par_colis,2026-02-01,2026-11-30
+31,Haute-Garonne,standard,600,799,0.378,par_colis,2026-02-01,2026-11-30
+31,Haute-Garonne,standard,800,1200,0.3255,par_colis,2026-02-01,2026-11-30
+32,Gers,standard,1,12,42.819,forfait,2026-02-01,2026-11-30
+32,Gers,standard,13,18,45.99,forfait,2026-02-01,2026-11-30
+32,Gers,standard,19,24,48.552,forfait,2026-02-01,2026-11-30
+32,Gers,standard,25,30,50.8095,forfait,2026-02-01,2026-11-30
+32,Gers,standard,31,36,52.5525,forfait,2026-02-01,2026-11-30
+32,Gers,standard,37,42,53.9385,forfait,2026-02-01,2026-11-30
+32,Gers,standard,43,48,55.3875,forfait,2026-02-01,2026-11-30
+32,Gers,standard,49,54,56.8155,forfait,2026-02-01,2026-11-30
+32,Gers,standard,55,59,58.2435,forfait,2026-02-01,2026-11-30
+32,Gers,standard,60,119,0.693,par_colis,2026-02-01,2026-11-30
+32,Gers,standard,120,299,0.483,par_colis,2026-02-01,2026-11-30
+32,Gers,standard,300,599,0.4515,par_colis,2026-02-01,2026-11-30
+32,Gers,standard,600,799,0.378,par_colis,2026-02-01,2026-11-30
+32,Gers,standard,800,1200,0.3255,par_colis,2026-02-01,2026-11-30
+33,Gironde,standard,1,12,35.721,forfait,2026-02-01,2026-11-30
+33,Gironde,standard,13,18,38.325,forfait,2026-02-01,2026-11-30
+33,Gironde,standard,19,24,40.467,forfait,2026-02-01,2026-11-30
+33,Gironde,standard,25,30,42.399,forfait,2026-02-01,2026-11-30
+33,Gironde,standard,31,36,43.8165,forfait,2026-02-01,2026-11-30
+33,Gironde,standard,37,42,44.982,forfait,2026-02-01,2026-11-30
+33,Gironde,standard,43,48,46.1685,forfait,2026-02-01,2026-11-30
+33,Gironde,standard,49,54,47.3865,forfait,2026-02-01,2026-11-30
+33,Gironde,standard,55,59,48.573,forfait,2026-02-01,2026-11-30
+33,Gironde,standard,60,119,0.546,par_colis,2026-02-01,2026-11-30
+33,Gironde,standard,120,299,0.378,par_colis,2026-02-01,2026-11-30
+33,Gironde,standard,300,599,0.3885,par_colis,2026-02-01,2026-11-30
+33,Gironde,standard,600,799,0.3045,par_colis,2026-02-01,2026-11-30
+33,Gironde,standard,800,1200,0.273,par_colis,2026-02-01,2026-11-30
+34,Herault,standard,1,12,47.355,forfait,2026-02-01,2026-11-30
+34,Herault,standard,13,18,50.8095,forfait,2026-02-01,2026-11-30
+34,Herault,standard,19,24,53.634,forfait,2026-02-01,2026-11-30
+34,Herault,standard,25,30,56.1855,forfait,2026-02-01,2026-11-30
+34,Herault,standard,31,36,58.0755,forfait,2026-02-01,2026-11-30
+34,Herault,standard,37,42,59.6715,forfait,2026-02-01,2026-11-30
+34,Herault,standard,43,48,61.2255,forfait,2026-02-01,2026-11-30
+34,Herault,standard,49,54,62.8005,forfait,2026-02-01,2026-11-30
+34,Herault,standard,55,59,64.3755,forfait,2026-02-01,2026-11-30
+34,Herault,standard,60,119,0.7455,par_colis,2026-02-01,2026-11-30
+34,Herault,standard,120,299,0.504,par_colis,2026-02-01,2026-11-30
+34,Herault,standard,300,599,0.504,par_colis,2026-02-01,2026-11-30
+34,Herault,standard,600,799,0.399,par_colis,2026-02-01,2026-11-30
+34,Herault,standard,800,1200,0.357,par_colis,2026-02-01,2026-11-30
+35,Ille-et-Vilaine,standard,1,12,21.5145,forfait,2026-02-01,2026-11-30
+35,Ille-et-Vilaine,standard,13,18,23.1,forfait,2026-02-01,2026-11-30
+35,Ille-et-Vilaine,standard,19,24,24.402,forfait,2026-02-01,2026-11-30
+35,Ille-et-Vilaine,standard,25,30,25.515,forfait,2026-02-01,2026-11-30
+35,Ille-et-Vilaine,standard,31,36,26.397,forfait,2026-02-01,2026-11-30
+35,Ille-et-Vilaine,standard,37,42,27.1215,forfait,2026-02-01,2026-11-30
+35,Ille-et-Vilaine,standard,43,48,27.8145,forfait,2026-02-01,2026-11-30
+35,Ille-et-Vilaine,standard,49,54,28.539,forfait,2026-02-01,2026-11-30
+35,Ille-et-Vilaine,standard,55,59,29.2635,forfait,2026-02-01,2026-11-30
+35,Ille-et-Vilaine,standard,60,119,0.336,par_colis,2026-02-01,2026-11-30
+35,Ille-et-Vilaine,standard,120,299,0.231,par_colis,2026-02-01,2026-11-30
+35,Ille-et-Vilaine,standard,300,599,0.2415,par_colis,2026-02-01,2026-11-30
+35,Ille-et-Vilaine,standard,600,799,0.1995,par_colis,2026-02-01,2026-11-30
+35,Ille-et-Vilaine,standard,800,1200,0.1575,par_colis,2026-02-01,2026-11-30
+36,Indre,standard,1,12,28.6125,forfait,2026-02-01,2026-11-30
+36,Indre,standard,13,18,30.702,forfait,2026-02-01,2026-11-30
+36,Indre,standard,19,24,32.445,forfait,2026-02-01,2026-11-30
+36,Indre,standard,25,30,33.9465,forfait,2026-02-01,2026-11-30
+36,Indre,standard,31,36,35.091,forfait,2026-02-01,2026-11-30
+36,Indre,standard,37,42,36.078,forfait,2026-02-01,2026-11-30
+36,Indre,standard,43,48,37.002,forfait,2026-02-01,2026-11-30
+36,Indre,standard,49,54,37.968,forfait,2026-02-01,2026-11-30
+36,Indre,standard,55,59,38.934,forfait,2026-02-01,2026-11-30
+36,Indre,standard,60,119,0.441,par_colis,2026-02-01,2026-11-30
+36,Indre,standard,120,299,0.3255,par_colis,2026-02-01,2026-11-30
+36,Indre,standard,300,599,0.315,par_colis,2026-02-01,2026-11-30
+36,Indre,standard,600,799,0.252,par_colis,2026-02-01,2026-11-30
+36,Indre,standard,800,1200,0.231,par_colis,2026-02-01,2026-11-30
+37,Indre-et-Loire,standard,1,12,21.5145,forfait,2026-02-01,2026-11-30
+37,Indre-et-Loire,standard,13,18,23.1,forfait,2026-02-01,2026-11-30
+37,Indre-et-Loire,standard,19,24,24.402,forfait,2026-02-01,2026-11-30
+37,Indre-et-Loire,standard,25,30,25.515,forfait,2026-02-01,2026-11-30
+37,Indre-et-Loire,standard,31,36,26.397,forfait,2026-02-01,2026-11-30
+37,Indre-et-Loire,standard,37,42,27.1215,forfait,2026-02-01,2026-11-30
+37,Indre-et-Loire,standard,43,48,27.8145,forfait,2026-02-01,2026-11-30
+37,Indre-et-Loire,standard,49,54,28.539,forfait,2026-02-01,2026-11-30
+37,Indre-et-Loire,standard,55,59,29.2635,forfait,2026-02-01,2026-11-30
+37,Indre-et-Loire,standard,60,119,0.3675,par_colis,2026-02-01,2026-11-30
+37,Indre-et-Loire,standard,120,299,0.231,par_colis,2026-02-01,2026-11-30
+37,Indre-et-Loire,standard,300,599,0.2415,par_colis,2026-02-01,2026-11-30
+37,Indre-et-Loire,standard,600,799,0.1995,par_colis,2026-02-01,2026-11-30
+37,Indre-et-Loire,standard,800,1200,0.1575,par_colis,2026-02-01,2026-11-30
+38,Isere,standard,1,12,42.819,forfait,2026-02-01,2026-11-30
+38,Isere,standard,13,18,45.99,forfait,2026-02-01,2026-11-30
+38,Isere,standard,19,24,48.552,forfait,2026-02-01,2026-11-30
+38,Isere,standard,25,30,50.8095,forfait,2026-02-01,2026-11-30
+38,Isere,standard,31,36,52.5525,forfait,2026-02-01,2026-11-30
+38,Isere,standard,37,42,53.9385,forfait,2026-02-01,2026-11-30
+38,Isere,standard,43,48,55.3875,forfait,2026-02-01,2026-11-30
+38,Isere,standard,49,54,56.8155,forfait,2026-02-01,2026-11-30
+38,Isere,standard,55,59,58.2435,forfait,2026-02-01,2026-11-30
+38,Isere,standard,60,119,0.693,par_colis,2026-02-01,2026-11-30
+38,Isere,standard,120,299,0.483,par_colis,2026-02-01,2026-11-30
+38,Isere,standard,300,599,0.4515,par_colis,2026-02-01,2026-11-30
+38,Isere,standard,600,799,0.378,par_colis,2026-02-01,2026-11-30
+38,Isere,standard,800,1200,0.3255,par_colis,2026-02-01,2026-11-30
+38,Isere,Haute montagne,1,12,51.3765,forfait,2026-02-01,2026-11-30
+38,Isere,Haute montagne,13,18,55.167,forfait,2026-02-01,2026-11-30
+38,Isere,Haute montagne,19,24,58.2435,forfait,2026-02-01,2026-11-30
+38,Isere,Haute montagne,25,30,60.9525,forfait,2026-02-01,2026-11-30
+38,Isere,Haute montagne,31,36,63.042,forfait,2026-02-01,2026-11-30
+38,Isere,Haute montagne,37,42,64.7535,forfait,2026-02-01,2026-11-30
+38,Isere,Haute montagne,43,48,66.465,forfait,2026-02-01,2026-11-30
+38,Isere,Haute montagne,49,54,68.1765,forfait,2026-02-01,2026-11-30
+38,Isere,Haute montagne,55,59,69.909,forfait,2026-02-01,2026-11-30
+38,Isere,Haute montagne,60,119,0.7875,par_colis,2026-02-01,2026-11-30
+38,Isere,Haute montagne,120,299,0.567,par_colis,2026-02-01,2026-11-30
+38,Isere,Haute montagne,300,599,0.5775,par_colis,2026-02-01,2026-11-30
+38,Isere,Haute montagne,600,799,0.42,par_colis,2026-02-01,2026-11-30
+38,Isere,Haute montagne,800,1200,0.3885,par_colis,2026-02-01,2026-11-30
+39,Jura,standard,1,12,42.819,forfait,2026-02-01,2026-11-30
+39,Jura,standard,13,18,45.99,forfait,2026-02-01,2026-11-30
+39,Jura,standard,19,24,48.552,forfait,2026-02-01,2026-11-30
+39,Jura,standard,25,30,50.8095,forfait,2026-02-01,2026-11-30
+39,Jura,standard,31,36,52.5525,forfait,2026-02-01,2026-11-30
+39,Jura,standard,37,42,53.9385,forfait,2026-02-01,2026-11-30
+39,Jura,standard,43,48,55.3875,forfait,2026-02-01,2026-11-30
+39,Jura,standard,49,54,56.8155,forfait,2026-02-01,2026-11-30
+39,Jura,standard,55,59,58.2435,forfait,2026-02-01,2026-11-30
+39,Jura,standard,60,119,0.693,par_colis,2026-02-01,2026-11-30
+39,Jura,standard,120,299,0.483,par_colis,2026-02-01,2026-11-30
+39,Jura,standard,300,599,0.4515,par_colis,2026-02-01,2026-11-30
+39,Jura,standard,600,799,0.378,par_colis,2026-02-01,2026-11-30
+39,Jura,standard,800,1200,0.3255,par_colis,2026-02-01,2026-11-30
+40,Landes,standard,1,12,42.819,forfait,2026-02-01,2026-11-30
+40,Landes,standard,13,18,45.99,forfait,2026-02-01,2026-11-30
+40,Landes,standard,19,24,48.552,forfait,2026-02-01,2026-11-30
+40,Landes,standard,25,30,50.8095,forfait,2026-02-01,2026-11-30
+40,Landes,standard,31,36,52.5525,forfait,2026-02-01,2026-11-30
+40,Landes,standard,37,42,53.9385,forfait,2026-02-01,2026-11-30
+40,Landes,standard,43,48,55.3875,forfait,2026-02-01,2026-11-30
+40,Landes,standard,49,54,56.8155,forfait,2026-02-01,2026-11-30
+40,Landes,standard,55,59,58.2435,forfait,2026-02-01,2026-11-30
+40,Landes,standard,60,119,0.693,par_colis,2026-02-01,2026-11-30
+40,Landes,standard,120,299,0.483,par_colis,2026-02-01,2026-11-30
+40,Landes,standard,300,599,0.4515,par_colis,2026-02-01,2026-11-30
+40,Landes,standard,600,799,0.378,par_colis,2026-02-01,2026-11-30
+40,Landes,standard,800,1200,0.3255,par_colis,2026-02-01,2026-11-30
+41,Loir-et-Cher,standard,1,12,23.6565,forfait,2026-02-01,2026-11-30
+41,Loir-et-Cher,standard,13,18,25.431,forfait,2026-02-01,2026-11-30
+41,Loir-et-Cher,standard,19,24,26.8275,forfait,2026-02-01,2026-11-30
+41,Loir-et-Cher,standard,25,30,28.077,forfait,2026-02-01,2026-11-30
+41,Loir-et-Cher,standard,31,36,29.0325,forfait,2026-02-01,2026-11-30
+41,Loir-et-Cher,standard,37,42,29.8305,forfait,2026-02-01,2026-11-30
+41,Loir-et-Cher,standard,43,48,30.6075,forfait,2026-02-01,2026-11-30
+41,Loir-et-Cher,standard,49,54,31.395,forfait,2026-02-01,2026-11-30
+41,Loir-et-Cher,standard,55,59,32.2035,forfait,2026-02-01,2026-11-30
+41,Loir-et-Cher,standard,60,119,0.357,par_colis,2026-02-01,2026-11-30
+41,Loir-et-Cher,standard,120,299,0.252,par_colis,2026-02-01,2026-11-30
+41,Loir-et-Cher,standard,300,599,0.2625,par_colis,2026-02-01,2026-11-30
+41,Loir-et-Cher,standard,600,799,0.231,par_colis,2026-02-01,2026-11-30
+41,Loir-et-Cher,standard,800,1200,0.189,par_colis,2026-02-01,2026-11-30
+42,Loire,standard,1,12,35.721,forfait,2026-02-01,2026-11-30
+42,Loire,standard,13,18,38.325,forfait,2026-02-01,2026-11-30
+42,Loire,standard,19,24,40.467,forfait,2026-02-01,2026-11-30
+42,Loire,standard,25,30,42.399,forfait,2026-02-01,2026-11-30
+42,Loire,standard,31,36,43.8165,forfait,2026-02-01,2026-11-30
+42,Loire,standard,37,42,44.982,forfait,2026-02-01,2026-11-30
+42,Loire,standard,43,48,46.1685,forfait,2026-02-01,2026-11-30
+42,Loire,standard,49,54,47.3865,forfait,2026-02-01,2026-11-30
+42,Loire,standard,55,59,48.573,forfait,2026-02-01,2026-11-30
+42,Loire,standard,60,119,0.546,par_colis,2026-02-01,2026-11-30
+42,Loire,standard,120,299,0.378,par_colis,2026-02-01,2026-11-30
+42,Loire,standard,300,599,0.3885,par_colis,2026-02-01,2026-11-30
+42,Loire,standard,600,799,0.3045,par_colis,2026-02-01,2026-11-30
+42,Loire,standard,800,1200,0.273,par_colis,2026-02-01,2026-11-30
+43,Haute-Loire,standard,1,12,35.721,forfait,2026-02-01,2026-11-30
+43,Haute-Loire,standard,13,18,38.325,forfait,2026-02-01,2026-11-30
+43,Haute-Loire,standard,19,24,40.467,forfait,2026-02-01,2026-11-30
+43,Haute-Loire,standard,25,30,42.399,forfait,2026-02-01,2026-11-30
+43,Haute-Loire,standard,31,36,43.8165,forfait,2026-02-01,2026-11-30
+43,Haute-Loire,standard,37,42,44.982,forfait,2026-02-01,2026-11-30
+43,Haute-Loire,standard,43,48,46.1685,forfait,2026-02-01,2026-11-30
+43,Haute-Loire,standard,49,54,47.3865,forfait,2026-02-01,2026-11-30
+43,Haute-Loire,standard,55,59,48.573,forfait,2026-02-01,2026-11-30
+43,Haute-Loire,standard,60,119,0.546,par_colis,2026-02-01,2026-11-30
+43,Haute-Loire,standard,120,299,0.378,par_colis,2026-02-01,2026-11-30
+43,Haute-Loire,standard,300,599,0.3885,par_colis,2026-02-01,2026-11-30
+43,Haute-Loire,standard,600,799,0.3045,par_colis,2026-02-01,2026-11-30
+43,Haute-Loire,standard,800,1200,0.273,par_colis,2026-02-01,2026-11-30
+44,Loire-Atlantique,standard,1,12,28.6125,forfait,2026-02-01,2026-11-30
+44,Loire-Atlantique,standard,13,18,30.702,forfait,2026-02-01,2026-11-30
+44,Loire-Atlantique,standard,19,24,32.445,forfait,2026-02-01,2026-11-30
+44,Loire-Atlantique,standard,25,30,33.9465,forfait,2026-02-01,2026-11-30
+44,Loire-Atlantique,standard,31,36,35.091,forfait,2026-02-01,2026-11-30
+44,Loire-Atlantique,standard,37,42,36.078,forfait,2026-02-01,2026-11-30
+44,Loire-Atlantique,standard,43,48,37.002,forfait,2026-02-01,2026-11-30
+44,Loire-Atlantique,standard,49,54,37.968,forfait,2026-02-01,2026-11-30
+44,Loire-Atlantique,standard,55,59,38.934,forfait,2026-02-01,2026-11-30
+44,Loire-Atlantique,standard,60,119,0.441,par_colis,2026-02-01,2026-11-30
+44,Loire-Atlantique,standard,120,299,0.3255,par_colis,2026-02-01,2026-11-30
+44,Loire-Atlantique,standard,300,599,0.315,par_colis,2026-02-01,2026-11-30
+44,Loire-Atlantique,standard,600,799,0.252,par_colis,2026-02-01,2026-11-30
+44,Loire-Atlantique,standard,800,1200,0.231,par_colis,2026-02-01,2026-11-30
+45,Loiret,standard,1,12,28.6125,forfait,2026-02-01,2026-11-30
+45,Loiret,standard,13,18,30.702,forfait,2026-02-01,2026-11-30
+45,Loiret,standard,19,24,32.445,forfait,2026-02-01,2026-11-30
+45,Loiret,standard,25,30,33.9465,forfait,2026-02-01,2026-11-30
+45,Loiret,standard,31,36,35.091,forfait,2026-02-01,2026-11-30
+45,Loiret,standard,37,42,36.078,forfait,2026-02-01,2026-11-30
+45,Loiret,standard,43,48,37.002,forfait,2026-02-01,2026-11-30
+45,Loiret,standard,49,54,37.968,forfait,2026-02-01,2026-11-30
+45,Loiret,standard,55,59,38.934,forfait,2026-02-01,2026-11-30
+45,Loiret,standard,60,119,0.441,par_colis,2026-02-01,2026-11-30
+45,Loiret,standard,120,299,0.3255,par_colis,2026-02-01,2026-11-30
+45,Loiret,standard,300,599,0.315,par_colis,2026-02-01,2026-11-30
+45,Loiret,standard,600,799,0.252,par_colis,2026-02-01,2026-11-30
+45,Loiret,standard,800,1200,0.231,par_colis,2026-02-01,2026-11-30
+46,Lot,standard,1,12,35.721,forfait,2026-02-01,2026-11-30
+46,Lot,standard,13,18,38.325,forfait,2026-02-01,2026-11-30
+46,Lot,standard,19,24,40.467,forfait,2026-02-01,2026-11-30
+46,Lot,standard,25,30,42.399,forfait,2026-02-01,2026-11-30
+46,Lot,standard,31,36,43.8165,forfait,2026-02-01,2026-11-30
+46,Lot,standard,37,42,44.982,forfait,2026-02-01,2026-11-30
+46,Lot,standard,43,48,46.1685,forfait,2026-02-01,2026-11-30
+46,Lot,standard,49,54,47.3865,forfait,2026-02-01,2026-11-30
+46,Lot,standard,55,59,48.573,forfait,2026-02-01,2026-11-30
+46,Lot,standard,60,119,0.546,par_colis,2026-02-01,2026-11-30
+46,Lot,standard,120,299,0.378,par_colis,2026-02-01,2026-11-30
+46,Lot,standard,300,599,0.3885,par_colis,2026-02-01,2026-11-30
+46,Lot,standard,600,799,0.3045,par_colis,2026-02-01,2026-11-30
+46,Lot,standard,800,1200,0.273,par_colis,2026-02-01,2026-11-30
+47,Lot-et-Garonne,standard,1,12,35.721,forfait,2026-02-01,2026-11-30
+47,Lot-et-Garonne,standard,13,18,38.325,forfait,2026-02-01,2026-11-30
+47,Lot-et-Garonne,standard,19,24,40.467,forfait,2026-02-01,2026-11-30
+47,Lot-et-Garonne,standard,25,30,42.399,forfait,2026-02-01,2026-11-30
+47,Lot-et-Garonne,standard,31,36,43.8165,forfait,2026-02-01,2026-11-30
+47,Lot-et-Garonne,standard,37,42,44.982,forfait,2026-02-01,2026-11-30
+47,Lot-et-Garonne,standard,43,48,46.1685,forfait,2026-02-01,2026-11-30
+47,Lot-et-Garonne,standard,49,54,47.3865,forfait,2026-02-01,2026-11-30
+47,Lot-et-Garonne,standard,55,59,48.573,forfait,2026-02-01,2026-11-30
+47,Lot-et-Garonne,standard,60,119,0.546,par_colis,2026-02-01,2026-11-30
+47,Lot-et-Garonne,standard,120,299,0.378,par_colis,2026-02-01,2026-11-30
+47,Lot-et-Garonne,standard,300,599,0.3885,par_colis,2026-02-01,2026-11-30
+47,Lot-et-Garonne,standard,600,799,0.3045,par_colis,2026-02-01,2026-11-30
+47,Lot-et-Garonne,standard,800,1200,0.273,par_colis,2026-02-01,2026-11-30
+48,Lozere,standard,1,12,42.819,forfait,2026-02-01,2026-11-30
+48,Lozere,standard,13,18,45.99,forfait,2026-02-01,2026-11-30
+48,Lozere,standard,19,24,48.552,forfait,2026-02-01,2026-11-30
+48,Lozere,standard,25,30,50.8095,forfait,2026-02-01,2026-11-30
+48,Lozere,standard,31,36,52.5525,forfait,2026-02-01,2026-11-30
+48,Lozere,standard,37,42,53.9385,forfait,2026-02-01,2026-11-30
+48,Lozere,standard,43,48,55.3875,forfait,2026-02-01,2026-11-30
+48,Lozere,standard,49,54,56.8155,forfait,2026-02-01,2026-11-30
+48,Lozere,standard,55,59,58.2435,forfait,2026-02-01,2026-11-30
+48,Lozere,standard,60,119,0.693,par_colis,2026-02-01,2026-11-30
+48,Lozere,standard,120,299,0.483,par_colis,2026-02-01,2026-11-30
+48,Lozere,standard,300,599,0.4515,par_colis,2026-02-01,2026-11-30
+48,Lozere,standard,600,799,0.378,par_colis,2026-02-01,2026-11-30
+48,Lozere,standard,800,1200,0.3255,par_colis,2026-02-01,2026-11-30
+49,Maine-et-Loire,standard,1,12,21.5145,forfait,2026-02-01,2026-11-30
+49,Maine-et-Loire,standard,13,18,23.1,forfait,2026-02-01,2026-11-30
+49,Maine-et-Loire,standard,19,24,24.402,forfait,2026-02-01,2026-11-30
+49,Maine-et-Loire,standard,25,30,25.515,forfait,2026-02-01,2026-11-30
+49,Maine-et-Loire,standard,31,36,26.397,forfait,2026-02-01,2026-11-30
+49,Maine-et-Loire,standard,37,42,27.1215,forfait,2026-02-01,2026-11-30
+49,Maine-et-Loire,standard,43,48,27.8145,forfait,2026-02-01,2026-11-30
+49,Maine-et-Loire,standard,49,54,28.539,forfait,2026-02-01,2026-11-30
+49,Maine-et-Loire,standard,55,59,29.2635,forfait,2026-02-01,2026-11-30
+49,Maine-et-Loire,standard,60,119,0.336,par_colis,2026-02-01,2026-11-30
+49,Maine-et-Loire,standard,120,299,0.231,par_colis,2026-02-01,2026-11-30
+49,Maine-et-Loire,standard,300,599,0.2415,par_colis,2026-02-01,2026-11-30
+49,Maine-et-Loire,standard,600,799,0.1995,par_colis,2026-02-01,2026-11-30
+49,Maine-et-Loire,standard,800,1200,0.1575,par_colis,2026-02-01,2026-11-30
+50,Manche,standard,1,12,28.6125,forfait,2026-02-01,2026-11-30
+50,Manche,standard,13,18,30.702,forfait,2026-02-01,2026-11-30
+50,Manche,standard,19,24,32.445,forfait,2026-02-01,2026-11-30
+50,Manche,standard,25,30,33.9465,forfait,2026-02-01,2026-11-30
+50,Manche,standard,31,36,35.091,forfait,2026-02-01,2026-11-30
+50,Manche,standard,37,42,36.078,forfait,2026-02-01,2026-11-30
+50,Manche,standard,43,48,37.002,forfait,2026-02-01,2026-11-30
+50,Manche,standard,49,54,37.968,forfait,2026-02-01,2026-11-30
+50,Manche,standard,55,59,38.934,forfait,2026-02-01,2026-11-30
+50,Manche,standard,60,119,0.441,par_colis,2026-02-01,2026-11-30
+50,Manche,standard,120,299,0.3255,par_colis,2026-02-01,2026-11-30
+50,Manche,standard,300,599,0.315,par_colis,2026-02-01,2026-11-30
+50,Manche,standard,600,799,0.252,par_colis,2026-02-01,2026-11-30
+50,Manche,standard,800,1200,0.231,par_colis,2026-02-01,2026-11-30
+50,Manche,Ile,1,12,34.3455,forfait,2026-02-01,2026-11-30
+50,Manche,Ile,13,18,36.855,forfait,2026-02-01,2026-11-30
+50,Manche,Ile,19,24,38.934,forfait,2026-02-01,2026-11-30
+50,Manche,Ile,25,30,40.74,forfait,2026-02-01,2026-11-30
+50,Manche,Ile,31,36,42.105,forfait,2026-02-01,2026-11-30
+50,Manche,Ile,37,42,43.302,forfait,2026-02-01,2026-11-30
+50,Manche,Ile,43,48,44.394,forfait,2026-02-01,2026-11-30
+50,Manche,Ile,49,54,45.5385,forfait,2026-02-01,2026-11-30
+50,Manche,Ile,55,59,46.6935,forfait,2026-02-01,2026-11-30
+50,Manche,Ile,60,119,0.525,par_colis,2026-02-01,2026-11-30
+50,Manche,Ile,120,299,0.357,par_colis,2026-02-01,2026-11-30
+50,Manche,Ile,300,599,0.3885,par_colis,2026-02-01,2026-11-30
+50,Manche,Ile,600,799,0.3045,par_colis,2026-02-01,2026-11-30
+50,Manche,Ile,800,1200,0.252,par_colis,2026-02-01,2026-11-30
+51,Marne,standard,1,12,35.721,forfait,2026-02-01,2026-11-30
+51,Marne,standard,13,18,38.325,forfait,2026-02-01,2026-11-30
+51,Marne,standard,19,24,40.467,forfait,2026-02-01,2026-11-30
+51,Marne,standard,25,30,42.399,forfait,2026-02-01,2026-11-30
+51,Marne,standard,31,36,43.8165,forfait,2026-02-01,2026-11-30
+51,Marne,standard,37,42,44.982,forfait,2026-02-01,2026-11-30
+51,Marne,standard,43,48,46.1685,forfait,2026-02-01,2026-11-30
+51,Marne,standard,49,54,47.3865,forfait,2026-02-01,2026-11-30
+51,Marne,standard,55,59,48.573,forfait,2026-02-01,2026-11-30
+51,Marne,standard,60,119,0.546,par_colis,2026-02-01,2026-11-30
+51,Marne,standard,120,299,0.378,par_colis,2026-02-01,2026-11-30
+51,Marne,standard,300,599,0.3885,par_colis,2026-02-01,2026-11-30
+51,Marne,standard,600,799,0.3045,par_colis,2026-02-01,2026-11-30
+51,Marne,standard,800,1200,0.273,par_colis,2026-02-01,2026-11-30
+52,Haute-Marne,standard,1,12,35.721,forfait,2026-02-01,2026-11-30
+52,Haute-Marne,standard,13,18,38.325,forfait,2026-02-01,2026-11-30
+52,Haute-Marne,standard,19,24,40.467,forfait,2026-02-01,2026-11-30
+52,Haute-Marne,standard,25,30,42.399,forfait,2026-02-01,2026-11-30
+52,Haute-Marne,standard,31,36,43.8165,forfait,2026-02-01,2026-11-30
+52,Haute-Marne,standard,37,42,44.982,forfait,2026-02-01,2026-11-30
+52,Haute-Marne,standard,43,48,46.1685,forfait,2026-02-01,2026-11-30
+52,Haute-Marne,standard,49,54,47.3865,forfait,2026-02-01,2026-11-30
+52,Haute-Marne,standard,55,59,48.573,forfait,2026-02-01,2026-11-30
+52,Haute-Marne,standard,60,119,0.546,par_colis,2026-02-01,2026-11-30
+52,Haute-Marne,standard,120,299,0.378,par_colis,2026-02-01,2026-11-30
+52,Haute-Marne,standard,300,599,0.3885,par_colis,2026-02-01,2026-11-30
+52,Haute-Marne,standard,600,799,0.3045,par_colis,2026-02-01,2026-11-30
+52,Haute-Marne,standard,800,1200,0.273,par_colis,2026-02-01,2026-11-30
+53,Mayenne,standard,1,12,28.6125,forfait,2026-02-01,2026-11-30
+53,Mayenne,standard,13,18,30.702,forfait,2026-02-01,2026-11-30
+53,Mayenne,standard,19,24,32.445,forfait,2026-02-01,2026-11-30
+53,Mayenne,standard,25,30,33.9465,forfait,2026-02-01,2026-11-30
+53,Mayenne,standard,31,36,35.091,forfait,2026-02-01,2026-11-30
+53,Mayenne,standard,37,42,36.078,forfait,2026-02-01,2026-11-30
+53,Mayenne,standard,43,48,37.002,forfait,2026-02-01,2026-11-30
+53,Mayenne,standard,49,54,37.968,forfait,2026-02-01,2026-11-30
+53,Mayenne,standard,55,59,38.934,forfait,2026-02-01,2026-11-30
+53,Mayenne,standard,60,119,0.441,par_colis,2026-02-01,2026-11-30
+53,Mayenne,standard,120,299,0.3255,par_colis,2026-02-01,2026-11-30
+53,Mayenne,standard,300,599,0.315,par_colis,2026-02-01,2026-11-30
+53,Mayenne,standard,600,799,0.252,par_colis,2026-02-01,2026-11-30
+53,Mayenne,standard,800,1200,0.231,par_colis,2026-02-01,2026-11-30
+54,Meurthe-et-Moselle,standard,1,12,42.819,forfait,2026-02-01,2026-11-30
+54,Meurthe-et-Moselle,standard,13,18,45.99,forfait,2026-02-01,2026-11-30
+54,Meurthe-et-Moselle,standard,19,24,48.552,forfait,2026-02-01,2026-11-30
+54,Meurthe-et-Moselle,standard,25,30,50.8095,forfait,2026-02-01,2026-11-30
+54,Meurthe-et-Moselle,standard,31,36,52.5525,forfait,2026-02-01,2026-11-30
+54,Meurthe-et-Moselle,standard,37,42,53.9385,forfait,2026-02-01,2026-11-30
+54,Meurthe-et-Moselle,standard,43,48,55.3875,forfait,2026-02-01,2026-11-30
+54,Meurthe-et-Moselle,standard,49,54,56.8155,forfait,2026-02-01,2026-11-30
+54,Meurthe-et-Moselle,standard,55,59,58.2435,forfait,2026-02-01,2026-11-30
+54,Meurthe-et-Moselle,standard,60,119,0.693,par_colis,2026-02-01,2026-11-30
+54,Meurthe-et-Moselle,standard,120,299,0.483,par_colis,2026-02-01,2026-11-30
+54,Meurthe-et-Moselle,standard,300,599,0.4515,par_colis,2026-02-01,2026-11-30
+54,Meurthe-et-Moselle,standard,600,799,0.378,par_colis,2026-02-01,2026-11-30
+54,Meurthe-et-Moselle,standard,800,1200,0.3255,par_colis,2026-02-01,2026-11-30
+55,Meuse,standard,1,12,35.721,forfait,2026-02-01,2026-11-30
+55,Meuse,standard,13,18,38.325,forfait,2026-02-01,2026-11-30
+55,Meuse,standard,19,24,40.467,forfait,2026-02-01,2026-11-30
+55,Meuse,standard,25,30,42.399,forfait,2026-02-01,2026-11-30
+55,Meuse,standard,31,36,43.8165,forfait,2026-02-01,2026-11-30
+55,Meuse,standard,37,42,44.982,forfait,2026-02-01,2026-11-30
+55,Meuse,standard,43,48,46.1685,forfait,2026-02-01,2026-11-30
+55,Meuse,standard,49,54,47.3865,forfait,2026-02-01,2026-11-30
+55,Meuse,standard,55,59,48.573,forfait,2026-02-01,2026-11-30
+55,Meuse,standard,60,119,0.546,par_colis,2026-02-01,2026-11-30
+55,Meuse,standard,120,299,0.378,par_colis,2026-02-01,2026-11-30
+55,Meuse,standard,300,599,0.3885,par_colis,2026-02-01,2026-11-30
+55,Meuse,standard,600,799,0.3045,par_colis,2026-02-01,2026-11-30
+55,Meuse,standard,800,1200,0.273,par_colis,2026-02-01,2026-11-30
+56,Morbihan,standard,1,12,28.6125,forfait,2026-02-01,2026-11-30
+56,Morbihan,standard,13,18,30.702,forfait,2026-02-01,2026-11-30
+56,Morbihan,standard,19,24,32.445,forfait,2026-02-01,2026-11-30
+56,Morbihan,standard,25,30,33.9465,forfait,2026-02-01,2026-11-30
+56,Morbihan,standard,31,36,35.091,forfait,2026-02-01,2026-11-30
+56,Morbihan,standard,37,42,36.078,forfait,2026-02-01,2026-11-30
+56,Morbihan,standard,43,48,37.002,forfait,2026-02-01,2026-11-30
+56,Morbihan,standard,49,54,37.968,forfait,2026-02-01,2026-11-30
+56,Morbihan,standard,55,59,38.934,forfait,2026-02-01,2026-11-30
+56,Morbihan,standard,60,119,0.441,par_colis,2026-02-01,2026-11-30
+56,Morbihan,standard,120,299,0.3255,par_colis,2026-02-01,2026-11-30
+56,Morbihan,standard,300,599,0.315,par_colis,2026-02-01,2026-11-30
+56,Morbihan,standard,600,799,0.252,par_colis,2026-02-01,2026-11-30
+56,Morbihan,standard,800,1200,0.231,par_colis,2026-02-01,2026-11-30
+56,Morbihan,Ile,1,12,34.3455,forfait,2026-02-01,2026-11-30
+56,Morbihan,Ile,13,18,36.855,forfait,2026-02-01,2026-11-30
+56,Morbihan,Ile,19,24,38.934,forfait,2026-02-01,2026-11-30
+56,Morbihan,Ile,25,30,40.74,forfait,2026-02-01,2026-11-30
+56,Morbihan,Ile,31,36,42.105,forfait,2026-02-01,2026-11-30
+56,Morbihan,Ile,37,42,43.302,forfait,2026-02-01,2026-11-30
+56,Morbihan,Ile,43,48,44.394,forfait,2026-02-01,2026-11-30
+56,Morbihan,Ile,49,54,45.5385,forfait,2026-02-01,2026-11-30
+56,Morbihan,Ile,55,59,46.6935,forfait,2026-02-01,2026-11-30
+56,Morbihan,Ile,60,119,0.525,par_colis,2026-02-01,2026-11-30
+56,Morbihan,Ile,120,299,0.357,par_colis,2026-02-01,2026-11-30
+56,Morbihan,Ile,300,599,0.3885,par_colis,2026-02-01,2026-11-30
+56,Morbihan,Ile,600,799,0.3045,par_colis,2026-02-01,2026-11-30
+56,Morbihan,Ile,800,1200,0.252,par_colis,2026-02-01,2026-11-30
+57,Moselle,standard,1,12,42.819,forfait,2026-02-01,2026-11-30
+57,Moselle,standard,13,18,45.99,forfait,2026-02-01,2026-11-30
+57,Moselle,standard,19,24,48.552,forfait,2026-02-01,2026-11-30
+57,Moselle,standard,25,30,50.8095,forfait,2026-02-01,2026-11-30
+57,Moselle,standard,31,36,52.5525,forfait,2026-02-01,2026-11-30
+57,Moselle,standard,37,42,53.9385,forfait,2026-02-01,2026-11-30
+57,Moselle,standard,43,48,55.3875,forfait,2026-02-01,2026-11-30
+57,Moselle,standard,49,54,56.8155,forfait,2026-02-01,2026-11-30
+57,Moselle,standard,55,59,58.2435,forfait,2026-02-01,2026-11-30
+57,Moselle,standard,60,119,0.693,par_colis,2026-02-01,2026-11-30
+57,Moselle,standard,120,299,0.483,par_colis,2026-02-01,2026-11-30
+57,Moselle,standard,300,599,0.4515,par_colis,2026-02-01,2026-11-30
+57,Moselle,standard,600,799,0.378,par_colis,2026-02-01,2026-11-30
+57,Moselle,standard,800,1200,0.3255,par_colis,2026-02-01,2026-11-30
+58,Nievre,standard,1,12,28.6125,forfait,2026-02-01,2026-11-30
+58,Nievre,standard,13,18,30.702,forfait,2026-02-01,2026-11-30
+58,Nievre,standard,19,24,32.445,forfait,2026-02-01,2026-11-30
+58,Nievre,standard,25,30,33.9465,forfait,2026-02-01,2026-11-30
+58,Nievre,standard,31,36,35.091,forfait,2026-02-01,2026-11-30
+58,Nievre,standard,37,42,36.078,forfait,2026-02-01,2026-11-30
+58,Nievre,standard,43,48,37.002,forfait,2026-02-01,2026-11-30
+58,Nievre,standard,49,54,37.968,forfait,2026-02-01,2026-11-30
+58,Nievre,standard,55,59,38.934,forfait,2026-02-01,2026-11-30
+58,Nievre,standard,60,119,0.441,par_colis,2026-02-01,2026-11-30
+58,Nievre,standard,120,299,0.3255,par_colis,2026-02-01,2026-11-30
+58,Nievre,standard,300,599,0.315,par_colis,2026-02-01,2026-11-30
+58,Nievre,standard,600,799,0.252,par_colis,2026-02-01,2026-11-30
+58,Nievre,standard,800,1200,0.231,par_colis,2026-02-01,2026-11-30
+59,Nord,standard,1,12,35.721,forfait,2026-02-01,2026-11-30
+59,Nord,standard,13,18,38.325,forfait,2026-02-01,2026-11-30
+59,Nord,standard,19,24,40.467,forfait,2026-02-01,2026-11-30
+59,Nord,standard,25,30,42.399,forfait,2026-02-01,2026-11-30
+59,Nord,standard,31,36,43.8165,forfait,2026-02-01,2026-11-30
+59,Nord,standard,37,42,44.982,forfait,2026-02-01,2026-11-30
+59,Nord,standard,43,48,46.1685,forfait,2026-02-01,2026-11-30
+59,Nord,standard,49,54,47.3865,forfait,2026-02-01,2026-11-30
+59,Nord,standard,55,59,48.573,forfait,2026-02-01,2026-11-30
+59,Nord,standard,60,119,0.546,par_colis,2026-02-01,2026-11-30
+59,Nord,standard,120,299,0.378,par_colis,2026-02-01,2026-11-30
+59,Nord,standard,300,599,0.3885,par_colis,2026-02-01,2026-11-30
+59,Nord,standard,600,799,0.3045,par_colis,2026-02-01,2026-11-30
+59,Nord,standard,800,1200,0.273,par_colis,2026-02-01,2026-11-30
+60,Oise,standard,1,12,28.6125,forfait,2026-02-01,2026-11-30
+60,Oise,standard,13,18,30.702,forfait,2026-02-01,2026-11-30
+60,Oise,standard,19,24,32.445,forfait,2026-02-01,2026-11-30
+60,Oise,standard,25,30,33.9465,forfait,2026-02-01,2026-11-30
+60,Oise,standard,31,36,35.091,forfait,2026-02-01,2026-11-30
+60,Oise,standard,37,42,36.078,forfait,2026-02-01,2026-11-30
+60,Oise,standard,43,48,37.002,forfait,2026-02-01,2026-11-30
+60,Oise,standard,49,54,37.968,forfait,2026-02-01,2026-11-30
+60,Oise,standard,55,59,38.934,forfait,2026-02-01,2026-11-30
+60,Oise,standard,60,119,0.441,par_colis,2026-02-01,2026-11-30
+60,Oise,standard,120,299,0.3255,par_colis,2026-02-01,2026-11-30
+60,Oise,standard,300,599,0.315,par_colis,2026-02-01,2026-11-30
+60,Oise,standard,600,799,0.252,par_colis,2026-02-01,2026-11-30
+60,Oise,standard,800,1200,0.231,par_colis,2026-02-01,2026-11-30
+61,Orne,standard,1,12,23.6565,forfait,2026-02-01,2026-11-30
+61,Orne,standard,13,18,25.431,forfait,2026-02-01,2026-11-30
+61,Orne,standard,19,24,26.8275,forfait,2026-02-01,2026-11-30
+61,Orne,standard,25,30,28.077,forfait,2026-02-01,2026-11-30
+61,Orne,standard,31,36,29.0325,forfait,2026-02-01,2026-11-30
+61,Orne,standard,37,42,29.8305,forfait,2026-02-01,2026-11-30
+61,Orne,standard,43,48,30.6075,forfait,2026-02-01,2026-11-30
+61,Orne,standard,49,54,31.395,forfait,2026-02-01,2026-11-30
+61,Orne,standard,55,59,32.2035,forfait,2026-02-01,2026-11-30
+61,Orne,standard,60,119,0.357,par_colis,2026-02-01,2026-11-30
+61,Orne,standard,120,299,0.252,par_colis,2026-02-01,2026-11-30
+61,Orne,standard,300,599,0.2625,par_colis,2026-02-01,2026-11-30
+61,Orne,standard,600,799,0.231,par_colis,2026-02-01,2026-11-30
+61,Orne,standard,800,1200,0.189,par_colis,2026-02-01,2026-11-30
+62,Pas-de-Calais,standard,1,12,35.721,forfait,2026-02-01,2026-11-30
+62,Pas-de-Calais,standard,13,18,38.325,forfait,2026-02-01,2026-11-30
+62,Pas-de-Calais,standard,19,24,40.467,forfait,2026-02-01,2026-11-30
+62,Pas-de-Calais,standard,25,30,42.399,forfait,2026-02-01,2026-11-30
+62,Pas-de-Calais,standard,31,36,43.8165,forfait,2026-02-01,2026-11-30
+62,Pas-de-Calais,standard,37,42,44.982,forfait,2026-02-01,2026-11-30
+62,Pas-de-Calais,standard,43,48,46.1685,forfait,2026-02-01,2026-11-30
+62,Pas-de-Calais,standard,49,54,47.3865,forfait,2026-02-01,2026-11-30
+62,Pas-de-Calais,standard,55,59,48.573,forfait,2026-02-01,2026-11-30
+62,Pas-de-Calais,standard,60,119,0.546,par_colis,2026-02-01,2026-11-30
+62,Pas-de-Calais,standard,120,299,0.378,par_colis,2026-02-01,2026-11-30
+62,Pas-de-Calais,standard,300,599,0.3885,par_colis,2026-02-01,2026-11-30
+62,Pas-de-Calais,standard,600,799,0.3045,par_colis,2026-02-01,2026-11-30
+62,Pas-de-Calais,standard,800,1200,0.273,par_colis,2026-02-01,2026-11-30
+63,Puy-de-Dome,standard,1,12,35.721,forfait,2026-02-01,2026-11-30
+63,Puy-de-Dome,standard,13,18,38.325,forfait,2026-02-01,2026-11-30
+63,Puy-de-Dome,standard,19,24,40.467,forfait,2026-02-01,2026-11-30
+63,Puy-de-Dome,standard,25,30,42.399,forfait,2026-02-01,2026-11-30
+63,Puy-de-Dome,standard,31,36,43.8165,forfait,2026-02-01,2026-11-30
+63,Puy-de-Dome,standard,37,42,44.982,forfait,2026-02-01,2026-11-30
+63,Puy-de-Dome,standard,43,48,46.1685,forfait,2026-02-01,2026-11-30
+63,Puy-de-Dome,standard,49,54,47.3865,forfait,2026-02-01,2026-11-30
+63,Puy-de-Dome,standard,55,59,48.573,forfait,2026-02-01,2026-11-30
+63,Puy-de-Dome,standard,60,119,0.546,par_colis,2026-02-01,2026-11-30
+63,Puy-de-Dome,standard,120,299,0.378,par_colis,2026-02-01,2026-11-30
+63,Puy-de-Dome,standard,300,599,0.3885,par_colis,2026-02-01,2026-11-30
+63,Puy-de-Dome,standard,600,799,0.3045,par_colis,2026-02-01,2026-11-30
+63,Puy-de-Dome,standard,800,1200,0.273,par_colis,2026-02-01,2026-11-30
+64,Pyrenees-Atlantiques,standard,1,12,42.819,forfait,2026-02-01,2026-11-30
+64,Pyrenees-Atlantiques,standard,13,18,45.99,forfait,2026-02-01,2026-11-30
+64,Pyrenees-Atlantiques,standard,19,24,48.552,forfait,2026-02-01,2026-11-30
+64,Pyrenees-Atlantiques,standard,25,30,50.8095,forfait,2026-02-01,2026-11-30
+64,Pyrenees-Atlantiques,standard,31,36,52.5525,forfait,2026-02-01,2026-11-30
+64,Pyrenees-Atlantiques,standard,37,42,53.9385,forfait,2026-02-01,2026-11-30
+64,Pyrenees-Atlantiques,standard,43,48,55.3875,forfait,2026-02-01,2026-11-30
+64,Pyrenees-Atlantiques,standard,49,54,56.8155,forfait,2026-02-01,2026-11-30
+64,Pyrenees-Atlantiques,standard,55,59,58.2435,forfait,2026-02-01,2026-11-30
+64,Pyrenees-Atlantiques,standard,60,119,0.693,par_colis,2026-02-01,2026-11-30
+64,Pyrenees-Atlantiques,standard,120,299,0.483,par_colis,2026-02-01,2026-11-30
+64,Pyrenees-Atlantiques,standard,300,599,0.4515,par_colis,2026-02-01,2026-11-30
+64,Pyrenees-Atlantiques,standard,600,799,0.378,par_colis,2026-02-01,2026-11-30
+64,Pyrenees-Atlantiques,standard,800,1200,0.3255,par_colis,2026-02-01,2026-11-30
+64,Pyrenees-Atlantiques,Haute montagne,1,12,51.3765,forfait,2026-02-01,2026-11-30
+64,Pyrenees-Atlantiques,Haute montagne,13,18,55.167,forfait,2026-02-01,2026-11-30
+64,Pyrenees-Atlantiques,Haute montagne,19,24,58.2435,forfait,2026-02-01,2026-11-30
+64,Pyrenees-Atlantiques,Haute montagne,25,30,60.9525,forfait,2026-02-01,2026-11-30
+64,Pyrenees-Atlantiques,Haute montagne,31,36,63.042,forfait,2026-02-01,2026-11-30
+64,Pyrenees-Atlantiques,Haute montagne,37,42,64.7535,forfait,2026-02-01,2026-11-30
+64,Pyrenees-Atlantiques,Haute montagne,43,48,66.465,forfait,2026-02-01,2026-11-30
+64,Pyrenees-Atlantiques,Haute montagne,49,54,68.1765,forfait,2026-02-01,2026-11-30
+64,Pyrenees-Atlantiques,Haute montagne,55,59,69.909,forfait,2026-02-01,2026-11-30
+64,Pyrenees-Atlantiques,Haute montagne,60,119,0.7875,par_colis,2026-02-01,2026-11-30
+64,Pyrenees-Atlantiques,Haute montagne,120,299,0.567,par_colis,2026-02-01,2026-11-30
+64,Pyrenees-Atlantiques,Haute montagne,300,599,0.5775,par_colis,2026-02-01,2026-11-30
+64,Pyrenees-Atlantiques,Haute montagne,600,799,0.42,par_colis,2026-02-01,2026-11-30
+64,Pyrenees-Atlantiques,Haute montagne,800,1200,0.3885,par_colis,2026-02-01,2026-11-30
+65,Hautes-Pyrenees,standard,1,12,42.819,forfait,2026-02-01,2026-11-30
+65,Hautes-Pyrenees,standard,13,18,45.99,forfait,2026-02-01,2026-11-30
+65,Hautes-Pyrenees,standard,19,24,48.552,forfait,2026-02-01,2026-11-30
+65,Hautes-Pyrenees,standard,25,30,50.8095,forfait,2026-02-01,2026-11-30
+65,Hautes-Pyrenees,standard,31,36,52.5525,forfait,2026-02-01,2026-11-30
+65,Hautes-Pyrenees,standard,37,42,53.9385,forfait,2026-02-01,2026-11-30
+65,Hautes-Pyrenees,standard,43,48,55.3875,forfait,2026-02-01,2026-11-30
+65,Hautes-Pyrenees,standard,49,54,56.8155,forfait,2026-02-01,2026-11-30
+65,Hautes-Pyrenees,standard,55,59,58.2435,forfait,2026-02-01,2026-11-30
+65,Hautes-Pyrenees,standard,60,119,0.693,par_colis,2026-02-01,2026-11-30
+65,Hautes-Pyrenees,standard,120,299,0.483,par_colis,2026-02-01,2026-11-30
+65,Hautes-Pyrenees,standard,300,599,0.4515,par_colis,2026-02-01,2026-11-30
+65,Hautes-Pyrenees,standard,600,799,0.378,par_colis,2026-02-01,2026-11-30
+65,Hautes-Pyrenees,standard,800,1200,0.3255,par_colis,2026-02-01,2026-11-30
+65,Hautes-Pyrenees,Haute montagne,1,12,51.3765,forfait,2026-02-01,2026-11-30
+65,Hautes-Pyrenees,Haute montagne,13,18,55.167,forfait,2026-02-01,2026-11-30
+65,Hautes-Pyrenees,Haute montagne,19,24,58.2435,forfait,2026-02-01,2026-11-30
+65,Hautes-Pyrenees,Haute montagne,25,30,60.9525,forfait,2026-02-01,2026-11-30
+65,Hautes-Pyrenees,Haute montagne,31,36,63.042,forfait,2026-02-01,2026-11-30
+65,Hautes-Pyrenees,Haute montagne,37,42,64.7535,forfait,2026-02-01,2026-11-30
+65,Hautes-Pyrenees,Haute montagne,43,48,66.465,forfait,2026-02-01,2026-11-30
+65,Hautes-Pyrenees,Haute montagne,49,54,68.1765,forfait,2026-02-01,2026-11-30
+65,Hautes-Pyrenees,Haute montagne,55,59,69.909,forfait,2026-02-01,2026-11-30
+65,Hautes-Pyrenees,Haute montagne,60,119,0.7875,par_colis,2026-02-01,2026-11-30
+65,Hautes-Pyrenees,Haute montagne,120,299,0.567,par_colis,2026-02-01,2026-11-30
+65,Hautes-Pyrenees,Haute montagne,300,599,0.5775,par_colis,2026-02-01,2026-11-30
+65,Hautes-Pyrenees,Haute montagne,600,799,0.42,par_colis,2026-02-01,2026-11-30
+65,Hautes-Pyrenees,Haute montagne,800,1200,0.3885,par_colis,2026-02-01,2026-11-30
+66,Pyrenees-Orientales,standard,1,12,47.355,forfait,2026-02-01,2026-11-30
+66,Pyrenees-Orientales,standard,13,18,50.8095,forfait,2026-02-01,2026-11-30
+66,Pyrenees-Orientales,standard,19,24,53.634,forfait,2026-02-01,2026-11-30
+66,Pyrenees-Orientales,standard,25,30,56.1855,forfait,2026-02-01,2026-11-30
+66,Pyrenees-Orientales,standard,31,36,58.0755,forfait,2026-02-01,2026-11-30
+66,Pyrenees-Orientales,standard,37,42,59.6715,forfait,2026-02-01,2026-11-30
+66,Pyrenees-Orientales,standard,43,48,61.2255,forfait,2026-02-01,2026-11-30
+66,Pyrenees-Orientales,standard,49,54,62.8005,forfait,2026-02-01,2026-11-30
+66,Pyrenees-Orientales,standard,55,59,64.3755,forfait,2026-02-01,2026-11-30
+66,Pyrenees-Orientales,standard,60,119,0.7455,par_colis,2026-02-01,2026-11-30
+66,Pyrenees-Orientales,standard,120,299,0.504,par_colis,2026-02-01,2026-11-30
+66,Pyrenees-Orientales,standard,300,599,0.504,par_colis,2026-02-01,2026-11-30
+66,Pyrenees-Orientales,standard,600,799,0.399,par_colis,2026-02-01,2026-11-30
+66,Pyrenees-Orientales,standard,800,1200,0.357,par_colis,2026-02-01,2026-11-30
+66,Pyrenees-Orientales,Haute montagne,1,12,56.8155,forfait,2026-02-01,2026-11-30
+66,Pyrenees-Orientales,Haute montagne,13,18,60.9525,forfait,2026-02-01,2026-11-30
+66,Pyrenees-Orientales,Haute montagne,19,24,64.3755,forfait,2026-02-01,2026-11-30
+66,Pyrenees-Orientales,Haute montagne,25,30,67.4205,forfait,2026-02-01,2026-11-30
+66,Pyrenees-Orientales,Haute montagne,31,36,69.6885,forfait,2026-02-01,2026-11-30
+66,Pyrenees-Orientales,Haute montagne,37,42,71.589,forfait,2026-02-01,2026-11-30
+66,Pyrenees-Orientales,Haute montagne,43,48,73.479,forfait,2026-02-01,2026-11-30
+66,Pyrenees-Orientales,Haute montagne,49,54,75.39,forfait,2026-02-01,2026-11-30
+66,Pyrenees-Orientales,Haute montagne,55,59,77.2695,forfait,2026-02-01,2026-11-30
+66,Pyrenees-Orientales,Haute montagne,60,119,0.882,par_colis,2026-02-01,2026-11-30
+66,Pyrenees-Orientales,Haute montagne,120,299,0.609,par_colis,2026-02-01,2026-11-30
+66,Pyrenees-Orientales,Haute montagne,300,599,0.63,par_colis,2026-02-01,2026-11-30
+66,Pyrenees-Orientales,Haute montagne,600,799,0.483,par_colis,2026-02-01,2026-11-30
+66,Pyrenees-Orientales,Haute montagne,800,1200,0.42,par_colis,2026-02-01,2026-11-30
+67,Bas-Rhin,standard,1,12,42.819,forfait,2026-02-01,2026-11-30
+67,Bas-Rhin,standard,13,18,45.99,forfait,2026-02-01,2026-11-30
+67,Bas-Rhin,standard,19,24,48.552,forfait,2026-02-01,2026-11-30
+67,Bas-Rhin,standard,25,30,50.8095,forfait,2026-02-01,2026-11-30
+67,Bas-Rhin,standard,31,36,52.5525,forfait,2026-02-01,2026-11-30
+67,Bas-Rhin,standard,37,42,53.9385,forfait,2026-02-01,2026-11-30
+67,Bas-Rhin,standard,43,48,55.3875,forfait,2026-02-01,2026-11-30
+67,Bas-Rhin,standard,49,54,56.8155,forfait,2026-02-01,2026-11-30
+67,Bas-Rhin,standard,55,59,58.2435,forfait,2026-02-01,2026-11-30
+67,Bas-Rhin,standard,60,119,0.693,par_colis,2026-02-01,2026-11-30
+67,Bas-Rhin,standard,120,299,0.483,par_colis,2026-02-01,2026-11-30
+67,Bas-Rhin,standard,300,599,0.4515,par_colis,2026-02-01,2026-11-30
+67,Bas-Rhin,standard,600,799,0.378,par_colis,2026-02-01,2026-11-30
+67,Bas-Rhin,standard,800,1200,0.3255,par_colis,2026-02-01,2026-11-30
+68,Haut-Rhin,standard,1,12,42.819,forfait,2026-02-01,2026-11-30
+68,Haut-Rhin,standard,13,18,45.99,forfait,2026-02-01,2026-11-30
+68,Haut-Rhin,standard,19,24,48.552,forfait,2026-02-01,2026-11-30
+68,Haut-Rhin,standard,25,30,50.8095,forfait,2026-02-01,2026-11-30
+68,Haut-Rhin,standard,31,36,52.5525,forfait,2026-02-01,2026-11-30
+68,Haut-Rhin,standard,37,42,53.9385,forfait,2026-02-01,2026-11-30
+68,Haut-Rhin,standard,43,48,55.3875,forfait,2026-02-01,2026-11-30
+68,Haut-Rhin,standard,49,54,56.8155,forfait,2026-02-01,2026-11-30
+68,Haut-Rhin,standard,55,59,58.2435,forfait,2026-02-01,2026-11-30
+68,Haut-Rhin,standard,60,119,0.693,par_colis,2026-02-01,2026-11-30
+68,Haut-Rhin,standard,120,299,0.483,par_colis,2026-02-01,2026-11-30
+68,Haut-Rhin,standard,300,599,0.4515,par_colis,2026-02-01,2026-11-30
+68,Haut-Rhin,standard,600,799,0.378,par_colis,2026-02-01,2026-11-30
+68,Haut-Rhin,standard,800,1200,0.3255,par_colis,2026-02-01,2026-11-30
+69,Rhone,standard,1,12,35.721,forfait,2026-02-01,2026-11-30
+69,Rhone,standard,13,18,38.325,forfait,2026-02-01,2026-11-30
+69,Rhone,standard,19,24,40.467,forfait,2026-02-01,2026-11-30
+69,Rhone,standard,25,30,42.399,forfait,2026-02-01,2026-11-30
+69,Rhone,standard,31,36,43.8165,forfait,2026-02-01,2026-11-30
+69,Rhone,standard,37,42,44.982,forfait,2026-02-01,2026-11-30
+69,Rhone,standard,43,48,46.1685,forfait,2026-02-01,2026-11-30
+69,Rhone,standard,49,54,47.3865,forfait,2026-02-01,2026-11-30
+69,Rhone,standard,55,59,48.573,forfait,2026-02-01,2026-11-30
+69,Rhone,standard,60,119,0.546,par_colis,2026-02-01,2026-11-30
+69,Rhone,standard,120,299,0.378,par_colis,2026-02-01,2026-11-30
+69,Rhone,standard,300,599,0.3885,par_colis,2026-02-01,2026-11-30
+69,Rhone,standard,600,799,0.3045,par_colis,2026-02-01,2026-11-30
+69,Rhone,standard,800,1200,0.273,par_colis,2026-02-01,2026-11-30
+70,Haute-Saone,standard,1,12,42.819,forfait,2026-02-01,2026-11-30
+70,Haute-Saone,standard,13,18,45.99,forfait,2026-02-01,2026-11-30
+70,Haute-Saone,standard,19,24,48.552,forfait,2026-02-01,2026-11-30
+70,Haute-Saone,standard,25,30,50.8095,forfait,2026-02-01,2026-11-30
+70,Haute-Saone,standard,31,36,52.5525,forfait,2026-02-01,2026-11-30
+70,Haute-Saone,standard,37,42,53.9385,forfait,2026-02-01,2026-11-30
+70,Haute-Saone,standard,43,48,55.3875,forfait,2026-02-01,2026-11-30
+70,Haute-Saone,standard,49,54,56.8155,forfait,2026-02-01,2026-11-30
+70,Haute-Saone,standard,55,59,58.2435,forfait,2026-02-01,2026-11-30
+70,Haute-Saone,standard,60,119,0.693,par_colis,2026-02-01,2026-11-30
+70,Haute-Saone,standard,120,299,0.483,par_colis,2026-02-01,2026-11-30
+70,Haute-Saone,standard,300,599,0.4515,par_colis,2026-02-01,2026-11-30
+70,Haute-Saone,standard,600,799,0.378,par_colis,2026-02-01,2026-11-30
+70,Haute-Saone,standard,800,1200,0.3255,par_colis,2026-02-01,2026-11-30
+71,Saone-et-Loire,standard,1,12,35.721,forfait,2026-02-01,2026-11-30
+71,Saone-et-Loire,standard,13,18,38.325,forfait,2026-02-01,2026-11-30
+71,Saone-et-Loire,standard,19,24,40.467,forfait,2026-02-01,2026-11-30
+71,Saone-et-Loire,standard,25,30,42.399,forfait,2026-02-01,2026-11-30
+71,Saone-et-Loire,standard,31,36,43.8165,forfait,2026-02-01,2026-11-30
+71,Saone-et-Loire,standard,37,42,44.982,forfait,2026-02-01,2026-11-30
+71,Saone-et-Loire,standard,43,48,46.1685,forfait,2026-02-01,2026-11-30
+71,Saone-et-Loire,standard,49,54,47.3865,forfait,2026-02-01,2026-11-30
+71,Saone-et-Loire,standard,55,59,48.573,forfait,2026-02-01,2026-11-30
+71,Saone-et-Loire,standard,60,119,0.546,par_colis,2026-02-01,2026-11-30
+71,Saone-et-Loire,standard,120,299,0.378,par_colis,2026-02-01,2026-11-30
+71,Saone-et-Loire,standard,300,599,0.3885,par_colis,2026-02-01,2026-11-30
+71,Saone-et-Loire,standard,600,799,0.3045,par_colis,2026-02-01,2026-11-30
+71,Saone-et-Loire,standard,800,1200,0.273,par_colis,2026-02-01,2026-11-30
+72,Sarthe,standard,1,12,21.5145,forfait,2026-02-01,2026-11-30
+72,Sarthe,standard,13,18,23.1,forfait,2026-02-01,2026-11-30
+72,Sarthe,standard,19,24,24.402,forfait,2026-02-01,2026-11-30
+72,Sarthe,standard,25,30,25.515,forfait,2026-02-01,2026-11-30
+72,Sarthe,standard,31,36,26.397,forfait,2026-02-01,2026-11-30
+72,Sarthe,standard,37,42,27.1215,forfait,2026-02-01,2026-11-30
+72,Sarthe,standard,43,48,27.8145,forfait,2026-02-01,2026-11-30
+72,Sarthe,standard,49,54,28.539,forfait,2026-02-01,2026-11-30
+72,Sarthe,standard,55,59,29.2635,forfait,2026-02-01,2026-11-30
+72,Sarthe,standard,60,119,0.336,par_colis,2026-02-01,2026-11-30
+72,Sarthe,standard,120,299,0.231,par_colis,2026-02-01,2026-11-30
+72,Sarthe,standard,300,599,0.2415,par_colis,2026-02-01,2026-11-30
+72,Sarthe,standard,600,799,0.1995,par_colis,2026-02-01,2026-11-30
+72,Sarthe,standard,800,1200,0.1575,par_colis,2026-02-01,2026-11-30
+73,Savoie,standard,1,12,47.355,forfait,2026-02-01,2026-11-30
+73,Savoie,standard,13,18,50.8095,forfait,2026-02-01,2026-11-30
+73,Savoie,standard,19,24,53.634,forfait,2026-02-01,2026-11-30
+73,Savoie,standard,25,30,56.1855,forfait,2026-02-01,2026-11-30
+73,Savoie,standard,31,36,58.0755,forfait,2026-02-01,2026-11-30
+73,Savoie,standard,37,42,59.6715,forfait,2026-02-01,2026-11-30
+73,Savoie,standard,43,48,61.2255,forfait,2026-02-01,2026-11-30
+73,Savoie,standard,49,54,62.8005,forfait,2026-02-01,2026-11-30
+73,Savoie,standard,55,59,64.3755,forfait,2026-02-01,2026-11-30
+73,Savoie,standard,60,119,0.7455,par_colis,2026-02-01,2026-11-30
+73,Savoie,standard,120,299,0.504,par_colis,2026-02-01,2026-11-30
+73,Savoie,standard,300,599,0.504,par_colis,2026-02-01,2026-11-30
+73,Savoie,standard,600,799,0.399,par_colis,2026-02-01,2026-11-30
+73,Savoie,standard,800,1200,0.357,par_colis,2026-02-01,2026-11-30
+73,Savoie,Haute montagne,1,12,56.8155,forfait,2026-02-01,2026-11-30
+73,Savoie,Haute montagne,13,18,60.9525,forfait,2026-02-01,2026-11-30
+73,Savoie,Haute montagne,19,24,64.3755,forfait,2026-02-01,2026-11-30
+73,Savoie,Haute montagne,25,30,67.4205,forfait,2026-02-01,2026-11-30
+73,Savoie,Haute montagne,31,36,69.6885,forfait,2026-02-01,2026-11-30
+73,Savoie,Haute montagne,37,42,71.589,forfait,2026-02-01,2026-11-30
+73,Savoie,Haute montagne,43,48,73.479,forfait,2026-02-01,2026-11-30
+73,Savoie,Haute montagne,49,54,75.39,forfait,2026-02-01,2026-11-30
+73,Savoie,Haute montagne,55,59,77.2695,forfait,2026-02-01,2026-11-30
+73,Savoie,Haute montagne,60,119,0.882,par_colis,2026-02-01,2026-11-30
+73,Savoie,Haute montagne,120,299,0.609,par_colis,2026-02-01,2026-11-30
+73,Savoie,Haute montagne,300,599,0.63,par_colis,2026-02-01,2026-11-30
+73,Savoie,Haute montagne,600,799,0.483,par_colis,2026-02-01,2026-11-30
+73,Savoie,Haute montagne,800,1200,0.42,par_colis,2026-02-01,2026-11-30
+74,Haute-Savoie,standard,1,12,47.355,forfait,2026-02-01,2026-11-30
+74,Haute-Savoie,standard,13,18,50.8095,forfait,2026-02-01,2026-11-30
+74,Haute-Savoie,standard,19,24,53.634,forfait,2026-02-01,2026-11-30
+74,Haute-Savoie,standard,25,30,56.1855,forfait,2026-02-01,2026-11-30
+74,Haute-Savoie,standard,31,36,58.0755,forfait,2026-02-01,2026-11-30
+74,Haute-Savoie,standard,37,42,59.6715,forfait,2026-02-01,2026-11-30
+74,Haute-Savoie,standard,43,48,61.2255,forfait,2026-02-01,2026-11-30
+74,Haute-Savoie,standard,49,54,62.8005,forfait,2026-02-01,2026-11-30
+74,Haute-Savoie,standard,55,59,64.3755,forfait,2026-02-01,2026-11-30
+74,Haute-Savoie,standard,60,119,0.7455,par_colis,2026-02-01,2026-11-30
+74,Haute-Savoie,standard,120,299,0.504,par_colis,2026-02-01,2026-11-30
+74,Haute-Savoie,standard,300,599,0.504,par_colis,2026-02-01,2026-11-30
+74,Haute-Savoie,standard,600,799,0.399,par_colis,2026-02-01,2026-11-30
+74,Haute-Savoie,standard,800,1200,0.357,par_colis,2026-02-01,2026-11-30
+74,Haute-Savoie,Haute montagne,1,12,56.8155,forfait,2026-02-01,2026-11-30
+74,Haute-Savoie,Haute montagne,13,18,60.9525,forfait,2026-02-01,2026-11-30
+74,Haute-Savoie,Haute montagne,19,24,64.3755,forfait,2026-02-01,2026-11-30
+74,Haute-Savoie,Haute montagne,25,30,67.4205,forfait,2026-02-01,2026-11-30
+74,Haute-Savoie,Haute montagne,31,36,69.6885,forfait,2026-02-01,2026-11-30
+74,Haute-Savoie,Haute montagne,37,42,71.589,forfait,2026-02-01,2026-11-30
+74,Haute-Savoie,Haute montagne,43,48,73.479,forfait,2026-02-01,2026-11-30
+74,Haute-Savoie,Haute montagne,49,54,75.39,forfait,2026-02-01,2026-11-30
+74,Haute-Savoie,Haute montagne,55,59,77.2695,forfait,2026-02-01,2026-11-30
+74,Haute-Savoie,Haute montagne,60,119,0.882,par_colis,2026-02-01,2026-11-30
+74,Haute-Savoie,Haute montagne,120,299,0.609,par_colis,2026-02-01,2026-11-30
+74,Haute-Savoie,Haute montagne,300,599,0.63,par_colis,2026-02-01,2026-11-30
+74,Haute-Savoie,Haute montagne,600,799,0.483,par_colis,2026-02-01,2026-11-30
+74,Haute-Savoie,Haute montagne,800,1200,0.42,par_colis,2026-02-01,2026-11-30
+75,Paris,standard,1,12,35.721,forfait,2026-02-01,2026-11-30
+75,Paris,standard,13,18,38.325,forfait,2026-02-01,2026-11-30
+75,Paris,standard,19,24,40.467,forfait,2026-02-01,2026-11-30
+75,Paris,standard,25,30,42.399,forfait,2026-02-01,2026-11-30
+75,Paris,standard,31,36,43.8165,forfait,2026-02-01,2026-11-30
+75,Paris,standard,37,42,44.982,forfait,2026-02-01,2026-11-30
+75,Paris,standard,43,48,46.1685,forfait,2026-02-01,2026-11-30
+75,Paris,standard,49,54,47.3865,forfait,2026-02-01,2026-11-30
+75,Paris,standard,55,59,48.573,forfait,2026-02-01,2026-11-30
+75,Paris,standard,60,119,0.546,par_colis,2026-02-01,2026-11-30
+75,Paris,standard,120,299,0.378,par_colis,2026-02-01,2026-11-30
+75,Paris,standard,300,599,0.3885,par_colis,2026-02-01,2026-11-30
+75,Paris,standard,600,799,0.3045,par_colis,2026-02-01,2026-11-30
+75,Paris,standard,800,1200,0.273,par_colis,2026-02-01,2026-11-30
+76,Seine-Maritime,standard,1,12,28.6125,forfait,2026-02-01,2026-11-30
+76,Seine-Maritime,standard,13,18,30.702,forfait,2026-02-01,2026-11-30
+76,Seine-Maritime,standard,19,24,32.445,forfait,2026-02-01,2026-11-30
+76,Seine-Maritime,standard,25,30,33.9465,forfait,2026-02-01,2026-11-30
+76,Seine-Maritime,standard,31,36,35.091,forfait,2026-02-01,2026-11-30
+76,Seine-Maritime,standard,37,42,36.078,forfait,2026-02-01,2026-11-30
+76,Seine-Maritime,standard,43,48,37.002,forfait,2026-02-01,2026-11-30
+76,Seine-Maritime,standard,49,54,37.968,forfait,2026-02-01,2026-11-30
+76,Seine-Maritime,standard,55,59,38.934,forfait,2026-02-01,2026-11-30
+76,Seine-Maritime,standard,60,119,0.441,par_colis,2026-02-01,2026-11-30
+76,Seine-Maritime,standard,120,299,0.3255,par_colis,2026-02-01,2026-11-30
+76,Seine-Maritime,standard,300,599,0.315,par_colis,2026-02-01,2026-11-30
+76,Seine-Maritime,standard,600,799,0.252,par_colis,2026-02-01,2026-11-30
+76,Seine-Maritime,standard,800,1200,0.231,par_colis,2026-02-01,2026-11-30
+77,Seine-et-Marne,standard,1,12,35.721,forfait,2026-02-01,2026-11-30
+77,Seine-et-Marne,standard,13,18,38.325,forfait,2026-02-01,2026-11-30
+77,Seine-et-Marne,standard,19,24,40.467,forfait,2026-02-01,2026-11-30
+77,Seine-et-Marne,standard,25,30,42.399,forfait,2026-02-01,2026-11-30
+77,Seine-et-Marne,standard,31,36,43.8165,forfait,2026-02-01,2026-11-30
+77,Seine-et-Marne,standard,37,42,44.982,forfait,2026-02-01,2026-11-30
+77,Seine-et-Marne,standard,43,48,46.1685,forfait,2026-02-01,2026-11-30
+77,Seine-et-Marne,standard,49,54,47.3865,forfait,2026-02-01,2026-11-30
+77,Seine-et-Marne,standard,55,59,48.573,forfait,2026-02-01,2026-11-30
+77,Seine-et-Marne,standard,60,119,0.546,par_colis,2026-02-01,2026-11-30
+77,Seine-et-Marne,standard,120,299,0.378,par_colis,2026-02-01,2026-11-30
+77,Seine-et-Marne,standard,300,599,0.3885,par_colis,2026-02-01,2026-11-30
+77,Seine-et-Marne,standard,600,799,0.3045,par_colis,2026-02-01,2026-11-30
+77,Seine-et-Marne,standard,800,1200,0.273,par_colis,2026-02-01,2026-11-30
+78,Yvelines,standard,1,12,35.721,forfait,2026-02-01,2026-11-30
+78,Yvelines,standard,13,18,38.325,forfait,2026-02-01,2026-11-30
+78,Yvelines,standard,19,24,40.467,forfait,2026-02-01,2026-11-30
+78,Yvelines,standard,25,30,42.399,forfait,2026-02-01,2026-11-30
+78,Yvelines,standard,31,36,43.8165,forfait,2026-02-01,2026-11-30
+78,Yvelines,standard,37,42,44.982,forfait,2026-02-01,2026-11-30
+78,Yvelines,standard,43,48,46.1685,forfait,2026-02-01,2026-11-30
+78,Yvelines,standard,49,54,47.3865,forfait,2026-02-01,2026-11-30
+78,Yvelines,standard,55,59,48.573,forfait,2026-02-01,2026-11-30
+78,Yvelines,standard,60,119,0.546,par_colis,2026-02-01,2026-11-30
+78,Yvelines,standard,120,299,0.378,par_colis,2026-02-01,2026-11-30
+78,Yvelines,standard,300,599,0.3885,par_colis,2026-02-01,2026-11-30
+78,Yvelines,standard,600,799,0.3045,par_colis,2026-02-01,2026-11-30
+78,Yvelines,standard,800,1200,0.273,par_colis,2026-02-01,2026-11-30
+79,Deux-Sevres,standard,1,12,21.5145,forfait,2026-02-01,2026-11-30
+79,Deux-Sevres,standard,13,18,23.1,forfait,2026-02-01,2026-11-30
+79,Deux-Sevres,standard,19,24,24.402,forfait,2026-02-01,2026-11-30
+79,Deux-Sevres,standard,25,30,25.515,forfait,2026-02-01,2026-11-30
+79,Deux-Sevres,standard,31,36,26.397,forfait,2026-02-01,2026-11-30
+79,Deux-Sevres,standard,37,42,27.1215,forfait,2026-02-01,2026-11-30
+79,Deux-Sevres,standard,43,48,27.8145,forfait,2026-02-01,2026-11-30
+79,Deux-Sevres,standard,49,54,28.539,forfait,2026-02-01,2026-11-30
+79,Deux-Sevres,standard,55,59,29.2635,forfait,2026-02-01,2026-11-30
+79,Deux-Sevres,standard,60,119,0.336,par_colis,2026-02-01,2026-11-30
+79,Deux-Sevres,standard,120,299,0.231,par_colis,2026-02-01,2026-11-30
+79,Deux-Sevres,standard,300,599,0.2415,par_colis,2026-02-01,2026-11-30
+79,Deux-Sevres,standard,600,799,0.1995,par_colis,2026-02-01,2026-11-30
+79,Deux-Sevres,standard,800,1200,0.1575,par_colis,2026-02-01,2026-11-30
+80,Somme,standard,1,12,35.721,forfait,2026-02-01,2026-11-30
+80,Somme,standard,13,18,38.325,forfait,2026-02-01,2026-11-30
+80,Somme,standard,19,24,40.467,forfait,2026-02-01,2026-11-30
+80,Somme,standard,25,30,42.399,forfait,2026-02-01,2026-11-30
+80,Somme,standard,31,36,43.8165,forfait,2026-02-01,2026-11-30
+80,Somme,standard,37,42,44.982,forfait,2026-02-01,2026-11-30
+80,Somme,standard,43,48,46.1685,forfait,2026-02-01,2026-11-30
+80,Somme,standard,49,54,47.3865,forfait,2026-02-01,2026-11-30
+80,Somme,standard,55,59,48.573,forfait,2026-02-01,2026-11-30
+80,Somme,standard,60,119,0.546,par_colis,2026-02-01,2026-11-30
+80,Somme,standard,120,299,0.378,par_colis,2026-02-01,2026-11-30
+80,Somme,standard,300,599,0.3885,par_colis,2026-02-01,2026-11-30
+80,Somme,standard,600,799,0.3045,par_colis,2026-02-01,2026-11-30
+80,Somme,standard,800,1200,0.273,par_colis,2026-02-01,2026-11-30
+81,Tarn,standard,1,12,42.819,forfait,2026-02-01,2026-11-30
+81,Tarn,standard,13,18,45.99,forfait,2026-02-01,2026-11-30
+81,Tarn,standard,19,24,48.552,forfait,2026-02-01,2026-11-30
+81,Tarn,standard,25,30,50.8095,forfait,2026-02-01,2026-11-30
+81,Tarn,standard,31,36,52.5525,forfait,2026-02-01,2026-11-30
+81,Tarn,standard,37,42,53.9385,forfait,2026-02-01,2026-11-30
+81,Tarn,standard,43,48,55.3875,forfait,2026-02-01,2026-11-30
+81,Tarn,standard,49,54,56.8155,forfait,2026-02-01,2026-11-30
+81,Tarn,standard,55,59,58.2435,forfait,2026-02-01,2026-11-30
+81,Tarn,standard,60,119,0.693,par_colis,2026-02-01,2026-11-30
+81,Tarn,standard,120,299,0.483,par_colis,2026-02-01,2026-11-30
+81,Tarn,standard,300,599,0.4515,par_colis,2026-02-01,2026-11-30
+81,Tarn,standard,600,799,0.378,par_colis,2026-02-01,2026-11-30
+81,Tarn,standard,800,1200,0.3255,par_colis,2026-02-01,2026-11-30
+82,Tarn-et-Garonne,standard,1,12,42.819,forfait,2026-02-01,2026-11-30
+82,Tarn-et-Garonne,standard,13,18,45.99,forfait,2026-02-01,2026-11-30
+82,Tarn-et-Garonne,standard,19,24,48.552,forfait,2026-02-01,2026-11-30
+82,Tarn-et-Garonne,standard,25,30,50.8095,forfait,2026-02-01,2026-11-30
+82,Tarn-et-Garonne,standard,31,36,52.5525,forfait,2026-02-01,2026-11-30
+82,Tarn-et-Garonne,standard,37,42,53.9385,forfait,2026-02-01,2026-11-30
+82,Tarn-et-Garonne,standard,43,48,55.3875,forfait,2026-02-01,2026-11-30
+82,Tarn-et-Garonne,standard,49,54,56.8155,forfait,2026-02-01,2026-11-30
+82,Tarn-et-Garonne,standard,55,59,58.2435,forfait,2026-02-01,2026-11-30
+82,Tarn-et-Garonne,standard,60,119,0.693,par_colis,2026-02-01,2026-11-30
+82,Tarn-et-Garonne,standard,120,299,0.483,par_colis,2026-02-01,2026-11-30
+82,Tarn-et-Garonne,standard,300,599,0.4515,par_colis,2026-02-01,2026-11-30
+82,Tarn-et-Garonne,standard,600,799,0.378,par_colis,2026-02-01,2026-11-30
+82,Tarn-et-Garonne,standard,800,1200,0.3255,par_colis,2026-02-01,2026-11-30
+83,Var,standard,1,12,47.355,forfait,2026-02-01,2026-11-30
+83,Var,standard,13,18,50.8095,forfait,2026-02-01,2026-11-30
+83,Var,standard,19,24,53.634,forfait,2026-02-01,2026-11-30
+83,Var,standard,25,30,56.1855,forfait,2026-02-01,2026-11-30
+83,Var,standard,31,36,58.0755,forfait,2026-02-01,2026-11-30
+83,Var,standard,37,42,59.6715,forfait,2026-02-01,2026-11-30
+83,Var,standard,43,48,61.2255,forfait,2026-02-01,2026-11-30
+83,Var,standard,49,54,62.8005,forfait,2026-02-01,2026-11-30
+83,Var,standard,55,59,64.3755,forfait,2026-02-01,2026-11-30
+83,Var,standard,60,119,0.7455,par_colis,2026-02-01,2026-11-30
+83,Var,standard,120,299,0.504,par_colis,2026-02-01,2026-11-30
+83,Var,standard,300,599,0.504,par_colis,2026-02-01,2026-11-30
+83,Var,standard,600,799,0.399,par_colis,2026-02-01,2026-11-30
+83,Var,standard,800,1200,0.357,par_colis,2026-02-01,2026-11-30
+84,Vaucluse,standard,1,12,47.355,forfait,2026-02-01,2026-11-30
+84,Vaucluse,standard,13,18,50.8095,forfait,2026-02-01,2026-11-30
+84,Vaucluse,standard,19,24,53.634,forfait,2026-02-01,2026-11-30
+84,Vaucluse,standard,25,30,56.1855,forfait,2026-02-01,2026-11-30
+84,Vaucluse,standard,31,36,58.0755,forfait,2026-02-01,2026-11-30
+84,Vaucluse,standard,37,42,59.6715,forfait,2026-02-01,2026-11-30
+84,Vaucluse,standard,43,48,61.2255,forfait,2026-02-01,2026-11-30
+84,Vaucluse,standard,49,54,62.8005,forfait,2026-02-01,2026-11-30
+84,Vaucluse,standard,55,59,64.3755,forfait,2026-02-01,2026-11-30
+84,Vaucluse,standard,60,119,0.7455,par_colis,2026-02-01,2026-11-30
+84,Vaucluse,standard,120,299,0.504,par_colis,2026-02-01,2026-11-30
+84,Vaucluse,standard,300,599,0.504,par_colis,2026-02-01,2026-11-30
+84,Vaucluse,standard,600,799,0.399,par_colis,2026-02-01,2026-11-30
+84,Vaucluse,standard,800,1200,0.357,par_colis,2026-02-01,2026-11-30
+85,Vendee,standard,1,12,21.5145,forfait,2026-02-01,2026-11-30
+85,Vendee,standard,13,18,23.1,forfait,2026-02-01,2026-11-30
+85,Vendee,standard,19,24,24.402,forfait,2026-02-01,2026-11-30
+85,Vendee,standard,25,30,25.515,forfait,2026-02-01,2026-11-30
+85,Vendee,standard,31,36,26.397,forfait,2026-02-01,2026-11-30
+85,Vendee,standard,37,42,27.1215,forfait,2026-02-01,2026-11-30
+85,Vendee,standard,43,48,27.8145,forfait,2026-02-01,2026-11-30
+85,Vendee,standard,49,54,28.539,forfait,2026-02-01,2026-11-30
+85,Vendee,standard,55,59,29.2635,forfait,2026-02-01,2026-11-30
+85,Vendee,standard,60,119,0.3675,par_colis,2026-02-01,2026-11-30
+85,Vendee,standard,120,299,0.231,par_colis,2026-02-01,2026-11-30
+85,Vendee,standard,300,599,0.2415,par_colis,2026-02-01,2026-11-30
+85,Vendee,standard,600,799,0.1995,par_colis,2026-02-01,2026-11-30
+85,Vendee,standard,800,1200,0.1575,par_colis,2026-02-01,2026-11-30
+85,Vendee,Ile,1,12,26.8905,forfait,2026-02-01,2026-11-30
+85,Vendee,Ile,13,18,28.875,forfait,2026-02-01,2026-11-30
+85,Vendee,Ile,19,24,30.5025,forfait,2026-02-01,2026-11-30
+85,Vendee,Ile,25,30,31.8885,forfait,2026-02-01,2026-11-30
+85,Vendee,Ile,31,36,32.991,forfait,2026-02-01,2026-11-30
+85,Vendee,Ile,37,42,33.894,forfait,2026-02-01,2026-11-30
+85,Vendee,Ile,43,48,34.776,forfait,2026-02-01,2026-11-30
+85,Vendee,Ile,49,54,35.6685,forfait,2026-02-01,2026-11-30
+85,Vendee,Ile,55,59,36.6135,forfait,2026-02-01,2026-11-30
+85,Vendee,Ile,60,119,0.441,par_colis,2026-02-01,2026-11-30
+85,Vendee,Ile,120,299,0.294,par_colis,2026-02-01,2026-11-30
+85,Vendee,Ile,300,599,0.3045,par_colis,2026-02-01,2026-11-30
+85,Vendee,Ile,600,799,0.252,par_colis,2026-02-01,2026-11-30
+85,Vendee,Ile,800,1200,0.2205,par_colis,2026-02-01,2026-11-30
+86,Vienne,standard,1,12,28.6125,forfait,2026-02-01,2026-11-30
+86,Vienne,standard,13,18,30.702,forfait,2026-02-01,2026-11-30
+86,Vienne,standard,19,24,32.445,forfait,2026-02-01,2026-11-30
+86,Vienne,standard,25,30,33.9465,forfait,2026-02-01,2026-11-30
+86,Vienne,standard,31,36,35.091,forfait,2026-02-01,2026-11-30
+86,Vienne,standard,37,42,36.078,forfait,2026-02-01,2026-11-30
+86,Vienne,standard,43,48,37.002,forfait,2026-02-01,2026-11-30
+86,Vienne,standard,49,54,37.968,forfait,2026-02-01,2026-11-30
+86,Vienne,standard,55,59,38.934,forfait,2026-02-01,2026-11-30
+86,Vienne,standard,60,119,0.441,par_colis,2026-02-01,2026-11-30
+86,Vienne,standard,120,299,0.3255,par_colis,2026-02-01,2026-11-30
+86,Vienne,standard,300,599,0.315,par_colis,2026-02-01,2026-11-30
+86,Vienne,standard,600,799,0.252,par_colis,2026-02-01,2026-11-30
+86,Vienne,standard,800,1200,0.231,par_colis,2026-02-01,2026-11-30
+87,Haute-Vienne,standard,1,12,30.0405,forfait,2026-02-01,2026-11-30
+87,Haute-Vienne,standard,13,18,32.2455,forfait,2026-02-01,2026-11-30
+87,Haute-Vienne,standard,19,24,34.0515,forfait,2026-02-01,2026-11-30
+87,Haute-Vienne,standard,25,30,35.6475,forfait,2026-02-01,2026-11-30
+87,Haute-Vienne,standard,31,36,36.855,forfait,2026-02-01,2026-11-30
+87,Haute-Vienne,standard,37,42,37.8735,forfait,2026-02-01,2026-11-30
+87,Haute-Vienne,standard,43,48,38.829,forfait,2026-02-01,2026-11-30
+87,Haute-Vienne,standard,49,54,39.8685,forfait,2026-02-01,2026-11-30
+87,Haute-Vienne,standard,55,59,40.8765,forfait,2026-02-01,2026-11-30
+87,Haute-Vienne,standard,60,119,0.4515,par_colis,2026-02-01,2026-11-30
+87,Haute-Vienne,standard,120,299,0.3465,par_colis,2026-02-01,2026-11-30
+87,Haute-Vienne,standard,300,599,0.3255,par_colis,2026-02-01,2026-11-30
+87,Haute-Vienne,standard,600,799,0.2625,par_colis,2026-02-01,2026-11-30
+87,Haute-Vienne,standard,800,1200,0.2415,par_colis,2026-02-01,2026-11-30
+88,Vosges,standard,1,12,42.819,forfait,2026-02-01,2026-11-30
+88,Vosges,standard,13,18,45.99,forfait,2026-02-01,2026-11-30
+88,Vosges,standard,19,24,48.552,forfait,2026-02-01,2026-11-30
+88,Vosges,standard,25,30,50.8095,forfait,2026-02-01,2026-11-30
+88,Vosges,standard,31,36,52.5525,forfait,2026-02-01,2026-11-30
+88,Vosges,standard,37,42,53.9385,forfait,2026-02-01,2026-11-30
+88,Vosges,standard,43,48,55.3875,forfait,2026-02-01,2026-11-30
+88,Vosges,standard,49,54,56.8155,forfait,2026-02-01,2026-11-30
+88,Vosges,standard,55,59,58.2435,forfait,2026-02-01,2026-11-30
+88,Vosges,standard,60,119,0.693,par_colis,2026-02-01,2026-11-30
+88,Vosges,standard,120,299,0.483,par_colis,2026-02-01,2026-11-30
+88,Vosges,standard,300,599,0.4515,par_colis,2026-02-01,2026-11-30
+88,Vosges,standard,600,799,0.378,par_colis,2026-02-01,2026-11-30
+88,Vosges,standard,800,1200,0.3255,par_colis,2026-02-01,2026-11-30
+89,Yonne,standard,1,12,28.6125,forfait,2026-02-01,2026-11-30
+89,Yonne,standard,13,18,30.702,forfait,2026-02-01,2026-11-30
+89,Yonne,standard,19,24,32.445,forfait,2026-02-01,2026-11-30
+89,Yonne,standard,25,30,33.9465,forfait,2026-02-01,2026-11-30
+89,Yonne,standard,31,36,35.091,forfait,2026-02-01,2026-11-30
+89,Yonne,standard,37,42,36.078,forfait,2026-02-01,2026-11-30
+89,Yonne,standard,43,48,37.002,forfait,2026-02-01,2026-11-30
+89,Yonne,standard,49,54,37.968,forfait,2026-02-01,2026-11-30
+89,Yonne,standard,55,59,38.934,forfait,2026-02-01,2026-11-30
+89,Yonne,standard,60,119,0.441,par_colis,2026-02-01,2026-11-30
+89,Yonne,standard,120,299,0.3255,par_colis,2026-02-01,2026-11-30
+89,Yonne,standard,300,599,0.315,par_colis,2026-02-01,2026-11-30
+89,Yonne,standard,600,799,0.252,par_colis,2026-02-01,2026-11-30
+89,Yonne,standard,800,1200,0.231,par_colis,2026-02-01,2026-11-30
+90,Terr. de Belfort,standard,1,12,42.819,forfait,2026-02-01,2026-11-30
+90,Terr. de Belfort,standard,13,18,45.99,forfait,2026-02-01,2026-11-30
+90,Terr. de Belfort,standard,19,24,48.552,forfait,2026-02-01,2026-11-30
+90,Terr. de Belfort,standard,25,30,50.8095,forfait,2026-02-01,2026-11-30
+90,Terr. de Belfort,standard,31,36,52.5525,forfait,2026-02-01,2026-11-30
+90,Terr. de Belfort,standard,37,42,53.9385,forfait,2026-02-01,2026-11-30
+90,Terr. de Belfort,standard,43,48,55.3875,forfait,2026-02-01,2026-11-30
+90,Terr. de Belfort,standard,49,54,56.8155,forfait,2026-02-01,2026-11-30
+90,Terr. de Belfort,standard,55,59,58.2435,forfait,2026-02-01,2026-11-30
+90,Terr. de Belfort,standard,60,119,0.693,par_colis,2026-02-01,2026-11-30
+90,Terr. de Belfort,standard,120,299,0.483,par_colis,2026-02-01,2026-11-30
+90,Terr. de Belfort,standard,300,599,0.4515,par_colis,2026-02-01,2026-11-30
+90,Terr. de Belfort,standard,600,799,0.378,par_colis,2026-02-01,2026-11-30
+90,Terr. de Belfort,standard,800,1200,0.3255,par_colis,2026-02-01,2026-11-30
+91,Essonne,standard,1,12,35.721,forfait,2026-02-01,2026-11-30
+91,Essonne,standard,13,18,38.325,forfait,2026-02-01,2026-11-30
+91,Essonne,standard,19,24,40.467,forfait,2026-02-01,2026-11-30
+91,Essonne,standard,25,30,42.399,forfait,2026-02-01,2026-11-30
+91,Essonne,standard,31,36,43.8165,forfait,2026-02-01,2026-11-30
+91,Essonne,standard,37,42,44.982,forfait,2026-02-01,2026-11-30
+91,Essonne,standard,43,48,46.1685,forfait,2026-02-01,2026-11-30
+91,Essonne,standard,49,54,47.3865,forfait,2026-02-01,2026-11-30
+91,Essonne,standard,55,59,48.573,forfait,2026-02-01,2026-11-30
+91,Essonne,standard,60,119,0.546,par_colis,2026-02-01,2026-11-30
+91,Essonne,standard,120,299,0.378,par_colis,2026-02-01,2026-11-30
+91,Essonne,standard,300,599,0.3885,par_colis,2026-02-01,2026-11-30
+91,Essonne,standard,600,799,0.3045,par_colis,2026-02-01,2026-11-30
+91,Essonne,standard,800,1200,0.273,par_colis,2026-02-01,2026-11-30
+92,Hauts-de-Seine,standard,1,12,35.721,forfait,2026-02-01,2026-11-30
+92,Hauts-de-Seine,standard,13,18,38.325,forfait,2026-02-01,2026-11-30
+92,Hauts-de-Seine,standard,19,24,40.467,forfait,2026-02-01,2026-11-30
+92,Hauts-de-Seine,standard,25,30,42.399,forfait,2026-02-01,2026-11-30
+92,Hauts-de-Seine,standard,31,36,43.8165,forfait,2026-02-01,2026-11-30
+92,Hauts-de-Seine,standard,37,42,44.982,forfait,2026-02-01,2026-11-30
+92,Hauts-de-Seine,standard,43,48,46.1685,forfait,2026-02-01,2026-11-30
+92,Hauts-de-Seine,standard,49,54,47.3865,forfait,2026-02-01,2026-11-30
+92,Hauts-de-Seine,standard,55,59,48.573,forfait,2026-02-01,2026-11-30
+92,Hauts-de-Seine,standard,60,119,0.546,par_colis,2026-02-01,2026-11-30
+92,Hauts-de-Seine,standard,120,299,0.378,par_colis,2026-02-01,2026-11-30
+92,Hauts-de-Seine,standard,300,599,0.3885,par_colis,2026-02-01,2026-11-30
+92,Hauts-de-Seine,standard,600,799,0.3045,par_colis,2026-02-01,2026-11-30
+92,Hauts-de-Seine,standard,800,1200,0.273,par_colis,2026-02-01,2026-11-30
+93,Seine-St-Denis,standard,1,12,35.721,forfait,2026-02-01,2026-11-30
+93,Seine-St-Denis,standard,13,18,38.325,forfait,2026-02-01,2026-11-30
+93,Seine-St-Denis,standard,19,24,40.467,forfait,2026-02-01,2026-11-30
+93,Seine-St-Denis,standard,25,30,42.399,forfait,2026-02-01,2026-11-30
+93,Seine-St-Denis,standard,31,36,43.8165,forfait,2026-02-01,2026-11-30
+93,Seine-St-Denis,standard,37,42,44.982,forfait,2026-02-01,2026-11-30
+93,Seine-St-Denis,standard,43,48,46.1685,forfait,2026-02-01,2026-11-30
+93,Seine-St-Denis,standard,49,54,47.3865,forfait,2026-02-01,2026-11-30
+93,Seine-St-Denis,standard,55,59,48.573,forfait,2026-02-01,2026-11-30
+93,Seine-St-Denis,standard,60,119,0.546,par_colis,2026-02-01,2026-11-30
+93,Seine-St-Denis,standard,120,299,0.378,par_colis,2026-02-01,2026-11-30
+93,Seine-St-Denis,standard,300,599,0.3885,par_colis,2026-02-01,2026-11-30
+93,Seine-St-Denis,standard,600,799,0.3045,par_colis,2026-02-01,2026-11-30
+93,Seine-St-Denis,standard,800,1200,0.273,par_colis,2026-02-01,2026-11-30
+94,Val-de-Marne,standard,1,12,35.721,forfait,2026-02-01,2026-11-30
+94,Val-de-Marne,standard,13,18,38.325,forfait,2026-02-01,2026-11-30
+94,Val-de-Marne,standard,19,24,40.467,forfait,2026-02-01,2026-11-30
+94,Val-de-Marne,standard,25,30,42.399,forfait,2026-02-01,2026-11-30
+94,Val-de-Marne,standard,31,36,43.8165,forfait,2026-02-01,2026-11-30
+94,Val-de-Marne,standard,37,42,44.982,forfait,2026-02-01,2026-11-30
+94,Val-de-Marne,standard,43,48,46.1685,forfait,2026-02-01,2026-11-30
+94,Val-de-Marne,standard,49,54,47.3865,forfait,2026-02-01,2026-11-30
+94,Val-de-Marne,standard,55,59,48.573,forfait,2026-02-01,2026-11-30
+94,Val-de-Marne,standard,60,119,0.546,par_colis,2026-02-01,2026-11-30
+94,Val-de-Marne,standard,120,299,0.378,par_colis,2026-02-01,2026-11-30
+94,Val-de-Marne,standard,300,599,0.3885,par_colis,2026-02-01,2026-11-30
+94,Val-de-Marne,standard,600,799,0.3045,par_colis,2026-02-01,2026-11-30
+94,Val-de-Marne,standard,800,1200,0.273,par_colis,2026-02-01,2026-11-30
+95,Val-D'Oise,standard,1,12,35.721,forfait,2026-02-01,2026-11-30
+95,Val-D'Oise,standard,13,18,38.325,forfait,2026-02-01,2026-11-30
+95,Val-D'Oise,standard,19,24,40.467,forfait,2026-02-01,2026-11-30
+95,Val-D'Oise,standard,25,30,42.399,forfait,2026-02-01,2026-11-30
+95,Val-D'Oise,standard,31,36,43.8165,forfait,2026-02-01,2026-11-30
+95,Val-D'Oise,standard,37,42,44.982,forfait,2026-02-01,2026-11-30
+95,Val-D'Oise,standard,43,48,46.1685,forfait,2026-02-01,2026-11-30
+95,Val-D'Oise,standard,49,54,47.3865,forfait,2026-02-01,2026-11-30
+95,Val-D'Oise,standard,55,59,48.573,forfait,2026-02-01,2026-11-30
+95,Val-D'Oise,standard,60,119,0.546,par_colis,2026-02-01,2026-11-30
+95,Val-D'Oise,standard,120,299,0.378,par_colis,2026-02-01,2026-11-30
+95,Val-D'Oise,standard,300,599,0.3885,par_colis,2026-02-01,2026-11-30
+95,Val-D'Oise,standard,600,799,0.3045,par_colis,2026-02-01,2026-11-30
+95,Val-D'Oise,standard,800,1200,0.273,par_colis,2026-02-01,2026-11-30

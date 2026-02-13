@@ -3399,7 +3399,7 @@ describe('API Integration Tests', () => {
 
   // ─── Shipping (V4.1 Tâche 5) ─────────────────────────
   describe('Shipping — POST /api/v1/shipping/calculate', () => {
-    test('Dept 49 (Loire Valley) qty=24 returns forfait rate with surcharges', async () => {
+    test('Dept 49 (Maine-et-Loire) qty=24 returns forfait rate with surcharges', async () => {
       const res = await request(app)
         .post('/api/v1/shipping/calculate')
         .send({ dept_code: '49', qty: 24, date: '2026-03-15' });
@@ -3407,9 +3407,9 @@ describe('API Integration Tests', () => {
       expect(res.status).toBe(200);
       expect(res.body.pricing_type).toBe('forfait');
       expect(res.body.zone_name).toContain('49');
-      // Loire rate for 24-35: 21.80€ + sûreté 2€ + transition 0.15€ = 23.95 HT
-      expect(res.body.price_ht).toBeCloseTo(23.95, 1);
-      expect(res.body.breakdown.base_price).toBeCloseTo(21.80, 1);
+      // Maine-et-Loire 19-24: 24.402€ + sûreté 2€ + transition 0.15€ = 26.552 HT
+      expect(res.body.price_ht).toBeCloseTo(26.55, 0);
+      expect(res.body.breakdown.base_price).toBeCloseTo(24.402, 1);
       expect(res.body.surcharges.length).toBe(2); // sûreté + transition
       expect(res.body.price_ttc).toBeCloseTo(res.body.price_ht * 1.20, 1);
     });
@@ -3421,9 +3421,9 @@ describe('API Integration Tests', () => {
 
       expect(res.status).toBe(200);
       expect(res.body.pricing_type).toBe('par_colis');
-      // Loire 60-119: 0.280€/u → 100 × 0.280 = 28.00 + 2 + 0.15 = 30.15 HT
-      expect(res.body.breakdown.base_price).toBeCloseTo(28.00, 1);
-      expect(res.body.price_ht).toBeCloseTo(30.15, 1);
+      // Maine-et-Loire 60-119: 0.336€/u → 100 × 0.336 = 33.60 + 2 + 0.15 = 35.75 HT
+      expect(res.body.breakdown.base_price).toBeCloseTo(33.60, 1);
+      expect(res.body.price_ht).toBeCloseTo(35.75, 1);
     });
 
     test('Dept 20 (Corse) includes surcharge Corse', async () => {
@@ -3432,8 +3432,8 @@ describe('API Integration Tests', () => {
         .send({ dept_code: '20', qty: 24, date: '2026-03-15' });
 
       expect(res.status).toBe(200);
-      // Standard rate 24-35: 28.20 + sûreté 2 + transition 0.15 + Corse 15 = 45.35 HT
-      expect(res.body.price_ht).toBeCloseTo(45.35, 1);
+      // Corse 19-24: 107.3205 + sûreté 2 + transition 0.15 + Corse 15 = 124.4705 HT
+      expect(res.body.price_ht).toBeCloseTo(124.47, 0);
       const corsSurcharge = res.body.surcharges.find((s) => s.label.includes('Corse'));
       expect(corsSurcharge).toBeDefined();
       expect(corsSurcharge.amount).toBe(15);
@@ -3445,12 +3445,12 @@ describe('API Integration Tests', () => {
         .send({ dept_code: '13', qty: 12, date: '2026-06-15' });
 
       expect(res.status).toBe(200);
-      // Standard 1-12: 21.51 + 2 + 0.15 = 23.66, seasonal +25% = 5.915 → total 29.575
+      // BdR 1-12: 47.355 + 2 + 0.15 = 49.505, seasonal +25% = 12.38 → total 61.88
       const seasonal = res.body.surcharges.find((s) => s.label.includes('Saisonnier'));
       expect(seasonal).toBeDefined();
       expect(seasonal.amount).toBeGreaterThan(0);
       // Should be ~25% more than without seasonal
-      expect(res.body.price_ht).toBeCloseTo(29.58, 0);
+      expect(res.body.price_ht).toBeCloseTo(61.88, 0);
     });
 
     test('Dept 13 no seasonal surcharge in February', async () => {
@@ -3459,8 +3459,8 @@ describe('API Integration Tests', () => {
         .send({ dept_code: '13', qty: 12, date: '2026-02-15' });
 
       expect(res.status).toBe(200);
-      // Standard 1-12: 21.51 + 2 + 0.15 = 23.66 HT, no seasonal
-      expect(res.body.price_ht).toBeCloseTo(23.66, 1);
+      // BdR 1-12: 47.355 + 2 + 0.15 = 49.505 HT, no seasonal
+      expect(res.body.price_ht).toBeCloseTo(49.51, 0);
       const seasonal = res.body.surcharges.find((s) => s.label.includes('Saisonnier'));
       expect(seasonal).toBeUndefined();
     });
@@ -3529,7 +3529,7 @@ describe('API Integration Tests', () => {
         .query({ dept_code: '49' });
 
       expect(res.status).toBe(200);
-      expect(res.body.data.length).toBe(10); // 10 qty ranges for dept 49
+      expect(res.body.data.length).toBe(14); // 14 qty ranges for dept 49
       res.body.data.forEach((r) => expect(r.dept_code).toBe('49'));
     });
   });
