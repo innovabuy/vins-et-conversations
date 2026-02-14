@@ -9,13 +9,20 @@ const badgeService = require('./badgeService');
 /**
  * Génère une référence commande unique : VC-2026-0001
  */
-async function generateOrderRef() {
+async function generateOrderRef(trx = null) {
+  const conn = trx || db;
   const year = new Date().getFullYear();
-  const lastOrder = await db('orders')
-    .where('ref', 'like', `VC-${year}-%`)
-    .orderBy('ref', 'desc')
-    .first();
 
+  // Use SELECT ... FOR UPDATE to prevent race conditions on ref generation
+  const result = await conn.raw(`
+    SELECT ref FROM orders
+    WHERE ref LIKE ?
+    ORDER BY ref DESC
+    LIMIT 1
+    FOR UPDATE
+  `, [`VC-${year}-%`]);
+
+  const lastOrder = result.rows?.[0];
   let counter = 1;
   if (lastOrder) {
     const lastNum = parseInt(lastOrder.ref.split('-')[2], 10);
@@ -87,7 +94,6 @@ async function createOrder({ userId, campaignId, items, customerId, notes, custo
     }
   }
 
-  const ref = await generateOrderRef();
   const orderId = uuidv4();
 
   let totalHT = 0;
@@ -128,7 +134,11 @@ async function createOrder({ userId, campaignId, items, customerId, notes, custo
     }
   }
 
+  let ref;
   await db.transaction(async (trx) => {
+    // Generate ref inside transaction with FOR UPDATE lock to prevent race conditions
+    ref = await generateOrderRef(trx);
+
     // Créer la commande
     await trx('orders').insert({
       id: orderId,

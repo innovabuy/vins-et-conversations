@@ -11,6 +11,7 @@ router.get(
   '/student',
   authenticate,
   requireRole('etudiant', 'super_admin'),
+  cacheMiddleware(30),
   async (req, res) => {
     try {
       const campaignId = req.query.campaign_id || req.user.campaign_ids[0];

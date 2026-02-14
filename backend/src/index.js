@@ -43,7 +43,7 @@ app.use(morgan('combined', {
 }));
 
 // Rate limiting
-if (process.env.NODE_ENV !== 'test' && !process.env.JEST_WORKER_ID) {
+if (process.env.NODE_ENV !== 'test' && !process.env.JEST_WORKER_ID && !process.env.LOAD_TEST) {
   const limiter = rateLimit({
     windowMs: 15 * 60 * 1000,
     max: 100,

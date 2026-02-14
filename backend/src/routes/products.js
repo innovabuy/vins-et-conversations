@@ -4,6 +4,7 @@ const db = require('../config/database');
 const { authenticate, requireRole, requireCampaignAccess } = require('../middleware/auth');
 const { validate } = require('../middleware/validate');
 const { auditAction } = require('../middleware/audit');
+const { cacheMiddleware } = require('../middleware/cache');
 
 const router = express.Router();
 const adminRouter = express.Router();
@@ -50,7 +51,7 @@ const productSchema = Joi.object({
 });
 
 // GET /api/v1/products — Catalogue (with filters)
-router.get('/', async (req, res) => {
+router.get('/', cacheMiddleware(60), async (req, res) => {
   try {
     const query = db('products')
       .leftJoin('product_categories', 'products.category_id', 'product_categories.id')

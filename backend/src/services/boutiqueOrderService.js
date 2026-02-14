@@ -66,8 +66,8 @@ async function upsertContact({ name, email, phone, address, city, postal_code, r
  */
 async function createBoutiqueOrder({ cartItems, customer, referralCode }) {
   const campaignId = await getBoutiqueWebCampaignId();
-  const ref = await generateOrderRef();
   const orderId = uuidv4();
+  // ref generated inside transaction below for concurrency safety
 
   // Resolve referral
   let source = 'boutique_web';
@@ -175,7 +175,9 @@ async function createBoutiqueOrder({ cartItems, customer, referralCode }) {
   totalHT += shippingHT;
   totalTTC += shippingTTC;
 
+  let ref;
   await db.transaction(async (trx) => {
+    ref = await generateOrderRef(trx);
     await trx('orders').insert({
       id: orderId,
       ref,

@@ -3,7 +3,7 @@ const Joi = require('joi');
 const db = require('../config/database');
 const { authenticate, requireRole } = require('../middleware/auth');
 const { auditAction } = require('../middleware/audit');
-const { invalidateCache } = require('../middleware/cache');
+const { invalidateCache, cacheMiddleware } = require('../middleware/cache');
 
 const router = express.Router();
 const adminRouter = express.Router();
@@ -29,7 +29,7 @@ function toSlug(name) {
 }
 
 // GET /api/v1/categories — Public: active categories
-router.get('/', async (req, res) => {
+router.get('/', cacheMiddleware(120), async (req, res) => {
   try {
     const cats = await db('product_categories')
       .where({ active: true })

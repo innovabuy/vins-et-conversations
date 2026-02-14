@@ -11,37 +11,31 @@ async function getStudentDashboard(userId, campaignId) {
 
   if (!participation) throw new Error('NOT_PARTICIPANT');
 
-  // CA personnel
-  const caResult = await db('orders')
-    .where({ user_id: userId, campaign_id: campaignId })
-    .whereIn('status', ['submitted', 'validated', 'preparing', 'shipped', 'delivered'])
-    .sum('total_ttc as total')
-    .count('id as count')
+  // Combined user stats: direct CA/bottles/count + referred CA/bottles (3 queries → 1)
+  const validStatuses = ['submitted', 'validated', 'preparing', 'shipped', 'delivered'];
+  const userStats = await db('orders')
+    .whereIn('status', validStatuses)
+    .where(function () {
+      this.where({ user_id: userId, campaign_id: campaignId })
+        .orWhere(function () {
+          this.where({ referred_by: userId, source: 'student_referral' });
+        });
+    })
+    .select(
+      db.raw('SUM(CASE WHEN user_id = ? AND campaign_id = ? THEN total_ttc ELSE 0 END) as direct_ca', [userId, campaignId]),
+      db.raw('COUNT(CASE WHEN user_id = ? AND campaign_id = ? THEN 1 END) as order_count', [userId, campaignId]),
+      db.raw('SUM(CASE WHEN user_id = ? AND campaign_id = ? THEN total_items ELSE 0 END) as direct_bottles', [userId, campaignId]),
+      db.raw('SUM(CASE WHEN referred_by = ? AND source = \'student_referral\' THEN total_ttc ELSE 0 END) as referred_ca', [userId]),
+      db.raw('SUM(CASE WHEN referred_by = ? AND source = \'student_referral\' THEN total_items ELSE 0 END) as referred_bottles', [userId]),
+    )
     .first();
 
-  const ca = parseFloat(caResult?.total || 0);
-  const orderCount = parseInt(caResult?.count || 0, 10);
-
-  // CA from referred orders (student referral)
-  const referredCaResult = await db('orders')
-    .where({ referred_by: userId })
-    .where('source', 'student_referral')
-    .whereIn('status', ['submitted', 'validated', 'preparing', 'shipped', 'delivered'])
-    .sum('total_ttc as total')
-    .sum('total_items as bottles')
-    .count('id as count')
-    .first();
-  const caReferred = parseFloat(referredCaResult?.total || 0);
-  const bottlesReferred = parseInt(referredCaResult?.bottles || 0, 10);
+  const ca = parseFloat(userStats?.direct_ca || 0);
+  const orderCount = parseInt(userStats?.order_count || 0, 10);
+  const caReferred = parseFloat(userStats?.referred_ca || 0);
+  const bottlesReferred = parseInt(userStats?.referred_bottles || 0, 10);
   const caTotal = parseFloat((ca + caReferred).toFixed(2));
-
-  // Bouteilles vendues
-  const bottlesResult = await db('orders')
-    .where({ user_id: userId, campaign_id: campaignId })
-    .whereIn('status', ['submitted', 'validated', 'preparing', 'shipped', 'delivered'])
-    .sum('total_items as total')
-    .first();
-  const bottlesSold = parseInt(bottlesResult?.total || 0, 10) + bottlesReferred;
+  const bottlesSold = parseInt(userStats?.direct_bottles || 0, 10) + bottlesReferred;
 
   // Classement (UNION ALL: direct orders + referred orders)
   const validStatusList = "('submitted','validated','preparing','shipped','delivered')";
@@ -81,14 +75,23 @@ async function getStudentDashboard(userId, campaignId) {
   // --- Campaign collective stats ---
   const campaign = await db('campaigns').where({ id: campaignId }).first();
   const campaignGoal = parseFloat(campaign?.goal || 0);
-  const totalCaResult = await db('orders')
+  // Combined campaign stats (3 queries → 1)
+  const todayStart = new Date();
+  todayStart.setHours(0, 0, 0, 0);
+  const campaignStats = await db('orders')
     .where({ campaign_id: campaignId })
-    .whereIn('status', ['submitted', 'validated', 'preparing', 'shipped', 'delivered'])
-    .sum('total_ttc as total')
-    .sum('total_items as bottles')
+    .whereIn('status', validStatuses)
+    .select(
+      db.raw('SUM(total_ttc) as total_ca'),
+      db.raw('SUM(total_items) as total_bottles'),
+      db.raw('COUNT(DISTINCT user_id) as active_participants'),
+      db.raw('MAX(CASE WHEN created_at >= ? THEN total_ttc ELSE 0 END) as record_today', [todayStart]),
+    )
     .first();
-  const totalCa = parseFloat(totalCaResult?.total || 0);
-  const totalBottles = parseInt(totalCaResult?.bottles || 0, 10);
+  const totalCa = parseFloat(campaignStats?.total_ca || 0);
+  const totalBottles = parseInt(campaignStats?.total_bottles || 0, 10);
+  const activeParticipants = parseInt(campaignStats?.active_participants || 0, 10);
+  const recordToday = parseFloat(campaignStats?.record_today || 0);
   const progressPct = campaignGoal > 0 ? Math.round((totalCa / campaignGoal) * 100) : 0;
 
   // Days remaining
@@ -98,27 +101,8 @@ async function getStudentDashboard(userId, campaignId) {
   const dailyTarget = (daysRemaining && daysRemaining > 0 && campaignGoal > totalCa)
     ? parseFloat(((campaignGoal - totalCa) / daysRemaining).toFixed(2)) : 0;
 
-  // Active participants (at least 1 order)
-  const activeParticipantsResult = await db('orders')
-    .where({ campaign_id: campaignId })
-    .whereIn('status', ['submitted', 'validated', 'preparing', 'shipped', 'delivered'])
-    .countDistinct('user_id as count')
-    .first();
-  const activeParticipants = parseInt(activeParticipantsResult?.count || 0, 10);
-
   // Average CA per student
   const avgCaPerStudent = totalParticipants > 0 ? parseFloat((totalCa / totalParticipants).toFixed(2)) : 0;
-
-  // Record today (highest single order today)
-  const todayStart = new Date();
-  todayStart.setHours(0, 0, 0, 0);
-  const recordTodayResult = await db('orders')
-    .where({ campaign_id: campaignId })
-    .whereIn('status', ['submitted', 'validated', 'preparing', 'shipped', 'delivered'])
-    .where('created_at', '>=', todayStart)
-    .max('total_ttc as max')
-    .first();
-  const recordToday = parseFloat(recordTodayResult?.max || 0);
 
   // Relative: vs average
   const vsAveragePct = avgCaPerStudent > 0 ? Math.round(((ca - avgCaPerStudent) / avgCaPerStudent) * 100) : 0;
@@ -155,24 +139,40 @@ async function getStudentDashboard(userId, campaignId) {
   const classGroups = campConfig.classes || [];
   let classRanking = { enabled: classGroups.length > 0, myClass: participation.class_group, classes: [] };
   if (classGroups.length > 0) {
-    const allParticipants = await db('participations')
-      .join('users', 'participations.user_id', 'users.id')
+    // Single query for all class stats (replaces N+1 loop)
+    const classStats = await db('orders')
+      .join('participations', function () {
+        this.on('orders.user_id', 'participations.user_id')
+          .andOn('orders.campaign_id', 'participations.campaign_id');
+      })
+      .where('orders.campaign_id', campaignId)
+      .where('participations.role_in_campaign', 'student')
+      .whereIn('orders.status', validStatuses)
+      .groupBy('participations.class_group')
+      .select(
+        'participations.class_group',
+        db.raw('SUM(orders.total_ttc) as ca'),
+        db.raw('COUNT(DISTINCT orders.user_id) as students')
+      );
+
+    const classMap = {};
+    classStats.forEach((cs) => { classMap[cs.class_group] = cs; });
+
+    // Also count all participants per class (including those with 0 orders)
+    const participantCounts = await db('participations')
       .where({ campaign_id: campaignId, role_in_campaign: 'student' })
-      .select('users.id', 'participations.class_group');
+      .groupBy('class_group')
+      .select('class_group', db.raw('COUNT(*) as count'));
+    const countMap = {};
+    participantCounts.forEach((pc) => { countMap[pc.class_group] = parseInt(pc.count, 10); });
 
     for (const cg of classGroups) {
-      const studentIds = allParticipants.filter((s) => s.class_group === cg).map((s) => s.id);
-      if (!studentIds.length) {
-        classRanking.classes.push({ name: cg, ca: 0, students: 0 });
-        continue;
-      }
-      const cgResult = await db('orders')
-        .where({ campaign_id: campaignId })
-        .whereIn('user_id', studentIds)
-        .whereIn('status', ['submitted', 'validated', 'preparing', 'shipped', 'delivered'])
-        .sum('total_ttc as ca')
-        .first();
-      classRanking.classes.push({ name: cg, ca: parseFloat(cgResult?.ca || 0), students: studentIds.length });
+      const stat = classMap[cg];
+      classRanking.classes.push({
+        name: cg,
+        ca: parseFloat(stat?.ca || 0),
+        students: countMap[cg] || 0,
+      });
     }
     classRanking.classes.sort((a, b) => b.ca - a.ca);
   }
