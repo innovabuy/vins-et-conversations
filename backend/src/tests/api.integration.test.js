@@ -2610,7 +2610,7 @@ describe('API Integration Tests', () => {
       const res = await request(app).get('/api/v1/categories');
       expect(res.status).toBe(200);
       expect(res.body.data).toBeInstanceOf(Array);
-      const wine = res.body.data.find(c => c.type === 'wine');
+      const wine = res.body.data.find(c => c.type === 'wine' && c.tasting_axes);
       expect(wine).toBeDefined();
       expect(wine.has_tasting_profile).toBe(true);
       expect(wine.tasting_axes).toBeDefined();

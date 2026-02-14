@@ -161,7 +161,7 @@ router.get('/:id', authenticate, requireRole('super_admin', 'commercial'), async
         'o.user_id', 'users.id'
       )
       .select(
-        db.raw("COALESCE(users.metadata->>'class', 'Non assigné') as class_name"),
+        db.raw("COALESCE(participations.class_group, 'Non assigné') as class_name"),
         db.raw('COUNT(DISTINCT users.id) as students'),
         db.raw('COALESCE(SUM(o.ca), 0) as ca'),
         db.raw('COALESCE(SUM(o.orders_count), 0) as orders_count')
