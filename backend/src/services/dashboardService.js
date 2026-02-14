@@ -22,25 +22,42 @@ async function getStudentDashboard(userId, campaignId) {
   const ca = parseFloat(caResult?.total || 0);
   const orderCount = parseInt(caResult?.count || 0, 10);
 
+  // CA from referred orders (student referral)
+  const referredCaResult = await db('orders')
+    .where({ referred_by: userId })
+    .where('source', 'student_referral')
+    .whereIn('status', ['submitted', 'validated', 'preparing', 'shipped', 'delivered'])
+    .sum('total_ttc as total')
+    .sum('total_items as bottles')
+    .count('id as count')
+    .first();
+  const caReferred = parseFloat(referredCaResult?.total || 0);
+  const bottlesReferred = parseInt(referredCaResult?.bottles || 0, 10);
+  const caTotal = parseFloat((ca + caReferred).toFixed(2));
+
   // Bouteilles vendues
   const bottlesResult = await db('orders')
     .where({ user_id: userId, campaign_id: campaignId })
     .whereIn('status', ['submitted', 'validated', 'preparing', 'shipped', 'delivered'])
     .sum('total_items as total')
     .first();
-  const bottlesSold = parseInt(bottlesResult?.total || 0, 10);
+  const bottlesSold = parseInt(bottlesResult?.total || 0, 10) + bottlesReferred;
 
-  // Classement
-  const ranking = await db('orders')
-    .select('user_id')
-    .where({ campaign_id: campaignId })
-    .whereIn('status', ['submitted', 'validated', 'preparing', 'shipped', 'delivered'])
-    .groupBy('user_id')
-    .sum('total_ttc as ca')
-    .orderBy('ca', 'desc');
+  // Classement (UNION ALL: direct orders + referred orders)
+  const validStatusList = "('submitted','validated','preparing','shipped','delivered')";
+  const ranking = await db.raw(`
+    SELECT user_id, SUM(total_ttc) as ca FROM (
+      SELECT user_id, total_ttc FROM orders
+        WHERE campaign_id = ? AND status IN ${validStatusList} AND user_id IS NOT NULL
+      UNION ALL
+      SELECT referred_by as user_id, total_ttc FROM orders
+        WHERE referred_by IS NOT NULL AND source = 'student_referral' AND status IN ${validStatusList}
+    ) combined GROUP BY user_id ORDER BY ca DESC
+  `, [campaignId]);
+  const rankingRows = ranking.rows || ranking;
 
-  const position = ranking.findIndex((r) => r.user_id === userId) + 1;
-  const totalParticipants = ranking.length;
+  const position = rankingRows.findIndex((r) => r.user_id === userId) + 1;
+  const totalParticipants = rankingRows.length;
 
   // Règles bouteilles gratuites + cagnottes (V4.1)
   const rules = await rulesEngine.loadRulesForCampaign(campaignId);
@@ -109,7 +126,7 @@ async function getStudentDashboard(userId, campaignId) {
   const gapToAverage = parseFloat((ca - avgCaPerStudent).toFixed(2));
 
   // Leaderboard preview: top 3 + self if not in top 3
-  const leaderboardPreview = ranking.slice(0, 3).map((r, i) => ({
+  const leaderboardPreview = rankingRows.slice(0, 3).map((r, i) => ({
     rank: i + 1,
     userId: r.user_id,
     name: null, // populated below
@@ -160,17 +177,22 @@ async function getStudentDashboard(userId, campaignId) {
     classRanking.classes.sort((a, b) => b.ca - a.ca);
   }
 
-  // Recent orders (3 latest with customer_name, payment_method)
+  // Recent orders (5 latest: direct + referred, with customer_name, payment_method)
   const recentOrdersData = await db('orders')
     .leftJoin('contacts', 'orders.customer_id', 'contacts.id')
-    .where({ 'orders.user_id': userId, 'orders.campaign_id': campaignId })
+    .where(function () {
+      this.where({ 'orders.user_id': userId, 'orders.campaign_id': campaignId })
+        .orWhere({ 'orders.referred_by': userId, 'orders.source': 'student_referral' });
+    })
     .whereIn('orders.status', ['submitted', 'validated', 'preparing', 'shipped', 'delivered'])
     .orderBy('orders.created_at', 'desc')
-    .limit(3)
-    .select('orders.id', 'orders.ref', 'orders.total_ttc', 'orders.total_items', 'orders.created_at', 'orders.payment_method', 'contacts.name as customer_name');
+    .limit(5)
+    .select('orders.id', 'orders.ref', 'orders.total_ttc', 'orders.total_items', 'orders.created_at', 'orders.payment_method', 'contacts.name as customer_name', 'orders.referred_by', 'orders.source');
 
   return {
     ca,
+    ca_referred: caReferred,
+    ca_total: caTotal,
     orderCount,
     bottlesSold,
     position,
@@ -210,6 +232,7 @@ async function getStudentDashboard(userId, campaignId) {
       created_at: o.created_at,
       payment_method: o.payment_method,
       customer_name: o.customer_name,
+      is_referred: o.referred_by === userId && o.source === 'student_referral',
     })),
   };
 }
@@ -223,32 +246,33 @@ async function getStudentRanking(userId, campaignId) {
     .first();
   if (!participation) throw new Error('NOT_PARTICIPANT');
 
-  const ranking = await db('orders')
-    .join('users', 'orders.user_id', 'users.id')
-    .join('participations', function () {
-      this.on('participations.user_id', 'orders.user_id')
-        .andOn('participations.campaign_id', 'orders.campaign_id');
-    })
-    .where('orders.campaign_id', campaignId)
-    .where('users.role', 'etudiant')
-    .whereIn('orders.status', ['submitted', 'validated', 'preparing', 'shipped', 'delivered'])
-    .groupBy('orders.user_id', 'users.name', 'participations.class_group')
-    .select(
-      'orders.user_id',
-      'users.name',
-      'participations.class_group',
-      db.raw('SUM(orders.total_ttc) as ca'),
-      db.raw('SUM(orders.total_items) as bottles'),
-      db.raw('COUNT(orders.id) as orders_count')
-    )
-    .orderBy('ca', 'desc');
+  const validStatusList = "('submitted','validated','preparing','shipped','delivered')";
+  const rankingResult = await db.raw(`
+    SELECT combined.user_id, u.name, p.class_group,
+           SUM(combined.total_ttc) as ca,
+           SUM(combined.total_items) as bottles,
+           COUNT(combined.id) as orders_count
+    FROM (
+      SELECT id, user_id, total_ttc, total_items FROM orders
+        WHERE campaign_id = ? AND status IN ${validStatusList} AND user_id IS NOT NULL
+      UNION ALL
+      SELECT id, referred_by as user_id, total_ttc, total_items FROM orders
+        WHERE referred_by IS NOT NULL AND source = 'student_referral' AND status IN ${validStatusList}
+    ) combined
+    JOIN users u ON combined.user_id = u.id
+    JOIN participations p ON p.user_id = combined.user_id AND p.campaign_id = ?
+    WHERE u.role = 'etudiant'
+    GROUP BY combined.user_id, u.name, p.class_group
+    ORDER BY ca DESC
+  `, [campaignId, campaignId]);
+  const rankingData = rankingResult.rows || rankingResult;
 
-  const myPosition = ranking.findIndex((r) => r.user_id === userId) + 1;
+  const myPosition = rankingData.findIndex((r) => r.user_id === userId) + 1;
 
   return {
     myPosition,
-    totalParticipants: ranking.length,
-    ranking: ranking.map((r, i) => ({
+    totalParticipants: rankingData.length,
+    ranking: rankingData.map((r, i) => ({
       rank: i + 1,
       name: r.name,
       classGroup: r.class_group,
@@ -356,7 +380,7 @@ async function getAdminCockpit(campaignIds) {
 
   // Boutique Web KPI
   const boutiqueStats = await db('orders')
-    .whereIn('source', ['boutique_web', 'ambassador_referral'])
+    .whereIn('source', ['boutique_web', 'ambassador_referral', 'student_referral'])
     .whereIn('status', ['submitted', 'validated', 'preparing', 'shipped', 'delivered'])
     .sum('total_ttc as ca_ttc')
     .count('id as count')
@@ -551,45 +575,57 @@ async function getStudentLeaderboard(userId, campaignId, { period = 'all', class
     .first();
   if (!participation) throw new Error('NOT_PARTICIPANT');
 
-  let query = db('orders')
-    .join('users', 'orders.user_id', 'users.id')
-    .join('participations', function () {
-      this.on('participations.user_id', 'orders.user_id')
-        .andOn('participations.campaign_id', 'orders.campaign_id');
-    })
-    .where('orders.campaign_id', campaignId)
-    .where('users.role', 'etudiant')
-    .whereIn('orders.status', ['submitted', 'validated', 'preparing', 'shipped', 'delivered']);
+  const validStatusList = "('submitted','validated','preparing','shipped','delivered')";
 
-  // Period filter
+  // Build period filter SQL
+  let periodFilter = '';
+  const params = [campaignId];
   if (period === 'week') {
     const weekAgo = new Date();
     weekAgo.setDate(weekAgo.getDate() - 7);
-    query = query.where('orders.created_at', '>=', weekAgo);
+    periodFilter = ' AND created_at >= ?';
+    params.push(weekAgo);
   } else if (period === 'month') {
     const monthAgo = new Date();
     monthAgo.setMonth(monthAgo.getMonth() - 1);
-    query = query.where('orders.created_at', '>=', monthAgo);
+    periodFilter = ' AND created_at >= ?';
+    params.push(monthAgo);
   }
 
-  // Class filter
+  // Duplicate params for UNION ALL second part
+  const referralParams = period !== 'all' ? [params[params.length - 1]] : [];
+
+  // Build class filter SQL
+  let classJoinFilter = '';
+  const classParams = [];
   if (classFilter && classFilter !== 'all') {
-    query = query.where('participations.class_group', classFilter);
+    classJoinFilter = ' AND p.class_group = ?';
+    classParams.push(classFilter);
   }
 
-  const ranking = await query
-    .groupBy('orders.user_id', 'users.name', 'participations.class_group')
-    .select(
-      'orders.user_id',
-      'users.name',
-      'participations.class_group',
-      db.raw('SUM(orders.total_ttc) as ca'),
-      db.raw('SUM(orders.total_items) as bottles'),
-      db.raw('COUNT(orders.id) as orders_count')
-    )
-    .orderBy('ca', 'desc');
+  const allParams = [...params, ...referralParams, campaignId, ...classParams];
 
-  const myPosition = ranking.findIndex((r) => r.user_id === userId) + 1;
+  const rankingResult = await db.raw(`
+    SELECT combined.user_id, u.name, p.class_group,
+           SUM(combined.total_ttc) as ca,
+           SUM(combined.total_items) as bottles,
+           COUNT(combined.id) as orders_count
+    FROM (
+      SELECT id, user_id, total_ttc, total_items, created_at FROM orders
+        WHERE campaign_id = ? AND status IN ${validStatusList} AND user_id IS NOT NULL${periodFilter}
+      UNION ALL
+      SELECT id, referred_by as user_id, total_ttc, total_items, created_at FROM orders
+        WHERE referred_by IS NOT NULL AND source = 'student_referral' AND status IN ${validStatusList}${periodFilter ? ' AND created_at >= ?' : ''}
+    ) combined
+    JOIN users u ON combined.user_id = u.id
+    JOIN participations p ON p.user_id = combined.user_id AND p.campaign_id = ?
+    WHERE u.role = 'etudiant'${classJoinFilter}
+    GROUP BY combined.user_id, u.name, p.class_group
+    ORDER BY ca DESC
+  `, allParams);
+  const lbRanking = rankingResult.rows || rankingResult;
+
+  const myPosition = lbRanking.findIndex((r) => r.user_id === userId) + 1;
 
   // Campaign header
   const campaign = await db('campaigns').where({ id: campaignId }).first();
@@ -606,7 +642,7 @@ async function getStudentLeaderboard(userId, campaignId, { period = 'all', class
 
   return {
     myPosition,
-    totalParticipants: ranking.length,
+    totalParticipants: lbRanking.length,
     period,
     classFilter,
     campaignHeader: {
@@ -616,7 +652,7 @@ async function getStudentLeaderboard(userId, campaignId, { period = 'all', class
       progress_pct: campaignGoal > 0 ? Math.round((totalCa / campaignGoal) * 100) : 0,
       days_remaining: daysRemaining,
     },
-    ranking: ranking.map((r, i) => ({
+    ranking: lbRanking.map((r, i) => ({
       rank: i + 1,
       name: r.name,
       classGroup: r.class_group,

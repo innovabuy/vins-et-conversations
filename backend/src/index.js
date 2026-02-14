@@ -100,6 +100,7 @@ app.use('/api/v1/admin/audit-log', require('./routes/auditLog'));
 app.use('/api/v1/payments', require('./routes/paymentIntents'));
 app.use('/api/v1/notifications', require('./routes/notifications'));
 app.use('/api/v1/ambassador', require('./routes/ambassador'));
+app.use('/api/v1/referral', require('./routes/referral'));
 app.use('/api/v1/formation', require('./routes/formation'));
 app.use('/api/v1/admin/users', require('./routes/users'));
 app.use('/api/v1/admin/invitations', require('./routes/invitations'));
@@ -112,6 +113,8 @@ app.use('/api/v1/admin/settings', require('./routes/appSettings'));
 app.use('/api/v1/settings', require('./routes/appSettings').publicRouter);
 app.use('/api/v1/shipping', require('./routes/shipping').router);
 app.use('/api/v1/admin', require('./routes/shipping').adminRouter);
+app.use('/api/v1/campaigns', require('./routes/campaignResources'));
+app.use('/api/v1/admin/campaign-resources', require('./routes/campaignResources').adminRouter);
 
 // ─── Health check ─────────────────────────────────────
 app.get('/api/health', async (req, res) => {

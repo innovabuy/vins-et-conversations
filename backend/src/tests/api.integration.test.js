@@ -1915,7 +1915,10 @@ describe('API Integration Tests', () => {
   describe('Boutique — Ambassador referral code', () => {
     test('GET /public/ambassador/:code resolves valid referral code', async () => {
       const participation = await db('participations')
-        .whereNotNull('referral_code')
+        .join('users', 'participations.user_id', 'users.id')
+        .where('users.role', 'ambassadeur')
+        .whereNotNull('participations.referral_code')
+        .select('participations.*')
         .first();
       if (!participation) return;
 
@@ -1936,7 +1939,12 @@ describe('API Integration Tests', () => {
 
     test('Referral checkout creates order with ambassador_referral source', async () => {
       const product = await db('products').where({ visible_boutique: true, active: true }).first();
-      const participation = await db('participations').whereNotNull('referral_code').first();
+      const participation = await db('participations')
+        .join('users', 'participations.user_id', 'users.id')
+        .where('users.role', 'ambassadeur')
+        .whereNotNull('participations.referral_code')
+        .select('participations.*')
+        .first();
       if (!product || !participation) return;
 
       // Create cart
@@ -3569,6 +3577,409 @@ describe('API Integration Tests', () => {
       await db('financial_events').where({ order_id: result.id }).del();
       await db('order_items').where({ order_id: result.id }).del();
       await db('orders').where({ id: result.id }).del();
+    });
+  });
+
+  // ═══════════════════════════════════════════════════════
+  // STUDENT REFERRAL
+  // ═══════════════════════════════════════════════════════
+  describe('Student Referral', () => {
+    let studentReferralToken;
+
+    beforeAll(async () => {
+      // Login as student (ACKAVONG)
+      const res = await request(app)
+        .post('/api/v1/auth/login')
+        .send({ email: 'ackavong@eleve.sc.fr', password: 'VinsConv2026!' });
+      studentReferralToken = res.body.accessToken;
+    });
+
+    test('Student participations have referral_code generated', async () => {
+      const participations = await db('participations')
+        .join('users', 'participations.user_id', 'users.id')
+        .where('users.role', 'etudiant')
+        .whereNotNull('participations.referral_code')
+        .select('participations.referral_code');
+
+      expect(participations.length).toBeGreaterThan(0);
+      participations.forEach((p) => {
+        expect(p.referral_code).toBeTruthy();
+        expect(p.referral_code.length).toBeGreaterThanOrEqual(4);
+      });
+    });
+
+    test('GET /referral/my-link returns code and URL', async () => {
+      const campaign = await db('campaigns')
+        .whereNot({ name: 'Boutique Web' })
+        .where({ status: 'active' })
+        .first();
+
+      const res = await request(app)
+        .get('/api/v1/referral/my-link')
+        .set('Authorization', `Bearer ${studentReferralToken}`)
+        .query({ campaign_id: campaign.id });
+
+      expect(res.status).toBe(200);
+      expect(res.body.referral_code).toBeTruthy();
+      expect(res.body.referral_link).toContain('/boutique?ref=');
+      expect(res.body.referral_link).toContain(res.body.referral_code);
+    });
+
+    test('GET /referral/stats returns referral statistics', async () => {
+      const campaign = await db('campaigns')
+        .whereNot({ name: 'Boutique Web' })
+        .where({ status: 'active' })
+        .first();
+
+      const res = await request(app)
+        .get('/api/v1/referral/stats')
+        .set('Authorization', `Bearer ${studentReferralToken}`)
+        .query({ campaign_id: campaign.id });
+
+      expect(res.status).toBe(200);
+      expect(res.body).toHaveProperty('total_orders');
+      expect(res.body).toHaveProperty('total_revenue');
+      expect(res.body).toHaveProperty('unique_clients');
+      expect(res.body).toHaveProperty('total_bottles');
+      // ACKAVONG has 2 referred orders in seeds
+      expect(res.body.total_orders).toBe(2);
+      expect(res.body.total_revenue).toBeGreaterThan(0);
+      expect(res.body.unique_clients).toBe(2);
+    });
+
+    test('POST /public/checkout with student referral_code creates student_referral order', async () => {
+      const product = await db('products').where({ visible_boutique: true, active: true }).first();
+      const studentParticipation = await db('participations')
+        .join('users', 'participations.user_id', 'users.id')
+        .where('users.role', 'etudiant')
+        .whereNotNull('participations.referral_code')
+        .select('participations.referral_code', 'participations.user_id')
+        .first();
+      if (!product || !studentParticipation) return;
+
+      // Create cart
+      const cartRes = await request(app)
+        .post('/api/v1/public/cart')
+        .send({ items: [{ product_id: product.id, qty: 1 }] });
+
+      const res = await request(app)
+        .post('/api/v1/public/checkout')
+        .send({
+          session_id: cartRes.body.session_id,
+          customer: {
+            name: 'Student Referral Test',
+            email: 'student.ref.test@example.fr',
+            address: '789 Rue Ref Student',
+            city: 'Angers',
+            postal_code: '49000',
+          },
+          referral_code: studentParticipation.referral_code,
+        });
+
+      expect(res.status).toBe(201);
+
+      // Verify source in DB
+      const order = await db('orders').where({ id: res.body.order_id }).first();
+      expect(order.source).toBe('student_referral');
+      expect(order.referred_by).toBe(studentParticipation.user_id);
+
+      // Cleanup
+      await db('financial_events').where({ order_id: res.body.order_id }).delete();
+      await db('order_items').where({ order_id: res.body.order_id }).delete();
+      await db('orders').where({ id: res.body.order_id }).delete();
+    });
+
+    test('Contact CRM source contains referral: prefix', async () => {
+      const contact = await db('contacts')
+        .where('source', 'like', 'referral:%')
+        .first();
+
+      expect(contact).toBeDefined();
+      expect(contact.source).toMatch(/^referral:/);
+    });
+
+    test('GET /public/referral/:code resolves student code', async () => {
+      const studentParticipation = await db('participations')
+        .join('users', 'participations.user_id', 'users.id')
+        .where('users.role', 'etudiant')
+        .whereNotNull('participations.referral_code')
+        .select('participations.referral_code', 'users.name')
+        .first();
+      if (!studentParticipation) return;
+
+      const res = await request(app)
+        .get(`/api/v1/public/referral/${studentParticipation.referral_code}`);
+
+      expect(res.status).toBe(200);
+      expect(res.body.name).toBe(studentParticipation.name);
+      expect(res.body.role).toBe('etudiant');
+    });
+
+    test('POST /public/register creates contact with referral source', async () => {
+      const studentParticipation = await db('participations')
+        .join('users', 'participations.user_id', 'users.id')
+        .where('users.role', 'etudiant')
+        .whereNotNull('participations.referral_code')
+        .select('participations.referral_code', 'users.name')
+        .first();
+      if (!studentParticipation) return;
+
+      const res = await request(app)
+        .post('/api/v1/public/register')
+        .send({
+          name: 'New Referral Client',
+          email: 'new.referral.client@example.fr',
+          phone: '0611223344',
+          referral_code: studentParticipation.referral_code,
+        });
+
+      expect(res.status).toBe(201);
+      expect(res.body.registered).toBe(true);
+
+      // Verify CRM source
+      const contact = await db('contacts').where({ email: 'new.referral.client@example.fr' }).first();
+      expect(contact.source).toContain('referral:');
+
+      // Cleanup
+      await db('contacts').where({ email: 'new.referral.client@example.fr' }).delete();
+    });
+
+    test('Dashboard student includes ca_referred and ca_total', async () => {
+      const campaign = await db('campaigns')
+        .whereNot({ name: 'Boutique Web' })
+        .where({ status: 'active' })
+        .first();
+
+      const res = await request(app)
+        .get('/api/v1/dashboard/student')
+        .set('Authorization', `Bearer ${studentReferralToken}`)
+        .query({ campaign_id: campaign.id });
+
+      expect(res.status).toBe(200);
+      expect(res.body).toHaveProperty('ca');
+      expect(res.body).toHaveProperty('ca_referred');
+      expect(res.body).toHaveProperty('ca_total');
+      expect(res.body.ca_total).toBe(parseFloat((res.body.ca + res.body.ca_referred).toFixed(2)));
+    });
+  });
+
+  // ═══════════════════════════════════════════════════════
+  // FEATURED PRODUCTS (Tâche 7)
+  // ═══════════════════════════════════════════════════════
+  describe('Featured Products — Toggle sélection du moment', () => {
+    let featuredProductId;
+    let otherProductIdSameCategory;
+
+    test('GET /public/featured returns seeded featured products', async () => {
+      const res = await request(app).get('/api/v1/public/featured');
+
+      expect(res.status).toBe(200);
+      expect(res.body.data).toBeInstanceOf(Array);
+      expect(res.body.data.length).toBeGreaterThanOrEqual(1);
+      res.body.data.forEach((p) => {
+        expect(p.is_featured).toBe(true);
+      });
+      featuredProductId = res.body.data[0].id;
+    });
+
+    test('Admin can toggle is_featured on a product', async () => {
+      const product = await db('products').where({ active: true }).whereNot({ is_featured: true }).first();
+      if (!product) return;
+
+      const res = await request(app)
+        .put(`/api/v1/admin/products/${product.id}`)
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({ is_featured: true });
+
+      expect(res.status).toBe(200);
+      expect(res.body.is_featured).toBe(true);
+
+      // Restore
+      await request(app)
+        .put(`/api/v1/admin/products/${product.id}`)
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({ is_featured: false });
+    });
+
+    test('Setting is_featured=true un-features other products in same category', async () => {
+      // Find two products in the same category
+      const products = await db('products').where({ active: true }).whereNotNull('category_id');
+      const catGroups = {};
+      products.forEach((p) => {
+        if (!catGroups[p.category_id]) catGroups[p.category_id] = [];
+        catGroups[p.category_id].push(p);
+      });
+      const catId = Object.keys(catGroups).find((k) => catGroups[k].length >= 2);
+      if (!catId) return;
+
+      const [p1, p2] = catGroups[catId];
+
+      // Feature p1
+      await request(app)
+        .put(`/api/v1/admin/products/${p1.id}`)
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({ is_featured: true });
+
+      // Feature p2 (should un-feature p1)
+      await request(app)
+        .put(`/api/v1/admin/products/${p2.id}`)
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({ is_featured: true });
+
+      const check1 = await db('products').where({ id: p1.id }).first();
+      const check2 = await db('products').where({ id: p2.id }).first();
+
+      expect(check1.is_featured).toBe(false);
+      expect(check2.is_featured).toBe(true);
+
+      // Restore p1 as featured (original seed state)
+      await request(app)
+        .put(`/api/v1/admin/products/${p1.id}`)
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({ is_featured: true });
+    });
+
+    test('Public catalog includes is_featured field', async () => {
+      const res = await request(app).get('/api/v1/public/catalog');
+
+      expect(res.status).toBe(200);
+      const featured = res.body.data.find((p) => p.is_featured === true);
+      expect(featured).toBeDefined();
+    });
+
+    test('Student cannot toggle is_featured', async () => {
+      const product = await db('products').where({ active: true }).first();
+      const res = await request(app)
+        .put(`/api/v1/admin/products/${product.id}`)
+        .set('Authorization', `Bearer ${studentToken}`)
+        .send({ is_featured: true });
+
+      expect(res.status).toBe(403);
+    });
+  });
+
+  // ═══════════════════════════════════════════════════════
+  // CAMPAIGN RESOURCES (Tâche 8)
+  // ═══════════════════════════════════════════════════════
+  describe('Campaign Resources — Espace ressources', () => {
+    let resourceId;
+    let resourceCampaignId;
+
+    beforeAll(async () => {
+      const campaign = await db('campaigns')
+        .whereNot({ name: 'Boutique Web' })
+        .where({ status: 'active' })
+        .first();
+      resourceCampaignId = campaign?.id;
+    });
+
+    test('Admin can list resources for a campaign', async () => {
+      if (!resourceCampaignId) return;
+
+      const res = await request(app)
+        .get(`/api/v1/admin/campaign-resources/${resourceCampaignId}`)
+        .set('Authorization', `Bearer ${adminToken}`);
+
+      expect(res.status).toBe(200);
+      expect(res.body.data).toBeInstanceOf(Array);
+      expect(res.body.data.length).toBeGreaterThanOrEqual(1);
+    });
+
+    test('Admin can create a resource', async () => {
+      if (!resourceCampaignId) return;
+
+      const res = await request(app)
+        .post('/api/v1/admin/campaign-resources')
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({
+          campaign_id: resourceCampaignId,
+          title: 'Test Resource',
+          type: 'link',
+          url: 'https://example.com/test',
+          description: 'A test resource',
+          sort_order: 99,
+          visible_to_roles: ['student', 'bts'],
+        });
+
+      expect(res.status).toBe(201);
+      expect(res.body.title).toBe('Test Resource');
+      expect(res.body.type).toBe('link');
+      resourceId = res.body.id;
+    });
+
+    test('Admin can update a resource', async () => {
+      if (!resourceId) return;
+
+      const res = await request(app)
+        .put(`/api/v1/admin/campaign-resources/${resourceId}`)
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({ title: 'Updated Resource', description: 'Updated desc' });
+
+      expect(res.status).toBe(200);
+      expect(res.body.title).toBe('Updated Resource');
+    });
+
+    test('Admin can reorder resources', async () => {
+      if (!resourceCampaignId) return;
+
+      const resources = await db('campaign_resources').where({ campaign_id: resourceCampaignId });
+      if (resources.length < 2) return;
+
+      const items = resources.map((r, i) => ({ id: r.id, sort_order: resources.length - i }));
+      const res = await request(app)
+        .put('/api/v1/admin/campaign-resources/reorder')
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({ items });
+
+      expect(res.status).toBe(200);
+      expect(res.body.message).toContain('mis à jour');
+    });
+
+    test('Student can list resources (filtered by role)', async () => {
+      if (!resourceCampaignId) return;
+
+      const res = await request(app)
+        .get(`/api/v1/campaigns/${resourceCampaignId}/resources`)
+        .set('Authorization', `Bearer ${studentToken}`);
+
+      expect(res.status).toBe(200);
+      expect(res.body.data).toBeInstanceOf(Array);
+      // Student should see resources with 'student' in visible_to_roles
+      res.body.data.forEach((r) => {
+        const roles = typeof r.visible_to_roles === 'string' ? JSON.parse(r.visible_to_roles) : r.visible_to_roles;
+        expect(roles).toContain('student');
+      });
+    });
+
+    test('Admin can delete a resource', async () => {
+      if (!resourceId) return;
+
+      const res = await request(app)
+        .delete(`/api/v1/admin/campaign-resources/${resourceId}`)
+        .set('Authorization', `Bearer ${adminToken}`);
+
+      expect(res.status).toBe(200);
+      expect(res.body.message).toContain('supprimée');
+
+      // Verify it's gone
+      const check = await db('campaign_resources').where({ id: resourceId }).first();
+      expect(check).toBeUndefined();
+    });
+
+    test('Student cannot create resources (403)', async () => {
+      if (!resourceCampaignId) return;
+
+      const res = await request(app)
+        .post('/api/v1/admin/campaign-resources')
+        .set('Authorization', `Bearer ${studentToken}`)
+        .send({
+          campaign_id: resourceCampaignId,
+          title: 'Hacked Resource',
+          type: 'link',
+          url: 'https://evil.com',
+        });
+
+      expect(res.status).toBe(403);
     });
   });
 });

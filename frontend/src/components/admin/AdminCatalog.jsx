@@ -3,7 +3,7 @@ import { productsAPI, catalogPdfAPI, categoriesAPI } from '../../services/api';
 import {
   RadarChart, Radar, PolarGrid, PolarAngleAxis, PolarRadiusAxis, ResponsiveContainer
 } from 'recharts';
-import { Wine, Plus, Pencil, Trash2, X, Save, ChevronLeft, Award, Thermometer, Grape, UtensilsCrossed, Download, Mail, FileText, Package, Eye, EyeOff } from 'lucide-react';
+import { Wine, Plus, Pencil, Trash2, X, Save, ChevronLeft, Award, Thermometer, Grape, UtensilsCrossed, Download, Mail, FileText, Package, Eye, EyeOff, Star } from 'lucide-react';
 import { WINE_TYPE_OPTIONS, TASTING_CRITERIA, resolveWineType, getCriteriaForProduct, buildRadarData } from '../../config/tastingCriteria';
 
 const formatEur = (v) => new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR' }).format(v);
@@ -509,6 +509,19 @@ export default function AdminCatalog() {
     } catch { alert('Erreur'); }
   };
 
+  const toggleFeatured = async (id, current, categoryId) => {
+    try {
+      const newVal = !current;
+      await productsAPI.update(id, { is_featured: newVal });
+      // When enabling, un-feature other products in same category (server-side enforced, update locally)
+      setProducts(prev => prev.map(p => {
+        if (p.id === id) return { ...p, is_featured: newVal };
+        if (newVal && categoryId && p.category_id === categoryId) return { ...p, is_featured: false };
+        return p;
+      }));
+    } catch { alert('Erreur'); }
+  };
+
   const handleDownloadPdf = (segment = 'public') => {
     const token = localStorage.getItem('accessToken');
     const params = {};
@@ -672,6 +685,9 @@ export default function AdminCatalog() {
                     </div>
                     <div className="flex items-center gap-2">
                       {p.color && <span className={`px-2 py-0.5 rounded-full text-[10px] font-medium ${COLOR_BADGES[p.color] || 'bg-gray-100 text-gray-700'}`}>{p.color}</span>}
+                      <span onClick={e => { e.stopPropagation(); toggleFeatured(p.id, p.is_featured, p.category_id); }}>
+                        <Star size={14} className={p.is_featured ? 'text-yellow-500 fill-yellow-500' : 'text-gray-300'} />
+                      </span>
                       <span onClick={e => { e.stopPropagation(); toggleBoutique(p.id, p.visible_boutique); }}>
                         {p.visible_boutique ? <Eye size={14} className="text-green-500" /> : <EyeOff size={14} className="text-gray-300" />}
                       </span>
@@ -700,6 +716,7 @@ export default function AdminCatalog() {
                 <th className="pb-3 font-medium">Prix TTC</th>
                 <th className="pb-3 font-medium">Marge</th>
                 <th className="pb-3 font-medium">Boutique</th>
+                <th className="pb-3 font-medium" title="Sélection du moment (1 par catégorie)">Sélection</th>
                 <th className="pb-3 font-medium">Dégustation</th>
                 <th className="pb-3 font-medium text-right">Actions</th>
               </tr>
@@ -732,6 +749,13 @@ export default function AdminCatalog() {
                         className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${p.visible_boutique ? 'bg-green-500' : 'bg-gray-300'}`}
                         title={p.visible_boutique ? 'Visible en boutique' : 'Masqué en boutique'}>
                         <span className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white transition-transform ${p.visible_boutique ? 'translate-x-4.5' : 'translate-x-0.5'}`} />
+                      </button>
+                    </td>
+                    <td className="py-3" onClick={e => e.stopPropagation()}>
+                      <button onClick={() => toggleFeatured(p.id, p.is_featured, p.category_id)}
+                        title={p.is_featured ? 'Retirer de la sélection' : 'Ajouter à la sélection (1 par catégorie)'}
+                        className="p-1 rounded-lg hover:bg-yellow-50 transition-colors">
+                        <Star size={16} className={p.is_featured ? 'text-yellow-500 fill-yellow-500' : 'text-gray-300'} />
                       </button>
                     </td>
                     <td className="py-3">{hasTasting ? <span className="text-xs text-wine-600">★ Profil</span> : <span className="text-xs text-gray-300">—</span>}</td>

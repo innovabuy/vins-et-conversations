@@ -74,6 +74,7 @@ const IDS = {
 exports.seed = async function (knex) {
   // Clean en ordre inverse des FK
   const tables = [
+    'campaign_resources',
     'formation_progress', 'formation_modules',
     'suppliers', 'pricing_conditions', 'delivery_routes', 'notifications', 'audit_log',
     'returns', 'delivery_notes', 'payments', 'financial_events',
@@ -298,6 +299,7 @@ exports.seed = async function (knex) {
       org_id: IDS.sacre_coeur,
       client_type_id: IDS.ct_scolaire,
       name: 'Sacré-Cœur 2025-2026',
+      slug: 'sacre-coeur-2025-2026',
       status: 'active',
       goal: 25000,
       start_date: '2025-09-15',
@@ -309,6 +311,7 @@ exports.seed = async function (knex) {
       org_id: IDS.leroy_merlin,
       client_type_id: IDS.ct_cse,
       name: 'CSE Leroy Merlin',
+      slug: 'cse-leroy-merlin',
       status: 'active',
       goal: 8000,
       start_date: '2025-11-01',
@@ -320,6 +323,7 @@ exports.seed = async function (knex) {
       org_id: IDS.reseau_loire,
       client_type_id: IDS.ct_ambassadeur,
       name: 'Ambassadeurs Loire',
+      slug: 'ambassadeurs-loire',
       status: 'active',
       goal: 15000,
       start_date: '2025-10-01',
@@ -331,6 +335,7 @@ exports.seed = async function (knex) {
       org_id: IDS.espl_angers,
       client_type_id: IDS.ct_scolaire,
       name: 'ESPL Angers',
+      slug: 'espl-angers',
       status: 'active',
       goal: 12000,
       start_date: '2025-10-01',
@@ -342,6 +347,7 @@ exports.seed = async function (knex) {
       org_id: IDS.espl_angers,
       client_type_id: IDS.ct_bts,
       name: 'BTS NDRC ESPL 2025-2026',
+      slug: 'bts-ndrc-espl-2025-2026',
       status: 'active',
       goal: 10000,
       start_date: '2025-09-15',
@@ -353,6 +359,7 @@ exports.seed = async function (knex) {
       org_id: IDS.org_boutique,
       client_type_id: IDS.ct_boutique,
       name: 'Boutique Web',
+      slug: 'boutique-web',
       status: 'active',
       goal: 50000,
       start_date: '2025-01-01',
@@ -379,7 +386,7 @@ exports.seed = async function (knex) {
   // ═══════════════════════════════════════════════════════
   await knex('products').insert([
     {
-      id: IDS.oriolus, name: 'Oriolus Blanc', description: 'Vin blanc sec et frais aux notes d\'agrumes et de fruits blancs. Idéal en apéritif ou avec des fruits de mer.', price_ht: 5.42, price_ttc: 6.50, purchase_price: 3.20, tva_rate: 20, visible_boutique: true,
+      id: IDS.oriolus, name: 'Oriolus Blanc', description: 'Vin blanc sec et frais aux notes d\'agrumes et de fruits blancs. Idéal en apéritif ou avec des fruits de mer.', price_ht: 5.42, price_ttc: 6.50, purchase_price: 3.20, tva_rate: 20, visible_boutique: true, is_featured: true,
       category: 'Blancs Secs', category_id: IDS.cat_blancs_secs, label: 'HVE', sort_order: 1,
       region: 'Loire', appellation: 'Anjou', color: 'blanc', vintage: 2023,
       grape_varieties: JSON.stringify(['Chenin Blanc']),
@@ -401,7 +408,7 @@ exports.seed = async function (knex) {
       awards: JSON.stringify([{ year: 2023, name: 'Médaille Or Concours Général Agricole Paris' }]),
     },
     {
-      id: IDS.carillon, name: 'Carillon', description: 'Rouge de garde élevé 12 mois en fûts de chêne. Tanins élégants, fruits noirs et finale épicée.', price_ht: 10.42, price_ttc: 12.50, purchase_price: 5.80, tva_rate: 20, visible_boutique: true,
+      id: IDS.carillon, name: 'Carillon', description: 'Rouge de garde élevé 12 mois en fûts de chêne. Tanins élégants, fruits noirs et finale épicée.', price_ht: 10.42, price_ttc: 12.50, purchase_price: 5.80, tva_rate: 20, visible_boutique: true, is_featured: true,
       category: 'Rouges', category_id: IDS.cat_rouges, label: 'Cru Bourgeois', sort_order: 3,
       region: 'Loire', appellation: 'Anjou-Villages', color: 'rouge', vintage: 2021,
       grape_varieties: JSON.stringify(['Cabernet Franc', 'Merlot']),
@@ -423,7 +430,7 @@ exports.seed = async function (knex) {
       awards: JSON.stringify([]),
     },
     {
-      id: IDS.cremant, name: 'Crémant de Loire', description: 'Effervescent méthode traditionnelle, 18 mois sur lattes. Fines bulles, fraîcheur et élégance.', price_ht: 10.75, price_ttc: 12.90, purchase_price: 5.90, tva_rate: 20, visible_boutique: true,
+      id: IDS.cremant, name: 'Crémant de Loire', description: 'Effervescent méthode traditionnelle, 18 mois sur lattes. Fines bulles, fraîcheur et élégance.', price_ht: 10.75, price_ttc: 12.90, purchase_price: 5.90, tva_rate: 20, visible_boutique: true, is_featured: true,
       category: 'Effervescents', category_id: IDS.cat_effervescents, label: null, sort_order: 5,
       region: 'Loire', appellation: 'Crémant de Loire', color: 'effervescent', vintage: null,
       grape_varieties: JSON.stringify(['Chenin Blanc', 'Chardonnay']),
@@ -505,6 +512,17 @@ exports.seed = async function (knex) {
     { id: IDS.berthommier, class_group: 'GA' },
   ];
 
+  const studentReferralCodes = {
+    [IDS.ackavong]: 'SCMA1234',
+    [IDS.bourcier]: 'SCBL5678',
+    [IDS.lebreton]: 'SCLP9012',
+    [IDS.flipeau]: 'SCFL3456',
+    [IDS.portier]: 'SCPP7890',
+    [IDS.benoit]: 'SCBL2345',
+    [IDS.moreau]: 'SCML6789',
+    [IDS.berthommier]: 'SCBC0123',
+  };
+
   await knex('participations').insert(
     students.map((s) => ({
       user_id: s.id,
@@ -512,6 +530,7 @@ exports.seed = async function (knex) {
       organization_id: IDS.sacre_coeur,
       role_in_campaign: 'student',
       class_group: s.class_group,
+      referral_code: studentReferralCodes[s.id],
     }))
   );
 
@@ -747,6 +766,115 @@ exports.seed = async function (knex) {
       active: true,
     },
   ]);
+  // ═══════════════════════════════════════════════════════
+  // COMMANDES BOUTIQUE REFEREES PAR ACKAVONG (Student referral)
+  // ═══════════════════════════════════════════════════════
+  const referralContact1 = uuidv4();
+  const referralContact2 = uuidv4();
+  await knex('contacts').insert([
+    { id: referralContact1, name: 'Marie Referral', email: 'marie.ref@example.fr', phone: '0612345678', source: 'referral:ACKAVONG Mathéo' },
+    { id: referralContact2, name: 'Pierre Referral', email: 'pierre.ref@example.fr', phone: '0698765432', source: 'referral:ACKAVONG Mathéo' },
+  ]);
+
+  const refOrder1Id = uuidv4();
+  const refOrder2Id = uuidv4();
+  const refOrderRef1 = `VC-2026-${String(orderCounter++).padStart(4, '0')}`;
+  const refOrderRef2 = `VC-2026-${String(orderCounter++).padStart(4, '0')}`;
+
+  await knex('orders').insert([
+    {
+      id: refOrder1Id,
+      ref: refOrderRef1,
+      campaign_id: IDS.camp_boutique,
+      user_id: null,
+      customer_id: referralContact1,
+      status: 'delivered',
+      source: 'student_referral',
+      referral_code: 'SCMA1234',
+      referred_by: IDS.ackavong,
+      total_ttc: 45.00,
+      total_ht: 37.50,
+      total_items: 3,
+      items: JSON.stringify([{ product_id: IDS.carillon, qty: 2 }, { product_id: IDS.oriolus, qty: 1 }]),
+      created_at: new Date(2026, 0, 20),
+      updated_at: new Date(2026, 0, 20),
+    },
+    {
+      id: refOrder2Id,
+      ref: refOrderRef2,
+      campaign_id: IDS.camp_boutique,
+      user_id: null,
+      customer_id: referralContact2,
+      status: 'delivered',
+      source: 'student_referral',
+      referral_code: 'SCMA1234',
+      referred_by: IDS.ackavong,
+      total_ttc: 32.00,
+      total_ht: 26.67,
+      total_items: 1,
+      items: JSON.stringify([{ product_id: IDS.coffret, qty: 1 }]),
+      created_at: new Date(2026, 1, 5),
+      updated_at: new Date(2026, 1, 5),
+    },
+  ]);
+
+  await knex('order_items').insert([
+    { order_id: refOrder1Id, product_id: IDS.carillon, qty: 2, unit_price_ht: 10.42, unit_price_ttc: 12.50, free_qty: 0, type: 'product' },
+    { order_id: refOrder1Id, product_id: IDS.oriolus, qty: 1, unit_price_ht: 5.42, unit_price_ttc: 6.50, free_qty: 0, type: 'product' },
+    { order_id: refOrder2Id, product_id: IDS.coffret, qty: 1, unit_price_ht: 26.67, unit_price_ttc: 32.00, free_qty: 0, type: 'product' },
+  ]);
+
+  await knex('financial_events').insert([
+    { order_id: refOrder1Id, campaign_id: IDS.camp_boutique, type: 'sale', amount: 45.00, description: `Vente boutique ${refOrderRef1} (referral ACKAVONG)`, created_at: new Date(2026, 0, 20) },
+    { order_id: refOrder2Id, campaign_id: IDS.camp_boutique, type: 'sale', amount: 32.00, description: `Vente boutique ${refOrderRef2} (referral ACKAVONG)`, created_at: new Date(2026, 1, 5) },
+  ]);
+
+  // ═══════════════════════════════════════════════════════
+  // CAMPAIGN RESOURCES (Tâche 8 — Espace ressources)
+  // ═══════════════════════════════════════════════════════
+  await knex('campaign_resources').insert([
+    {
+      campaign_id: IDS.camp_sacre_coeur,
+      title: 'Guide de vente — Argumentaire produit',
+      type: 'pdf',
+      url: 'https://example.com/resources/guide-vente.pdf',
+      description: 'Argumentaire complet pour chaque vin du catalogue, fiches techniques et conseils de vente.',
+      sort_order: 1,
+      visible_to_roles: JSON.stringify(['student', 'bts']),
+      active: true,
+    },
+    {
+      campaign_id: IDS.camp_sacre_coeur,
+      title: 'Vidéo — Présentation du domaine',
+      type: 'video',
+      url: 'https://example.com/resources/domaine-video.mp4',
+      description: 'Visite guidée du domaine viticole et interview du vigneron.',
+      sort_order: 2,
+      visible_to_roles: JSON.stringify(['student', 'bts', 'teacher']),
+      active: true,
+    },
+    {
+      campaign_id: IDS.camp_sacre_coeur,
+      title: 'FAQ Clients',
+      type: 'link',
+      url: 'https://example.com/faq',
+      description: 'Réponses aux questions fréquentes des clients.',
+      sort_order: 3,
+      visible_to_roles: JSON.stringify(['student']),
+      active: true,
+    },
+    {
+      campaign_id: IDS.camp_bts_espl,
+      title: 'Méthode de prospection BTS NDRC',
+      type: 'document',
+      url: 'https://example.com/resources/methode-prospection.docx',
+      description: 'Document de référence pour la prospection terrain.',
+      sort_order: 1,
+      visible_to_roles: JSON.stringify(['student', 'bts']),
+      active: true,
+    },
+  ]);
+
   // ─── Shipping grid import ────────────────────────────
   const { importShippingGrid } = require('../scripts/import-shipping-grid');
   const shippingResult = await importShippingGrid(knex);

@@ -24,7 +24,7 @@ async function getBoutiqueWebCampaignId() {
 /**
  * Find or create a contact by email
  */
-async function upsertContact({ name, email, phone, address, city, postal_code }) {
+async function upsertContact({ name, email, phone, address, city, postal_code, referralSource }) {
   // Combine address + city + postal_code into single address field
   const fullAddress = [address, postal_code, city].filter(Boolean).join(', ');
   const notes = {};
@@ -54,7 +54,7 @@ async function upsertContact({ name, email, phone, address, city, postal_code })
     email,
     phone: phone || null,
     address: fullAddress || null,
-    source: 'boutique_web',
+    source: referralSource || 'boutique_web',
     notes: Object.keys(notes).length > 0 ? JSON.stringify(notes) : null,
   }).returning('*');
 
@@ -74,18 +74,21 @@ async function createBoutiqueOrder({ cartItems, customer, referralCode }) {
   let referredBy = null;
 
   if (referralCode) {
-    const participation = await db('participations')
-      .where({ referral_code: referralCode })
-      .first();
+    const referralResult = await resolveReferralCode(referralCode);
 
-    if (participation) {
-      source = 'ambassador_referral';
-      referredBy = participation.user_id;
+    if (referralResult) {
+      source = referralResult.role === 'etudiant' ? 'student_referral' : 'ambassador_referral';
+      referredBy = referralResult.user_id;
     }
   }
 
-  // Upsert contact
-  const contact = await upsertContact(customer);
+  // Upsert contact with referral source
+  let referralSource = null;
+  if (referredBy) {
+    const referrer = await db('users').where({ id: referredBy }).select('name').first();
+    if (referrer) referralSource = `referral:${referrer.name}`;
+  }
+  const contact = await upsertContact({ ...customer, referralSource });
 
   // Fetch products (server-authoritative pricing)
   const productIds = cartItems.map((i) => i.product_id);
@@ -328,7 +331,7 @@ async function resolveReferralCode(code) {
   const participation = await db('participations')
     .join('users', 'participations.user_id', 'users.id')
     .where('participations.referral_code', code)
-    .select('users.name', 'participations.referral_code')
+    .select('users.name', 'users.role', 'participations.referral_code', 'participations.user_id')
     .first();
 
   return participation || null;

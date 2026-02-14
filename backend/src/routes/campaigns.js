@@ -8,6 +8,7 @@ const { auditAction } = require('../middleware/audit');
 const PDFDocument = require('pdfkit');
 const emailService = require('../services/emailService');
 const logger = require('../utils/logger');
+const { generateUniqueReferralCode } = require('../utils/referralCode');
 
 const router = express.Router();
 
@@ -671,12 +672,21 @@ router.post('/', authenticate, requireRole('super_admin'), auditAction('campaign
       }
 
       if (participants.length) {
-        await trx('participations').insert(
-          participants.map((userId) => ({
-            user_id: userId,
-            campaign_id: newId,
-          }))
-        );
+        // Check which participants are students for referral code generation
+        const users = await trx('users').whereIn('id', participants).select('id', 'name', 'role');
+        const userMap = {};
+        users.forEach((u) => { userMap[u.id] = u; });
+
+        const participationRows = [];
+        for (const userId of participants) {
+          const row = { user_id: userId, campaign_id: newId };
+          const u = userMap[userId];
+          if (u && u.role === 'etudiant') {
+            row.referral_code = await generateUniqueReferralCode(campaignData.name, u.name);
+          }
+          participationRows.push(row);
+        }
+        await trx('participations').insert(participationRows);
       }
     });
 
@@ -716,14 +726,32 @@ router.put('/:id', authenticate, requireRole('super_admin'), auditAction('campai
 
       // Sync participants if provided
       if (participants) {
+        // Preserve existing referral codes before deleting
+        const existingParticipations = await trx('participations')
+          .where({ campaign_id: req.params.id })
+          .whereNotNull('referral_code')
+          .select('user_id', 'referral_code');
+        const existingCodeMap = {};
+        existingParticipations.forEach((p) => { existingCodeMap[p.user_id] = p.referral_code; });
+
         await trx('participations').where({ campaign_id: req.params.id }).del();
         if (participants.length) {
-          await trx('participations').insert(
-            participants.map((userId) => ({
-              user_id: userId,
-              campaign_id: req.params.id,
-            }))
-          );
+          const users = await trx('users').whereIn('id', participants).select('id', 'name', 'role');
+          const userMap = {};
+          users.forEach((u) => { userMap[u.id] = u; });
+
+          const participationRows = [];
+          for (const userId of participants) {
+            const row = { user_id: userId, campaign_id: req.params.id };
+            const u = userMap[userId];
+            if (u && u.role === 'etudiant') {
+              row.referral_code = existingCodeMap[userId] || await generateUniqueReferralCode(updated.name, u.name);
+            } else if (existingCodeMap[userId]) {
+              row.referral_code = existingCodeMap[userId];
+            }
+            participationRows.push(row);
+          }
+          await trx('participations').insert(participationRows);
         }
       }
 

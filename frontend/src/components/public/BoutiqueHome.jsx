@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
-import { Wine, Search, Filter, ChevronRight, ShoppingCart, Check } from 'lucide-react';
+import { Wine, Search, Filter, ChevronRight, ShoppingCart, Check, Star } from 'lucide-react';
 import api from '../../services/api';
+import { featuredAPI } from '../../services/api';
 import { useCart } from '../../contexts/CartContext';
 
 const formatEur = (v) => new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR' }).format(v);
@@ -34,16 +35,22 @@ export default function BoutiqueHome() {
   const [categoryId, setCategoryId] = useState('');
   const [showFilters, setShowFilters] = useState(false);
   const [addedId, setAddedId] = useState(null);
-  const [ambassadorName, setAmbassadorName] = useState(null);
+  const [referrerName, setReferrerName] = useState(null);
+  const [featured, setFeatured] = useState([]);
   const { addToCart, getReferralCode } = useCart();
 
-  // Detect ambassador referral
+  // Detect referral (ambassador or student)
   useEffect(() => {
     const code = getReferralCode();
-    if (code && !ambassadorName) {
-      api.get(`/public/ambassador/${code}`)
-        .then(r => setAmbassadorName(r.data.name))
-        .catch(() => {});
+    if (code && !referrerName) {
+      api.get(`/public/referral/${code}`)
+        .then(r => setReferrerName(r.data.name))
+        .catch(() => {
+          // Fallback to ambassador endpoint for backward compat
+          api.get(`/public/ambassador/${code}`)
+            .then(r => setReferrerName(r.data.name))
+            .catch(() => {});
+        });
     }
   }, []);
 
@@ -67,6 +74,7 @@ export default function BoutiqueHome() {
 
   useEffect(() => {
     api.get('/public/filters').then(r => setFilters(r.data)).catch(console.error);
+    featuredAPI.list().then(r => setFeatured(r.data.data || [])).catch(() => {});
   }, []);
 
   useEffect(() => { fetchProducts(); }, [search, color, region, categoryId, campaignId]);
@@ -93,13 +101,74 @@ export default function BoutiqueHome() {
         </div>
       </section>
 
-      {/* Ambassador banner */}
-      {ambassadorName && (
+      {/* Referral banner */}
+      {referrerName && (
         <div className="bg-gradient-to-r from-indigo-50 to-purple-50 border-b border-indigo-100">
           <div className="max-w-7xl mx-auto px-4 py-2.5 text-center text-sm text-indigo-700">
-            Recommandé par <span className="font-semibold">{ambassadorName}</span>
+            Recommandé par <span className="font-semibold">{referrerName}</span>
           </div>
         </div>
+      )}
+
+      {/* Featured — Sélection du moment */}
+      {featured.length > 0 && (
+        <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+          <div className="flex items-center gap-2 mb-6">
+            <Star size={20} className="text-yellow-500 fill-yellow-500" />
+            <h2 className="text-xl font-bold text-gray-900">Notre sélection du moment</h2>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+            {featured.map((p) => (
+              <Link
+                key={p.id}
+                to={`/boutique/vin/${p.id}`}
+                className="group relative bg-white border-2 border-yellow-200 rounded-2xl overflow-hidden hover:shadow-lg transition-all hover:-translate-y-1"
+              >
+                <div className="absolute top-3 right-3 z-10 bg-yellow-400 text-yellow-900 px-2 py-0.5 rounded-full text-xs font-semibold flex items-center gap-1">
+                  <Star size={12} className="fill-yellow-900" /> Sélection
+                </div>
+                <div className="aspect-[4/3] bg-gradient-to-br from-yellow-50 to-wine-50 flex items-center justify-center">
+                  {p.image_url ? (
+                    <img src={p.image_url} alt={p.name} className="w-full h-full object-cover" />
+                  ) : (
+                    <Wine size={48} className="text-wine-300" />
+                  )}
+                </div>
+                <div className="p-4">
+                  <div className="flex items-center gap-2 mb-2">
+                    {p.category_details ? (
+                      <span className="px-2 py-0.5 rounded-full text-xs font-medium text-white" style={{ backgroundColor: p.category_details.color || '#666' }}>{p.category_details.icon} {p.category_details.name}</span>
+                    ) : p.color ? (
+                      <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${COLOR_MAP[p.color?.toLowerCase()] || 'bg-gray-100 text-gray-600'}`}>{p.color}</span>
+                    ) : null}
+                    {p.region && <span className="text-xs text-gray-400">{p.region}</span>}
+                  </div>
+                  <h3 className="font-semibold text-gray-900 group-hover:text-wine-700 transition-colors">{p.name}</h3>
+                  {p.description && <p className="text-xs text-gray-500 mt-1 line-clamp-2">{p.description}</p>}
+                  <div className="flex items-center justify-between mt-3">
+                    <span className="text-lg font-bold text-wine-700">{formatEur(p.price_ttc)}</span>
+                    <button
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        addToCart({ id: p.id, name: p.name, price_ttc: p.price_ttc });
+                        setAddedId(p.id);
+                        setTimeout(() => setAddedId(null), 1500);
+                      }}
+                      className={`flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
+                        addedId === p.id
+                          ? 'bg-green-100 text-green-700'
+                          : 'bg-wine-50 text-wine-700 hover:bg-wine-100'
+                      }`}
+                    >
+                      {addedId === p.id ? <><Check size={14} /> Ajouté</> : <><ShoppingCart size={14} /> Ajouter</>}
+                    </button>
+                  </div>
+                </div>
+              </Link>
+            ))}
+          </div>
+        </section>
       )}
 
       {/* Catalog */}

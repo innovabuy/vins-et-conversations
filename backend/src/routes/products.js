@@ -22,6 +22,7 @@ const productSchema = Joi.object({
   description: Joi.string().allow(null, ''),
   active: Joi.boolean().default(true),
   visible_boutique: Joi.boolean().default(false),
+  is_featured: Joi.boolean().default(false),
   sort_order: Joi.number().integer().default(0),
   // Enriched fields
   region: Joi.string().max(100).allow(null, ''),
@@ -294,6 +295,12 @@ adminRouter.post(
         const cat = await db('product_categories').where({ id: body.category_id }).first();
         if (cat) body.category = cat.name;
       }
+      // Enforce 1 featured per category_id
+      if (body.is_featured === true && body.category_id) {
+        await db('products')
+          .where('category_id', body.category_id)
+          .update({ is_featured: false });
+      }
       const [product] = await db('products').insert(body).returning('*');
       res.status(201).json(product);
     } catch (err) {
@@ -319,6 +326,17 @@ adminRouter.put(
       if (body.category_id) {
         const cat = await db('product_categories').where({ id: body.category_id }).first();
         if (cat) body.category = cat.name;
+      }
+      // Enforce 1 featured per category_id
+      if (body.is_featured === true) {
+        const current = await db('products').where({ id: req.params.id }).first();
+        const catId = body.category_id || current?.category_id;
+        if (catId) {
+          await db('products')
+            .where('category_id', catId)
+            .whereNot('id', req.params.id)
+            .update({ is_featured: false });
+        }
       }
       const [product] = await db('products')
         .where({ id: req.params.id })

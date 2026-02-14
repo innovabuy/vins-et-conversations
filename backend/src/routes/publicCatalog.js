@@ -49,6 +49,7 @@ router.get('/catalog', async (req, res) => {
         'products.region', 'products.appellation', 'products.color', 'products.vintage',
         'products.grape_varieties', 'products.serving_temp', 'products.food_pairing',
         'products.tasting_notes', 'products.winemaker_notes', 'products.awards', 'products.sort_order',
+        'products.is_featured',
         'product_categories.name as cat_name', 'product_categories.icon as cat_icon', 'product_categories.color as cat_color', 'product_categories.slug as cat_slug'
       )
       .orderBy('products.sort_order')
@@ -93,6 +94,33 @@ router.get('/catalog/:id', async (req, res) => {
       .first();
     if (!product) return res.status(404).json({ error: 'NOT_FOUND' });
     res.json(product);
+  } catch (err) {
+    res.status(500).json({ error: 'SERVER_ERROR' });
+  }
+});
+
+// GET /api/v1/public/featured — Produits "sélection du moment"
+router.get('/featured', async (req, res) => {
+  try {
+    const products = await db('products')
+      .leftJoin('product_categories', 'products.category_id', 'product_categories.id')
+      .where({ 'products.active': true, 'products.visible_boutique': true, 'products.is_featured': true })
+      .select(
+        'products.id', 'products.name', 'products.price_ttc', 'products.price_ht', 'products.tva_rate',
+        'products.category', 'products.category_id', 'products.label', 'products.image_url', 'products.description',
+        'products.region', 'products.appellation', 'products.color', 'products.vintage', 'products.is_featured',
+        'product_categories.name as cat_name', 'product_categories.icon as cat_icon',
+        'product_categories.color as cat_color', 'product_categories.slug as cat_slug'
+      )
+      .orderBy('products.sort_order');
+
+    res.json({
+      data: products.map(p => ({
+        ...p,
+        category_details: p.category_id ? { id: p.category_id, name: p.cat_name, slug: p.cat_slug, icon: p.cat_icon, color: p.cat_color } : null,
+        cat_name: undefined, cat_icon: undefined, cat_color: undefined, cat_slug: undefined,
+      })),
+    });
   } catch (err) {
     res.status(500).json({ error: 'SERVER_ERROR' });
   }

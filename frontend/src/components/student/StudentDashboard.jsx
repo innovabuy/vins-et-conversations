@@ -1,8 +1,9 @@
 import { useState, useEffect, useMemo } from 'react';
-import { dashboardAPI, productsAPI, ordersAPI } from '../../services/api';
+import { dashboardAPI, productsAPI, ordersAPI, campaignResourcesAPI } from '../../services/api';
 import { useAuth } from '../../contexts/AuthContext';
-import { Flame, Trophy, ShoppingCart, User, ChevronUp, Wine, Package, Clock, Award, Zap, Heart, Target, DollarSign, ArrowLeft, ArrowRight, Check, Phone, Mail, FileText, CreditCard, Banknote, Building, HelpCircle, Users, TrendingUp, TrendingDown, Minus, BarChart3, PiggyBank } from 'lucide-react';
+import { Flame, Trophy, ShoppingCart, User, ChevronUp, Wine, Package, Clock, Award, Zap, Heart, Target, DollarSign, ArrowLeft, ArrowRight, Check, Phone, Mail, FileText, CreditCard, Banknote, Building, HelpCircle, Users, TrendingUp, TrendingDown, Minus, BarChart3, PiggyBank, BookOpen, ExternalLink, Video, Image, FileDown } from 'lucide-react';
 import WinePiggyBank from '../shared/WinePiggyBank';
+import ReferralSection from './ReferralSection';
 
 const formatEur = (v) => new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR' }).format(v);
 const formatDate = (d) => new Date(d).toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit', year: 'numeric' });
@@ -397,6 +398,7 @@ export default function StudentDashboard() {
   const [data, setData] = useState(null);
   const [products, setProducts] = useState([]);
   const [customers, setCustomers] = useState([]);
+  const [resources, setResources] = useState([]);
   const [loading, setLoading] = useState(true);
   const [orderSuccess, setOrderSuccess] = useState(false);
 
@@ -409,10 +411,12 @@ export default function StudentDashboard() {
       dashboardAPI.student(campaignId),
       productsAPI.byCampaign(campaignId),
       ordersAPI.myCustomers(),
-    ]).then(([dashRes, prodRes, custRes]) => {
+      campaignResourcesAPI.list(campaignId),
+    ]).then(([dashRes, prodRes, custRes, resRes]) => {
       if (dashRes.status === 'fulfilled') setData(dashRes.value.data);
       if (prodRes.status === 'fulfilled') setProducts(prodRes.value.data.data || []);
       if (custRes.status === 'fulfilled') setCustomers(custRes.value.data.data || []);
+      if (resRes.status === 'fulfilled') setResources(resRes.value.data.data || []);
     }).finally(() => setLoading(false));
   };
 
@@ -433,6 +437,7 @@ export default function StudentDashboard() {
     { id: 'home', label: 'Accueil', icon: Trophy },
     { id: 'order', label: 'Commander', icon: ShoppingCart },
     { id: 'ranking', label: 'Classement', icon: ChevronUp },
+    ...(resources.length > 0 ? [{ id: 'resources', label: 'Ressources', icon: BookOpen }] : []),
     { id: 'profile', label: 'Profil', icon: User },
   ];
 
@@ -454,8 +459,11 @@ export default function StudentDashboard() {
         {tab === 'home' && data && (
           <>
             <div className="text-center py-4">
-              <p className="text-wine-200 text-sm">Mon CA</p>
-              <p className="text-4xl font-bold">{formatEur(data.ca)}</p>
+              <p className="text-wine-200 text-sm">{data.ca_referred > 0 ? 'Mon CA total' : 'Mon CA'}</p>
+              <p className="text-4xl font-bold">{formatEur(data.ca_referred > 0 ? data.ca_total : data.ca)}</p>
+              {data.ca_referred > 0 && (
+                <p className="text-wine-300 text-xs mt-1">dont {formatEur(data.ca_referred)} par partage</p>
+              )}
             </div>
             <div className="grid grid-cols-3 gap-3 mt-2">
               <div className="bg-white/10 rounded-xl p-3 text-center">
@@ -527,6 +535,9 @@ export default function StudentDashboard() {
                 </div>
               </div>
             )}
+
+            {/* Referral section */}
+            <ReferralSection campaignId={campaignId} />
 
             {/* Campaign collective stats */}
             {campaign && (
@@ -635,7 +646,10 @@ export default function StudentDashboard() {
                 {data.recent_orders.map((o) => (
                   <div key={o.id} className="flex items-center justify-between py-2 border-b last:border-0 text-sm">
                     <div>
-                      <p className="font-medium">{o.customer_name || 'Client'}</p>
+                      <p className="font-medium">
+                        {o.customer_name || 'Client'}
+                        {o.is_referred && <span className="ml-1.5 px-1.5 py-0.5 bg-indigo-100 text-indigo-700 text-[10px] rounded-full font-medium">Référé</span>}
+                      </p>
                       <p className="text-xs text-gray-400">{formatDate(o.created_at)} · {o.total_items} art.</p>
                     </div>
                     <div className="text-right">
@@ -676,6 +690,37 @@ export default function StudentDashboard() {
 
         {/* ===== RANKING TAB ===== */}
         {tab === 'ranking' && <RankingTab campaignId={campaignId} />}
+
+        {/* ===== RESOURCES TAB ===== */}
+        {tab === 'resources' && resources.length > 0 && (
+          <div className="space-y-3">
+            <h3 className="font-semibold text-sm flex items-center gap-2"><BookOpen size={16} /> Ressources</h3>
+            {resources.map((r) => {
+              const typeIcons = { pdf: FileDown, video: Video, image: Image, document: FileText, link: ExternalLink };
+              const TypeIcon = typeIcons[r.type] || ExternalLink;
+              const typeColors = { pdf: 'bg-red-50 text-red-600', video: 'bg-purple-50 text-purple-600', image: 'bg-blue-50 text-blue-600', document: 'bg-orange-50 text-orange-600', link: 'bg-green-50 text-green-600' };
+              return (
+                <a
+                  key={r.id}
+                  href={r.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="card flex items-start gap-3 hover:shadow-md transition-shadow"
+                >
+                  <div className={`p-2 rounded-lg ${typeColors[r.type] || 'bg-gray-50 text-gray-600'}`}>
+                    <TypeIcon size={20} />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="font-medium text-sm text-gray-900">{r.title}</p>
+                    {r.description && <p className="text-xs text-gray-500 mt-0.5 line-clamp-2">{r.description}</p>}
+                    <span className="text-[10px] text-gray-400 uppercase mt-1 inline-block">{r.type}</span>
+                  </div>
+                  <ExternalLink size={14} className="text-gray-300 shrink-0 mt-1" />
+                </a>
+              );
+            })}
+          </div>
+        )}
 
         {/* ===== PROFILE TAB ===== */}
         {tab === 'profile' && (

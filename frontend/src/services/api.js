@@ -287,6 +287,29 @@ export const boutiqueAPI = {
   confirmCheckout: (data) => api.post('/public/checkout/confirm', data),
   trackOrder: (ref, email) => api.get(`/public/order/${ref}`, { params: { email } }),
   resolveAmbassador: (code) => api.get(`/public/ambassador/${code}`),
+  resolveReferral: (code) => api.get(`/public/referral/${code}`),
+  register: (data) => api.post('/public/register', data),
+};
+
+// ─── Referral (Student) ─────────────────────────
+export const referralAPI = {
+  myLink: (campaignId) => api.get('/referral/my-link', { params: { campaign_id: campaignId } }),
+  stats: (campaignId) => api.get('/referral/stats', { params: { campaign_id: campaignId } }),
+};
+
+// ─── Featured Products (Public) ──────────────────
+export const featuredAPI = {
+  list: () => api.get('/public/featured'),
+};
+
+// ─── Campaign Resources ─────────────────────────
+export const campaignResourcesAPI = {
+  list: (campaignId) => api.get(`/campaigns/${campaignId}/resources`),
+  adminList: (campaignId) => api.get(`/admin/campaign-resources/${campaignId}`),
+  create: (data) => api.post('/admin/campaign-resources', data),
+  update: (id, data) => api.put(`/admin/campaign-resources/${id}`, data),
+  reorder: (items) => api.put('/admin/campaign-resources/reorder', { items }),
+  delete: (id) => api.delete(`/admin/campaign-resources/${id}`),
 };
 
 // ─── Shipping ────────────────────────────────────

@@ -216,4 +216,53 @@ router.get('/ambassador/:code', async (req, res) => {
   }
 });
 
+// ─── GET /referral/:code — Generic referral code resolve ───
+
+router.get('/referral/:code', async (req, res) => {
+  try {
+    const result = await boutiqueOrderService.resolveReferralCode(req.params.code);
+    if (!result) {
+      return res.status(404).json({ error: 'CODE_NOT_FOUND', message: 'Code de parrainage invalide' });
+    }
+    res.json({ name: result.name, code: result.referral_code, role: result.role });
+  } catch (err) {
+    logger.error(`Referral resolve error: ${err.message}`);
+    res.status(500).json({ error: 'SERVER_ERROR', message: err.message });
+  }
+});
+
+// ─── POST /register — Lightweight external client registration ───
+
+const registerSchema = Joi.object({
+  name: Joi.string().min(2).max(100).required(),
+  email: Joi.string().email().required(),
+  phone: Joi.string().allow('', null).optional(),
+  referral_code: Joi.string().allow('', null).optional(),
+});
+
+router.post('/register', async (req, res) => {
+  try {
+    const { error, value } = registerSchema.validate(req.body);
+    if (error) return res.status(400).json({ error: 'VALIDATION_ERROR', message: error.details[0].message });
+
+    let referralSource = null;
+    if (value.referral_code) {
+      const referral = await boutiqueOrderService.resolveReferralCode(value.referral_code);
+      if (referral) referralSource = `referral:${referral.name}`;
+    }
+
+    const contact = await boutiqueOrderService.upsertContact({
+      name: value.name,
+      email: value.email,
+      phone: value.phone || null,
+      referralSource,
+    });
+
+    res.status(201).json({ id: contact.id, name: contact.name, email: contact.email, registered: true });
+  } catch (err) {
+    logger.error(`Register error: ${err.message}`);
+    res.status(500).json({ error: 'SERVER_ERROR', message: err.message });
+  }
+});
+
 module.exports = router;

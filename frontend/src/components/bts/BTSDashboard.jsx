@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
-import { dashboardAPI } from '../../services/api';
-import { formationAPI } from '../../services/api';
-import { GraduationCap, ShoppingCart, Trophy, BookOpen, Play, FileText, HelpCircle, CheckCircle, Clock } from 'lucide-react';
+import { dashboardAPI, formationAPI, campaignResourcesAPI } from '../../services/api';
+import { useAuth } from '../../contexts/AuthContext';
+import { GraduationCap, ShoppingCart, Trophy, BookOpen, Play, FileText, HelpCircle, CheckCircle, Clock, ExternalLink, Video, Image, FileDown } from 'lucide-react';
 
 const TYPE_ICONS = {
   video: Play,
@@ -17,10 +17,14 @@ const STATUS_STYLES = {
 };
 
 export default function BTSDashboard() {
+  const { user } = useAuth();
   const [data, setData] = useState(null);
+  const [resources, setResources] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [tab, setTab] = useState('ventes'); // 'ventes' | 'formation'
+  const [tab, setTab] = useState('ventes'); // 'ventes' | 'formation' | 'resources'
   const [updating, setUpdating] = useState(null);
+
+  const campaignId = user?.campaigns?.[0]?.campaign_id;
 
   useEffect(() => {
     loadDashboard();
@@ -28,8 +32,12 @@ export default function BTSDashboard() {
 
   const loadDashboard = async () => {
     try {
-      const res = await dashboardAPI.bts();
-      setData(res.data);
+      const [dashRes, resRes] = await Promise.allSettled([
+        dashboardAPI.bts(),
+        campaignId ? campaignResourcesAPI.list(campaignId) : Promise.resolve({ data: { data: [] } }),
+      ]);
+      if (dashRes.status === 'fulfilled') setData(dashRes.value.data);
+      if (resRes.status === 'fulfilled') setResources(resRes.value.data.data || []);
     } catch (err) {
       console.error(err);
     } finally {
@@ -85,6 +93,14 @@ export default function BTSDashboard() {
         >
           <GraduationCap size={16} className="inline mr-1" /> Formation ({formation?.pct || 0}%)
         </button>
+        {resources.length > 0 && (
+          <button
+            onClick={() => setTab('resources')}
+            className={`px-4 py-2 text-sm font-medium border-b-2 ${tab === 'resources' ? 'border-wine-700 text-wine-700' : 'border-transparent text-gray-500'}`}
+          >
+            <BookOpen size={16} className="inline mr-1" /> Ressources
+          </button>
+        )}
       </div>
 
       {/* Ventes tab */}
@@ -202,6 +218,30 @@ export default function BTSDashboard() {
               );
             })}
           </div>
+        </div>
+      )}
+
+      {/* Resources tab */}
+      {tab === 'resources' && resources.length > 0 && (
+        <div className="space-y-3">
+          {resources.map((r) => {
+            const typeIcons = { pdf: FileDown, video: Video, image: Image, document: FileText, link: ExternalLink };
+            const TypeIcon = typeIcons[r.type] || ExternalLink;
+            const typeColors = { pdf: 'bg-red-100 text-red-600', video: 'bg-purple-100 text-purple-600', image: 'bg-blue-100 text-blue-600', document: 'bg-orange-100 text-orange-600', link: 'bg-green-100 text-green-600' };
+            return (
+              <a key={r.id} href={r.url} target="_blank" rel="noopener noreferrer" className="card flex items-start gap-3 hover:shadow-md transition-shadow">
+                <div className={`p-2 rounded-lg ${typeColors[r.type] || 'bg-gray-100 text-gray-600'}`}>
+                  <TypeIcon size={20} />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="font-medium text-sm">{r.title}</p>
+                  {r.description && <p className="text-xs text-gray-500 mt-0.5 line-clamp-2">{r.description}</p>}
+                  <span className="text-[10px] text-gray-400 uppercase mt-1 inline-block">{r.type}</span>
+                </div>
+                <ExternalLink size={14} className="text-gray-300 shrink-0 mt-1" />
+              </a>
+            );
+          })}
         </div>
       )}
     </div>
