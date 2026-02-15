@@ -343,13 +343,11 @@ h1, h2, h3, h4 {
   height: 60px;
   width: auto;
   object-fit: contain;
-  filter: grayscale(100%);
-  opacity: 0.6;
+  opacity: 0.85;
   transition: all var(--transition);
 }
 
 .logos-grid img:hover {
-  filter: grayscale(0%);
   opacity: 1;
 }
 
