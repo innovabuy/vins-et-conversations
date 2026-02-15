@@ -3,12 +3,8 @@ const Joi = require('joi');
 const { v4: uuidv4 } = require('uuid');
 const cartService = require('../services/cartService');
 const boutiqueOrderService = require('../services/boutiqueOrderService');
+const { getStripe } = require('../services/stripeService');
 const logger = require('../utils/logger');
-
-const stripeKey = process.env.STRIPE_SECRET_KEY;
-const stripe = stripeKey && !stripeKey.includes('placeholder')
-  ? require('stripe')(stripeKey)
-  : null;
 
 const router = express.Router();
 
@@ -97,6 +93,7 @@ router.post('/checkout', async (req, res) => {
 
     // Create Stripe PaymentIntent
     let clientSecret = null;
+    const stripe = await getStripe();
     if (stripe) {
       const amountCents = Math.round(order.total_ttc * 100);
       const paymentIntent = await stripe.paymentIntents.create({
@@ -124,6 +121,15 @@ router.post('/checkout', async (req, res) => {
     logger.error(`Checkout error: ${err.message}`);
     if (err.message === 'INVALID_PRODUCTS') {
       return res.status(400).json({ error: 'INVALID_PRODUCTS', message: 'Produits invalides dans le panier' });
+    }
+    if (err.message.startsWith('INSUFFICIENT_STOCK:')) {
+      const parts = err.message.split(':');
+      return res.status(400).json({
+        error: 'INSUFFICIENT_STOCK',
+        message: `Stock insuffisant pour ${parts[1]}`,
+        product: parts[1],
+        available: parseInt(parts[2]) || 0,
+      });
     }
     res.status(500).json({ error: 'SERVER_ERROR', message: err.message });
   }

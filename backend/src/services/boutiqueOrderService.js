@@ -100,6 +100,30 @@ async function createBoutiqueOrder({ cartItems, customer, referralCode }) {
   const productMap = {};
   products.forEach((p) => { productMap[p.id] = p; });
 
+  // ─── Stock validation (Phase 5) ─────────────────────
+  const stockBalances = await db('stock_movements')
+    .whereIn('product_id', productIds)
+    .groupBy('product_id')
+    .select(
+      'product_id',
+      db.raw("SUM(CASE WHEN type IN ('initial', 'entry', 'return') THEN qty ELSE 0 END) as total_in"),
+      db.raw("SUM(CASE WHEN type IN ('exit', 'adjustment') THEN qty ELSE 0 END) as total_out")
+    );
+
+  const stockMap = {};
+  stockBalances.forEach((s) => {
+    stockMap[s.product_id] = parseInt(s.total_in) - parseInt(s.total_out);
+  });
+
+  for (const item of cartItems) {
+    const product = productMap[item.product_id];
+    if (!product) continue;
+    const available = stockMap[item.product_id] || 0;
+    if (item.qty > available) {
+      throw new Error(`INSUFFICIENT_STOCK:${product.name}:${available}`);
+    }
+  }
+
   let totalHT = 0;
   let totalTTC = 0;
   let totalItems = 0;

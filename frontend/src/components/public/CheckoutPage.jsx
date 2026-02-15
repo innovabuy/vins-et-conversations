@@ -1,23 +1,119 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
+import { loadStripe } from '@stripe/stripe-js';
+import { Elements, CardElement, useStripe, useElements } from '@stripe/react-stripe-js';
 import { useCart } from '../../contexts/CartContext';
-import { boutiqueAPI, shippingAPI } from '../../services/api';
-import { ArrowLeft, Lock, ShoppingCart, Truck, Loader2 } from 'lucide-react';
+import { useAuth } from '../../contexts/AuthContext';
+import { boutiqueAPI, shippingAPI, authAPI, appSettingsAPI } from '../../services/api';
+import { ArrowLeft, Lock, ShoppingCart, Truck, Loader2, User, MapPin, CreditCard, Check, LogIn, UserPlus, UserX } from 'lucide-react';
 
 const formatEur = (v) => new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR' }).format(v);
 
+// Dynamic Stripe promise
+let cachedStripePromise = null;
+function getStripePromise() {
+  if (cachedStripePromise) return cachedStripePromise;
+  cachedStripePromise = appSettingsAPI.stripePublicKey()
+    .then((res) => {
+      const key = res.data.publishable_key;
+      if (key && !key.includes('placeholder') && key.length > 10) return loadStripe(key);
+      const envKey = import.meta.env.VITE_STRIPE_PUBLIC_KEY;
+      return envKey ? loadStripe(envKey) : null;
+    })
+    .catch(() => {
+      const envKey = import.meta.env.VITE_STRIPE_PUBLIC_KEY;
+      return envKey ? loadStripe(envKey) : null;
+    });
+  return cachedStripePromise;
+}
+
+// Inline payment form
+function InlinePaymentForm({ clientSecret, amount, onSuccess, onError }) {
+  const stripe = useStripe();
+  const elements = useElements();
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    if (!stripe || !elements) return;
+    setLoading(true);
+    setError(null);
+    try {
+      const result = await stripe.confirmCardPayment(clientSecret, {
+        payment_method: { card: elements.getElement(CardElement) },
+      });
+      if (result.error) {
+        setError(result.error.message);
+        onError?.(result.error.message);
+      } else if (result.paymentIntent.status === 'succeeded') {
+        onSuccess?.(result.paymentIntent);
+      }
+    } catch (err) {
+      setError(err.message);
+      onError?.(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <form onSubmit={handleSubmit} className="space-y-4">
+      <div className="border rounded-lg p-4 bg-gray-50">
+        <CardElement options={{
+          style: { base: { fontSize: '16px', color: '#374151', '::placeholder': { color: '#9CA3AF' } } },
+        }} />
+      </div>
+      {error && <p className="text-red-600 text-sm">{error}</p>}
+      <button
+        type="submit"
+        disabled={!stripe || loading}
+        className="btn-primary w-full flex items-center justify-center gap-2 py-3 disabled:opacity-50"
+      >
+        <Lock size={16} />
+        {loading ? 'Traitement...' : `Payer ${formatEur(amount)}`}
+      </button>
+    </form>
+  );
+}
+
 export default function CheckoutPage() {
   const navigate = useNavigate();
-  const { cart, getSessionId, getReferralCode, clearCart } = useCart();
+  const { cart, getSessionId, getReferralCode, clearCart, mergeCartOnLogin } = useCart();
+  const { user, login, setUserData } = useAuth();
+  const [step, setStep] = useState(1);
+  const [identMode, setIdentMode] = useState('guest'); // guest | login | register
   const [form, setForm] = useState({
     name: '', email: '', phone: '', address: '', city: '', postal_code: '',
   });
+  const [loginForm, setLoginForm] = useState({ email: '', password: '' });
+  const [registerForm, setRegisterForm] = useState({ name: '', email: '', password: '', phone: '', age_verified: false, cgv_accepted: false });
   const [errors, setErrors] = useState({});
+  const [authError, setAuthError] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [orderError, setOrderError] = useState('');
   const [shipping, setShipping] = useState(null);
   const [shippingLoading, setShippingLoading] = useState(false);
   const [shippingError, setShippingError] = useState('');
+  const [orderData, setOrderData] = useState(null); // { order_id, ref, total_ttc, client_secret }
+  const [stripeObj, setStripeObj] = useState(null);
+
+  // Load Stripe
+  useEffect(() => {
+    getStripePromise().then(setStripeObj);
+  }, []);
+
+  // Pre-fill from logged-in user
+  useEffect(() => {
+    if (user) {
+      setForm((prev) => ({
+        ...prev,
+        name: prev.name || user.name || '',
+        email: prev.email || user.email || '',
+      }));
+      setStep(2); // Skip identification if logged in
+    }
+  }, [user]);
 
   // Fetch shipping when postal code is 5 digits
   useEffect(() => {
@@ -34,7 +130,7 @@ export default function CheckoutPage() {
       .catch((err) => {
         setShipping(null);
         if (err.response?.data?.code === 'ZONE_NOT_FOUND') {
-          setShippingError('Livraison non disponible pour votre département — contactez-nous');
+          setShippingError('Livraison non disponible pour votre departement');
         } else {
           setShippingError('Impossible de calculer les frais de livraison');
         }
@@ -44,7 +140,7 @@ export default function CheckoutPage() {
 
   const grandTotalTTC = cart.total_ttc + (shipping?.price_ttc || 0);
 
-  if (cart.items.length === 0) {
+  if (cart.items.length === 0 && !orderData) {
     return (
       <div className="max-w-3xl mx-auto px-4 py-20 text-center">
         <ShoppingCart size={64} className="mx-auto text-gray-300 mb-4" />
@@ -56,10 +152,64 @@ export default function CheckoutPage() {
     );
   }
 
-  const validate = () => {
+  const inputClass = (field) =>
+    `w-full border rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-wine-200 focus:border-wine-500 ${errors[field] ? 'border-red-300' : ''}`;
+
+  // Step 1: Identification
+  const handleLogin = async (e) => {
+    e.preventDefault();
+    setAuthError('');
+    setSubmitting(true);
+    try {
+      const u = await login(loginForm.email, loginForm.password);
+      setForm((prev) => ({ ...prev, name: u.name, email: u.email }));
+      await mergeCartOnLogin();
+      setStep(2);
+    } catch (err) {
+      setAuthError(err.response?.data?.message || 'Identifiants incorrects');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleRegister = async (e) => {
+    e.preventDefault();
+    setAuthError('');
+    const errs = {};
+    if (!registerForm.name || registerForm.name.length < 2) errs.reg_name = 'Nom requis';
+    if (!registerForm.email) errs.reg_email = 'Email requis';
+    if (!registerForm.password || registerForm.password.length < 8) errs.reg_password = '8 caracteres minimum';
+    if (!registerForm.age_verified) errs.reg_age = 'Verification requise';
+    if (!registerForm.cgv_accepted) errs.reg_cgv = 'Acceptation requise';
+    setErrors(errs);
+    if (Object.keys(errs).length) return;
+
+    setSubmitting(true);
+    try {
+      const { data } = await authAPI.registerCustomer(registerForm);
+      setUserData(data.user, data.accessToken);
+      setForm((prev) => ({ ...prev, name: data.user.name, email: data.user.email }));
+      await mergeCartOnLogin();
+      setStep(2);
+    } catch (err) {
+      setAuthError(err.response?.data?.message || 'Erreur lors de l\'inscription');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleGuestContinue = () => {
+    const errs = {};
+    if (!form.name || form.name.length < 2) errs.name = 'Nom requis';
+    if (!form.email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email)) errs.email = 'Email invalide';
+    setErrors(errs);
+    if (Object.keys(errs).length) return;
+    setStep(2);
+  };
+
+  // Step 2: Address validation + create order
+  const validateAddress = () => {
     const e = {};
-    if (!form.name || form.name.length < 2) e.name = 'Nom requis (2 car. min)';
-    if (!form.email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email)) e.email = 'Email invalide';
     if (!form.address || form.address.length < 5) e.address = 'Adresse requise';
     if (!form.city || form.city.length < 2) e.city = 'Ville requise';
     if (!form.postal_code || !/^\d{5}$/.test(form.postal_code)) e.postal_code = 'Code postal (5 chiffres)';
@@ -67,36 +217,18 @@ export default function CheckoutPage() {
     return Object.keys(e).length === 0;
   };
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    if (!validate()) return;
-
+  const handleCreateOrder = async () => {
+    if (!validateAddress()) return;
     setSubmitting(true);
     setOrderError('');
-
     try {
       const res = await boutiqueAPI.checkout({
         session_id: getSessionId(),
         customer: form,
         referral_code: getReferralCode() || undefined,
       });
-
-      // If Stripe is configured, we'd integrate payment here.
-      // For now, auto-confirm (simulates payment success)
-      if (res.data.client_secret) {
-        await boutiqueAPI.confirmCheckout({
-          order_id: res.data.order_id,
-          payment_intent_id: 'pi_demo_' + Date.now(),
-        });
-      } else {
-        await boutiqueAPI.confirmCheckout({
-          order_id: res.data.order_id,
-          payment_intent_id: 'pi_demo_' + Date.now(),
-        });
-      }
-
-      await clearCart();
-      navigate(`/boutique/confirmation/${res.data.ref}`);
+      setOrderData(res.data);
+      setStep(3);
     } catch (err) {
       setOrderError(err.response?.data?.message || 'Erreur lors de la commande');
     } finally {
@@ -104,8 +236,42 @@ export default function CheckoutPage() {
     }
   };
 
-  const inputClass = (field) =>
-    `w-full border rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-wine-200 focus:border-wine-500 ${errors[field] ? 'border-red-300' : ''}`;
+  // Step 3: Payment success
+  const handlePaymentSuccess = async (paymentIntent) => {
+    try {
+      await boutiqueAPI.confirmCheckout({
+        order_id: orderData.order_id,
+        payment_intent_id: paymentIntent.id,
+      });
+      await clearCart();
+      navigate(`/boutique/confirmation/${orderData.ref}`);
+    } catch (err) {
+      setOrderError(err.response?.data?.message || 'Erreur de confirmation');
+    }
+  };
+
+  // If no Stripe, fall back to demo flow
+  const handleDemoPayment = async () => {
+    setSubmitting(true);
+    try {
+      await boutiqueAPI.confirmCheckout({
+        order_id: orderData.order_id,
+        payment_intent_id: 'pi_demo_' + Date.now(),
+      });
+      await clearCart();
+      navigate(`/boutique/confirmation/${orderData.ref}`);
+    } catch (err) {
+      setOrderError(err.response?.data?.message || 'Erreur de confirmation');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const steps = [
+    { num: 1, label: 'Identification', icon: User },
+    { num: 2, label: 'Adresse', icon: MapPin },
+    { num: 3, label: 'Paiement', icon: CreditCard },
+  ];
 
   return (
     <div className="max-w-5xl mx-auto px-4 sm:px-6 py-8">
@@ -113,75 +279,225 @@ export default function CheckoutPage() {
         <ArrowLeft size={16} /> Retour au panier
       </Link>
 
-      <h1 className="text-2xl font-bold text-gray-900 mb-6">Commander</h1>
+      {/* Step indicator */}
+      <div className="flex items-center justify-center gap-2 mb-8">
+        {steps.map((s, i) => (
+          <div key={s.num} className="flex items-center">
+            <div className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-sm font-medium ${
+              step >= s.num ? 'bg-wine-100 text-wine-700' : 'bg-gray-100 text-gray-400'
+            }`}>
+              {step > s.num ? <Check size={14} /> : <s.icon size={14} />}
+              <span className="hidden sm:inline">{s.label}</span>
+            </div>
+            {i < steps.length - 1 && <div className={`w-8 h-0.5 mx-1 ${step > s.num ? 'bg-wine-300' : 'bg-gray-200'}`} />}
+          </div>
+        ))}
+      </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-5 gap-8">
-        {/* Form */}
-        <form onSubmit={handleSubmit} className="lg:col-span-3 space-y-4">
-          <h2 className="font-semibold text-gray-900">Vos coordonnées</h2>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        {/* Main content */}
+        <div className="lg:col-span-3 space-y-4">
+          {/* ═══ STEP 1: IDENTIFICATION ═══ */}
+          {step === 1 && (
             <div>
-              <label className="block text-xs font-medium text-gray-500 mb-1">Nom complet *</label>
-              <input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} className={inputClass('name')} />
-              {errors.name && <p className="text-xs text-red-500 mt-1">{errors.name}</p>}
+              <h2 className="font-semibold text-gray-900 mb-4">Identification</h2>
+
+              {/* Mode tabs */}
+              <div className="flex gap-2 mb-6">
+                {[
+                  { id: 'login', label: 'Se connecter', icon: LogIn },
+                  { id: 'register', label: 'Creer un compte', icon: UserPlus },
+                  { id: 'guest', label: 'Invite', icon: UserX },
+                ].map((m) => (
+                  <button
+                    key={m.id}
+                    onClick={() => { setIdentMode(m.id); setErrors({}); setAuthError(''); }}
+                    className={`flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-lg text-sm font-medium transition-colors ${
+                      identMode === m.id ? 'bg-wine-100 text-wine-700 ring-1 ring-wine-300' : 'bg-gray-50 text-gray-500 hover:bg-gray-100'
+                    }`}
+                  >
+                    <m.icon size={14} />
+                    {m.label}
+                  </button>
+                ))}
+              </div>
+
+              {authError && <div className="bg-red-50 text-red-700 text-sm p-3 rounded-lg mb-4">{authError}</div>}
+
+              {identMode === 'login' && (
+                <form onSubmit={handleLogin} className="space-y-4">
+                  <div>
+                    <label className="block text-xs font-medium text-gray-500 mb-1">Email</label>
+                    <input type="email" value={loginForm.email} onChange={(e) => setLoginForm({ ...loginForm, email: e.target.value })} className={inputClass()} />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-gray-500 mb-1">Mot de passe</label>
+                    <input type="password" value={loginForm.password} onChange={(e) => setLoginForm({ ...loginForm, password: e.target.value })} className={inputClass()} />
+                  </div>
+                  <button type="submit" disabled={submitting} className="btn-primary w-full py-2.5 disabled:opacity-50">
+                    {submitting ? 'Connexion...' : 'Se connecter'}
+                  </button>
+                </form>
+              )}
+
+              {identMode === 'register' && (
+                <form onSubmit={handleRegister} className="space-y-4">
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-xs font-medium text-gray-500 mb-1">Nom *</label>
+                      <input value={registerForm.name} onChange={(e) => setRegisterForm({ ...registerForm, name: e.target.value })} className={inputClass('reg_name')} />
+                      {errors.reg_name && <p className="text-xs text-red-500 mt-1">{errors.reg_name}</p>}
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-gray-500 mb-1">Email *</label>
+                      <input type="email" value={registerForm.email} onChange={(e) => setRegisterForm({ ...registerForm, email: e.target.value })} className={inputClass('reg_email')} />
+                      {errors.reg_email && <p className="text-xs text-red-500 mt-1">{errors.reg_email}</p>}
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-xs font-medium text-gray-500 mb-1">Mot de passe *</label>
+                      <input type="password" value={registerForm.password} onChange={(e) => setRegisterForm({ ...registerForm, password: e.target.value })} className={inputClass('reg_password')} />
+                      {errors.reg_password && <p className="text-xs text-red-500 mt-1">{errors.reg_password}</p>}
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-gray-500 mb-1">Telephone</label>
+                      <input value={registerForm.phone} onChange={(e) => setRegisterForm({ ...registerForm, phone: e.target.value })} className={inputClass()} />
+                    </div>
+                  </div>
+                  <div className="space-y-2">
+                    <label className="flex items-center gap-2 text-sm">
+                      <input type="checkbox" checked={registerForm.age_verified} onChange={(e) => setRegisterForm({ ...registerForm, age_verified: e.target.checked })} className="rounded" />
+                      Je certifie avoir plus de 18 ans *
+                    </label>
+                    {errors.reg_age && <p className="text-xs text-red-500">{errors.reg_age}</p>}
+                    <label className="flex items-center gap-2 text-sm">
+                      <input type="checkbox" checked={registerForm.cgv_accepted} onChange={(e) => setRegisterForm({ ...registerForm, cgv_accepted: e.target.checked })} className="rounded" />
+                      J'accepte les CGV *
+                    </label>
+                    {errors.reg_cgv && <p className="text-xs text-red-500">{errors.reg_cgv}</p>}
+                  </div>
+                  <button type="submit" disabled={submitting} className="btn-primary w-full py-2.5 disabled:opacity-50">
+                    {submitting ? 'Inscription...' : 'Creer mon compte'}
+                  </button>
+                </form>
+              )}
+
+              {identMode === 'guest' && (
+                <div className="space-y-4">
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-xs font-medium text-gray-500 mb-1">Nom *</label>
+                      <input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} className={inputClass('name')} />
+                      {errors.name && <p className="text-xs text-red-500 mt-1">{errors.name}</p>}
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-gray-500 mb-1">Email *</label>
+                      <input type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} className={inputClass('email')} />
+                      {errors.email && <p className="text-xs text-red-500 mt-1">{errors.email}</p>}
+                    </div>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-gray-500 mb-1">Telephone</label>
+                    <input value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} className={inputClass()} />
+                  </div>
+                  <button onClick={handleGuestContinue} className="btn-primary w-full py-2.5">
+                    Continuer
+                  </button>
+                </div>
+              )}
             </div>
-            <div>
-              <label className="block text-xs font-medium text-gray-500 mb-1">Email *</label>
-              <input type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} className={inputClass('email')} />
-              {errors.email && <p className="text-xs text-red-500 mt-1">{errors.email}</p>}
-            </div>
-          </div>
-
-          <div>
-            <label className="block text-xs font-medium text-gray-500 mb-1">Téléphone</label>
-            <input value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} className={inputClass('phone')} />
-          </div>
-
-          <h2 className="font-semibold text-gray-900 pt-2">Adresse de livraison</h2>
-
-          <div>
-            <label className="block text-xs font-medium text-gray-500 mb-1">Adresse *</label>
-            <input value={form.address} onChange={(e) => setForm({ ...form, address: e.target.value })} className={inputClass('address')} />
-            {errors.address && <p className="text-xs text-red-500 mt-1">{errors.address}</p>}
-          </div>
-
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-xs font-medium text-gray-500 mb-1">Ville *</label>
-              <input value={form.city} onChange={(e) => setForm({ ...form, city: e.target.value })} className={inputClass('city')} />
-              {errors.city && <p className="text-xs text-red-500 mt-1">{errors.city}</p>}
-            </div>
-            <div>
-              <label className="block text-xs font-medium text-gray-500 mb-1">Code postal *</label>
-              <input value={form.postal_code} onChange={(e) => setForm({ ...form, postal_code: e.target.value })} className={inputClass('postal_code')} maxLength={5} />
-              {errors.postal_code && <p className="text-xs text-red-500 mt-1">{errors.postal_code}</p>}
-            </div>
-          </div>
-
-          {orderError && (
-            <div className="bg-red-50 text-red-700 text-sm p-3 rounded-lg">{orderError}</div>
           )}
 
-          <div className="pt-2">
-            <p className="text-xs text-gray-500 mb-3">
-              En passant commande, vous acceptez nos <Link to="/boutique/cgv" className="text-wine-700 hover:underline">CGV</Link> et notre politique de confidentialité.
-            </p>
-            <button
-              type="submit"
-              disabled={submitting || !!shippingError}
-              className="btn-primary w-full flex items-center justify-center gap-2 py-3 disabled:opacity-50"
-            >
-              <Lock size={16} />
-              {submitting ? 'Traitement...' : `Payer ${formatEur(grandTotalTTC)}`}
-            </button>
-          </div>
-        </form>
+          {/* ═══ STEP 2: ADDRESS ═══ */}
+          {step === 2 && (
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <h2 className="font-semibold text-gray-900">Adresse de livraison</h2>
+                <button onClick={() => setStep(1)} className="text-sm text-wine-700 hover:underline">Modifier identification</button>
+              </div>
 
-        {/* Recap */}
+              <div className="bg-gray-50 rounded-lg p-3 text-sm text-gray-600">
+                <User size={14} className="inline mr-1" /> {form.name} ({form.email})
+              </div>
+
+              <div>
+                <label className="block text-xs font-medium text-gray-500 mb-1">Adresse *</label>
+                <input value={form.address} onChange={(e) => setForm({ ...form, address: e.target.value })} className={inputClass('address')} />
+                {errors.address && <p className="text-xs text-red-500 mt-1">{errors.address}</p>}
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-medium text-gray-500 mb-1">Ville *</label>
+                  <input value={form.city} onChange={(e) => setForm({ ...form, city: e.target.value })} className={inputClass('city')} />
+                  {errors.city && <p className="text-xs text-red-500 mt-1">{errors.city}</p>}
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-500 mb-1">Code postal *</label>
+                  <input value={form.postal_code} onChange={(e) => setForm({ ...form, postal_code: e.target.value })} className={inputClass('postal_code')} maxLength={5} />
+                  {errors.postal_code && <p className="text-xs text-red-500 mt-1">{errors.postal_code}</p>}
+                </div>
+              </div>
+
+              {orderError && <div className="bg-red-50 text-red-700 text-sm p-3 rounded-lg">{orderError}</div>}
+
+              <button
+                onClick={handleCreateOrder}
+                disabled={submitting || !!shippingError}
+                className="btn-primary w-full flex items-center justify-center gap-2 py-3 disabled:opacity-50"
+              >
+                {submitting ? <Loader2 size={16} className="animate-spin" /> : <CreditCard size={16} />}
+                {submitting ? 'Creation de la commande...' : 'Passer au paiement'}
+              </button>
+            </div>
+          )}
+
+          {/* ═══ STEP 3: PAYMENT ═══ */}
+          {step === 3 && orderData && (
+            <div className="space-y-4">
+              <h2 className="font-semibold text-gray-900">Paiement</h2>
+
+              <div className="bg-green-50 rounded-lg p-3 text-sm text-green-700">
+                Commande {orderData.ref} creee. Finalisez le paiement ci-dessous.
+              </div>
+
+              {orderError && <div className="bg-red-50 text-red-700 text-sm p-3 rounded-lg">{orderError}</div>}
+
+              {stripeObj && orderData.client_secret ? (
+                <Elements stripe={stripeObj} options={{ clientSecret: orderData.client_secret }}>
+                  <InlinePaymentForm
+                    clientSecret={orderData.client_secret}
+                    amount={orderData.total_ttc}
+                    onSuccess={handlePaymentSuccess}
+                    onError={(msg) => setOrderError(msg)}
+                  />
+                </Elements>
+              ) : (
+                <div className="space-y-3">
+                  <p className="text-sm text-gray-500">Stripe non configure. Paiement en mode demo.</p>
+                  <button
+                    onClick={handleDemoPayment}
+                    disabled={submitting}
+                    className="btn-primary w-full flex items-center justify-center gap-2 py-3 disabled:opacity-50"
+                  >
+                    <Lock size={16} />
+                    {submitting ? 'Confirmation...' : `Confirmer ${formatEur(orderData.total_ttc)}`}
+                  </button>
+                </div>
+              )}
+
+              <p className="text-xs text-gray-400 text-center">
+                Paiement securise. Carte de test : 4242 4242 4242 4242
+              </p>
+            </div>
+          )}
+        </div>
+
+        {/* Recap sidebar */}
         <div className="lg:col-span-2">
           <div className="sticky top-24 bg-gray-50 rounded-xl p-5 space-y-3">
-            <h3 className="font-semibold text-gray-900">Récapitulatif</h3>
+            <h3 className="font-semibold text-gray-900">Recapitulatif</h3>
             <div className="divide-y">
               {cart.items.map((item) => (
                 <div key={item.product_id} className="flex justify-between py-2 text-sm">
@@ -194,13 +510,11 @@ export default function CheckoutPage() {
               ))}
             </div>
 
-            {/* Sous-total produits */}
             <div className="border-t pt-3 flex justify-between text-sm">
-              <span className="text-gray-600">Sous-total produits</span>
+              <span className="text-gray-600">Sous-total</span>
               <span className="font-medium">{formatEur(cart.total_ttc)}</span>
             </div>
 
-            {/* Shipping */}
             <div className="flex justify-between text-sm">
               <span className="text-gray-600 flex items-center gap-1">
                 <Truck size={14} /> Livraison
@@ -218,11 +532,10 @@ export default function CheckoutPage() {
               )}
             </div>
 
-            {/* Shipping breakdown */}
             {shipping && shipping.surcharges && (
               <div className="bg-white rounded-lg p-3 text-xs text-gray-500 space-y-1">
                 <div className="flex justify-between">
-                  <span>{shipping.zone_name} ({shipping.pricing_type === 'forfait' ? 'forfait' : 'par colis'})</span>
+                  <span>{shipping.zone_name}</span>
                   <span>{formatEur(shipping.breakdown.base_price)}</span>
                 </div>
                 {shipping.surcharges.map((s, i) => (
@@ -231,18 +544,9 @@ export default function CheckoutPage() {
                     <span>+{formatEur(s.amount)}</span>
                   </div>
                 ))}
-                <div className="flex justify-between font-medium text-gray-700 pt-1 border-t">
-                  <span>Transport HT</span>
-                  <span>{formatEur(shipping.price_ht)}</span>
-                </div>
-                <div className="flex justify-between text-gray-400">
-                  <span>TVA 20%</span>
-                  <span>{formatEur(shipping.price_ttc - shipping.price_ht)}</span>
-                </div>
               </div>
             )}
 
-            {/* Grand total */}
             <div className="border-t pt-3 flex justify-between font-bold text-lg">
               <span>Total TTC</span>
               <span className="text-wine-700">{formatEur(grandTotalTTC)}</span>

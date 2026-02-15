@@ -100,6 +100,83 @@ router.post(
   }
 );
 
+// GET /api/v1/orders/my — Unified order listing per role (MUST be before /:id)
+router.get(
+  '/my',
+  authenticate,
+  async (req, res) => {
+    try {
+      const { status, page = 1, limit = 20 } = req.query;
+      const offset = (parseInt(page) - 1) * parseInt(limit);
+      const role = req.user.role;
+
+      // Base query builder
+      let query = db('orders')
+        .leftJoin('contacts', 'orders.customer_id', 'contacts.id');
+
+      // Role-based filtering
+      if (role === 'etudiant') {
+        query = query.where('orders.user_id', req.user.userId);
+      } else if (role === 'cse') {
+        query = query.where('orders.user_id', req.user.userId);
+      } else if (role === 'ambassadeur') {
+        query = query.where(function () {
+          this.where('orders.user_id', req.user.userId)
+            .orWhere('orders.referred_by', req.user.userId);
+        });
+      } else if (role === 'customer') {
+        query = query.where('contacts.email', req.user.email);
+      } else if (role === 'enseignant') {
+        // Teacher: orders in my campaigns only
+        const myCampaigns = await db('participations')
+          .where({ user_id: req.user.userId })
+          .select('campaign_id');
+        const campaignIds = myCampaigns.map((p) => p.campaign_id);
+        if (campaignIds.length === 0) {
+          return res.json({ data: [], total: 0, page: parseInt(page), limit: parseInt(limit) });
+        }
+        query = query.whereIn('orders.campaign_id', campaignIds);
+      } else {
+        return res.status(403).json({ error: 'FORBIDDEN', message: 'Accès non autorisé' });
+      }
+
+      if (status) {
+        query = query.where('orders.status', status);
+      }
+
+      // Count total
+      const [{ count: total }] = await query.clone().clearSelect().clearOrder().count('orders.id as count');
+
+      // Select fields — NO monetary fields for teacher
+      let selectFields;
+      if (role === 'enseignant') {
+        selectFields = [
+          'orders.id', 'orders.ref', 'orders.status', 'orders.total_items',
+          'orders.source', 'orders.created_at', 'orders.updated_at',
+          'contacts.name as customer_name',
+        ];
+      } else {
+        selectFields = [
+          'orders.id', 'orders.ref', 'orders.status', 'orders.total_ht',
+          'orders.total_ttc', 'orders.total_items', 'orders.source',
+          'orders.created_at', 'orders.updated_at',
+          'contacts.name as customer_name',
+        ];
+      }
+
+      const data = await query
+        .select(selectFields)
+        .orderBy('orders.created_at', 'desc')
+        .limit(parseInt(limit))
+        .offset(offset);
+
+      res.json({ data, total: parseInt(total), page: parseInt(page), limit: parseInt(limit) });
+    } catch (err) {
+      res.status(500).json({ error: 'SERVER_ERROR', message: err.message });
+    }
+  }
+);
+
 // GET /api/v1/orders/:id — Détail commande
 router.get('/:id', authenticate, async (req, res) => {
   try {

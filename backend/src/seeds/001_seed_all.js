@@ -106,6 +106,12 @@ exports.seed = async function (knex) {
     { key: 'app_logo_url', value: '' },
     { key: 'app_name', value: 'Vins & Conversations' },
     { key: 'app_primary_color', value: '#722F37' },
+    { key: 'stripe_mode', value: 'test' },
+    { key: 'stripe_test_publishable_key', value: 'pk_test_placeholder' },
+    { key: 'stripe_test_secret_key', value: 'sk_test_placeholder' },
+    { key: 'stripe_live_publishable_key', value: '' },
+    { key: 'stripe_live_secret_key', value: '' },
+    { key: 'stripe_webhook_secret', value: process.env.STRIPE_WEBHOOK_SECRET || 'whsec_placeholder' },
   ]);
 
   const hash = await bcrypt.hash('VinsConv2026!', 12);

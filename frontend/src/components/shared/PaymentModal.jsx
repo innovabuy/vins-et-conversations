@@ -1,11 +1,40 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { loadStripe } from '@stripe/stripe-js';
 import { Elements, CardElement, useStripe, useElements } from '@stripe/react-stripe-js';
 import { X } from 'lucide-react';
+import { appSettingsAPI } from '../../services/api';
 
-const stripePromise = import.meta.env.VITE_STRIPE_PUBLIC_KEY
-  ? loadStripe(import.meta.env.VITE_STRIPE_PUBLIC_KEY)
-  : null;
+// Dynamic Stripe key loading from DB
+let stripePromiseCache = null;
+
+function getStripePromise() {
+  if (stripePromiseCache) return stripePromiseCache;
+
+  stripePromiseCache = appSettingsAPI.stripePublicKey()
+    .then((res) => {
+      const key = res.data.publishable_key;
+      if (key && !key.includes('placeholder') && key.length > 10) {
+        return loadStripe(key);
+      }
+      // Fallback to env var
+      const envKey = import.meta.env.VITE_STRIPE_PUBLIC_KEY;
+      if (envKey) return loadStripe(envKey);
+      return null;
+    })
+    .catch(() => {
+      // Fallback to env var on error
+      const envKey = import.meta.env.VITE_STRIPE_PUBLIC_KEY;
+      if (envKey) return loadStripe(envKey);
+      return null;
+    });
+
+  return stripePromiseCache;
+}
+
+// Reset cache when admin updates keys
+export function resetStripePromise() {
+  stripePromiseCache = null;
+}
 
 function CheckoutForm({ clientSecret, onSuccess, onError }) {
   const stripe = useStripe();
@@ -60,7 +89,20 @@ function CheckoutForm({ clientSecret, onSuccess, onError }) {
   );
 }
 
+export { getStripePromise };
+
 export default function PaymentModal({ isOpen, onClose, clientSecret, amount, onSuccess, onError }) {
+  const [stripeInstance, setStripeInstance] = useState(null);
+  const [stripeLoading, setStripeLoading] = useState(true);
+
+  useEffect(() => {
+    if (isOpen) {
+      getStripePromise()
+        .then((s) => setStripeInstance(s))
+        .finally(() => setStripeLoading(false));
+    }
+  }, [isOpen]);
+
   if (!isOpen) return null;
 
   return (
@@ -79,8 +121,10 @@ export default function PaymentModal({ isOpen, onClose, clientSecret, amount, on
           </p>
         )}
 
-        {stripePromise && clientSecret ? (
-          <Elements stripe={stripePromise} options={{ clientSecret }}>
+        {stripeLoading ? (
+          <p className="text-gray-500 text-sm">Chargement...</p>
+        ) : stripeInstance && clientSecret ? (
+          <Elements stripe={stripeInstance} options={{ clientSecret }}>
             <CheckoutForm
               clientSecret={clientSecret}
               onSuccess={(pi) => { onSuccess?.(pi); onClose(); }}
@@ -89,7 +133,7 @@ export default function PaymentModal({ isOpen, onClose, clientSecret, amount, on
           </Elements>
         ) : (
           <p className="text-gray-500 text-sm">
-            Stripe non configuré. Contactez l'administrateur.
+            Stripe non configure. Contactez l'administrateur.
           </p>
         )}
       </div>

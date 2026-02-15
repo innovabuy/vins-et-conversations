@@ -80,6 +80,13 @@ export function CartProvider({ children }) {
     return updateCart([]);
   }, [updateCart]);
 
+  const mergeCartOnLogin = useCallback(async () => {
+    // After login, re-sync local cart items to server
+    if (cart.items.length > 0) {
+      await updateCart(cart.items.map((i) => ({ product_id: i.product_id, qty: i.qty })));
+    }
+  }, [cart.items, updateCart]);
+
   return (
     <CartContext.Provider value={{
       cart,
@@ -90,6 +97,7 @@ export function CartProvider({ children }) {
       clearCart,
       getSessionId,
       getReferralCode,
+      mergeCartOnLogin,
     }}>
       {children}
     </CartContext.Provider>

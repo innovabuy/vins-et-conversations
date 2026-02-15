@@ -3,19 +3,51 @@ const db = require('../config/database');
 const { authenticate, requireRole } = require('../middleware/auth');
 const { auditAction } = require('../middleware/audit');
 const { invalidateCache } = require('../middleware/cache');
+const logger = require('../utils/logger');
 
 const router = express.Router();
 const publicRouter = express.Router();
+
+const SECRET_KEYS = ['stripe_test_secret_key', 'stripe_live_secret_key', 'stripe_webhook_secret'];
+
+function maskSecret(value) {
+  if (!value || value.length <= 8) return '****';
+  return '****' + value.slice(-8);
+}
 
 // ─── Admin: GET /api/v1/admin/settings ───────────────
 router.get('/', authenticate, requireRole('super_admin'), async (req, res) => {
   try {
     const settings = await db('app_settings').orderBy('key');
     const result = {};
-    for (const s of settings) result[s.key] = s.value;
+    for (const s of settings) {
+      result[s.key] = SECRET_KEYS.includes(s.key) ? maskSecret(s.value) : s.value;
+    }
     res.json(result);
   } catch (err) {
     res.status(500).json({ error: 'SERVER_ERROR', message: err.message });
+  }
+});
+
+// ─── Admin: GET /api/v1/admin/settings/stripe-test ───
+router.get('/stripe-test', authenticate, requireRole('super_admin'), async (req, res) => {
+  try {
+    const modeRow = await db('app_settings').where({ key: 'stripe_mode' }).first();
+    const mode = modeRow?.value || 'test';
+    const secretKeyName = mode === 'live' ? 'stripe_live_secret_key' : 'stripe_test_secret_key';
+    const secretRow = await db('app_settings').where({ key: secretKeyName }).first();
+    const secretKey = secretRow?.value;
+
+    if (!secretKey || secretKey.includes('placeholder') || secretKey.length < 10) {
+      return res.json({ connected: false, mode, error: 'Clé secrète non configurée' });
+    }
+
+    const stripe = require('stripe')(secretKey);
+    const balance = await stripe.balance.retrieve();
+    res.json({ connected: true, mode, currency: balance.available?.[0]?.currency || 'eur' });
+  } catch (err) {
+    logger.error(`Stripe test connection failed: ${err.message}`);
+    res.json({ connected: false, mode: 'test', error: err.message });
   }
 });
 
@@ -27,10 +59,16 @@ router.put('/', authenticate, requireRole('super_admin'), auditAction('app_setti
       return res.status(400).json({ error: 'INVALID_PAYLOAD' });
     }
 
-    const allowedKeys = ['app_logo_url', 'app_name', 'app_primary_color'];
+    const allowedKeys = [
+      'app_logo_url', 'app_name', 'app_primary_color',
+      'stripe_mode', 'stripe_test_publishable_key', 'stripe_test_secret_key',
+      'stripe_live_publishable_key', 'stripe_live_secret_key', 'stripe_webhook_secret',
+    ];
 
     for (const [key, value] of Object.entries(updates)) {
       if (!allowedKeys.includes(key)) continue;
+      // Don't overwrite secrets with the masked value
+      if (SECRET_KEYS.includes(key) && value.startsWith('****')) continue;
       await db('app_settings')
         .where({ key })
         .update({ value: String(value), updated_at: new Date() });
@@ -38,9 +76,20 @@ router.put('/', authenticate, requireRole('super_admin'), auditAction('app_setti
 
     await invalidateCache('vc:cache:*/settings*');
 
+    // Invalidate cached Stripe instance when keys change
+    const stripeKeys = Object.keys(updates).filter((k) => k.startsWith('stripe_'));
+    if (stripeKeys.length > 0) {
+      try {
+        const { resetStripeCache } = require('../services/stripeService');
+        resetStripeCache();
+      } catch (e) { /* ignore if not yet available */ }
+    }
+
     const settings = await db('app_settings').orderBy('key');
     const result = {};
-    for (const s of settings) result[s.key] = s.value;
+    for (const s of settings) {
+      result[s.key] = SECRET_KEYS.includes(s.key) ? maskSecret(s.value) : s.value;
+    }
     res.json(result);
   } catch (err) {
     res.status(500).json({ error: 'SERVER_ERROR', message: err.message });
@@ -106,6 +155,19 @@ publicRouter.get('/public', async (req, res) => {
     const result = {};
     for (const s of settings) result[s.key] = s.value;
     res.json(result);
+  } catch (err) {
+    res.status(500).json({ error: 'SERVER_ERROR', message: err.message });
+  }
+});
+
+// ─── Public: GET /api/v1/settings/stripe-public-key ──
+publicRouter.get('/stripe-public-key', async (req, res) => {
+  try {
+    const modeRow = await db('app_settings').where({ key: 'stripe_mode' }).first();
+    const mode = modeRow?.value || 'test';
+    const pubKeyName = mode === 'live' ? 'stripe_live_publishable_key' : 'stripe_test_publishable_key';
+    const pubKeyRow = await db('app_settings').where({ key: pubKeyName }).first();
+    res.json({ publishable_key: pubKeyRow?.value || '', mode });
   } catch (err) {
     res.status(500).json({ error: 'SERVER_ERROR', message: err.message });
   }

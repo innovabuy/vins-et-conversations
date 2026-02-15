@@ -38,9 +38,16 @@ export function AuthProvider({ children }) {
   const isTeacher = user?.role === 'enseignant';
   const isCSE = user?.role === 'cse';
   const isAmbassador = user?.role === 'ambassadeur';
+  const isCustomer = user?.role === 'customer';
+
+  const setUserData = useCallback((userData, token) => {
+    localStorage.setItem('accessToken', token);
+    localStorage.setItem('user', JSON.stringify(userData));
+    setUser(userData);
+  }, []);
 
   return (
-    <AuthContext.Provider value={{ user, loading, login, logout, isAdmin, isStudent, isTeacher, isCSE, isAmbassador }}>
+    <AuthContext.Provider value={{ user, loading, login, logout, setUserData, isAdmin, isStudent, isTeacher, isCSE, isAmbassador, isCustomer }}>
       {children}
     </AuthContext.Provider>
   );

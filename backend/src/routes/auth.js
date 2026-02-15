@@ -105,6 +105,69 @@ router.post('/logout', authenticate, async (req, res) => {
   res.json({ message: 'Déconnexion réussie' });
 });
 
+// POST /api/v1/auth/register-customer
+const customerSchema = Joi.object({
+  name: Joi.string().min(2).max(100).required(),
+  email: Joi.string().email().required(),
+  password: Joi.string().min(8).required(),
+  phone: Joi.string().allow('', null).optional(),
+  age_verified: Joi.boolean().valid(true).required().messages({
+    'any.only': 'La vérification de l\'âge est obligatoire',
+  }),
+  cgv_accepted: Joi.boolean().valid(true).required().messages({
+    'any.only': 'L\'acceptation des CGV est obligatoire',
+  }),
+});
+
+router.post('/register-customer', validate(customerSchema), async (req, res) => {
+  try {
+    const { name, email, password, phone } = req.body;
+
+    // Check email uniqueness
+    const existing = await db('users').where({ email: email.toLowerCase().trim() }).first();
+    if (existing) {
+      return res.status(409).json({ error: 'EMAIL_EXISTS', message: 'Cet email est déjà utilisé' });
+    }
+
+    const passwordHash = await bcrypt.hash(password, 12);
+    const userId = crypto.randomUUID ? crypto.randomUUID() : require('uuid').v4();
+
+    await db('users').insert({
+      id: userId,
+      email: email.toLowerCase().trim(),
+      password_hash: passwordHash,
+      name,
+      role: 'customer',
+      status: 'active',
+    });
+
+    // Upsert contact for this customer
+    try {
+      const boutiqueOrderService = require('../services/boutiqueOrderService');
+      await boutiqueOrderService.upsertContact({
+        name,
+        email: email.toLowerCase().trim(),
+        phone: phone || null,
+      });
+    } catch (e) {
+      logger.warn(`Customer contact upsert failed: ${e.message}`);
+    }
+
+    // Auto-login
+    const result = await authService.login(email.toLowerCase().trim(), password);
+    res.cookie('refreshToken', result.refreshToken, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'strict',
+      maxAge: 7 * 24 * 60 * 60 * 1000,
+    });
+    res.status(201).json({ accessToken: result.accessToken, user: result.user });
+  } catch (err) {
+    logger.error(`Customer registration error: ${err.message}`);
+    res.status(500).json({ error: 'SERVER_ERROR' });
+  }
+});
+
 // POST /api/v1/auth/forgot-password
 const forgotSchema = Joi.object({
   email: Joi.string().email().required(),
@@ -182,6 +245,25 @@ router.post('/reset-password', validate(resetSchema), async (req, res) => {
     res.json({ message: 'Mot de passe réinitialisé avec succès' });
   } catch (err) {
     logger.error(`Reset password error: ${err.message}`);
+    res.status(500).json({ error: 'SERVER_ERROR' });
+  }
+});
+
+// PUT /auth/profile — update own name/phone
+router.put('/profile', authenticate, async (req, res) => {
+  try {
+    const { name, phone } = req.body;
+    const updates = {};
+    if (name) updates.name = name.trim();
+    if (phone !== undefined) updates.phone = phone.trim() || null;
+    if (Object.keys(updates).length === 0) {
+      return res.status(400).json({ error: 'NO_FIELDS' });
+    }
+    await db('users').where({ id: req.user.userId }).update(updates);
+    const user = await db('users').where({ id: req.user.userId }).first();
+    res.json({ id: user.id, name: user.name, email: user.email, phone: user.phone, role: user.role });
+  } catch (err) {
+    logger.error(`Profile update error: ${err.message}`);
     res.status(500).json({ error: 'SERVER_ERROR' });
   }
 });

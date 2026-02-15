@@ -41,7 +41,9 @@ api.interceptors.response.use(
 export const authAPI = {
   login: (email, password) => api.post('/auth/login', { email, password }),
   register: (data) => api.post('/auth/register', data),
+  registerCustomer: (data) => api.post('/auth/register-customer', data),
   logout: () => api.post('/auth/logout'),
+  updateProfile: (data) => api.put('/auth/profile', data),
 };
 
 // ─── Dashboard ────────────────────────────────────────
@@ -78,6 +80,7 @@ export const ordersAPI = {
   pdf: (id) => `${api.defaults.baseURL}/orders/${id}/pdf`,
   sendEmail: (id) => api.post(`/orders/${id}/send-email`),
   myCustomers: () => api.get('/orders/my-customers'),
+  my: (params) => api.get('/orders/my', { params }),
 };
 
 // ─── Campaigns ────────────────────────────────────────
@@ -290,6 +293,8 @@ export const appSettingsAPI = {
   getPublic: () => api.get('/settings/public'),
   getAdmin: () => api.get('/admin/settings'),
   update: (data) => api.put('/admin/settings', data),
+  stripeTest: () => api.get('/admin/settings/stripe-test'),
+  stripePublicKey: () => api.get('/settings/stripe-public-key'),
 };
 
 // ─── Organizations ────────────────────────────────

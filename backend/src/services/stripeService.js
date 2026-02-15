@@ -1,9 +1,69 @@
 const db = require('../config/database');
 const logger = require('../utils/logger');
 
-const stripe = process.env.STRIPE_SECRET_KEY
-  ? require('stripe')(process.env.STRIPE_SECRET_KEY)
-  : null;
+let cachedStripe = null;
+let cachedMode = null;
+
+/**
+ * Get or create Stripe instance from DB settings (with env fallback)
+ */
+async function getStripe() {
+  // In test environment, use env var directly
+  if (process.env.NODE_ENV === 'test' || process.env.JEST_WORKER_ID) {
+    if (process.env.STRIPE_SECRET_KEY && !process.env.STRIPE_SECRET_KEY.includes('placeholder')) {
+      return require('stripe')(process.env.STRIPE_SECRET_KEY);
+    }
+    return null;
+  }
+
+  try {
+    const modeRow = await db('app_settings').where({ key: 'stripe_mode' }).first();
+    const mode = modeRow?.value || 'test';
+
+    // Return cached if mode hasn't changed
+    if (cachedStripe && cachedMode === mode) return cachedStripe;
+
+    const secretKeyName = mode === 'live' ? 'stripe_live_secret_key' : 'stripe_test_secret_key';
+    const secretRow = await db('app_settings').where({ key: secretKeyName }).first();
+    const secretKey = secretRow?.value;
+
+    if (secretKey && !secretKey.includes('placeholder') && secretKey.length >= 10) {
+      cachedStripe = require('stripe')(secretKey);
+      cachedMode = mode;
+      return cachedStripe;
+    }
+  } catch (e) {
+    logger.warn(`Failed to load Stripe from DB: ${e.message}`);
+  }
+
+  // Fallback to env var
+  if (process.env.STRIPE_SECRET_KEY && !process.env.STRIPE_SECRET_KEY.includes('placeholder')) {
+    cachedStripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
+    cachedMode = 'env';
+    return cachedStripe;
+  }
+
+  return null;
+}
+
+/**
+ * Reset cached Stripe instance (called when admin updates keys)
+ */
+function resetStripeCache() {
+  cachedStripe = null;
+  cachedMode = null;
+}
+
+/**
+ * Get webhook secret from DB, fallback to env
+ */
+async function getWebhookSecret() {
+  try {
+    const row = await db('app_settings').where({ key: 'stripe_webhook_secret' }).first();
+    if (row?.value && row.value !== 'whsec_placeholder') return row.value;
+  } catch (e) { /* ignore */ }
+  return process.env.STRIPE_WEBHOOK_SECRET || null;
+}
 
 /**
  * Create a Stripe PaymentIntent for an order
@@ -12,6 +72,7 @@ async function createPaymentIntent(orderId) {
   const order = await db('orders').where({ id: orderId }).first();
   if (!order) throw new Error('ORDER_NOT_FOUND');
 
+  const stripe = await getStripe();
   if (!stripe) throw new Error('STRIPE_NOT_CONFIGURED');
 
   const amountCents = Math.round(parseFloat(order.total_ttc) * 100);
@@ -53,9 +114,10 @@ async function createPaymentIntent(orderId) {
 async function handleWebhook(rawBody, signature) {
   let event;
 
-  // Verify signature if a real webhook secret is configured
-  const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
+  const stripe = await getStripe();
+  const webhookSecret = await getWebhookSecret();
   const hasRealSecret = webhookSecret && webhookSecret !== 'whsec_placeholder' && stripe;
+
   if (hasRealSecret) {
     try {
       event = stripe.webhooks.constructEvent(rawBody, signature, webhookSecret);
@@ -171,4 +233,4 @@ async function handleWebhook(rawBody, signature) {
   return { received: true };
 }
 
-module.exports = { createPaymentIntent, handleWebhook };
+module.exports = { getStripe, resetStripeCache, createPaymentIntent, handleWebhook };

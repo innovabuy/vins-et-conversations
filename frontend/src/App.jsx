@@ -49,6 +49,7 @@ import OrderTrackingPage from './components/public/OrderTrackingPage';
 import CGVPage from './components/public/CGVPage';
 import MentionsLegalesPage from './components/public/MentionsLegalesPage';
 import { CartProvider } from './contexts/CartContext';
+import CustomerDashboard from './components/customer/CustomerDashboard';
 import { AppSettingsProvider } from './contexts/AppSettingsContext';
 
 function ProtectedRoute({ children, roles }) {
@@ -155,6 +156,13 @@ function AppRoutes() {
         </ProtectedRoute>
       } />
 
+      {/* Customer route */}
+      <Route path="/mon-compte" element={
+        <ProtectedRoute roles={['customer']}>
+          <CustomerDashboard />
+        </ProtectedRoute>
+      } />
+
       {/* Redirects */}
       <Route path="/" element={
         user ? <Navigate to={
@@ -163,6 +171,7 @@ function AppRoutes() {
           user.role === 'ambassadeur' ? '/ambassador' :
           user.role === 'enseignant' ? '/teacher' :
           user.role === 'etudiant' ? '/student' :
+          user.role === 'customer' ? '/mon-compte' :
           '/login'
         } replace /> : <Navigate to="/login" replace />
       } />
