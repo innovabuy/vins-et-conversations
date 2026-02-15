@@ -15,7 +15,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,600;0,700;1,400&family=Jost:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="assets/css/style.css?v=2">
+  <link rel="stylesheet" href="assets/css/style.css?v=3">
   <link rel="icon" href="assets/images/logo-vc.jpeg" type="image/jpeg">
 </head>
 <body>
@@ -63,7 +63,6 @@
           <button class="filter-cat-btn active" data-cat="">Tous</button>
         </div>
         <div class="filter-bar">
-          <div class="filter-colors" id="filter-colors"></div>
           <div class="filter-search">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg>
             <input type="text" id="search-input" placeholder="Rechercher un vin...">
@@ -148,7 +147,7 @@
     /* ─── Catalogue Logic ──────────────────────── */
     let currentPage = 1;
     const perPage = 12;
-    let currentFilters = { category: '', color: '', search: '' };
+    let currentFilters = { category: '', search: '' };
     let totalProducts = 0;
     let filtersData = null;
 
@@ -191,29 +190,6 @@
           loadProducts();
         });
 
-        // Color chips
-        const colorContainer = document.getElementById('filter-colors');
-        const colorLabels = { blanc: 'Blanc', rouge: 'Rouge', 'rosé': 'Rosé', effervescent: 'Effervescent', sans_alcool: 'Sans alcool' };
-        const colorHex = { blanc: '#E8D5A3', rouge: '#722F37', 'rosé': '#E8A0B0', effervescent: '#59a9d4', sans_alcool: '#059669' };
-        (filtersData.colors || []).forEach(color => {
-          const chip = document.createElement('button');
-          chip.className = 'color-chip';
-          chip.dataset.color = color;
-          chip.innerHTML = `<span class="color-dot" style="background:${colorHex[color] || '#999'}"></span>${colorLabels[color] || color}`;
-          chip.addEventListener('click', () => {
-            if (chip.classList.contains('active')) {
-              chip.classList.remove('active');
-              currentFilters.color = '';
-            } else {
-              document.querySelectorAll('.color-chip').forEach(c => c.classList.remove('active'));
-              chip.classList.add('active');
-              currentFilters.color = color;
-            }
-            currentPage = 1;
-            loadProducts();
-          });
-          colorContainer.appendChild(chip);
-        });
       } catch (err) {
         console.warn('Failed to load filters', err);
       }
@@ -238,7 +214,6 @@
 
       const params = new URLSearchParams({ page: currentPage, limit: perPage });
       if (currentFilters.category) params.set('category', currentFilters.category);
-      if (currentFilters.color) params.set('color', currentFilters.color);
       if (currentFilters.search) params.set('search', currentFilters.search);
 
       try {
@@ -300,11 +275,10 @@
     });
 
     function resetFilters() {
-      currentFilters = { category: '', color: '', search: '' };
+      currentFilters = { category: '', search: '' };
       currentPage = 1;
       document.querySelectorAll('.filter-cat-btn').forEach(b => b.classList.remove('active'));
       document.querySelector('.filter-cat-btn[data-cat=""]').classList.add('active');
-      document.querySelectorAll('.color-chip').forEach(c => c.classList.remove('active'));
       document.getElementById('search-input').value = '';
       loadProducts();
     }
@@ -315,9 +289,7 @@
     }
 
     function getProductImage(p) {
-      if (p.image_url) return p.image_url;
-      const slug = (p.name||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'');
-      return 'assets/images/produits/' + slug + '.jpg';
+      return p.image_url || '';
     }
 
     function escapeHtml(t) { const d = document.createElement('div'); d.textContent = t || ''; return d.innerHTML; }
