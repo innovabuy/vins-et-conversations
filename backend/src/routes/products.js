@@ -1,10 +1,32 @@
 const express = require('express');
 const Joi = require('joi');
+const path = require('path');
+const multer = require('multer');
 const db = require('../config/database');
 const { authenticate, requireRole, requireCampaignAccess } = require('../middleware/auth');
 const { validate } = require('../middleware/validate');
 const { auditAction } = require('../middleware/audit');
 const { cacheMiddleware } = require('../middleware/cache');
+
+// Multer config for product images
+const storage = multer.diskStorage({
+  destination: path.join(__dirname, '../../uploads/products'),
+  filename: (req, file, cb) => {
+    const ext = path.extname(file.originalname).toLowerCase() || '.jpg';
+    const slug = Date.now() + '-' + Math.round(Math.random() * 1e6);
+    cb(null, slug + ext);
+  },
+});
+const upload = multer({
+  storage,
+  limits: { fileSize: 5 * 1024 * 1024 }, // 5 MB
+  fileFilter: (req, file, cb) => {
+    const allowed = ['.jpg', '.jpeg', '.png', '.webp'];
+    const ext = path.extname(file.originalname).toLowerCase();
+    if (allowed.includes(ext)) return cb(null, true);
+    cb(new Error('Format non supporté. Utilisez JPG, PNG ou WebP.'));
+  },
+});
 
 const router = express.Router();
 const adminRouter = express.Router();
@@ -19,7 +41,7 @@ const productSchema = Joi.object({
   category: Joi.string().max(100).allow(null, ''),
   category_id: Joi.string().uuid().allow(null),
   label: Joi.string().max(100).allow(null, ''),
-  image_url: Joi.string().uri().allow(null, ''),
+  image_url: Joi.string().max(500).allow(null, ''),
   description: Joi.string().allow(null, ''),
   active: Joi.boolean().default(true),
   visible_boutique: Joi.boolean().default(false),
@@ -345,6 +367,38 @@ adminRouter.put(
         .returning('*');
       if (!product) return res.status(404).json({ error: 'NOT_FOUND' });
       res.json(product);
+    } catch (err) {
+      res.status(500).json({ error: 'SERVER_ERROR' });
+    }
+  }
+);
+
+// POST /api/v1/admin/products/:id/image — Upload image produit
+adminRouter.post(
+  '/:id/image',
+  authenticate,
+  requireRole('super_admin', 'commercial'),
+  (req, res, next) => {
+    upload.single('image')(req, res, (err) => {
+      if (err instanceof multer.MulterError) {
+        return res.status(400).json({ error: 'UPLOAD_ERROR', message: err.code === 'LIMIT_FILE_SIZE' ? 'Fichier trop volumineux (max 5 Mo)' : err.message });
+      }
+      if (err) return res.status(400).json({ error: 'UPLOAD_ERROR', message: err.message });
+      next();
+    });
+  },
+  async (req, res) => {
+    try {
+      const product = await db('products').where({ id: req.params.id }).first();
+      if (!product) return res.status(404).json({ error: 'NOT_FOUND' });
+      if (!req.file) return res.status(400).json({ error: 'NO_FILE', message: 'Aucun fichier envoyé' });
+
+      const image_url = `/uploads/products/${req.file.filename}`;
+      const [updated] = await db('products')
+        .where({ id: req.params.id })
+        .update({ image_url, updated_at: new Date() })
+        .returning('*');
+      res.json(updated);
     } catch (err) {
       res.status(500).json({ error: 'SERVER_ERROR' });
     }

@@ -11,6 +11,8 @@ const swaggerUi = require('swagger-ui-express');
 const swaggerSpec = require('./docs/swagger');
 const logger = require('./utils/logger');
 
+const path = require('path');
+
 const app = express();
 const PORT = process.env.PORT || 3001;
 
@@ -87,6 +89,9 @@ app.use('/api/docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec, {
   customCss: '.swagger-ui .topbar { display: none }',
   customSiteTitle: 'Vins & Conversations API',
 }));
+
+// ─── Static files (uploaded images) ───────────────────
+app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
 
 // ─── Routes ───────────────────────────────────────────
 app.use('/api/v1/auth', require('./routes/auth'));

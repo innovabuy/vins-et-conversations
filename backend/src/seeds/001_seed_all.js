@@ -438,6 +438,7 @@ exports.seed = async function (knex) {
   await knex('products').insert([
     {
       id: IDS.oriolus, name: 'Oriolus Blanc', description: 'Vin blanc sec et frais aux notes d\'agrumes et de fruits blancs. Idéal en apéritif ou avec des fruits de mer.', price_ht: 5.42, price_ttc: 6.50, purchase_price: 3.20, tva_rate: 20, visible_boutique: true, is_featured: true,
+      image_url: '/uploads/products/oriolus-blanc.jpg',
       category: 'Blancs Secs', category_id: IDS.cat_blancs_secs, label: 'HVE', sort_order: 1,
       region: 'Loire', appellation: 'Anjou', color: 'blanc', vintage: 2023,
       grape_varieties: JSON.stringify(['Chenin Blanc']),
@@ -449,6 +450,7 @@ exports.seed = async function (knex) {
     },
     {
       id: IDS.clemence, name: 'Cuvée Clémence', description: 'Blanc moelleux Bio issu de vendanges tardives. Arômes de miel, coing et fruits confits pour un vin gourmand.', price_ht: 7.08, price_ttc: 8.50, purchase_price: 4.10, tva_rate: 20, visible_boutique: true,
+      image_url: '/uploads/products/cuvee-clemence.jpg',
       category: 'Blancs Moelleux', category_id: IDS.cat_blancs_moelleux, label: 'Bio', sort_order: 2,
       region: 'Loire', appellation: 'Anjou', color: 'blanc', vintage: 2022,
       grape_varieties: JSON.stringify(['Chenin Blanc']),
@@ -460,6 +462,7 @@ exports.seed = async function (knex) {
     },
     {
       id: IDS.carillon, name: 'Carillon', description: 'Rouge de garde élevé 12 mois en fûts de chêne. Tanins élégants, fruits noirs et finale épicée.', price_ht: 10.42, price_ttc: 12.50, purchase_price: 5.80, tva_rate: 20, visible_boutique: true, is_featured: true,
+      image_url: '/uploads/products/carillon.jpg',
       category: 'Rouges', category_id: IDS.cat_rouges, label: 'Cru Bourgeois', sort_order: 3,
       region: 'Loire', appellation: 'Anjou-Villages', color: 'rouge', vintage: 2021,
       grape_varieties: JSON.stringify(['Cabernet Franc', 'Merlot']),
@@ -471,6 +474,7 @@ exports.seed = async function (knex) {
     },
     {
       id: IDS.apertus, name: 'Apertus', description: 'Rouge gourmand HVE aux arômes de fruits rouges et poivre. Equilibré et souple, parfait pour les grillades.', price_ht: 11.25, price_ttc: 13.50, purchase_price: 6.50, tva_rate: 20, visible_boutique: true,
+      image_url: '/uploads/products/apertus.jpg',
       category: 'Rouges', category_id: IDS.cat_rouges, label: 'HVE', sort_order: 4,
       region: 'Loire', appellation: 'Anjou', color: 'rouge', vintage: 2022,
       grape_varieties: JSON.stringify(['Cabernet Franc']),
@@ -482,6 +486,7 @@ exports.seed = async function (knex) {
     },
     {
       id: IDS.cremant, name: 'Crémant de Loire', description: 'Effervescent méthode traditionnelle, 18 mois sur lattes. Fines bulles, fraîcheur et élégance.', price_ht: 10.75, price_ttc: 12.90, purchase_price: 5.90, tva_rate: 20, visible_boutique: true, is_featured: true,
+      image_url: '/uploads/products/cremant-de-loire.jpg',
       category: 'Effervescents', category_id: IDS.cat_effervescents, label: null, sort_order: 5,
       region: 'Loire', appellation: 'Crémant de Loire', color: 'effervescent', vintage: null,
       grape_varieties: JSON.stringify(['Chenin Blanc', 'Chardonnay']),
@@ -493,6 +498,7 @@ exports.seed = async function (knex) {
     },
     {
       id: IDS.coffret, name: 'Coffret Découverte 3bt', description: 'Coffret de 3 bouteilles pour découvrir notre gamme : 1 blanc, 1 rouge et 1 effervescent.', price_ht: 26.67, price_ttc: 32.00, purchase_price: 14.00, tva_rate: 20,
+      image_url: '/uploads/products/coffret-decouverte-3bt.jpg',
       category: 'Coffrets', category_id: IDS.cat_coffrets, label: null, sort_order: 6,
       region: 'Loire', appellation: null, color: null, vintage: null,
       grape_varieties: JSON.stringify([]),
@@ -504,6 +510,7 @@ exports.seed = async function (knex) {
     },
     {
       id: IDS.coteaux, name: 'Coteaux du Layon', description: 'Grand moelleux du Layon aux arômes de fruits exotiques et miel d\'acacia. Idéal avec foie gras ou desserts.', price_ht: 9.17, price_ttc: 11.00, purchase_price: 5.30, tva_rate: 20, visible_boutique: true,
+      image_url: '/uploads/products/coteaux-du-layon.jpg',
       category: 'Blancs Moelleux', category_id: IDS.cat_blancs_moelleux, label: 'HVE', sort_order: 7,
       region: 'Loire', appellation: 'Coteaux du Layon', color: 'blanc', vintage: 2022,
       grape_varieties: JSON.stringify(['Chenin Blanc']),
@@ -515,6 +522,7 @@ exports.seed = async function (knex) {
     },
     {
       id: IDS.jus_pomme, name: 'Jus de Pomme', description: 'Pur jus de pommes Bio du Maine-et-Loire. Sans sucre ajouté, naturellement doux et rafraîchissant.', price_ht: 3.32, price_ttc: 3.50, purchase_price: 1.80, tva_rate: 5.5, visible_boutique: true,
+      image_url: '/uploads/products/jus-de-pomme.jpg',
       category: 'Sans Alcool', category_id: IDS.cat_jus_softs, label: 'Bio', sort_order: 8,
       region: 'Loire', appellation: null, color: 'sans_alcool', vintage: null,
       grape_varieties: JSON.stringify([]),
