@@ -18,7 +18,8 @@ router.get('/', authenticate, requireRole('super_admin', 'commercial'), async (r
     const campaigns = await db('campaigns')
       .join('organizations', 'campaigns.org_id', 'organizations.id')
       .join('client_types', 'campaigns.client_type_id', 'client_types.id')
-      .select('campaigns.*', 'organizations.name as org_name', 'client_types.label as type_label')
+      .leftJoin('campaign_types', 'campaigns.campaign_type_id', 'campaign_types.id')
+      .select('campaigns.*', 'organizations.name as org_name', 'client_types.label as type_label', 'campaign_types.label as campaign_type_label')
       .orderBy('campaigns.created_at', 'desc');
 
     const enriched = await Promise.all(campaigns.map(async (c) => {
@@ -53,7 +54,13 @@ router.get('/resources', authenticate, requireRole('super_admin', 'commercial'),
     const clientTypes = await db('client_types').orderBy('label');
     const products = await db('products').where({ active: true }).orderBy('sort_order');
     const users = await db('users').where({ status: 'active' }).select('id', 'name', 'email', 'role').orderBy('name');
-    res.json({ organizations, clientTypes, products, users });
+
+    // Organization & campaign types for coherence validation
+    const organizationTypes = await db('organization_types').where({ active: true }).orderBy('label');
+    const campaignTypes = await db('campaign_types').where({ active: true }).orderBy('label');
+    const orgTypeCampTypes = await db('organization_type_campaign_types').select('organization_type_id', 'campaign_type_id');
+
+    res.json({ organizations, clientTypes, products, users, organizationTypes, campaignTypes, orgTypeCampTypes });
   } catch (err) {
     res.status(500).json({ error: 'SERVER_ERROR', message: err.message });
   }
@@ -66,7 +73,8 @@ router.get('/:id', authenticate, requireRole('super_admin', 'commercial'), async
       .where('campaigns.id', req.params.id)
       .join('organizations', 'campaigns.org_id', 'organizations.id')
       .join('client_types', 'campaigns.client_type_id', 'client_types.id')
-      .select('campaigns.*', 'organizations.name as org_name', 'client_types.label as type_label')
+      .leftJoin('campaign_types', 'campaigns.campaign_type_id', 'campaign_types.id')
+      .select('campaigns.*', 'organizations.name as org_name', 'client_types.label as type_label', 'campaign_types.label as campaign_type_label')
       .first();
     if (!campaign) return res.status(404).json({ error: 'NOT_FOUND' });
 
@@ -637,6 +645,7 @@ const campaignSchema = Joi.object({
   name: Joi.string().min(3).max(200).required(),
   org_id: Joi.string().uuid().required(),
   client_type_id: Joi.string().uuid().required(),
+  campaign_type_id: Joi.string().uuid().allow(null),
   status: Joi.string().valid('draft', 'active', 'paused', 'completed', 'archived').default('draft'),
   goal: Joi.number().min(0).default(0),
   start_date: Joi.date().allow(null),
@@ -654,6 +663,30 @@ const campaignSchema = Joi.object({
 router.post('/', authenticate, requireRole('super_admin'), auditAction('campaigns'), validate(campaignSchema), async (req, res) => {
   try {
     const { products: productList, participants, ...campaignData } = req.body;
+
+    // Coherence check: campaign_type must be allowed for the org's organization_type
+    if (campaignData.campaign_type_id && campaignData.org_id) {
+      const campType = await db('campaign_types').where({ id: campaignData.campaign_type_id }).first();
+      if (!campType) return res.status(400).json({ error: 'CAMPAIGN_TYPE_NOT_FOUND', message: 'Type de campagne introuvable' });
+
+      const org = await db('organizations').where({ id: campaignData.org_id }).first();
+      if (org && org.organization_type_id) {
+        const allowed = await db('organization_type_campaign_types')
+          .where({ organization_type_id: org.organization_type_id, campaign_type_id: campaignData.campaign_type_id })
+          .first();
+        if (!allowed) {
+          return res.status(400).json({
+            error: 'CAMPAIGN_TYPE_NOT_ALLOWED',
+            message: `Le type de campagne "${campType.label}" n'est pas autorisé pour ce type d'organisation`,
+          });
+        }
+      }
+
+      // Auto-set client_type_id from campaign type default if not provided
+      if (!campaignData.client_type_id && campType.default_client_type_id) {
+        campaignData.client_type_id = campType.default_client_type_id;
+      }
+    }
 
     const newId = uuidv4();
     await db.transaction(async (trx) => {

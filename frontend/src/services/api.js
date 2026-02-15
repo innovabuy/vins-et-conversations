@@ -261,6 +261,24 @@ export const categoriesAPI = {
   reorder: (order) => api.put('/admin/categories/reorder', { order }),
 };
 
+// ─── Organization Types ─────────────────────────────
+export const organizationTypesAPI = {
+  list: () => api.get('/admin/organization-types'),
+  get: (id) => api.get(`/admin/organization-types/${id}`),
+  create: (data) => api.post('/admin/organization-types', data),
+  update: (id, data) => api.put(`/admin/organization-types/${id}`, data),
+  delete: (id) => api.delete(`/admin/organization-types/${id}`),
+};
+
+// ─── Campaign Types ─────────────────────────────────
+export const campaignTypesAPI = {
+  list: () => api.get('/admin/campaign-types'),
+  get: (id) => api.get(`/admin/campaign-types/${id}`),
+  create: (data) => api.post('/admin/campaign-types', data),
+  update: (id, data) => api.put(`/admin/campaign-types/${id}`, data),
+  delete: (id) => api.delete(`/admin/campaign-types/${id}`),
+};
+
 // ─── Audit Log ─────────────────────────────────────
 export const auditLogAPI = {
   list: (params) => api.get('/admin/audit-log', { params }),

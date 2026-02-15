@@ -69,6 +69,17 @@ const IDS = {
   supplier_fruitiere: uuidv4(),
   supplier_carillon: uuidv4(),
   supplier_vouvray: uuidv4(),
+  // Organization types
+  ot_school: uuidv4(),
+  ot_company: uuidv4(),
+  ot_network: uuidv4(),
+  ot_boutique: uuidv4(),
+  // Campaign types
+  cpt_scolaire: uuidv4(),
+  cpt_cse: uuidv4(),
+  cpt_ambassadeur: uuidv4(),
+  cpt_bts: uuidv4(),
+  cpt_boutique: uuidv4(),
 };
 
 exports.seed = async function (knex) {
@@ -80,7 +91,9 @@ exports.seed = async function (knex) {
     'returns', 'delivery_notes', 'payments', 'financial_events',
     'order_items', 'orders', 'contacts',
     'stock_movements', 'campaign_products', 'products', 'product_categories',
-    'invitations', 'participations', 'campaigns', 'client_types', 'organizations',
+    'invitations', 'participations', 'campaigns', 'client_types',
+    'organization_type_campaign_types', 'campaign_types', 'organization_types',
+    'organizations',
     'shipping_rates', 'shipping_zones',
     'refresh_tokens', 'users', 'app_settings',
   ];
@@ -96,6 +109,16 @@ exports.seed = async function (knex) {
   ]);
 
   const hash = await bcrypt.hash('VinsConv2026!', 12);
+
+  // ═══════════════════════════════════════════════════════
+  // ORGANIZATION TYPES
+  // ═══════════════════════════════════════════════════════
+  await knex('organization_types').insert([
+    { id: IDS.ot_school, code: 'school', label: 'Établissement scolaire', description: 'Lycées, collèges et écoles', default_config: JSON.stringify({ allowed_roles: ['etudiant', 'enseignant'], features: ['gamification', 'ranking'] }), active: true },
+    { id: IDS.ot_company, code: 'company', label: 'Entreprise (CSE)', description: 'Comités sociaux et économiques', default_config: JSON.stringify({ allowed_roles: ['cse'], features: ['ecommerce_mode', 'discount'] }), active: true },
+    { id: IDS.ot_network, code: 'network', label: 'Réseau ambassadeur', description: 'Réseaux de vente directe', default_config: JSON.stringify({ allowed_roles: ['ambassadeur'], features: ['tiers', 'referral'] }), active: true },
+    { id: IDS.ot_boutique, code: 'boutique', label: 'Boutique en ligne', description: 'Vente directe boutique web', default_config: JSON.stringify({ allowed_roles: [], features: ['public_shop'] }), active: true },
+  ]);
 
   // ═══════════════════════════════════════════════════════
   // USERS
@@ -176,11 +199,11 @@ exports.seed = async function (knex) {
   // ORGANISATIONS
   // ═══════════════════════════════════════════════════════
   await knex('organizations').insert([
-    { id: IDS.sacre_coeur, name: 'Lycée Sacré-Cœur', type: 'school', address: 'Angers, 49' },
-    { id: IDS.leroy_merlin, name: 'Leroy Merlin', type: 'company', address: 'Angers, 49' },
-    { id: IDS.reseau_loire, name: 'Réseau Ambassadeurs Loire', type: 'network', address: 'Loire Valley' },
-    { id: IDS.espl_angers, name: 'ESPL Angers', type: 'school', address: 'Angers, 49' },
-    { id: IDS.org_boutique, name: 'Boutique V&C', type: 'boutique', address: 'Angers, 49' },
+    { id: IDS.sacre_coeur, name: 'Lycée Sacré-Cœur', type: 'school', address: 'Angers, 49', organization_type_id: IDS.ot_school },
+    { id: IDS.leroy_merlin, name: 'Leroy Merlin', type: 'company', address: 'Angers, 49', organization_type_id: IDS.ot_company },
+    { id: IDS.reseau_loire, name: 'Réseau Ambassadeurs Loire', type: 'network', address: 'Loire Valley', organization_type_id: IDS.ot_network },
+    { id: IDS.espl_angers, name: 'ESPL Angers', type: 'school', address: 'Angers, 49', organization_type_id: IDS.ot_school },
+    { id: IDS.org_boutique, name: 'Boutique V&C', type: 'boutique', address: 'Angers, 49', organization_type_id: IDS.ot_boutique },
   ]);
 
   // ═══════════════════════════════════════════════════════
@@ -291,6 +314,28 @@ exports.seed = async function (knex) {
   ]);
 
   // ═══════════════════════════════════════════════════════
+  // CAMPAIGN TYPES
+  // ═══════════════════════════════════════════════════════
+  await knex('campaign_types').insert([
+    { id: IDS.cpt_scolaire, code: 'scolaire', label: 'Campagne scolaire', description: 'Financement de projets scolaires', default_client_type_id: IDS.ct_scolaire, default_config: JSON.stringify({ show_ranking: true, show_gamification: true }), active: true },
+    { id: IDS.cpt_cse, code: 'cse', label: 'Campagne CSE', description: 'Offre CSE avec tarifs remisés', default_client_type_id: IDS.ct_cse, default_config: JSON.stringify({ ecommerce_mode: true }), active: true },
+    { id: IDS.cpt_ambassadeur, code: 'ambassadeur', label: 'Campagne ambassadeur', description: 'Réseau de vente directe', default_client_type_id: IDS.ct_ambassadeur, default_config: JSON.stringify({ show_tiers: true }), active: true },
+    { id: IDS.cpt_bts, code: 'bts_ndrc', label: 'Campagne BTS NDRC', description: 'Projet commercial BTS NDRC', default_client_type_id: IDS.ct_bts, default_config: JSON.stringify({ show_formation: true }), active: true },
+    { id: IDS.cpt_boutique, code: 'boutique_web', label: 'Boutique en ligne', description: 'Campagne permanente boutique', default_client_type_id: IDS.ct_boutique, default_config: JSON.stringify({ permanent: true }), active: true },
+  ]);
+
+  // ═══════════════════════════════════════════════════════
+  // ORGANIZATION TYPE ↔ CAMPAIGN TYPE JUNCTION
+  // ═══════════════════════════════════════════════════════
+  await knex('organization_type_campaign_types').insert([
+    { organization_type_id: IDS.ot_school, campaign_type_id: IDS.cpt_scolaire },
+    { organization_type_id: IDS.ot_school, campaign_type_id: IDS.cpt_bts },
+    { organization_type_id: IDS.ot_company, campaign_type_id: IDS.cpt_cse },
+    { organization_type_id: IDS.ot_network, campaign_type_id: IDS.cpt_ambassadeur },
+    { organization_type_id: IDS.ot_boutique, campaign_type_id: IDS.cpt_boutique },
+  ]);
+
+  // ═══════════════════════════════════════════════════════
   // CAMPAGNES
   // ═══════════════════════════════════════════════════════
   await knex('campaigns').insert([
@@ -298,6 +343,7 @@ exports.seed = async function (knex) {
       id: IDS.camp_sacre_coeur,
       org_id: IDS.sacre_coeur,
       client_type_id: IDS.ct_scolaire,
+      campaign_type_id: IDS.cpt_scolaire,
       name: 'Sacré-Cœur 2025-2026',
       slug: 'sacre-coeur-2025-2026',
       status: 'active',
@@ -310,6 +356,7 @@ exports.seed = async function (knex) {
       id: IDS.camp_cse_leroy,
       org_id: IDS.leroy_merlin,
       client_type_id: IDS.ct_cse,
+      campaign_type_id: IDS.cpt_cse,
       name: 'CSE Leroy Merlin',
       slug: 'cse-leroy-merlin',
       status: 'active',
@@ -322,6 +369,7 @@ exports.seed = async function (knex) {
       id: IDS.camp_ambassadeurs,
       org_id: IDS.reseau_loire,
       client_type_id: IDS.ct_ambassadeur,
+      campaign_type_id: IDS.cpt_ambassadeur,
       name: 'Ambassadeurs Loire',
       slug: 'ambassadeurs-loire',
       status: 'active',
@@ -334,6 +382,7 @@ exports.seed = async function (knex) {
       id: IDS.camp_espl,
       org_id: IDS.espl_angers,
       client_type_id: IDS.ct_scolaire,
+      campaign_type_id: IDS.cpt_scolaire,
       name: 'ESPL Angers',
       slug: 'espl-angers',
       status: 'active',
@@ -346,6 +395,7 @@ exports.seed = async function (knex) {
       id: IDS.camp_bts_espl,
       org_id: IDS.espl_angers,
       client_type_id: IDS.ct_bts,
+      campaign_type_id: IDS.cpt_bts,
       name: 'BTS NDRC ESPL 2025-2026',
       slug: 'bts-ndrc-espl-2025-2026',
       status: 'active',
@@ -358,6 +408,7 @@ exports.seed = async function (knex) {
       id: IDS.camp_boutique,
       org_id: IDS.org_boutique,
       client_type_id: IDS.ct_boutique,
+      campaign_type_id: IDS.cpt_boutique,
       name: 'Boutique Web',
       slug: 'boutique-web',
       status: 'active',

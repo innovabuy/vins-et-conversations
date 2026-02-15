@@ -24,6 +24,8 @@ import AdminAuditLog from './components/admin/AdminAuditLog';
 import AdminCategories from './components/admin/AdminCategories';
 import AdminShipping from './components/admin/AdminShipping';
 import AppSettings from './components/admin/AppSettings';
+import AdminOrganizationTypes from './components/admin/AdminOrganizationTypes';
+import AdminCampaignTypes from './components/admin/AdminCampaignTypes';
 import StudentDashboard from './components/student/StudentDashboard';
 import CSELayout from './components/layout/CSELayout';
 import CSEDashboard from './components/cse/CSEDashboard';
@@ -105,6 +107,8 @@ function AppRoutes() {
         <Route path="exports" element={<AdminExports />} />
         <Route path="shipping" element={<AdminShipping />} />
         <Route path="users" element={<AdminUsers />} />
+        <Route path="organization-types" element={<AdminOrganizationTypes />} />
+        <Route path="campaign-types" element={<AdminCampaignTypes />} />
         <Route path="settings" element={<AppSettings />} />
       </Route>
 

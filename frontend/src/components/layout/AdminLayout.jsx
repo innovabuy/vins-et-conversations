@@ -28,6 +28,8 @@ const allNavItems = [
   { to: '/admin/pricing', icon: FileText, label: 'Conditions', adminOnly: true },
   { to: '/admin/exports', icon: Download, label: 'Exports', adminOnly: true },
   { to: '/admin/users', icon: Settings, label: 'Utilisateurs', adminOnly: true },
+  { to: '/admin/organization-types', icon: Building2, label: "Types d'org.", adminOnly: true },
+  { to: '/admin/campaign-types', icon: Tag, label: 'Types campagne', adminOnly: true },
   { to: '/admin/audit', icon: Shield, label: 'Audit', adminOnly: true },
   { to: '/admin/settings', icon: Settings, label: 'Paramètres', adminOnly: true },
 ];

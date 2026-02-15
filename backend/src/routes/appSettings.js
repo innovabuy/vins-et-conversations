@@ -50,15 +50,40 @@ router.put('/', authenticate, requireRole('super_admin'), auditAction('app_setti
 // ─── Admin: PUT /api/v1/admin/organizations/:id ──────
 router.put('/organizations/:id', authenticate, requireRole('super_admin', 'commercial'), auditAction('organizations'), async (req, res) => {
   try {
-    const { name, type, address, logo_url } = req.body;
+    const { name, type, address, logo_url, organization_type_id } = req.body;
     const updates = {};
     if (name !== undefined) updates.name = name;
     if (type !== undefined) updates.type = type;
     if (address !== undefined) updates.address = address;
     if (logo_url !== undefined) updates.logo_url = logo_url;
+    if (organization_type_id !== undefined) updates.organization_type_id = organization_type_id;
 
     if (Object.keys(updates).length === 0) {
       return res.status(400).json({ error: 'NO_FIELDS' });
+    }
+
+    // Coherence check: when changing org type, verify existing campaigns are compatible
+    if (organization_type_id) {
+      const campaigns = await db('campaigns')
+        .where({ org_id: req.params.id })
+        .whereNotNull('campaign_type_id')
+        .select('campaigns.id', 'campaigns.name', 'campaigns.campaign_type_id');
+
+      if (campaigns.length) {
+        const allowed = await db('organization_type_campaign_types')
+          .where({ organization_type_id })
+          .select('campaign_type_id');
+        const allowedSet = new Set(allowed.map((r) => r.campaign_type_id));
+
+        const incompatible = campaigns.filter((c) => !allowedSet.has(c.campaign_type_id));
+        if (incompatible.length) {
+          return res.status(409).json({
+            error: 'INCOMPATIBLE_CAMPAIGNS',
+            message: `${incompatible.length} campagne(s) incompatible(s) avec ce type d'organisation`,
+            campaigns: incompatible.map((c) => ({ id: c.id, name: c.name })),
+          });
+        }
+      }
     }
 
     const [updated] = await db('organizations')

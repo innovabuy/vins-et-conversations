@@ -31,6 +31,7 @@ export default function CampaignWizard() {
 
   const [form, setForm] = useState({
     client_type_id: '',
+    campaign_type_id: '',
     org_id: '',
     partner_logo_url: '',
     name: '',
@@ -55,7 +56,7 @@ export default function CampaignWizard() {
   const updateForm = (key, value) => setForm((f) => ({ ...f, [key]: value }));
 
   const canNext = () => {
-    if (step === 0) return !!form.client_type_id;
+    if (step === 0) return !!form.campaign_type_id;
     if (step === 1) return !!form.org_id;
     if (step === 2) return true; // branding — optional
     if (step === 3) return form.name.length >= 3;
@@ -69,12 +70,13 @@ export default function CampaignWizard() {
       if (form.partner_logo_url && form.org_id) {
         await organizationsAPI.update(form.org_id, { logo_url: form.partner_logo_url }).catch(() => {});
       }
-      const { partner_logo_url, fund_collective_pct, fund_individual_pct, ...rest } = form;
+      const { partner_logo_url, fund_collective_pct, fund_individual_pct, campaign_type_id, ...rest } = form;
       const configWithFunds = { ...rest.config };
       if (fund_collective_pct !== '' && fund_collective_pct != null) configWithFunds.fund_collective_pct = parseFloat(fund_collective_pct);
       if (fund_individual_pct !== '' && fund_individual_pct != null) configWithFunds.fund_individual_pct = parseFloat(fund_individual_pct);
       const payload = {
         ...rest,
+        campaign_type_id: campaign_type_id || null,
         config: configWithFunds,
         goal: parseFloat(rest.goal) || 0,
         start_date: rest.start_date || null,
@@ -94,7 +96,18 @@ export default function CampaignWizard() {
   if (!resources) return <div className="text-center py-20 text-gray-400">Erreur de chargement</div>;
 
   const selectedType = resources.clientTypes.find((t) => t.id === form.client_type_id);
+  const selectedCampaignType = (resources.campaignTypes || []).find((t) => t.id === form.campaign_type_id);
   const selectedOrg = resources.organizations.find((o) => o.id === form.org_id);
+
+  // Filter organizations by selected campaign type compatibility
+  const filteredOrgs = form.campaign_type_id && resources.orgTypeCampTypes
+    ? resources.organizations.filter((o) => {
+        if (!o.organization_type_id) return true; // orgs without type are always shown
+        return resources.orgTypeCampTypes.some(
+          (j) => j.organization_type_id === o.organization_type_id && j.campaign_type_id === form.campaign_type_id
+        );
+      })
+    : resources.organizations;
 
   return (
     <div className="space-y-6">
@@ -125,31 +138,68 @@ export default function CampaignWizard() {
       <div className="card min-h-[300px]">
         {step === 0 && (
           <div className="space-y-4">
-            <h2 className="font-bold text-lg">Type de client</h2>
-            <p className="text-sm text-gray-500">Choisissez le type de campagne.</p>
+            <h2 className="font-bold text-lg">Type de campagne</h2>
+            <p className="text-sm text-gray-500">Choisissez le type de campagne à créer.</p>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-              {resources.clientTypes.map((t) => (
+              {(resources.campaignTypes || []).map((t) => (
                 <button
                   key={t.id}
-                  onClick={() => updateForm('client_type_id', t.id)}
+                  onClick={() => {
+                    updateForm('campaign_type_id', t.id);
+                    // Auto-set client_type_id from campaign type default
+                    if (t.default_client_type_id) {
+                      updateForm('client_type_id', t.default_client_type_id);
+                    }
+                    // Reset org if incompatible
+                    if (form.org_id) {
+                      const org = resources.organizations.find((o) => o.id === form.org_id);
+                      if (org && org.organization_type_id) {
+                        const compatible = (resources.orgTypeCampTypes || []).some(
+                          (j) => j.organization_type_id === org.organization_type_id && j.campaign_type_id === t.id
+                        );
+                        if (!compatible) updateForm('org_id', '');
+                      }
+                    }
+                  }}
                   className={`p-4 border-2 rounded-xl text-left transition-all ${
-                    form.client_type_id === t.id ? 'border-wine-600 bg-wine-50' : 'border-gray-200 hover:border-gray-300'
+                    form.campaign_type_id === t.id ? 'border-wine-600 bg-wine-50' : 'border-gray-200 hover:border-gray-300'
                   }`}
                 >
                   <p className="font-semibold">{t.label}</p>
-                  <p className="text-xs text-gray-500 mt-1">{t.name}</p>
+                  <p className="text-xs text-gray-500 mt-1">{t.code}</p>
+                  {t.description && <p className="text-xs text-gray-400 mt-1">{t.description}</p>}
                 </button>
               ))}
             </div>
+            {/* Fallback: show client types if no campaign types available */}
+            {(!resources.campaignTypes || resources.campaignTypes.length === 0) && (
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                {resources.clientTypes.map((t) => (
+                  <button
+                    key={t.id}
+                    onClick={() => updateForm('client_type_id', t.id)}
+                    className={`p-4 border-2 rounded-xl text-left transition-all ${
+                      form.client_type_id === t.id ? 'border-wine-600 bg-wine-50' : 'border-gray-200 hover:border-gray-300'
+                    }`}
+                  >
+                    <p className="font-semibold">{t.label}</p>
+                    <p className="text-xs text-gray-500 mt-1">{t.name}</p>
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
         )}
 
         {step === 1 && (
           <div className="space-y-4">
             <h2 className="font-bold text-lg">Organisation</h2>
-            <p className="text-sm text-gray-500">Sélectionnez l'établissement ou l'entreprise.</p>
+            <p className="text-sm text-gray-500">Sélectionnez l'établissement ou l'entreprise{selectedCampaignType ? ` (compatible avec "${selectedCampaignType.label}")` : ''}.</p>
+            {filteredOrgs.length === 0 && (
+              <p className="text-sm text-amber-600 bg-amber-50 p-3 rounded-lg">Aucune organisation compatible avec ce type de campagne.</p>
+            )}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              {resources.organizations.map((o) => (
+              {filteredOrgs.map((o) => (
                 <button
                   key={o.id}
                   onClick={() => updateForm('org_id', o.id)}
@@ -237,7 +287,7 @@ export default function CampaignWizard() {
             </div>
 
             {/* Commission % inputs — visible for types with commission rules */}
-            {selectedType && ['scolaire', 'bts_ndrc'].includes(selectedType.name) && (
+            {(selectedCampaignType ? ['scolaire', 'bts_ndrc'].includes(selectedCampaignType.code) : selectedType && ['scolaire', 'bts_ndrc'].includes(selectedType.name)) && (
               <div className="mt-6 p-4 bg-wine-50 rounded-xl space-y-4">
                 <div className="flex items-center gap-2 mb-1">
                   <PiggyBank size={18} className="text-wine-700" />
@@ -359,8 +409,8 @@ export default function CampaignWizard() {
             <h2 className="font-bold text-lg">Récapitulatif</h2>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="p-4 bg-gray-50 rounded-xl">
-                <p className="text-xs text-gray-500 font-medium">Type</p>
-                <p className="font-semibold mt-1">{selectedType?.label || '—'}</p>
+                <p className="text-xs text-gray-500 font-medium">Type de campagne</p>
+                <p className="font-semibold mt-1">{selectedCampaignType?.label || selectedType?.label || '—'}</p>
               </div>
               <div className="p-4 bg-gray-50 rounded-xl">
                 <p className="text-xs text-gray-500 font-medium">Organisation</p>

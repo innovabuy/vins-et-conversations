@@ -32,8 +32,18 @@ app.use((req, res, next) => {
 // ─── Middlewares globaux ──────────────────────────────
 app.use(helmet());
 app.use(compression());
+const allowedOrigins = [
+  process.env.FRONTEND_URL || 'http://localhost:5173',
+  process.env.SITE_PUBLIC_URL || 'http://localhost:8080',
+];
 app.use(cors({
-  origin: process.env.FRONTEND_URL || 'http://localhost:5173',
+  origin: (origin, cb) => {
+    if (!origin) return cb(null, true);
+    if (allowedOrigins.includes(origin)) return cb(null, true);
+    // In dev mode, accept all origins (access via IP, etc.)
+    if (process.env.NODE_ENV !== 'production') return cb(null, true);
+    cb(new Error('CORS'));
+  },
   credentials: true,
 }));
 app.use(express.json({ limit: '10mb' }));
@@ -115,6 +125,8 @@ app.use('/api/v1/shipping', require('./routes/shipping').router);
 app.use('/api/v1/admin', require('./routes/shipping').adminRouter);
 app.use('/api/v1/campaigns', require('./routes/campaignResources'));
 app.use('/api/v1/admin/campaign-resources', require('./routes/campaignResources').adminRouter);
+app.use('/api/v1/admin/organization-types', require('./routes/organizationTypes'));
+app.use('/api/v1/admin/campaign-types', require('./routes/campaignTypes'));
 
 // ─── Health check ─────────────────────────────────────
 app.get('/api/health', async (req, res) => {
