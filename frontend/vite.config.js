@@ -11,6 +11,10 @@ export default defineConfig({
         target: 'http://vc-api:3001',
         changeOrigin: true,
       },
+      '/uploads': {
+        target: 'http://vc-api:3001',
+        changeOrigin: true,
+      },
     },
   },
 });
