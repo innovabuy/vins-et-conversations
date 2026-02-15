@@ -95,9 +95,14 @@ export default function BoutiqueHome() {
             Découvrez notre sélection de vins français, choisis avec soin par Nicolas Froment.
             Chaque bouteille raconte une histoire.
           </p>
-          <a href="#catalog" className="inline-flex items-center gap-2 bg-white text-wine-800 px-6 py-3 rounded-xl font-semibold hover:bg-wine-50 transition-all">
-            Découvrir nos vins <ChevronRight size={18} />
-          </a>
+          <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
+            <a href="#catalog" className="inline-flex items-center gap-2 bg-white text-wine-800 px-6 py-3 rounded-xl font-semibold hover:bg-wine-50 transition-all">
+              Découvrir nos vins <ChevronRight size={18} />
+            </a>
+            <Link to="/boutique/wizard" className="inline-flex items-center gap-2 bg-wine-600/30 backdrop-blur text-white px-6 py-3 rounded-xl font-semibold hover:bg-wine-600/50 transition-all border border-white/20">
+              Quel vin pour moi ? <ChevronRight size={18} />
+            </Link>
+          </div>
         </div>
       </section>
 
@@ -122,7 +127,7 @@ export default function BoutiqueHome() {
               <Link
                 key={p.id}
                 to={`/boutique/vin/${p.id}`}
-                className="group relative bg-white border-2 border-yellow-200 rounded-2xl overflow-hidden hover:shadow-lg transition-all hover:-translate-y-1"
+                className="group relative bg-white border-2 border-yellow-200 rounded-2xl overflow-hidden hover:shadow-lg transition-all hover:-translate-y-1 flex flex-col"
               >
                 <div className="absolute top-3 right-3 z-10 bg-yellow-400 text-yellow-900 px-2 py-0.5 rounded-full text-xs font-semibold flex items-center gap-1">
                   <Star size={12} className="fill-yellow-900" /> Sélection
@@ -134,7 +139,7 @@ export default function BoutiqueHome() {
                     <Wine size={48} className="text-wine-300" />
                   )}
                 </div>
-                <div className="p-4">
+                <div className="p-4 flex-1 flex flex-col">
                   <div className="flex items-center gap-2 mb-2">
                     {p.category_details ? (
                       <span className="px-2 py-0.5 rounded-full text-xs font-medium text-white" style={{ backgroundColor: p.category_details.color || '#666' }}>{p.category_details.icon} {p.category_details.name}</span>
@@ -145,7 +150,7 @@ export default function BoutiqueHome() {
                   </div>
                   <h3 className="font-semibold text-gray-900 group-hover:text-wine-700 transition-colors">{p.name}</h3>
                   {p.description && <p className="text-xs text-gray-500 mt-1 line-clamp-2">{p.description}</p>}
-                  <div className="flex items-center justify-between mt-3">
+                  <div className="flex items-center justify-between mt-auto pt-3">
                     <span className="text-lg font-bold text-wine-700">{formatEur(p.price_ttc)}</span>
                     <button
                       onClick={(e) => {
@@ -257,7 +262,7 @@ export default function BoutiqueHome() {
               <Link
                 key={p.id}
                 to={`/boutique/vin/${p.id}`}
-                className="group bg-white border border-gray-100 rounded-2xl overflow-hidden hover:shadow-lg transition-all hover:-translate-y-1"
+                className="group bg-white border border-gray-100 rounded-2xl overflow-hidden hover:shadow-lg transition-all hover:-translate-y-1 flex flex-col"
               >
                 <div className="aspect-[4/3] bg-gradient-to-br from-wine-50 to-wine-100 flex items-center justify-center">
                   {p.image_url ? (
@@ -266,7 +271,7 @@ export default function BoutiqueHome() {
                     <Wine size={48} className="text-wine-300" />
                   )}
                 </div>
-                <div className="p-4">
+                <div className="p-4 flex-1 flex flex-col">
                   <div className="flex items-center gap-2 mb-2">
                     {p.category_details ? (
                       <span className="px-2 py-0.5 rounded-full text-xs font-medium text-white" style={{ backgroundColor: p.category_details.color || '#666' }}>{p.category_details.icon} {p.category_details.name}</span>
@@ -278,7 +283,7 @@ export default function BoutiqueHome() {
                   <h3 className="font-semibold text-gray-900 group-hover:text-wine-700 transition-colors">{p.name}</h3>
                   {p.appellation && <p className="text-xs text-gray-500 mt-1">{p.appellation}</p>}
                   {p.description && <p className="text-xs text-gray-500 mt-1 line-clamp-2">{p.description}</p>}
-                  <div className="flex items-center justify-between mt-3">
+                  <div className="flex items-center justify-between mt-auto pt-3">
                     <span className="text-lg font-bold text-wine-700">{formatEur(p.price_ttc)}</span>
                     <button
                       onClick={(e) => {

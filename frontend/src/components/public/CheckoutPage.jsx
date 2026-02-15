@@ -535,7 +535,7 @@ export default function CheckoutPage() {
             {shipping && shipping.surcharges && (
               <div className="bg-white rounded-lg p-3 text-xs text-gray-500 space-y-1">
                 <div className="flex justify-between">
-                  <span>{shipping.zone_name}</span>
+                  <span>{shipping.zone_name} — {shipping.qty_bottles} bout. ({shipping.qty_colis} colis)</span>
                   <span>{formatEur(shipping.breakdown.base_price)}</span>
                 </div>
                 {shipping.surcharges.map((s, i) => (

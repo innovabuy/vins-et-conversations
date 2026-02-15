@@ -347,7 +347,15 @@ async function getOrderByRefAndEmail(ref, email) {
       'order_items.type'
     );
 
-  return { ...order, items };
+  // PostgreSQL DECIMAL returns strings — cast to numbers for frontend math
+  return {
+    ...order,
+    total_ttc: parseFloat(order.total_ttc),
+    items: items.map(item => ({
+      ...item,
+      unit_price_ttc: parseFloat(item.unit_price_ttc),
+    })),
+  };
 }
 
 /**

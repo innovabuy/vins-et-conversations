@@ -101,12 +101,17 @@ router.post('/calculate', async (req, res) => {
     const totalHT = parseFloat((subtotal + seasonalAmount).toFixed(2));
     const totalTTC = parseFloat((totalHT * 1.20).toFixed(2));
 
+    const BOTTLES_PER_CASE = 6;
+    const colis = Math.ceil(quantity / BOTTLES_PER_CASE);
+
     res.json({
       price_ht: totalHT,
       price_ttc: totalTTC,
       zone_name: `${zone.dept_code} - ${zone.dept_name}`,
       zone_difficulty: zone.difficulty,
       pricing_type: rate.pricing_type,
+      qty_bottles: quantity,
+      qty_colis: colis,
       surcharges,
       breakdown: {
         base_price: basePrice,

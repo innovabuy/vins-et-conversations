@@ -48,6 +48,7 @@ import ConfirmationPage from './components/public/ConfirmationPage';
 import OrderTrackingPage from './components/public/OrderTrackingPage';
 import CGVPage from './components/public/CGVPage';
 import MentionsLegalesPage from './components/public/MentionsLegalesPage';
+import TasteWizard from './components/public/TasteWizard';
 import { CartProvider } from './contexts/CartContext';
 import CustomerDashboard from './components/customer/CustomerDashboard';
 import { AppSettingsProvider } from './contexts/AppSettingsContext';
@@ -77,6 +78,7 @@ function AppRoutes() {
         <Route path="commander" element={<CheckoutPage />} />
         <Route path="confirmation/:ref" element={<ConfirmationPage />} />
         <Route path="suivi" element={<OrderTrackingPage />} />
+        <Route path="wizard" element={<TasteWizard />} />
         <Route path="cgv" element={<CGVPage />} />
         <Route path="mentions-legales" element={<MentionsLegalesPage />} />
       </Route>
