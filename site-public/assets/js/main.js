@@ -104,9 +104,7 @@ function initScrollReveal() {
 /* ─── Helpers ──────────────────────────────── */
 function escapeHtml(t) { const d = document.createElement('div'); d.textContent = t || ''; return d.innerHTML; }
 function getProductImage(product) {
-  if (product.image_url) return product.image_url;
-  const slug = (product.name || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
-  return `assets/images/produits/${slug}.jpg`;
+  return product.image_url || '';
 }
 function resolveWineType(color, category) {
   if (!color && (!category || (category||'').toLowerCase().includes('coffret'))) return 'coffret';

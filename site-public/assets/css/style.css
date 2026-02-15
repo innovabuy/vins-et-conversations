@@ -467,6 +467,8 @@ h1, h2, h3, h4 {
   overflow: hidden;
   transition: all var(--transition);
   text-align: center;
+  display: flex;
+  flex-direction: column;
 }
 
 .wine-card:hover {
@@ -491,6 +493,9 @@ h1, h2, h3, h4 {
 
 .wine-card-body {
   padding: 20px;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
 }
 
 .wine-card-body h3 {
@@ -523,6 +528,8 @@ h1, h2, h3, h4 {
   font-size: 1.5rem;
   font-weight: 700;
   color: var(--wine);
+  margin-top: auto;
+  padding-top: 8px;
 }
 
 .wine-price small {
