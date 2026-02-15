@@ -295,6 +295,7 @@ export const appSettingsAPI = {
   update: (data) => api.put('/admin/settings', data),
   stripeTest: () => api.get('/admin/settings/stripe-test'),
   stripePublicKey: () => api.get('/settings/stripe-public-key'),
+  emailTest: () => api.post('/admin/settings/email-test'),
 };
 
 // ─── Organizations ────────────────────────────────

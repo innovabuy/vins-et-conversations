@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { appSettingsAPI } from '../../services/api';
-import { Settings, Palette, Save, Image, Type, Check, CreditCard, AlertTriangle, Wifi, WifiOff, Eye, EyeOff } from 'lucide-react';
+import { Settings, Palette, Save, Image, Type, Check, CreditCard, AlertTriangle, Wifi, WifiOff, Eye, EyeOff, Mail, Send } from 'lucide-react';
 
 export default function AppSettings() {
   const [settings, setSettings] = useState({
@@ -13,12 +13,21 @@ export default function AppSettings() {
     stripe_live_publishable_key: '',
     stripe_live_secret_key: '',
     stripe_webhook_secret: '',
+    smtp_host: '',
+    smtp_port: '587',
+    smtp_user: '',
+    smtp_password: '',
+    smtp_from_name: 'Vins & Conversations',
+    smtp_from_email: '',
+    smtp_mode: 'test',
   });
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [stripeTest, setStripeTest] = useState(null);
   const [testingStripe, setTestingStripe] = useState(false);
+  const [emailTest, setEmailTest] = useState(null);
+  const [testingEmail, setTestingEmail] = useState(false);
   const [showSecrets, setShowSecrets] = useState({});
 
   useEffect(() => {
@@ -58,6 +67,19 @@ export default function AppSettings() {
 
   const toggleSecret = (key) => {
     setShowSecrets((prev) => ({ ...prev, [key]: !prev[key] }));
+  };
+
+  const handleTestEmail = async () => {
+    setTestingEmail(true);
+    setEmailTest(null);
+    try {
+      const res = await appSettingsAPI.emailTest();
+      setEmailTest(res.data);
+    } catch (err) {
+      setEmailTest({ success: false, error: err.response?.data?.error || err.message });
+    } finally {
+      setTestingEmail(false);
+    }
   };
 
   if (loading) {
@@ -289,6 +311,135 @@ export default function AppSettings() {
               {stripeTest.connected
                 ? `Connecte (${stripeTest.mode})`
                 : `Erreur : ${stripeTest.error}`
+              }
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Email section */}
+      <div className="card">
+        <h2 className="font-semibold text-lg mb-4 flex items-center gap-2">
+          <Mail size={18} className="text-wine-700" />
+          Emails transactionnels
+        </h2>
+
+        {/* Mode toggle */}
+        <div className="mb-5">
+          <label className="block text-sm font-medium text-gray-700 mb-2">Mode</label>
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => setSettings({ ...settings, smtp_mode: 'test' })}
+              className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                settings.smtp_mode === 'test' ? 'bg-blue-100 text-blue-700 ring-2 ring-blue-400' : 'bg-gray-100 text-gray-500'
+              }`}
+            >
+              Test
+            </button>
+            <button
+              onClick={() => setSettings({ ...settings, smtp_mode: 'production' })}
+              className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                settings.smtp_mode === 'production' ? 'bg-green-100 text-green-700 ring-2 ring-green-400' : 'bg-gray-100 text-gray-500'
+              }`}
+            >
+              Production
+            </button>
+          </div>
+          {settings.smtp_mode === 'test' && (
+            <p className="mt-2 text-sm text-blue-600">
+              Mode test actif : les emails ne sont pas envoyes, ils sont traces dans les logs du serveur.
+            </p>
+          )}
+        </div>
+
+        {/* SMTP config */}
+        <div className="space-y-4 mb-5">
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-xs text-gray-500 mb-1">Serveur SMTP</label>
+              <input
+                type="text"
+                value={settings.smtp_host}
+                onChange={(e) => setSettings({ ...settings, smtp_host: e.target.value })}
+                className="w-full border rounded-lg px-3 py-2 text-sm"
+                placeholder="smtp.example.com"
+              />
+            </div>
+            <div>
+              <label className="block text-xs text-gray-500 mb-1">Port</label>
+              <input
+                type="text"
+                value={settings.smtp_port}
+                onChange={(e) => setSettings({ ...settings, smtp_port: e.target.value })}
+                className="w-full border rounded-lg px-3 py-2 text-sm"
+                placeholder="587"
+              />
+            </div>
+          </div>
+          <div>
+            <label className="block text-xs text-gray-500 mb-1">Utilisateur SMTP</label>
+            <input
+              type="text"
+              value={settings.smtp_user}
+              onChange={(e) => setSettings({ ...settings, smtp_user: e.target.value })}
+              className="w-full border rounded-lg px-3 py-2 text-sm"
+              placeholder="user@example.com"
+            />
+          </div>
+          <div>
+            <label className="block text-xs text-gray-500 mb-1">Mot de passe SMTP</label>
+            <div className="flex items-center gap-2">
+              <input
+                type={showSecrets.smtp_password ? 'text' : 'password'}
+                value={settings.smtp_password}
+                onChange={(e) => setSettings({ ...settings, smtp_password: e.target.value })}
+                className="flex-1 border rounded-lg px-3 py-2 text-sm font-mono"
+                placeholder="••••••••"
+              />
+              <button onClick={() => toggleSecret('smtp_password')} className="text-gray-400 hover:text-gray-600">
+                {showSecrets.smtp_password ? <EyeOff size={18} /> : <Eye size={18} />}
+              </button>
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-xs text-gray-500 mb-1">Nom expediteur</label>
+              <input
+                type="text"
+                value={settings.smtp_from_name}
+                onChange={(e) => setSettings({ ...settings, smtp_from_name: e.target.value })}
+                className="w-full border rounded-lg px-3 py-2 text-sm"
+                placeholder="Vins & Conversations"
+              />
+            </div>
+            <div>
+              <label className="block text-xs text-gray-500 mb-1">Email expediteur</label>
+              <input
+                type="email"
+                value={settings.smtp_from_email}
+                onChange={(e) => setSettings({ ...settings, smtp_from_email: e.target.value })}
+                className="w-full border rounded-lg px-3 py-2 text-sm"
+                placeholder="noreply@vins-conversations.fr"
+              />
+            </div>
+          </div>
+        </div>
+
+        {/* Test email button */}
+        <div className="flex items-center gap-3">
+          <button
+            onClick={handleTestEmail}
+            disabled={testingEmail}
+            className="px-4 py-2 bg-gray-100 hover:bg-gray-200 rounded-lg text-sm font-medium transition-colors disabled:opacity-50 flex items-center gap-2"
+          >
+            <Send size={14} />
+            {testingEmail ? 'Envoi en cours...' : 'Envoyer un email de test'}
+          </button>
+          {emailTest && (
+            <div className={`flex items-center gap-2 text-sm ${emailTest.success ? 'text-green-600' : 'text-red-600'}`}>
+              {emailTest.success
+                ? `${emailTest.testMode ? 'Email simule (mode test)' : 'Email envoye'}`
+                : `Erreur : ${emailTest.error}`
               }
             </div>
           )}

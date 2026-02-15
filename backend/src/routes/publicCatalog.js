@@ -336,28 +336,23 @@ router.post('/contact', async (req, res) => {
       notes: JSON.stringify({ message: value.message, company: value.company || null }),
     }).returning('*');
 
-    // Notify admin by email
-    const adminHtml = emailService.renderTemplate('layout', {})
-      .replace('{{CONTENT}}', `
-        <h2>Nouveau contact depuis le site</h2>
-        <div class="card">
-          <div class="card-row"><span class="card-label">Nom</span><span class="card-value">${value.name}</span></div>
-          <div class="card-row"><span class="card-label">Email</span><span class="card-value">${value.email}</span></div>
-          ${value.phone ? `<div class="card-row"><span class="card-label">Téléphone</span><span class="card-value">${value.phone}</span></div>` : ''}
-          ${value.company ? `<div class="card-row"><span class="card-label">Entreprise</span><span class="card-value">${value.company}</span></div>` : ''}
-          <div class="card-row"><span class="card-label">Type</span><span class="card-value">${value.type}</span></div>
-        </div>
-        <p>${value.message.replace(/\n/g, '<br>')}</p>
-      `)
-      .replace(/\{\{SUBJECT\}\}/g, 'Nouveau contact')
-      .replace(/\{\{YEAR\}\}/g, String(new Date().getFullYear()))
-      .replace(/\{\{BASE_URL\}\}/g, process.env.BASE_URL || 'http://localhost:5173');
-
-    emailService.sendEmail({
-      to: process.env.ADMIN_EMAIL || 'nicolas@vins-conversations.fr',
-      subject: `[Contact] ${value.type} — ${value.name}`,
-      html: adminHtml,
+    // Notify admin by email (template-based)
+    emailService.sendContactNotification({
+      name: value.name,
+      email: value.email,
+      phone: value.phone || '',
+      company: value.company || '',
+      type: value.type,
+      message: value.message,
     }).catch((e) => logger.error(`Contact notification email failed: ${e.message}`));
+
+    // Send acknowledgement to sender
+    emailService.sendContactReceived({
+      email: value.email,
+      name: value.name,
+      type: value.type,
+      company: value.company || '',
+    }).catch((e) => logger.error(`Contact ack email failed: ${e.message}`));
 
     notificationService.onNewContact(value.name, value.type)
       .catch((e) => logger.error(`Contact notification failed: ${e.message}`));

@@ -200,6 +200,22 @@ async function handleWebhook(rawBody, signature) {
           );
         }
 
+        // Send payment failed email
+        const order = await db('orders').where({ id: orderId }).first();
+        if (order && order.user_id) {
+          const user = await db('users').where({ id: order.user_id }).first();
+          if (user) {
+            const emailService = require('./emailService');
+            emailService.sendPaymentFailed({
+              email: user.email,
+              name: user.name,
+              orderRef: order.ref,
+              amount: order.total_ttc,
+              errorMessage: pi?.last_payment_error?.message || '',
+            }).catch((e) => logger.error(`Payment failed email error: ${e.message}`));
+          }
+        }
+
         logger.warn(`Stripe webhook: payment failed for order ${orderId}`);
       }
       break;

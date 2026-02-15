@@ -8,7 +8,7 @@ const logger = require('../utils/logger');
 const router = express.Router();
 const publicRouter = express.Router();
 
-const SECRET_KEYS = ['stripe_test_secret_key', 'stripe_live_secret_key', 'stripe_webhook_secret'];
+const SECRET_KEYS = ['stripe_test_secret_key', 'stripe_live_secret_key', 'stripe_webhook_secret', 'smtp_password'];
 
 function maskSecret(value) {
   if (!value || value.length <= 8) return '****';
@@ -63,6 +63,7 @@ router.put('/', authenticate, requireRole('super_admin'), auditAction('app_setti
       'app_logo_url', 'app_name', 'app_primary_color',
       'stripe_mode', 'stripe_test_publishable_key', 'stripe_test_secret_key',
       'stripe_live_publishable_key', 'stripe_live_secret_key', 'stripe_webhook_secret',
+      'smtp_host', 'smtp_port', 'smtp_user', 'smtp_password', 'smtp_from_name', 'smtp_from_email', 'smtp_mode',
     ];
 
     for (const [key, value] of Object.entries(updates)) {
@@ -85,6 +86,15 @@ router.put('/', authenticate, requireRole('super_admin'), auditAction('app_setti
       } catch (e) { /* ignore if not yet available */ }
     }
 
+    // Invalidate cached SMTP transporter when keys change
+    const smtpKeys = Object.keys(updates).filter((k) => k.startsWith('smtp_'));
+    if (smtpKeys.length > 0) {
+      try {
+        const { resetSmtpCache } = require('../services/emailService');
+        resetSmtpCache();
+      } catch (e) { /* ignore */ }
+    }
+
     const settings = await db('app_settings').orderBy('key');
     const result = {};
     for (const s of settings) {
@@ -93,6 +103,21 @@ router.put('/', authenticate, requireRole('super_admin'), auditAction('app_setti
     res.json(result);
   } catch (err) {
     res.status(500).json({ error: 'SERVER_ERROR', message: err.message });
+  }
+});
+
+// ─── Admin: POST /api/v1/admin/settings/email-test ────
+router.post('/email-test', authenticate, requireRole('super_admin'), async (req, res) => {
+  try {
+    const emailService = require('../services/emailService');
+    const result = await emailService.sendWelcome({
+      email: req.user.email,
+      name: req.user.name || 'Admin',
+      role: req.user.role || 'super_admin',
+    });
+    res.json(result);
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
   }
 });
 

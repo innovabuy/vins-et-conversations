@@ -112,6 +112,13 @@ exports.seed = async function (knex) {
     { key: 'stripe_live_publishable_key', value: '' },
     { key: 'stripe_live_secret_key', value: '' },
     { key: 'stripe_webhook_secret', value: process.env.STRIPE_WEBHOOK_SECRET || 'whsec_placeholder' },
+    { key: 'smtp_host', value: '' },
+    { key: 'smtp_port', value: '587' },
+    { key: 'smtp_user', value: '' },
+    { key: 'smtp_password', value: '' },
+    { key: 'smtp_from_name', value: 'Vins & Conversations' },
+    { key: 'smtp_from_email', value: '' },
+    { key: 'smtp_mode', value: 'test' },
   ]);
 
   const hash = await bcrypt.hash('VinsConv2026!', 12);

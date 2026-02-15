@@ -3,6 +3,8 @@ const db = require('../config/database');
 const crypto = require('crypto');
 const { authenticate, requireRole } = require('../middleware/auth');
 const { auditAction } = require('../middleware/audit');
+const emailService = require('../services/emailService');
+const logger = require('../utils/logger');
 
 const router = express.Router();
 
@@ -75,6 +77,19 @@ router.post(
           ...inv,
           link: `${process.env.FRONTEND_URL || 'http://localhost:5173'}/invite/${code}`,
         });
+      }
+
+      // Send email if method is email
+      if (method === 'email' && email && invitations[0]) {
+        const org = await db('organizations').where({ id: campaign.org_id }).first();
+        emailService.sendInvitation({
+          email,
+          campaignName: campaign.name,
+          orgName: org?.name || '',
+          role,
+          code: invitations[0].code,
+          expiresAt: invitations[0].expires_at,
+        }).catch((e) => logger.error(`Invitation email failed: ${e.message}`));
       }
 
       req.auditEntityId = invitations[0]?.id;

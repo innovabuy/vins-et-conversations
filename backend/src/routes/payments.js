@@ -2,6 +2,7 @@ const express = require('express');
 const db = require('../config/database');
 const { authenticate, requireRole } = require('../middleware/auth');
 const { auditAction } = require('../middleware/audit');
+const emailService = require('../services/emailService');
 const logger = require('../utils/logger');
 
 const router = express.Router();
@@ -44,6 +45,35 @@ router.put('/:id/reconcile', authenticate, requireRole('super_admin', 'comptable
 
     if (!payment) return res.status(404).json({ error: 'NOT_FOUND' });
     res.json(payment);
+  } catch (err) {
+    res.status(500).json({ error: 'SERVER_ERROR', message: err.message });
+  }
+});
+
+// POST /api/v1/admin/payments/:id/remind — Envoyer un rappel de paiement
+router.post('/:id/remind', authenticate, requireRole('super_admin', 'commercial', 'comptable'), auditAction('payments'), async (req, res) => {
+  try {
+    const payment = await db('payments').where({ id: req.params.id }).first();
+    if (!payment) return res.status(404).json({ error: 'NOT_FOUND' });
+
+    const order = await db('orders').where({ id: payment.order_id }).first();
+    if (!order) return res.status(404).json({ error: 'ORDER_NOT_FOUND' });
+
+    const user = await db('users').where({ id: order.user_id }).first();
+    if (!user) return res.status(404).json({ error: 'USER_NOT_FOUND' });
+
+    const result = await emailService.sendPaymentReminder({
+      email: user.email,
+      name: user.name,
+      orderRef: order.ref,
+      amount: payment.amount,
+      method: payment.method,
+      dueDate: payment.due_date,
+    });
+
+    req.auditEntityId = payment.id;
+    req.auditAfter = { reminded_user: user.email, order_ref: order.ref };
+    res.json(result);
   } catch (err) {
     res.status(500).json({ error: 'SERVER_ERROR', message: err.message });
   }

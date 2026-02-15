@@ -5,16 +5,83 @@ const logger = require('../utils/logger');
 
 const BASE_URL = process.env.BASE_URL || 'http://localhost:5173';
 
-// SMTP configuration
-const transporter = nodemailer.createTransport({
-  host: process.env.SMTP_HOST || 'localhost',
-  port: parseInt(process.env.SMTP_PORT || '587', 10),
-  secure: process.env.SMTP_SECURE === 'true',
-  auth: process.env.SMTP_USER ? {
-    user: process.env.SMTP_USER,
-    pass: process.env.SMTP_PASS,
-  } : undefined,
-});
+// ─── Dynamic SMTP configuration ──────────────────────
+
+let cachedTransporter = null;
+let cachedSmtpMode = null;
+
+async function getSmtpConfig() {
+  // In test env, skip DB lookup
+  if (process.env.NODE_ENV === 'test' || process.env.JEST_WORKER_ID) {
+    return {
+      host: process.env.SMTP_HOST || 'localhost',
+      port: parseInt(process.env.SMTP_PORT || '587', 10),
+      from_name: process.env.SMTP_FROM_NAME || 'Vins & Conversations',
+      from_email: process.env.SMTP_FROM_EMAIL || 'noreply@vins-conversations.fr',
+      mode: process.env.SMTP_MODE || 'test',
+    };
+  }
+
+  try {
+    const db = require('../config/database');
+    const rows = await db('app_settings')
+      .whereIn('key', ['smtp_host', 'smtp_port', 'smtp_user', 'smtp_password', 'smtp_from_name', 'smtp_from_email', 'smtp_mode'])
+      .select('key', 'value');
+
+    const cfg = {};
+    for (const r of rows) cfg[r.key] = r.value;
+
+    // Use DB values if smtp_host is configured, otherwise fall back to env
+    if (cfg.smtp_host) {
+      return {
+        host: cfg.smtp_host,
+        port: parseInt(cfg.smtp_port || '587', 10),
+        user: cfg.smtp_user || undefined,
+        password: cfg.smtp_password || undefined,
+        from_name: cfg.smtp_from_name || 'Vins & Conversations',
+        from_email: cfg.smtp_from_email || 'noreply@vins-conversations.fr',
+        mode: cfg.smtp_mode || 'test',
+      };
+    }
+  } catch (e) {
+    logger.warn(`Failed to load SMTP config from DB: ${e.message}`);
+  }
+
+  // Fallback to env vars
+  return {
+    host: process.env.SMTP_HOST || 'localhost',
+    port: parseInt(process.env.SMTP_PORT || '587', 10),
+    user: process.env.SMTP_USER || undefined,
+    password: process.env.SMTP_PASS || undefined,
+    from_name: process.env.SMTP_FROM_NAME || 'Vins & Conversations',
+    from_email: process.env.SMTP_FROM_EMAIL || 'noreply@vins-conversations.fr',
+    mode: process.env.SMTP_MODE || 'test',
+  };
+}
+
+async function getTransporter() {
+  const cfg = await getSmtpConfig();
+  cachedSmtpMode = cfg.mode;
+
+  if (cachedTransporter) return { transporter: cachedTransporter, config: cfg };
+
+  const transportOpts = {
+    host: cfg.host,
+    port: cfg.port,
+    secure: cfg.port === 465,
+  };
+  if (cfg.user) {
+    transportOpts.auth = { user: cfg.user, pass: cfg.password };
+  }
+
+  cachedTransporter = nodemailer.createTransport(transportOpts);
+  return { transporter: cachedTransporter, config: cfg };
+}
+
+function resetSmtpCache() {
+  cachedTransporter = null;
+  cachedSmtpMode = null;
+}
 
 // ─── Template engine ──────────────────────────────────
 
@@ -61,8 +128,17 @@ function renderTemplate(name, vars = {}) {
 
 async function sendEmail({ to, subject, html, attachments = [] }) {
   try {
+    const { transporter, config } = await getTransporter();
+
+    // Test mode: log instead of sending
+    if (config.mode === 'test') {
+      logger.info(`[EMAIL TEST MODE] To: ${to} | Subject: ${subject}`);
+      return { success: true, testMode: true, messageId: `test-${Date.now()}` };
+    }
+
+    const from = `"${config.from_name}" <${config.from_email}>`;
     const info = await transporter.sendMail({
-      from: process.env.SMTP_FROM || '"Vins & Conversations" <noreply@vins-conversations.fr>',
+      from,
       to,
       subject,
       html,
@@ -221,9 +297,51 @@ async function sendBoutiquePaymentConfirmed({ email, name, orderRef, totalTTC })
   return sendEmail({ to: email, subject: `Paiement confirmé — ${orderRef}`, html });
 }
 
+async function sendPaymentFailed({ email, name, orderRef, amount, errorMessage }) {
+  const html = renderTemplate('payment-failed', {
+    SUBJECT: `Problème avec votre paiement — Commande ${orderRef}`,
+    NAME: name,
+    ORDER_REF: orderRef,
+    AMOUNT: formatEur(amount),
+    ERROR_MESSAGE: errorMessage || '',
+    DASHBOARD_URL: `${BASE_URL}`,
+  });
+  return sendEmail({ to: email, subject: `Problème avec votre paiement — Commande ${orderRef}`, html });
+}
+
+async function sendContactReceived({ email, name, type, company }) {
+  const TYPE_LABELS = { question: 'Question', devis: 'Demande de devis', partenariat: 'Partenariat', autre: 'Autre' };
+  const html = renderTemplate('contact-received', {
+    SUBJECT: 'Nous avons bien recu votre message',
+    NAME: name,
+    TYPE_LABEL: TYPE_LABELS[type] || type,
+    COMPANY: company || '',
+  });
+  return sendEmail({ to: email, subject: 'Nous avons bien recu votre message', html });
+}
+
+async function sendContactNotification({ name, email, phone, company, type, message }) {
+  const TYPE_LABELS = { question: 'Question', devis: 'Demande de devis', partenariat: 'Partenariat', autre: 'Autre' };
+  const html = renderTemplate('contact-notification', {
+    SUBJECT: `[Contact] ${TYPE_LABELS[type] || type} — ${name}`,
+    NAME: name,
+    EMAIL: email,
+    PHONE: phone || '—',
+    COMPANY: company || '—',
+    TYPE_LABEL: TYPE_LABELS[type] || type,
+    MESSAGE: message.replace(/\n/g, '<br>'),
+  });
+  return sendEmail({
+    to: process.env.ADMIN_EMAIL || 'nicolas@vins-conversations.fr',
+    subject: `[Contact] ${TYPE_LABELS[type] || type} — ${name}`,
+    html,
+  });
+}
+
 module.exports = {
   sendEmail,
   renderTemplate,
+  resetSmtpCache,
   sendWelcome,
   sendOrderConfirmation,
   sendOrderValidated,
@@ -234,4 +352,7 @@ module.exports = {
   sendPasswordReset,
   sendBoutiqueOrderConfirmation,
   sendBoutiquePaymentConfirmed,
+  sendPaymentFailed,
+  sendContactReceived,
+  sendContactNotification,
 };

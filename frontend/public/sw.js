@@ -1,9 +1,14 @@
-const CACHE_NAME = 'vc-cache-v1';
+const CACHE_NAME = 'vc-cache-v2';
 const STATIC_ASSETS = [
   '/',
   '/manifest.json',
-  '/icon-192.svg',
-  '/icon-512.svg',
+  '/favicon.svg',
+  '/icon-72.png',
+  '/icon-96.png',
+  '/icon-128.png',
+  '/icon-144.png',
+  '/icon-192.png',
+  '/icon-512.png',
 ];
 
 // Install: cache static assets
