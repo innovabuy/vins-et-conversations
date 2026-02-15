@@ -15,13 +15,6 @@ const COLOR_MAP = {
   sans_alcool: 'bg-green-100 text-green-700',
 };
 
-const COLOR_CHIPS = [
-  { value: 'rouge', label: 'Rouge', dot: 'bg-red-500' },
-  { value: 'blanc', label: 'Blanc', dot: 'bg-yellow-400' },
-  { value: 'rosé', label: 'Rosé', dot: 'bg-pink-400' },
-  { value: 'effervescent', label: 'Effervescent', dot: 'bg-sky-400' },
-  { value: 'sans_alcool', label: 'Sans alcool', dot: 'bg-green-500' },
-];
 
 export default function BoutiqueHome() {
   const [searchParams] = useSearchParams();
@@ -30,7 +23,6 @@ export default function BoutiqueHome() {
   const [filters, setFilters] = useState(null);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
-  const [color, setColor] = useState('');
   const [region, setRegion] = useState('');
   const [categoryId, setCategoryId] = useState('');
   const [showFilters, setShowFilters] = useState(false);
@@ -59,7 +51,6 @@ export default function BoutiqueHome() {
     try {
       const params = {};
       if (search) params.search = search;
-      if (color) params.color = color;
       if (region) params.region = region;
       if (categoryId) params.category_id = categoryId;
       if (campaignId) params.campaign_id = campaignId;
@@ -77,7 +68,7 @@ export default function BoutiqueHome() {
     featuredAPI.list().then(r => setFeatured(r.data.data || [])).catch(() => {});
   }, []);
 
-  useEffect(() => { fetchProducts(); }, [search, color, region, categoryId, campaignId]);
+  useEffect(() => { fetchProducts(); }, [search, region, categoryId, campaignId]);
 
   return (
     <div>
@@ -194,30 +185,6 @@ export default function BoutiqueHome() {
             <Filter size={16} /> Régions
             {region && <span className="w-2 h-2 rounded-full bg-wine-600" />}
           </button>
-        </div>
-
-        {/* Color chips */}
-        <div className="flex flex-wrap gap-2 mb-6">
-          <button
-            onClick={() => setColor('')}
-            className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium transition-all ${
-              !color ? 'bg-wine-700 text-white shadow-sm' : 'bg-white border border-gray-200 text-gray-600 hover:border-gray-300'
-            }`}
-          >
-            Tous
-          </button>
-          {COLOR_CHIPS.map((c) => (
-            <button
-              key={c.value}
-              onClick={() => setColor(color === c.value ? '' : c.value)}
-              className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium transition-all ${
-                color === c.value ? 'bg-wine-700 text-white shadow-sm' : 'bg-white border border-gray-200 text-gray-600 hover:border-gray-300'
-              }`}
-            >
-              <span className={`w-2.5 h-2.5 rounded-full ${c.dot} ${color === c.value ? 'ring-1 ring-white' : ''}`} />
-              {c.label}
-            </button>
-          ))}
         </div>
 
         {/* Category filter buttons */}
