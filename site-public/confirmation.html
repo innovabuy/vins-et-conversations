@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Commande confirmée — Vins & Conversations</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,600;0,700;1,400&family=Jost:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="assets/css/style.css?v=2">
+  <link rel="icon" href="assets/images/logo-vc.jpeg" type="image/jpeg">
+</head>
+<body>
+
+  <!-- Header -->
+  <header class="site-header scrolled">
+    <div class="header-inner">
+      <a href="index.html" class="header-logo">
+        <img src="assets/images/logo-vc.jpeg" alt="Vins & Conversations" loading="eager">
+        <span>Vins & Conversations</span>
+      </a>
+      <nav>
+        <ul class="nav-links">
+          <li><a href="index.html">Accueil</a></li>
+          <li><a href="index.html#selection">Nos vins</a></li>
+        </ul>
+      </nav>
+    </div>
+  </header>
+
+  <!-- Confirmation -->
+  <section class="confirmation-page">
+    <div class="container">
+      <div class="confirmation-icon">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+          <polyline points="20 6 9 17 4 12"/>
+        </svg>
+      </div>
+      <h1>Merci pour votre commande !</h1>
+      <p class="confirm-ref" id="confirm-ref">
+        Référence : <strong id="order-ref">—</strong>
+      </p>
+      <p style="color:var(--text-light); max-width: 500px; margin: 0 auto;">
+        Un email de confirmation vous sera envoyé. Vous pouvez suivre l'état de votre commande à tout moment.
+      </p>
+      <div class="confirm-actions">
+        <a href="suivi.html" class="btn btn-wine" id="track-link">Suivre ma commande</a>
+        <a href="index.html" class="btn btn-outline">Continuer mes achats</a>
+      </div>
+    </div>
+  </section>
+
+  <!-- Footer -->
+  <footer class="site-footer">
+    <div class="container">
+      <div class="alcohol-warning">
+        L'abus d'alcool est dangereux pour la santé. À consommer avec modération. La vente d'alcool est interdite aux mineurs.
+      </div>
+      <div class="footer-bottom">
+        <span>&copy; 2026 Vins & Conversations. Tous droits réservés.</span>
+        <div class="footer-legal">
+          <a href="mentions-legales.html">Mentions légales</a>
+          <a href="cgv.html">CGV</a>
+          <a href="confidentialite.html">Confidentialité</a>
+          <a href="avertissement-alcool.html">Avertissement alcool</a>
+        </div>
+      </div>
+    </div>
+  </footer>
+
+  <script src="assets/js/main.js?v=2"></script>
+  <script>
+    document.addEventListener('DOMContentLoaded', () => {
+      const params = new URLSearchParams(window.location.search);
+      const ref = params.get('ref');
+      const email = params.get('email');
+
+      if (ref) {
+        document.getElementById('order-ref').textContent = ref;
+      }
+      if (ref && email) {
+        document.getElementById('track-link').href = `suivi.html?ref=${encodeURIComponent(ref)}&email=${encodeURIComponent(email)}`;
+      }
+    });
+  </script>
+</body>
+</html>

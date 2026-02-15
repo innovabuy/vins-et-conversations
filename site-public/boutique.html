@@ -1,0 +1,319 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Nos vins — Vins & Conversations</title>
+  <meta name="description" content="Découvrez notre sélection de vins de Loire : rouges, blancs, effervescents, rosés. Livraison en France métropolitaine.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,600;0,700;1,400&family=Jost:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="assets/css/style.css?v=2">
+  <link rel="icon" href="assets/images/logo-vc.jpeg" type="image/jpeg">
+</head>
+<body>
+
+  <!-- Header -->
+  <header class="site-header scrolled">
+    <div class="header-inner">
+      <a href="index.html" class="header-logo">
+        <img src="assets/images/logo-vc.jpeg" alt="Vins & Conversations" loading="eager">
+        <span>Vins & Conversations</span>
+      </a>
+      <button class="menu-toggle" id="menu-toggle" aria-label="Menu" aria-expanded="false">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M3 12h18M3 6h18M3 18h18"/>
+        </svg>
+      </button>
+      <nav>
+        <ul class="nav-links" id="nav-menu">
+          <li><a href="index.html">Accueil</a></li>
+          <li><a href="boutique.html" class="active">Nos vins</a></li>
+          <li><a href="contact.html">Contact</a></li>
+          <li>
+            <a href="panier.html" class="nav-cart" aria-label="Panier">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 002 1.61h9.72a2 2 0 002-1.61L23 6H6"/></svg>
+              <span class="cart-badge" style="display:none">0</span>
+            </a>
+          </li>
+          <li><a href="http://localhost:5173" class="nav-cta">Espace membre</a></li>
+        </ul>
+      </nav>
+    </div>
+  </header>
+
+  <!-- Catalogue -->
+  <section class="catalogue-page">
+    <div class="container">
+      <div class="catalogue-header">
+        <h1>Nos vins</h1>
+        <p>Sélectionnés avec soin par Nicolas, directement chez les vignerons.</p>
+      </div>
+
+      <!-- Filters -->
+      <div class="catalogue-filters" id="catalogue-filters">
+        <div class="filter-categories" id="filter-categories">
+          <button class="filter-cat-btn active" data-cat="">Tous</button>
+        </div>
+        <div class="filter-bar">
+          <div class="filter-colors" id="filter-colors"></div>
+          <div class="filter-search">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg>
+            <input type="text" id="search-input" placeholder="Rechercher un vin...">
+          </div>
+        </div>
+      </div>
+
+      <!-- Products grid -->
+      <div class="catalogue-grid" id="catalogue-grid">
+        <div class="catalogue-loading">Chargement...</div>
+      </div>
+
+      <!-- Pagination -->
+      <div class="catalogue-pagination" id="catalogue-pagination" style="display:none">
+        <button class="btn btn-outline btn-sm" id="prev-page" disabled>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"/></svg>
+          Précédent
+        </button>
+        <span class="page-info" id="page-info">Page 1</span>
+        <button class="btn btn-outline btn-sm" id="next-page">
+          Suivant
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>
+        </button>
+      </div>
+    </div>
+  </section>
+
+  <!-- Footer -->
+  <footer class="site-footer" id="contact-footer">
+    <div class="container">
+      <div class="footer-grid">
+        <div class="footer-brand">
+          <img src="assets/images/logo-vc.jpeg" alt="Vins & Conversations" class="footer-logo">
+          <h3>Vins & Conversations</h3>
+          <p>Vins de qualité sélectionnés avec passion, au service de vos projets éducatifs et de vos envies de partage.</p>
+        </div>
+        <div class="footer-col">
+          <h4>Navigation</h4>
+          <ul>
+            <li><a href="index.html">Accueil</a></li>
+            <li><a href="boutique.html">Nos vins</a></li>
+            <li><a href="contact.html">Contact</a></li>
+          </ul>
+        </div>
+        <div class="footer-col">
+          <h4>Informations</h4>
+          <ul>
+            <li><a href="mentions-legales.html">Mentions légales</a></li>
+            <li><a href="cgv.html">CGV</a></li>
+            <li><a href="confidentialite.html">Confidentialité</a></li>
+            <li><a href="avertissement-alcool.html">Avertissement alcool</a></li>
+          </ul>
+        </div>
+        <div class="footer-col">
+          <h4>Contact</h4>
+          <div class="footer-contact-item">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
+            <span>contact@vinsetconversations.fr</span>
+          </div>
+          <div class="footer-contact-item">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0118 0z"/><circle cx="12" cy="10" r="3"/></svg>
+            <span>6 Sq. Léon Morice, 49480 Verrières-en-Anjou</span>
+          </div>
+        </div>
+      </div>
+      <div class="alcohol-warning">
+        L'abus d'alcool est dangereux pour la santé. À consommer avec modération. La vente d'alcool est interdite aux mineurs.
+      </div>
+      <div class="footer-bottom">
+        <span>&copy; 2026 Vins & Conversations. Tous droits réservés.</span>
+        <div class="footer-legal">
+          <a href="mentions-legales.html">Mentions légales</a>
+          <a href="cgv.html">CGV</a>
+          <a href="confidentialite.html">Confidentialité</a>
+        </div>
+      </div>
+    </div>
+  </footer>
+
+  <script src="assets/js/main.js?v=2"></script>
+  <script>
+    /* ─── Catalogue Logic ──────────────────────── */
+    let currentPage = 1;
+    const perPage = 12;
+    let currentFilters = { category: '', color: '', search: '' };
+    let totalProducts = 0;
+    let filtersData = null;
+
+    document.addEventListener('DOMContentLoaded', async () => {
+      await loadFilters();
+      await loadProducts();
+      setupSearch();
+    });
+
+    async function loadFilters() {
+      try {
+        const res = await fetch('/api/v1/public/filters');
+        if (!res.ok) return;
+        filtersData = await res.json();
+
+        // Category buttons
+        const catContainer = document.getElementById('filter-categories');
+        const cats = (filtersData.categoryObjects || []).filter(c => c.slug !== 'test-cat-xxxx');
+        cats.forEach(cat => {
+          const btn = document.createElement('button');
+          btn.className = 'filter-cat-btn';
+          btn.dataset.cat = cat.name;
+          btn.innerHTML = `${cat.icon || ''} ${cat.name}`;
+          btn.addEventListener('click', () => {
+            document.querySelectorAll('.filter-cat-btn').forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+            currentFilters.category = cat.name;
+            currentPage = 1;
+            loadProducts();
+          });
+          catContainer.appendChild(btn);
+        });
+
+        // "Tous" button handler
+        catContainer.querySelector('[data-cat=""]').addEventListener('click', () => {
+          document.querySelectorAll('.filter-cat-btn').forEach(b => b.classList.remove('active'));
+          catContainer.querySelector('[data-cat=""]').classList.add('active');
+          currentFilters.category = '';
+          currentPage = 1;
+          loadProducts();
+        });
+
+        // Color chips
+        const colorContainer = document.getElementById('filter-colors');
+        const colorLabels = { blanc: 'Blanc', rouge: 'Rouge', 'rosé': 'Rosé', effervescent: 'Effervescent', sans_alcool: 'Sans alcool' };
+        const colorHex = { blanc: '#E8D5A3', rouge: '#722F37', 'rosé': '#E8A0B0', effervescent: '#59a9d4', sans_alcool: '#059669' };
+        (filtersData.colors || []).forEach(color => {
+          const chip = document.createElement('button');
+          chip.className = 'color-chip';
+          chip.dataset.color = color;
+          chip.innerHTML = `<span class="color-dot" style="background:${colorHex[color] || '#999'}"></span>${colorLabels[color] || color}`;
+          chip.addEventListener('click', () => {
+            if (chip.classList.contains('active')) {
+              chip.classList.remove('active');
+              currentFilters.color = '';
+            } else {
+              document.querySelectorAll('.color-chip').forEach(c => c.classList.remove('active'));
+              chip.classList.add('active');
+              currentFilters.color = color;
+            }
+            currentPage = 1;
+            loadProducts();
+          });
+          colorContainer.appendChild(chip);
+        });
+      } catch (err) {
+        console.warn('Failed to load filters', err);
+      }
+    }
+
+    function setupSearch() {
+      const input = document.getElementById('search-input');
+      let timer;
+      input.addEventListener('input', () => {
+        clearTimeout(timer);
+        timer = setTimeout(() => {
+          currentFilters.search = input.value.trim();
+          currentPage = 1;
+          loadProducts();
+        }, 400);
+      });
+    }
+
+    async function loadProducts() {
+      const grid = document.getElementById('catalogue-grid');
+      grid.innerHTML = '<div class="catalogue-loading">Chargement...</div>';
+
+      const params = new URLSearchParams({ page: currentPage, limit: perPage });
+      if (currentFilters.category) params.set('category', currentFilters.category);
+      if (currentFilters.color) params.set('color', currentFilters.color);
+      if (currentFilters.search) params.set('search', currentFilters.search);
+
+      try {
+        const res = await fetch(`/api/v1/public/catalog?${params}`);
+        if (!res.ok) throw new Error('API error');
+        const result = await res.json();
+        const wines = result.data || result.products || result;
+        totalProducts = result.total || result.totalCount || wines.length;
+
+        if (!wines.length) {
+          grid.innerHTML = '<div class="catalogue-empty"><p>Aucun vin trouvé pour ces critères.</p><button class="btn btn-outline btn-sm" onclick="resetFilters()">Réinitialiser les filtres</button></div>';
+          document.getElementById('catalogue-pagination').style.display = 'none';
+          return;
+        }
+
+        grid.innerHTML = wines.map(w => `
+          <div class="wine-card">
+            <a href="produit.html?id=${w.id}" class="wine-card-link">
+              <div class="wine-card-img">
+                <img src="${getProductImage(w)}" alt="${escapeHtml(w.name)}" loading="lazy">
+                ${w.label ? `<span class="wine-badge wine-badge-abs">${escapeHtml(w.label)}</span>` : ''}
+              </div>
+              <div class="wine-card-body">
+                <h3>${escapeHtml(w.name)}</h3>
+                <p class="appellation">${escapeHtml(w.appellation || w.region || '')}</p>
+                <p class="wine-category-tag">${escapeHtml(w.category || '')}</p>
+                <div class="wine-price">${parseFloat(w.price_ttc).toFixed(2)} € <small>TTC</small></div>
+              </div>
+            </a>
+            <button class="btn btn-wine btn-sm btn-add-cart" data-id="${w.id}" data-name="${escapeHtml(w.name)}" data-price="${w.price_ttc}" data-img="${getProductImage(w)}" data-appellation="${escapeHtml(w.appellation||'')}">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 002 1.61h9.72a2 2 0 002-1.61L23 6H6"/></svg>
+              Ajouter au panier
+            </button>
+          </div>
+        `).join('');
+
+        grid.querySelectorAll('.btn-add-cart').forEach(btn => btn.addEventListener('click', onAddToCart));
+        updatePagination();
+      } catch (err) {
+        grid.innerHTML = '<div class="catalogue-empty"><p>Erreur de chargement. Veuillez réessayer.</p></div>';
+        console.error(err);
+      }
+    }
+
+    function updatePagination() {
+      const pag = document.getElementById('catalogue-pagination');
+      const totalPages = Math.ceil(totalProducts / perPage);
+      if (totalPages <= 1) { pag.style.display = 'none'; return; }
+
+      pag.style.display = 'flex';
+      document.getElementById('page-info').textContent = `Page ${currentPage} / ${totalPages}`;
+      document.getElementById('prev-page').disabled = currentPage <= 1;
+      document.getElementById('next-page').disabled = currentPage >= totalPages;
+    }
+
+    document.addEventListener('click', (e) => {
+      if (e.target.closest('#prev-page') && currentPage > 1) { currentPage--; loadProducts(); window.scrollTo({ top: 0, behavior: 'smooth' }); }
+      if (e.target.closest('#next-page')) { currentPage++; loadProducts(); window.scrollTo({ top: 0, behavior: 'smooth' }); }
+    });
+
+    function resetFilters() {
+      currentFilters = { category: '', color: '', search: '' };
+      currentPage = 1;
+      document.querySelectorAll('.filter-cat-btn').forEach(b => b.classList.remove('active'));
+      document.querySelector('.filter-cat-btn[data-cat=""]').classList.add('active');
+      document.querySelectorAll('.color-chip').forEach(c => c.classList.remove('active'));
+      document.getElementById('search-input').value = '';
+      loadProducts();
+    }
+
+    function onAddToCart(e) {
+      const btn = e.currentTarget;
+      Cart.add({ id: btn.dataset.id, name: btn.dataset.name, price_ttc: btn.dataset.price, image_url: btn.dataset.img, appellation: btn.dataset.appellation });
+    }
+
+    function getProductImage(p) {
+      if (p.image_url) return p.image_url;
+      const slug = (p.name||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'');
+      return 'assets/images/produits/' + slug + '.jpg';
+    }
+
+    function escapeHtml(t) { const d = document.createElement('div'); d.textContent = t || ''; return d.innerHTML; }
+  </script>
+</body>
+</html>

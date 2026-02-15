@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Suivi de commande — Vins & Conversations</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,600;0,700;1,400&family=Jost:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="assets/css/style.css?v=2">
+  <link rel="icon" href="assets/images/logo-vc.jpeg" type="image/jpeg">
+  <style>
+    .tracking-page { padding: 120px 0 80px; }
+    .tracking-page h1 { color: var(--wine); margin-bottom: 12px; font-size: 2.5rem; }
+    .tracking-page > .container > p { color: var(--text-light); margin-bottom: 32px; }
+
+    .tracking-form {
+      max-width: 500px;
+      margin: 0 auto 40px;
+      background: var(--cream);
+      padding: 32px;
+      border-radius: var(--radius-lg);
+    }
+
+    .tracking-form .form-group { margin-bottom: 16px; }
+    .tracking-form label { display: block; font-weight: 500; margin-bottom: 6px; font-size: 0.9rem; }
+    .tracking-form input {
+      width: 100%;
+      padding: 12px 16px;
+      border: 1px solid var(--cream-dark);
+      border-radius: var(--radius);
+      font-family: 'Jost', sans-serif;
+      font-size: 0.95rem;
+    }
+    .tracking-form input:focus { outline: none; border-color: var(--wine); }
+
+    .tracking-result {
+      max-width: 600px;
+      margin: 0 auto;
+      text-align: left;
+    }
+
+    .tracking-result h2 { color: var(--wine); margin-bottom: 16px; }
+
+    .tracking-status {
+      display: inline-block;
+      padding: 6px 16px;
+      border-radius: 50px;
+      font-size: 0.85rem;
+      font-weight: 600;
+      margin-bottom: 20px;
+    }
+    .status-pending { background: #fff3cd; color: #856404; }
+    .status-confirmed { background: #d1ecf1; color: #0c5460; }
+    .status-shipped { background: #d4edda; color: #155724; }
+    .status-delivered { background: #d4edda; color: #155724; }
+
+    .tracking-items {
+      background: var(--cream);
+      border-radius: var(--radius);
+      padding: 20px;
+    }
+
+    .tracking-item {
+      display: flex;
+      justify-content: space-between;
+      padding: 8px 0;
+      border-bottom: 1px solid var(--cream-dark);
+    }
+    .tracking-item:last-child { border-bottom: none; }
+
+    .tracking-total {
+      display: flex;
+      justify-content: space-between;
+      padding-top: 12px;
+      margin-top: 8px;
+      border-top: 2px solid var(--wine);
+      font-weight: 700;
+      color: var(--wine);
+      font-size: 1.1rem;
+    }
+
+    .tracking-error {
+      background: #fef2f2;
+      border: 1px solid #fca5a5;
+      color: #991b1b;
+      padding: 12px 16px;
+      border-radius: var(--radius);
+      max-width: 500px;
+      margin: 0 auto;
+      text-align: center;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Header -->
+  <header class="site-header scrolled">
+    <div class="header-inner">
+      <a href="index.html" class="header-logo">
+        <img src="assets/images/logo-vc.jpeg" alt="Vins & Conversations" loading="eager">
+        <span>Vins & Conversations</span>
+      </a>
+      <nav>
+        <ul class="nav-links">
+          <li><a href="index.html">Accueil</a></li>
+          <li><a href="index.html#selection">Nos vins</a></li>
+        </ul>
+      </nav>
+    </div>
+  </header>
+
+  <!-- Tracking -->
+  <section class="tracking-page">
+    <div class="container" style="text-align:center">
+      <h1>Suivi de commande</h1>
+      <p>Entrez votre référence de commande et votre email pour consulter l'état de votre commande.</p>
+
+      <div class="tracking-form">
+        <form id="tracking-form">
+          <div class="form-group">
+            <label for="track-ref">Référence de commande</label>
+            <input type="text" id="track-ref" required placeholder="Ex: ORD-2026-XXXXX">
+          </div>
+          <div class="form-group">
+            <label for="track-email">Email</label>
+            <input type="email" id="track-email" required placeholder="votre@email.com">
+          </div>
+          <button type="submit" class="btn btn-wine" style="width:100%; justify-content:center; margin-top:8px;">Rechercher</button>
+        </form>
+      </div>
+
+      <div id="tracking-result" style="display:none"></div>
+      <div id="tracking-error" style="display:none" class="tracking-error"></div>
+    </div>
+  </section>
+
+  <!-- Footer -->
+  <footer class="site-footer">
+    <div class="container">
+      <div class="alcohol-warning">
+        L'abus d'alcool est dangereux pour la santé. À consommer avec modération. La vente d'alcool est interdite aux mineurs.
+      </div>
+      <div class="footer-bottom">
+        <span>&copy; 2026 Vins & Conversations. Tous droits réservés.</span>
+        <div class="footer-legal">
+          <a href="mentions-legales.html">Mentions légales</a>
+          <a href="cgv.html">CGV</a>
+          <a href="confidentialite.html">Confidentialité</a>
+          <a href="avertissement-alcool.html">Avertissement alcool</a>
+        </div>
+      </div>
+    </div>
+  </footer>
+
+  <script src="assets/js/main.js?v=2"></script>
+  <script>
+    document.addEventListener('DOMContentLoaded', () => {
+      // Pre-fill from URL params
+      const params = new URLSearchParams(window.location.search);
+      const ref = params.get('ref');
+      const email = params.get('email');
+      if (ref) document.getElementById('track-ref').value = ref;
+      if (email) document.getElementById('track-email').value = email;
+      if (ref && email) lookupOrder(ref, email);
+
+      document.getElementById('tracking-form').addEventListener('submit', (e) => {
+        e.preventDefault();
+        const r = document.getElementById('track-ref').value.trim();
+        const em = document.getElementById('track-email').value.trim();
+        if (r && em) lookupOrder(r, em);
+      });
+    });
+
+    async function lookupOrder(ref, email) {
+      const resultDiv = document.getElementById('tracking-result');
+      const errorDiv = document.getElementById('tracking-error');
+      resultDiv.style.display = 'none';
+      errorDiv.style.display = 'none';
+
+      try {
+        const res = await fetch(`/api/v1/public/order/${encodeURIComponent(ref)}?email=${encodeURIComponent(email)}`);
+        if (!res.ok) {
+          const data = await res.json().catch(() => ({}));
+          errorDiv.textContent = data.message || 'Commande introuvable. Vérifiez votre référence et email.';
+          errorDiv.style.display = 'block';
+          return;
+        }
+
+        const order = await res.json();
+        const statusLabels = {
+          pending: 'En attente',
+          confirmed: 'Confirmée',
+          shipped: 'Expédiée',
+          delivered: 'Livrée',
+          cancelled: 'Annulée',
+        };
+        const statusClass = `status-${order.status || 'pending'}`;
+
+        resultDiv.innerHTML = `
+          <div class="tracking-result">
+            <h2>Commande ${escapeHtml(order.reference || ref)}</h2>
+            <span class="tracking-status ${statusClass}">${statusLabels[order.status] || order.status}</span>
+            <div class="tracking-items">
+              ${(order.items || []).map(item => `
+                <div class="tracking-item">
+                  <span>${escapeHtml(item.product_name || item.name)} x${item.quantity || item.qty}</span>
+                  <span>${parseFloat(item.total || item.price * item.quantity).toFixed(2)} &euro;</span>
+                </div>
+              `).join('')}
+              <div class="tracking-total">
+                <span>Total</span>
+                <span>${parseFloat(order.total || 0).toFixed(2)} &euro; TTC</span>
+              </div>
+            </div>
+          </div>
+        `;
+        resultDiv.style.display = 'block';
+      } catch (err) {
+        errorDiv.textContent = 'Erreur réseau. Veuillez réessayer.';
+        errorDiv.style.display = 'block';
+      }
+    }
+
+    function escapeHtml(t) { const d = document.createElement('div'); d.textContent = t || ''; return d.innerHTML; }
+  </script>
+</body>
+</html>

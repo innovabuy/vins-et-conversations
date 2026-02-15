@@ -1,0 +1,396 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Vins & Conversations — Du vignoble à vos projets</title>
+  <meta name="description" content="Vins & Conversations sélectionne des vins de qualité pour financer les projets éducatifs. Partenariats écoles, CSE, ambassadeurs et événements.">
+  <meta name="keywords" content="vin, Loire, financement, école, CSE, ambassadeur, dégustation">
+
+  <!-- Open Graph -->
+  <meta property="og:title" content="Vins & Conversations — Du vignoble à vos projets">
+  <meta property="og:description" content="Le vin qui crée du lien. Sélection de vins pour financer vos projets éducatifs.">
+  <meta property="og:image" content="assets/images/logo-vc.jpeg">
+  <meta property="og:type" content="website">
+
+  <!-- Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,600;0,700;1,400&family=Jost:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+
+  <!-- CSS -->
+  <link rel="stylesheet" href="assets/css/style.css?v=2">
+
+  <!-- Favicon -->
+  <link rel="icon" href="assets/images/logo-vc.jpeg" type="image/jpeg">
+
+  <!-- Video preload -->
+  <link rel="preload" as="video" href="assets/images/hero-video-720p.mp4">
+
+  <!-- Schema.org -->
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "LocalBusiness",
+    "name": "Vins & Conversations",
+    "description": "Sélection de vins de qualité pour financer les projets éducatifs",
+    "address": {
+      "@type": "PostalAddress",
+      "addressRegion": "Pays de la Loire",
+      "addressCountry": "FR"
+    },
+    "url": "https://vinsetconversations.com"
+  }
+  </script>
+</head>
+<body>
+
+  <!-- Header -->
+  <header class="site-header">
+    <div class="header-inner">
+      <a href="index.html" class="header-logo">
+        <img src="assets/images/logo-vc.jpeg" alt="Vins & Conversations" loading="eager">
+        <span>Vins & Conversations</span>
+      </a>
+      <button class="menu-toggle" id="menu-toggle" aria-label="Menu" aria-expanded="false">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M3 12h18M3 6h18M3 18h18"/>
+        </svg>
+      </button>
+      <nav>
+        <ul class="nav-links" id="nav-menu">
+          <li><a href="#prestations">Nos prestations</a></li>
+          <li><a href="boutique.html">Nos vins</a></li>
+          <li><a href="#nicolas">Notre histoire</a></li>
+          <li><a href="contact.html">Contact</a></li>
+          <li>
+            <a href="panier.html" class="nav-cart" aria-label="Panier">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 002 1.61h9.72a2 2 0 002-1.61L23 6H6"/></svg>
+              <span class="cart-badge" style="display:none">0</span>
+            </a>
+          </li>
+          <li><a href="http://localhost:5173" class="nav-cta">Espace membre</a></li>
+        </ul>
+      </nav>
+    </div>
+  </header>
+
+  <!-- Hero -->
+  <section class="hero" id="hero">
+    <div class="hero-video-wrap">
+      <video autoplay muted loop playsinline poster="assets/images/section-vignoble.png">
+        <source src="assets/images/hero-video-720p.mp4" type="video/mp4">
+      </video>
+    </div>
+    <div class="hero-overlay"></div>
+    <div class="hero-content">
+      <h1>Vins <span>&</span> Conversations</h1>
+      <p class="hero-subtitle">Du vignoble à vos projets — le vin qui crée du lien</p>
+      <div class="hero-buttons">
+        <a href="boutique.html" class="btn btn-primary">Découvrir nos vins</a>
+        <a href="#prestations" class="btn btn-secondary">Notre démarche</a>
+      </div>
+    </div>
+    <a href="#logos" class="hero-scroll" aria-label="Défiler">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M7 13l5 5 5-5M7 6l5 5 5-5"/>
+      </svg>
+    </a>
+  </section>
+
+  <!-- Logos Partenaires -->
+  <section class="logos-band" id="logos">
+    <div class="container">
+      <p>Ils nous font confiance</p>
+      <div class="logos-grid">
+        <img src="assets/images/logo-sacrecoeur.png" alt="Sacré-Cœur" loading="lazy">
+        <img src="assets/images/logo-espl.jpg" alt="ESPL" loading="lazy">
+        <img src="assets/images/logo-pba.png" alt="PBA" loading="lazy">
+        <img src="assets/images/logo-esup.jpg" alt="ESUP" loading="lazy">
+        <img src="assets/images/logo-cci.png" alt="CCI" loading="lazy">
+      </div>
+    </div>
+  </section>
+
+  <!-- Prestations -->
+  <section class="section prestations" id="prestations">
+    <div class="container">
+      <div class="section-header reveal">
+        <span class="section-label">Nos prestations</span>
+        <h2>Le vin au service de vos projets</h2>
+        <p>Quatre façons de collaborer avec Vins & Conversations, toutes centrées sur la création de valeur partagée.</p>
+      </div>
+      <div class="prestations-grid">
+
+        <div class="prestation-card reveal">
+          <div class="prestation-card-img">
+            <img src="assets/images/section-equipe-bts.jpg" alt="Partenariat écoles" loading="lazy">
+          </div>
+          <div class="prestation-card-body">
+            <div class="subtitle">Écoles & étudiants</div>
+            <h3>Financez vos projets</h3>
+            <p>Vos étudiants vendent des vins sélectionnés et financent leurs voyages, événements et projets pédagogiques. Une expérience commerciale concrète et formatrice.</p>
+          </div>
+        </div>
+
+        <div class="prestation-card reveal">
+          <div class="prestation-card-img">
+            <img src="assets/images/section-verres.png" alt="CSE dégustation" loading="lazy">
+          </div>
+          <div class="prestation-card-body">
+            <div class="subtitle">Comités d'entreprise</div>
+            <h3>Des vins pour vos salariés</h3>
+            <p>Offrez à vos collaborateurs une sélection de vins de qualité à prix négociés. Idéal pour vos paniers gourmands, événements d'entreprise et cadeaux de fin d'année.</p>
+          </div>
+        </div>
+
+        <div class="prestation-card reveal">
+          <div class="prestation-card-img">
+            <img src="assets/images/section-vignoble.png" alt="Ambassadeurs" loading="lazy">
+          </div>
+          <div class="prestation-card-body">
+            <div class="subtitle">Réseau ambassadeurs</div>
+            <h3>Partagez votre passion</h3>
+            <p>Devenez ambassadeur et recommandez nos vins autour de vous. Parrainage, commissions et avantages exclusifs pour les passionnés qui font vivre notre réseau.</p>
+          </div>
+        </div>
+
+        <div class="prestation-card reveal">
+          <div class="prestation-card-img">
+            <img src="assets/images/section-verres.png" alt="Événements" loading="lazy">
+          </div>
+          <div class="prestation-card-body">
+            <div class="subtitle">Événements & dégustations</div>
+            <h3>Des moments uniques</h3>
+            <p>Organisez des dégustations privées, soirées œnologiques ou événements sur-mesure. Nicolas vous accompagne pour créer des moments de partage inoubliables.</p>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </section>
+
+  <!-- La Sélection de Nicolas -->
+  <section class="section selection" id="selection">
+    <div class="container">
+      <div class="section-header reveal">
+        <span class="section-label">Cave & sélection</span>
+        <h2>La sélection de Nicolas</h2>
+        <p>Des vins choisis avec soin, directement chez les vignerons, pour leur qualité et leur caractère.</p>
+      </div>
+      <div class="wines-grid" id="wines-grid">
+
+        <!-- Fallback statique (remplacé par l'API si disponible) -->
+        <div class="wine-card reveal">
+          <div class="wine-card-img">
+            <img src="assets/images/produits/oriolus-blanc.jpg" alt="Oriolus Blanc" loading="lazy">
+          </div>
+          <div class="wine-card-body">
+            <h3>Oriolus Blanc</h3>
+            <p class="appellation">Chardonnay, Pierre Jean Larraqué</p>
+            <span class="wine-badge">HVE</span>
+            <div class="wine-price">6,50 € <small>TTC</small></div>
+            <button class="btn btn-wine btn-sm btn-add-cart" data-name="Oriolus Blanc" data-price="6.50" data-img="assets/images/produits/oriolus-blanc.jpg" data-appellation="Chardonnay">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 002 1.61h9.72a2 2 0 002-1.61L23 6H6"/></svg>
+              Ajouter
+            </button>
+          </div>
+        </div>
+
+        <div class="wine-card reveal">
+          <div class="wine-card-img">
+            <img src="assets/images/produits/cuvee-clemence.jpg" alt="Cuvée Clémence" loading="lazy">
+          </div>
+          <div class="wine-card-body">
+            <h3>Cuvée Clémence</h3>
+            <p class="appellation">Entre-Deux-Mers, Cheval Quancard</p>
+            <span class="wine-badge">Bio</span>
+            <div class="wine-price">8,50 € <small>TTC</small></div>
+            <button class="btn btn-wine btn-sm btn-add-cart" data-name="Cuvée Clémence" data-price="8.50" data-img="assets/images/produits/cuvee-clemence.jpg" data-appellation="Entre-Deux-Mers">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 002 1.61h9.72a2 2 0 002-1.61L23 6H6"/></svg>
+              Ajouter
+            </button>
+          </div>
+        </div>
+
+        <div class="wine-card reveal">
+          <div class="wine-card-img">
+            <img src="assets/images/produits/bourgogne-lamy.jpg" alt="Bourgogne Hautes-Côtes de Nuits" loading="lazy">
+          </div>
+          <div class="wine-card-body">
+            <h3>Bourgogne HCN</h3>
+            <p class="appellation">René Lamy, 2020</p>
+            <div class="wine-price">18,00 € <small>TTC</small></div>
+            <button class="btn btn-wine btn-sm btn-add-cart" data-name="Bourgogne HCN" data-price="18.00" data-img="assets/images/produits/bourgogne-lamy.jpg" data-appellation="Hautes-Côtes de Nuits">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 002 1.61h9.72a2 2 0 002-1.61L23 6H6"/></svg>
+              Ajouter
+            </button>
+          </div>
+        </div>
+
+        <div class="wine-card reveal">
+          <div class="wine-card-img">
+            <img src="assets/images/produits/coteaux-du-layon.jpg" alt="Coteaux du Layon" loading="lazy">
+          </div>
+          <div class="wine-card-body">
+            <h3>Coteaux du Layon</h3>
+            <p class="appellation">Domaine de la Bougrie, 2020</p>
+            <span class="wine-badge">HVE</span>
+            <div class="wine-price">11,00 € <small>TTC</small></div>
+            <button class="btn btn-wine btn-sm btn-add-cart" data-name="Coteaux du Layon" data-price="11.00" data-img="assets/images/produits/coteaux-du-layon.jpg" data-appellation="Coteaux du Layon">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 002 1.61h9.72a2 2 0 002-1.61L23 6H6"/></svg>
+              Ajouter
+            </button>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </section>
+
+  <!-- Wizard CTA -->
+  <section class="section wizard-section" id="wizard">
+    <div class="container">
+      <div class="wizard-inner">
+        <span class="section-label" style="color: var(--gold);">Recommandation personnalisée</span>
+        <h2>Trouvez le vin qui vous ressemble</h2>
+        <p>En 3 étapes, découvrez les vins qui correspondent à vos goûts et à votre occasion.</p>
+
+        <div class="wizard-steps">
+          <div class="wizard-step">
+            <div class="step-num">1</div>
+            <h3>L'occasion</h3>
+            <p>Repas, cadeau, apéro ou événement ?</p>
+          </div>
+          <div class="wizard-step">
+            <div class="step-num">2</div>
+            <h3>Vos goûts</h3>
+            <p>Fruité, boisé, frais ou corsé ?</p>
+          </div>
+          <div class="wizard-step">
+            <div class="step-num">3</div>
+            <h3>Nos suggestions</h3>
+            <p>Les vins faits pour vous</p>
+          </div>
+        </div>
+
+        <button class="btn btn-primary btn-open-wizard" id="open-wizard">Trouvez votre vin</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- Wizard Overlay (modal) -->
+  <div class="wizard-overlay" id="wizard-overlay">
+    <div class="wizard-modal"></div>
+  </div>
+
+  <!-- Galerie -->
+  <section class="section galerie" id="galerie">
+    <div class="container">
+      <div class="section-header reveal">
+        <span class="section-label">En images</span>
+        <h2>Nos moments de partage</h2>
+      </div>
+      <div class="galerie-grid">
+        <div class="galerie-item reveal">
+          <img src="assets/images/section-verres.png" alt="Dégustation de vins" loading="lazy">
+        </div>
+        <div class="galerie-item reveal">
+          <img src="assets/images/section-equipe-bts.jpg" alt="Équipe BTS NDRC" loading="lazy">
+        </div>
+        <div class="galerie-item reveal">
+          <img src="assets/images/section-vignoble.png" alt="Vignoble de Loire" loading="lazy">
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Nicolas -->
+  <section class="section nicolas" id="nicolas">
+    <div class="container">
+      <div class="nicolas-layout">
+        <div class="nicolas-photo reveal">
+          <img src="assets/images/section-equipe-bts.jpg" alt="Nicolas Froment" loading="lazy">
+        </div>
+        <div class="nicolas-text reveal">
+          <span class="section-label">Le fondateur</span>
+          <h2>Qui sélectionne vos vins ?</h2>
+          <p>Nicolas Froment, passionné de vin et d'entrepreneuriat depuis plus de 12 ans, sillonne les vignobles français pour dénicher des pépites. Son approche : privilégier les rencontres avec les vignerons, comprendre leur terroir, et sélectionner des vins qui racontent une histoire.</p>
+          <p>Avec Vins & Conversations, il met cette expertise au service de projets éducatifs et solidaires. Chaque bouteille vendue contribue à financer les ambitions des étudiants et les initiatives des entreprises partenaires.</p>
+          <div class="nicolas-stats">
+            <div class="stat-item">
+              <span class="stat-number">18 000 €</span>
+              <span class="stat-label">Collectés pour les écoles</span>
+            </div>
+            <div class="stat-item">
+              <span class="stat-number">5</span>
+              <span class="stat-label">Écoles partenaires</span>
+            </div>
+            <div class="stat-item">
+              <span class="stat-number">12 ans</span>
+              <span class="stat-label">D'expérience</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Footer -->
+  <footer class="site-footer" id="contact-footer">
+    <div class="container">
+      <div class="footer-grid">
+        <div class="footer-brand">
+          <img src="assets/images/logo-vc.jpeg" alt="Vins & Conversations" class="footer-logo">
+          <h3>Vins & Conversations</h3>
+          <p>Vins de qualité sélectionnés avec passion, au service de vos projets éducatifs et de vos envies de partage.</p>
+        </div>
+        <div class="footer-col">
+          <h4>Navigation</h4>
+          <ul>
+            <li><a href="index.html">Accueil</a></li>
+            <li><a href="boutique.html">Nos vins</a></li>
+            <li><a href="contact.html">Contact</a></li>
+            <li><a href="#nicolas">Notre histoire</a></li>
+          </ul>
+        </div>
+        <div class="footer-col">
+          <h4>Informations</h4>
+          <ul>
+            <li><a href="mentions-legales.html">Mentions légales</a></li>
+            <li><a href="cgv.html">CGV</a></li>
+            <li><a href="confidentialite.html">Confidentialité</a></li>
+            <li><a href="avertissement-alcool.html">Avertissement alcool</a></li>
+          </ul>
+        </div>
+        <div class="footer-col" id="contact-info">
+          <h4>Contact</h4>
+          <div class="footer-contact-item">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
+            <span>contact@vinsetconversations.fr</span>
+          </div>
+          <div class="footer-contact-item">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0118 0z"/><circle cx="12" cy="10" r="3"/></svg>
+            <span>6 Sq. Léon Morice, 49480 Verrières-en-Anjou</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="alcohol-warning">
+        L'abus d'alcool est dangereux pour la santé. À consommer avec modération. La vente d'alcool est interdite aux mineurs.
+      </div>
+
+      <div class="footer-bottom">
+        <span>&copy; 2026 Vins & Conversations. Tous droits réservés.</span>
+        <div class="footer-legal">
+          <a href="mentions-legales.html">Mentions légales</a>
+          <a href="cgv.html">CGV</a>
+          <a href="confidentialite.html">Confidentialité</a>
+        </div>
+      </div>
+    </div>
+  </footer>
+
+  <script src="assets/js/main.js?v=2"></script>
+</body>
+</html>
