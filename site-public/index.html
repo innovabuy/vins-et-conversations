@@ -10,8 +10,15 @@
   <!-- Open Graph -->
   <meta property="og:title" content="Vins & Conversations — Du vignoble à vos projets">
   <meta property="og:description" content="Le vin qui crée du lien. Sélection de vins pour financer vos projets éducatifs.">
-  <meta property="og:image" content="assets/images/logo-vc.jpeg">
+  <meta property="og:image" content="https://vinsetconversations.com/assets/images/logo-vc.jpeg">
+  <meta property="og:url" content="https://vinsetconversations.com/">
   <meta property="og:type" content="website">
+  <meta property="og:locale" content="fr_FR">
+  <meta property="og:site_name" content="Vins & Conversations">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="Vins & Conversations — Du vignoble à vos projets">
+  <meta name="twitter:description" content="Le vin qui crée du lien. Sélection de vins pour financer vos projets éducatifs.">
+  <meta name="twitter:image" content="https://vinsetconversations.com/assets/images/logo-vc.jpeg">
 
   <!-- Fonts -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -31,15 +38,33 @@
   <script type="application/ld+json">
   {
     "@context": "https://schema.org",
-    "@type": "LocalBusiness",
+    "@type": "Organization",
     "name": "Vins & Conversations",
     "description": "Sélection de vins de qualité pour financer les projets éducatifs",
+    "url": "https://vinsetconversations.com",
+    "logo": "https://vinsetconversations.com/assets/images/logo-vc.jpeg",
+    "email": "contact@vinsetconversations.fr",
     "address": {
       "@type": "PostalAddress",
+      "streetAddress": "6 Square Léon Morice",
+      "addressLocality": "Verrières-en-Anjou",
+      "postalCode": "49480",
       "addressRegion": "Pays de la Loire",
       "addressCountry": "FR"
-    },
-    "url": "https://vinsetconversations.com"
+    }
+  }
+  </script>
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "WebSite",
+    "name": "Vins & Conversations",
+    "url": "https://vinsetconversations.com",
+    "potentialAction": {
+      "@type": "SearchAction",
+      "target": "https://vinsetconversations.com/boutique.html?search={search_term_string}",
+      "query-input": "required name=search_term_string"
+    }
   }
   </script>
 </head>
@@ -69,7 +94,7 @@
               <span class="cart-badge" style="display:none">0</span>
             </a>
           </li>
-          <li><a href="http://localhost:5173" class="nav-cta">Espace membre</a></li>
+          <li><a href="/app" class="nav-cta">Espace membre</a></li>
         </ul>
       </nav>
     </div>

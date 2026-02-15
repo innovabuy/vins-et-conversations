@@ -5,6 +5,12 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Fiche produit — Vins & Conversations</title>
   <meta name="description" content="Découvrez ce vin sélectionné par Nicolas Froment chez Vins & Conversations.">
+  <meta property="og:title" content="Fiche produit — Vins & Conversations">
+  <meta property="og:description" content="Découvrez ce vin sélectionné par Nicolas Froment.">
+  <meta property="og:image" content="https://vinsetconversations.com/assets/images/logo-vc.jpeg">
+  <meta property="og:type" content="product">
+  <meta property="og:locale" content="fr_FR">
+  <meta name="twitter:card" content="summary_large_image">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,600;0,700;1,400&family=Jost:wght@300;400;500;600;700&display=swap" rel="stylesheet">
@@ -325,7 +331,7 @@
               <span class="cart-badge" style="display:none">0</span>
             </a>
           </li>
-          <li><a href="http://localhost:5173" class="nav-cta">Espace membre</a></li>
+          <li><a href="/app" class="nav-cta">Espace membre</a></li>
         </ul>
       </nav>
     </div>
@@ -408,12 +414,43 @@
         if (!res.ok) throw new Error('NOT_FOUND');
         const product = await res.json();
         document.title = `${product.name} — Vins & Conversations`;
+        updateSEO(product);
         renderProduct(product);
         loadSimilarWines(product);
       } catch (err) {
         console.error('Product load error:', err);
         showNotFound();
       }
+    }
+
+    function updateSEO(p) {
+      const img = getProductImage(p);
+      const absImg = img.startsWith('http') ? img : 'https://vinsetconversations.com/' + img;
+      // Update OG tags
+      document.querySelector('meta[property="og:title"]')?.setAttribute('content', p.name + ' — Vins & Conversations');
+      document.querySelector('meta[property="og:description"]')?.setAttribute('content', (p.description || p.appellation || 'Vin sélectionné par Nicolas Froment').substring(0, 160));
+      document.querySelector('meta[property="og:image"]')?.setAttribute('content', absImg);
+      document.querySelector('meta[name="description"]')?.setAttribute('content', (p.description || 'Découvrez ' + p.name + ' chez Vins & Conversations.').substring(0, 160));
+      // Inject schema.org Product
+      const schema = {
+        '@context': 'https://schema.org',
+        '@type': 'Product',
+        name: p.name,
+        image: absImg,
+        description: p.description || 'Vin sélectionné par Nicolas Froment',
+        brand: { '@type': 'Brand', name: 'Vins & Conversations' },
+        offers: {
+          '@type': 'Offer',
+          price: parseFloat(p.price_ttc).toFixed(2),
+          priceCurrency: 'EUR',
+          availability: 'https://schema.org/InStock',
+          seller: { '@type': 'Organization', name: 'Vins & Conversations' }
+        }
+      };
+      const script = document.createElement('script');
+      script.type = 'application/ld+json';
+      script.textContent = JSON.stringify(schema);
+      document.head.appendChild(script);
     }
 
     function showNotFound() {
