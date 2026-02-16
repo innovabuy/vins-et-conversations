@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { campaignsAPI } from '../../services/api';
-import { ChevronLeft, ChevronRight, Check, Building2, Users, Wine, Settings, FileText, Rocket, Image, PiggyBank, Upload } from 'lucide-react';
+import { useNavigate, useParams } from 'react-router-dom';
+import { campaignsAPI, clientTypesAPI } from '../../services/api';
+import { ChevronLeft, ChevronRight, Check, Building2, Users, Wine, Settings, FileText, Rocket, Image, PiggyBank, Upload, Plus, X } from 'lucide-react';
 import { organizationsAPI } from '../../services/api';
 import { useAppSettings } from '../../contexts/AppSettingsContext';
 import { formatEur } from '../../utils/chartTheme';
@@ -19,16 +19,166 @@ const STEPS = [
 const STATUS_OPTIONS = [
   { value: 'draft', label: 'Brouillon' },
   { value: 'active', label: 'Active' },
+  { value: 'paused', label: 'En pause' },
+  { value: 'completed', label: 'Terminée' },
 ];
+
+function NewClientTypeModal({ existingTypes, onCreated, onClose }) {
+  const [sourceId, setSourceId] = useState('');
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
+  const [ctForm, setCtForm] = useState({
+    name: '',
+    label: '',
+    pricing_rules: { type: 'none', value: 0, applies_to: 'all', min_order: 0 },
+    commission_rules: {},
+    free_bottle_rules: { enabled: false, every_n_sold: 12, choice: 'catalog' },
+    tier_rules: { enabled: false, tiers: [] },
+    ui_config: { color: '#722F37', icon: 'wine', dashboard_type: 'student' },
+  });
+
+  const handleCopyFrom = async (id) => {
+    if (!id) {
+      setSourceId('');
+      return;
+    }
+    setSourceId(id);
+    try {
+      const { data } = await clientTypesAPI.get(id);
+      setCtForm((f) => ({
+        ...f,
+        pricing_rules: typeof data.pricing_rules === 'string' ? JSON.parse(data.pricing_rules) : (data.pricing_rules || {}),
+        commission_rules: typeof data.commission_rules === 'string' ? JSON.parse(data.commission_rules) : (data.commission_rules || {}),
+        free_bottle_rules: typeof data.free_bottle_rules === 'string' ? JSON.parse(data.free_bottle_rules) : (data.free_bottle_rules || {}),
+        tier_rules: typeof data.tier_rules === 'string' ? JSON.parse(data.tier_rules) : (data.tier_rules || {}),
+        ui_config: typeof data.ui_config === 'string' ? JSON.parse(data.ui_config) : (data.ui_config || {}),
+      }));
+    } catch { /* ignore */ }
+  };
+
+  const updatePricing = (key, val) => setCtForm((f) => ({ ...f, pricing_rules: { ...f.pricing_rules, [key]: val } }));
+  const updateFreeBottle = (key, val) => setCtForm((f) => ({ ...f, free_bottle_rules: { ...f.free_bottle_rules, [key]: val } }));
+  const updateUi = (key, val) => setCtForm((f) => ({ ...f, ui_config: { ...f.ui_config, [key]: val } }));
+
+  const handleSubmit = async () => {
+    setError('');
+    if (ctForm.name.length < 2) { setError('Nom trop court (min 2 caractères)'); return; }
+    if (ctForm.label.length < 2) { setError('Libellé trop court (min 2 caractères)'); return; }
+    setSaving(true);
+    try {
+      const { data } = await clientTypesAPI.create(ctForm);
+      onCreated(data);
+    } catch (err) {
+      setError(err.response?.data?.message || 'Erreur de création');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 overflow-y-auto">
+      <div className="bg-white rounded-2xl max-w-lg w-full p-6 space-y-4 my-8">
+        <div className="flex items-center justify-between">
+          <h3 className="text-lg font-bold">Nouveau type de client</h3>
+          <button onClick={onClose} className="p-1 hover:bg-gray-100 rounded-lg"><X size={18} /></button>
+        </div>
+
+        <div className="space-y-3">
+          <div>
+            <label className="block text-sm font-medium mb-1">Nom (code interne) *</label>
+            <input type="text" value={ctForm.name} onChange={(e) => setCtForm((f) => ({ ...f, name: e.target.value }))} className="w-full border rounded-lg px-3 py-2 text-sm" placeholder="ex: association_sportive" />
+          </div>
+          <div>
+            <label className="block text-sm font-medium mb-1">Libellé (affiché) *</label>
+            <input type="text" value={ctForm.label} onChange={(e) => setCtForm((f) => ({ ...f, label: e.target.value }))} className="w-full border rounded-lg px-3 py-2 text-sm" placeholder="ex: Association Sportive" />
+          </div>
+          <div>
+            <label className="block text-sm font-medium mb-1">Copier depuis un type existant</label>
+            <select value={sourceId} onChange={(e) => handleCopyFrom(e.target.value)} className="w-full border rounded-lg px-3 py-2 text-sm">
+              <option value="">Partir de zéro</option>
+              {existingTypes.map((t) => <option key={t.id} value={t.id}>{t.label}</option>)}
+            </select>
+          </div>
+        </div>
+
+        <div className="border-t pt-3 space-y-3">
+          <h4 className="text-sm font-semibold text-gray-700">Tarification</h4>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs font-medium mb-1">Type de remise</label>
+              <select value={ctForm.pricing_rules.type || 'none'} onChange={(e) => updatePricing('type', e.target.value)} className="w-full border rounded-lg px-3 py-2 text-sm">
+                <option value="none">Aucune</option>
+                <option value="percentage_discount">% de remise</option>
+                <option value="fixed_discount">Remise fixe</option>
+              </select>
+            </div>
+            <div>
+              <label className="block text-xs font-medium mb-1">Valeur remise</label>
+              <input type="number" min="0" step="0.5" value={ctForm.pricing_rules.value || 0} onChange={(e) => updatePricing('value', parseFloat(e.target.value) || 0)} className="w-full border rounded-lg px-3 py-2 text-sm" />
+            </div>
+          </div>
+          <div>
+            <label className="block text-xs font-medium mb-1">Commande minimum (EUR)</label>
+            <input type="number" min="0" step="10" value={ctForm.pricing_rules.min_order || 0} onChange={(e) => updatePricing('min_order', parseFloat(e.target.value) || 0)} className="w-full border rounded-lg px-3 py-2 text-sm" />
+          </div>
+        </div>
+
+        <div className="border-t pt-3 space-y-3">
+          <h4 className="text-sm font-semibold text-gray-700">Bouteilles gratuites</h4>
+          <label className="flex items-center gap-2 text-sm">
+            <input type="checkbox" checked={ctForm.free_bottle_rules.enabled} onChange={(e) => updateFreeBottle('enabled', e.target.checked)} className="rounded" />
+            Activer les bouteilles gratuites
+          </label>
+          {ctForm.free_bottle_rules.enabled && (
+            <div>
+              <label className="block text-xs font-medium mb-1">1 gratuite pour X vendues</label>
+              <input type="number" min="1" value={ctForm.free_bottle_rules.every_n_sold || 12} onChange={(e) => updateFreeBottle('every_n_sold', parseInt(e.target.value) || 12)} className="w-full border rounded-lg px-3 py-2 text-sm" />
+            </div>
+          )}
+        </div>
+
+        <div className="border-t pt-3 space-y-3">
+          <h4 className="text-sm font-semibold text-gray-700">Apparence</h4>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs font-medium mb-1">Couleur</label>
+              <input type="color" value={ctForm.ui_config.color || '#722F37'} onChange={(e) => updateUi('color', e.target.value)} className="w-full h-9 border rounded-lg cursor-pointer" />
+            </div>
+            <div>
+              <label className="block text-xs font-medium mb-1">Type dashboard</label>
+              <select value={ctForm.ui_config.dashboard_type || 'student'} onChange={(e) => updateUi('dashboard_type', e.target.value)} className="w-full border rounded-lg px-3 py-2 text-sm">
+                <option value="student">Étudiant</option>
+                <option value="cse">CSE</option>
+                <option value="ambassador">Ambassadeur</option>
+              </select>
+            </div>
+          </div>
+        </div>
+
+        {error && <p className="text-sm text-red-600 bg-red-50 p-2 rounded-lg">{error}</p>}
+
+        <div className="flex justify-end gap-3 pt-2">
+          <button onClick={onClose} className="px-4 py-2 border rounded-lg text-sm hover:bg-gray-50">Annuler</button>
+          <button onClick={handleSubmit} disabled={saving} className="btn-primary text-sm disabled:opacity-50">
+            {saving ? 'Création...' : 'Créer le type'}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 export default function CampaignWizard() {
   const navigate = useNavigate();
+  const { id: editId } = useParams();
+  const isEdit = !!editId;
   const appSettings = useAppSettings();
-  const [step, setStep] = useState(0);
+  const [step, setStep] = useState(isEdit ? 3 : 0); // Edit mode starts at details
   const [resources, setResources] = useState(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [uploadingPartnerLogo, setUploadingPartnerLogo] = useState(false);
+  const [showNewClientType, setShowNewClientType] = useState(false);
 
   const [form, setForm] = useState({
     client_type_id: '',
@@ -48,11 +198,46 @@ export default function CampaignWizard() {
   });
 
   useEffect(() => {
-    campaignsAPI.resources()
-      .then((r) => setResources(r.data))
-      .catch(console.error)
-      .finally(() => setLoading(false));
-  }, []);
+    const loadData = async () => {
+      try {
+        const { data: res } = await campaignsAPI.resources();
+        setResources(res);
+
+        // In edit mode, load existing campaign data
+        if (editId) {
+          const { data: detail } = await campaignsAPI.get(editId);
+          const c = detail.campaign;
+          const campConfig = typeof c.config === 'string' ? JSON.parse(c.config) : (c.config || {});
+          setForm({
+            client_type_id: c.client_type_id || '',
+            campaign_type_id: c.campaign_type_id || '',
+            org_id: c.org_id || '',
+            partner_logo_url: '',
+            name: c.name || '',
+            status: c.status || 'draft',
+            goal: c.goal || 0,
+            start_date: c.start_date ? c.start_date.split('T')[0] : '',
+            end_date: c.end_date ? c.end_date.split('T')[0] : '',
+            config: campConfig,
+            fund_collective_pct: campConfig.fund_collective_pct ?? '',
+            fund_individual_pct: campConfig.fund_individual_pct ?? '',
+            products: (detail.products || []).map((p) => ({
+              id: p.id,
+              name: p.name,
+              price_ttc: p.price_ttc,
+              custom_price: p.custom_price,
+            })),
+            participants: (detail.participants || []).map((p) => p.id),
+          });
+        }
+      } catch (err) {
+        console.error(err);
+      } finally {
+        setLoading(false);
+      }
+    };
+    loadData();
+  }, [editId]);
 
   const updateForm = (key, value) => setForm((f) => ({ ...f, [key]: value }));
 
@@ -64,7 +249,7 @@ export default function CampaignWizard() {
     return true;
   };
 
-  const handleCreate = async () => {
+  const handleSave = async () => {
     setSaving(true);
     try {
       // Save partner logo to organization if provided
@@ -84,13 +269,26 @@ export default function CampaignWizard() {
         end_date: rest.end_date || null,
         products: rest.products.map((p, i) => ({ product_id: p.id, custom_price: p.custom_price || null, sort_order: i })),
       };
-      const { data } = await campaignsAPI.create(payload);
-      navigate(`/admin/campaigns/${data.id}`);
+
+      if (isEdit) {
+        await campaignsAPI.update(editId, payload);
+        navigate(`/admin/campaigns/${editId}`);
+      } else {
+        const { data } = await campaignsAPI.create(payload);
+        navigate(`/admin/campaigns/${data.id}`);
+      }
     } catch (err) {
-      alert(err.response?.data?.message || 'Erreur de création');
+      alert(err.response?.data?.message || `Erreur ${isEdit ? 'de modification' : 'de création'}`);
     } finally {
       setSaving(false);
     }
+  };
+
+  const handleNewClientTypeCreated = (newType) => {
+    // Add to resources and select it
+    setResources((r) => ({ ...r, clientTypes: [...r.clientTypes, newType] }));
+    updateForm('client_type_id', newType.id);
+    setShowNewClientType(false);
   };
 
   if (loading) return <div className="flex justify-center py-20"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-wine-700" /></div>;
@@ -114,7 +312,7 @@ export default function CampaignWizard() {
     <div className="space-y-6">
       <div className="flex items-center gap-3">
         <button onClick={() => navigate('/admin/campaigns')} className="p-2 hover:bg-gray-100 rounded-lg"><ChevronLeft size={20} /></button>
-        <h1 className="text-2xl font-bold text-gray-900">Nouvelle campagne</h1>
+        <h1 className="text-2xl font-bold text-gray-900">{isEdit ? 'Modifier la campagne' : 'Nouvelle campagne'}</h1>
       </div>
 
       {/* Steps indicator */}
@@ -189,6 +387,26 @@ export default function CampaignWizard() {
                 ))}
               </div>
             )}
+
+            {/* Override client type + new type button */}
+            <div className="border-t pt-4 mt-4">
+              <div className="flex items-center gap-3">
+                <div className="flex-1">
+                  <label className="block text-sm font-medium mb-1">Type de client (override)</label>
+                  <select value={form.client_type_id} onChange={(e) => updateForm('client_type_id', e.target.value)} className="w-full border rounded-lg px-3 py-2 text-sm">
+                    <option value="">— Auto (depuis type campagne) —</option>
+                    {resources.clientTypes.map((t) => <option key={t.id} value={t.id}>{t.label}</option>)}
+                  </select>
+                </div>
+                <button
+                  onClick={() => setShowNewClientType(true)}
+                  className="flex items-center gap-1.5 px-3 py-2 mt-5 text-sm border-2 border-dashed border-wine-300 rounded-lg hover:bg-wine-50 text-wine-700 font-medium whitespace-nowrap"
+                >
+                  <Plus size={14} />
+                  Nouveau type
+                </button>
+              </div>
+            </div>
           </div>
         )}
 
@@ -498,15 +716,23 @@ export default function CampaignWizard() {
           </button>
         ) : (
           <button
-            onClick={handleCreate}
+            onClick={handleSave}
             disabled={saving}
             className="btn-primary flex items-center gap-2 disabled:opacity-50"
           >
             {saving ? <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white" /> : <Rocket size={16} />}
-            Créer la campagne
+            {isEdit ? 'Enregistrer' : 'Créer la campagne'}
           </button>
         )}
       </div>
+
+      {showNewClientType && (
+        <NewClientTypeModal
+          existingTypes={resources.clientTypes}
+          onCreated={handleNewClientTypeCreated}
+          onClose={() => setShowNewClientType(false)}
+        />
+      )}
     </div>
   );
 }

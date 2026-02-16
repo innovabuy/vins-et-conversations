@@ -15,12 +15,19 @@ const router = express.Router();
 // GET /api/v1/admin/campaigns
 router.get('/', authenticate, requireRole('super_admin', 'commercial'), async (req, res) => {
   try {
-    const campaigns = await db('campaigns')
+    let query = db('campaigns')
       .join('organizations', 'campaigns.org_id', 'organizations.id')
       .join('client_types', 'campaigns.client_type_id', 'client_types.id')
       .leftJoin('campaign_types', 'campaigns.campaign_type_id', 'campaign_types.id')
       .select('campaigns.*', 'organizations.name as org_name', 'client_types.label as type_label', 'campaign_types.label as campaign_type_label')
       .orderBy('campaigns.created_at', 'desc');
+
+    // Filter out soft-deleted unless ?include_archived=true
+    if (req.query.include_archived !== 'true') {
+      query = query.whereNull('campaigns.deleted_at');
+    }
+
+    const campaigns = await query;
 
     const enriched = await Promise.all(campaigns.map(async (c) => {
       const stats = await db('orders')
@@ -71,6 +78,7 @@ router.get('/:id', authenticate, requireRole('super_admin', 'commercial'), async
   try {
     const campaign = await db('campaigns')
       .where('campaigns.id', req.params.id)
+      .whereNull('campaigns.deleted_at')
       .join('organizations', 'campaigns.org_id', 'organizations.id')
       .join('client_types', 'campaigns.client_type_id', 'client_types.id')
       .leftJoin('campaign_types', 'campaigns.campaign_type_id', 'campaign_types.id')
@@ -609,7 +617,7 @@ router.post('/:id/send-report', authenticate, requireRole('super_admin', 'commer
 // POST /api/v1/admin/campaigns/:id/duplicate
 router.post('/:id/duplicate', authenticate, requireRole('super_admin'), auditAction('campaigns'), async (req, res) => {
   try {
-    const source = await db('campaigns').where({ id: req.params.id }).first();
+    const source = await db('campaigns').where({ id: req.params.id }).whereNull('deleted_at').first();
     if (!source) return res.status(404).json({ error: 'NOT_FOUND' });
 
     const newId = uuidv4();
@@ -737,6 +745,7 @@ router.put('/:id', authenticate, requireRole('super_admin'), auditAction('campai
     await db.transaction(async (trx) => {
       const [updated] = await trx('campaigns')
         .where({ id: req.params.id })
+        .whereNull('deleted_at')
         .update({ ...campaignData, updated_at: new Date() })
         .returning('*');
       if (!updated) return res.status(404).json({ error: 'NOT_FOUND' });
@@ -789,6 +798,130 @@ router.put('/:id', authenticate, requireRole('super_admin'), auditAction('campai
       }
 
       res.json(updated);
+    });
+  } catch (err) {
+    res.status(500).json({ error: 'SERVER_ERROR', message: err.message });
+  }
+});
+
+// GET /api/v1/admin/campaigns/:id/dependencies — Pre-delete dependency check
+router.get('/:id/dependencies', authenticate, requireRole('super_admin'), async (req, res) => {
+  try {
+    const campaign = await db('campaigns').where({ id: req.params.id }).whereNull('deleted_at').first();
+    if (!campaign) return res.status(404).json({ error: 'NOT_FOUND' });
+
+    const [orders, participations, financialEvents, deliveryNotes, campaignProducts] = await Promise.all([
+      db('orders').where({ campaign_id: req.params.id }).count('id as count').first(),
+      db('participations').where({ campaign_id: req.params.id }).count('id as count').first(),
+      db('financial_events').where({ campaign_id: req.params.id }).count('id as count').first(),
+      db('delivery_notes')
+        .join('orders', 'delivery_notes.order_id', 'orders.id')
+        .where('orders.campaign_id', req.params.id)
+        .count('delivery_notes.id as count').first(),
+      db('campaign_products').where({ campaign_id: req.params.id }).count('id as count').first(),
+    ]);
+
+    const counts = {
+      orders: parseInt(orders?.count || 0, 10),
+      participations: parseInt(participations?.count || 0, 10),
+      financial_events: parseInt(financialEvents?.count || 0, 10),
+      delivery_notes: parseInt(deliveryNotes?.count || 0, 10),
+      campaign_products: parseInt(campaignProducts?.count || 0, 10),
+    };
+
+    const hasDependencies = counts.orders > 0 || counts.participations > 0 || counts.financial_events > 0;
+    const deletable = !hasDependencies;
+
+    res.json({
+      campaign_id: req.params.id,
+      has_dependencies: hasDependencies,
+      deletable,
+      counts,
+      message: deletable
+        ? 'Cette campagne peut être supprimée définitivement'
+        : 'Cette campagne sera archivée (données conservées)',
+    });
+  } catch (err) {
+    res.status(500).json({ error: 'SERVER_ERROR', message: err.message });
+  }
+});
+
+// DELETE /api/v1/admin/campaigns/:id — Soft or hard delete
+router.delete('/:id', authenticate, requireRole('super_admin'), auditAction('campaigns'), async (req, res) => {
+  try {
+    const campaign = await db('campaigns').where({ id: req.params.id }).whereNull('deleted_at').first();
+    if (!campaign) return res.status(404).json({ error: 'NOT_FOUND' });
+
+    // Count dependencies in parallel
+    const [orders, participations, financialEvents, deliveryNotes] = await Promise.all([
+      db('orders').where({ campaign_id: req.params.id }).count('id as count').first(),
+      db('participations').where({ campaign_id: req.params.id }).count('id as count').first(),
+      db('financial_events').where({ campaign_id: req.params.id }).count('id as count').first(),
+      db('delivery_notes')
+        .join('orders', 'delivery_notes.order_id', 'orders.id')
+        .where('orders.campaign_id', req.params.id)
+        .count('delivery_notes.id as count').first(),
+    ]);
+
+    const deps = {
+      orders: parseInt(orders?.count || 0, 10),
+      participations: parseInt(participations?.count || 0, 10),
+      financial_events: parseInt(financialEvents?.count || 0, 10),
+      delivery_notes: parseInt(deliveryNotes?.count || 0, 10),
+    };
+
+    const hasDependencies = deps.orders > 0 || deps.participations > 0 || deps.financial_events > 0;
+
+    if (hasDependencies) {
+      // Soft delete: archive
+      await db('campaigns')
+        .where({ id: req.params.id })
+        .update({ deleted_at: new Date(), status: 'archived', updated_at: new Date() });
+
+      // Audit log
+      await db('audit_log').insert({
+        user_id: req.user.userId,
+        action: 'archive_campaign',
+        entity: 'campaigns',
+        entity_id: req.params.id,
+        before: JSON.stringify(campaign),
+        after: JSON.stringify({ deleted_at: new Date(), status: 'archived' }),
+        reason: `Archivage: ${deps.orders} commandes, ${deps.participations} participations, ${deps.financial_events} événements financiers`,
+        ip_address: req.ip,
+      });
+
+      return res.json({
+        success: true,
+        action: 'archived',
+        dependencies: deps,
+        message: 'Campagne archivée (données conservées)',
+      });
+    }
+
+    // Hard delete: no dependencies
+    await db.transaction(async (trx) => {
+      await trx('campaign_products').where({ campaign_id: req.params.id }).del();
+      await trx('invitations').where({ campaign_id: req.params.id }).del();
+      await trx('campaign_resources').where({ campaign_id: req.params.id }).del();
+      await trx('campaigns').where({ id: req.params.id }).del();
+    });
+
+    // Audit log
+    await db('audit_log').insert({
+      user_id: req.user.userId,
+      action: 'delete_campaign',
+      entity: 'campaigns',
+      entity_id: req.params.id,
+      before: JSON.stringify(campaign),
+      after: JSON.stringify({}),
+      reason: 'Suppression définitive (aucune dépendance)',
+      ip_address: req.ip,
+    });
+
+    res.json({
+      success: true,
+      action: 'deleted',
+      message: 'Campagne supprimée définitivement',
     });
   } catch (err) {
     res.status(500).json({ error: 'SERVER_ERROR', message: err.message });

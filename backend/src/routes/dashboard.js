@@ -161,6 +161,7 @@ router.get(
       const campaign = await db('campaigns')
         .join('client_types', 'campaigns.client_type_id', 'client_types.id')
         .where('campaigns.id', campaignId)
+        .whereNull('campaigns.deleted_at')
         .select('campaigns.*', 'client_types.pricing_rules')
         .first();
 
@@ -327,6 +328,7 @@ router.get(
       const campaign = await db('campaigns')
         .join('client_types', 'campaigns.client_type_id', 'client_types.id')
         .where('campaigns.id', campaignId)
+        .whereNull('campaigns.deleted_at')
         .select('campaigns.*', 'client_types.ui_config', 'client_types.name as ct_name')
         .first();
 

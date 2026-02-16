@@ -95,6 +95,7 @@ function AppRoutes() {
         <Route index element={<AdminCockpit />} />
         <Route path="campaigns" element={<AdminCampaigns />} />
         <Route path="campaigns/new" element={<CampaignWizard />} />
+        <Route path="campaigns/:id/edit" element={<CampaignWizard />} />
         <Route path="campaigns/:id" element={<AdminCampaignDetail />} />
         <Route path="orders" element={<AdminOrders />} />
         <Route path="delivery" element={<AdminDeliveryNotes />} />

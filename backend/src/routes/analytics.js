@@ -60,6 +60,7 @@ router.get('/', authenticate, requireRole('super_admin', 'commercial', 'comptabl
     // 5. Comparaison campagnes
     let campQuery = db('orders')
       .join('campaigns', 'orders.campaign_id', 'campaigns.id')
+      .whereNull('campaigns.deleted_at')
       .whereIn('orders.status', validStatuses)
       .select(
         'campaigns.name',
