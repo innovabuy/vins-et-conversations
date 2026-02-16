@@ -52,6 +52,7 @@ import TasteWizard from './components/public/TasteWizard';
 import { CartProvider } from './contexts/CartContext';
 import CustomerDashboard from './components/customer/CustomerDashboard';
 import { AppSettingsProvider } from './contexts/AppSettingsContext';
+import InviteRegisterPage from './pages/InviteRegisterPage';
 
 function ProtectedRoute({ children, roles }) {
   const { user, loading } = useAuth();
@@ -67,6 +68,7 @@ function AppRoutes() {
   return (
     <Routes>
       <Route path="/login" element={<LoginPage />} />
+      <Route path="/invite/:code" element={<InviteRegisterPage />} />
       <Route path="/installer" element={<InstallGuide />} />
 
       {/* Public boutique */}

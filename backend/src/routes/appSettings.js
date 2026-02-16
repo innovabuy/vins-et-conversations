@@ -1,4 +1,6 @@
 const express = require('express');
+const path = require('path');
+const multer = require('multer');
 const db = require('../config/database');
 const { authenticate, requireRole } = require('../middleware/auth');
 const { auditAction } = require('../middleware/audit');
@@ -7,6 +9,25 @@ const logger = require('../utils/logger');
 
 const router = express.Router();
 const publicRouter = express.Router();
+
+// ─── Multer config for logos ────────────────────────
+const logoStorage = multer.diskStorage({
+  destination: path.join(__dirname, '../../uploads/logos'),
+  filename: (req, file, cb) => {
+    const ext = path.extname(file.originalname).toLowerCase() || '.png';
+    cb(null, `logo_${Date.now()}${ext}`);
+  },
+});
+
+const uploadLogo = multer({
+  storage: logoStorage,
+  limits: { fileSize: 2 * 1024 * 1024 },
+  fileFilter: (req, file, cb) => {
+    const allowed = ['.jpg', '.jpeg', '.png', '.webp', '.svg'];
+    if (allowed.includes(path.extname(file.originalname).toLowerCase())) cb(null, true);
+    else cb(new Error('Format non supporté. Utilisez JPG, PNG, WebP ou SVG.'));
+  },
+});
 
 const SECRET_KEYS = ['stripe_test_secret_key', 'stripe_live_secret_key', 'stripe_webhook_secret', 'smtp_password'];
 
@@ -118,6 +139,53 @@ router.post('/email-test', authenticate, requireRole('super_admin'), async (req,
     res.json(result);
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// ─── Admin: PUT /api/v1/admin/settings/logo — Upload logo global ──
+router.put('/logo', authenticate, requireRole('super_admin'), (req, res, next) => {
+  uploadLogo.single('logo')(req, res, (err) => {
+    if (err instanceof multer.MulterError) {
+      return res.status(400).json({ error: 'UPLOAD_ERROR', message: err.code === 'LIMIT_FILE_SIZE' ? 'Fichier trop volumineux (max 2 Mo)' : err.message });
+    }
+    if (err) return res.status(400).json({ error: 'UPLOAD_ERROR', message: err.message });
+    next();
+  });
+}, async (req, res) => {
+  try {
+    if (!req.file) return res.status(400).json({ error: 'NO_FILE', message: 'Aucun fichier envoyé' });
+    const logo_url = `/uploads/logos/${req.file.filename}`;
+    await db('app_settings')
+      .where({ key: 'app_logo_url' })
+      .update({ value: logo_url, updated_at: new Date() });
+    await invalidateCache('vc:cache:*/settings*');
+    res.json({ success: true, logo_url });
+  } catch (err) {
+    res.status(500).json({ error: 'SERVER_ERROR', message: err.message });
+  }
+});
+
+// ─── Admin: PUT /api/v1/admin/organizations/:id/logo — Upload logo organisation ──
+router.put('/organizations/:id/logo', authenticate, requireRole('super_admin', 'commercial'), (req, res, next) => {
+  uploadLogo.single('logo')(req, res, (err) => {
+    if (err instanceof multer.MulterError) {
+      return res.status(400).json({ error: 'UPLOAD_ERROR', message: err.code === 'LIMIT_FILE_SIZE' ? 'Fichier trop volumineux (max 2 Mo)' : err.message });
+    }
+    if (err) return res.status(400).json({ error: 'UPLOAD_ERROR', message: err.message });
+    next();
+  });
+}, async (req, res) => {
+  try {
+    if (!req.file) return res.status(400).json({ error: 'NO_FILE', message: 'Aucun fichier envoyé' });
+    const logo_url = `/uploads/logos/${req.file.filename}`;
+    const [updated] = await db('organizations')
+      .where({ id: req.params.id })
+      .update({ logo_url })
+      .returning('*');
+    if (!updated) return res.status(404).json({ error: 'NOT_FOUND' });
+    res.json({ success: true, logo_url });
+  } catch (err) {
+    res.status(500).json({ error: 'SERVER_ERROR', message: err.message });
   }
 });
 

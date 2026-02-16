@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { campaignsAPI } from '../../services/api';
-import { ChevronLeft, ChevronRight, Check, Building2, Users, Wine, Settings, FileText, Rocket, Image, PiggyBank } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Check, Building2, Users, Wine, Settings, FileText, Rocket, Image, PiggyBank, Upload } from 'lucide-react';
 import { organizationsAPI } from '../../services/api';
 import { useAppSettings } from '../../contexts/AppSettingsContext';
 import { formatEur } from '../../utils/chartTheme';
@@ -28,6 +28,7 @@ export default function CampaignWizard() {
   const [resources, setResources] = useState(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [uploadingPartnerLogo, setUploadingPartnerLogo] = useState(false);
 
   const [form, setForm] = useState({
     client_type_id: '',
@@ -220,14 +221,40 @@ export default function CampaignWizard() {
             <h2 className="font-bold text-lg">Identité visuelle</h2>
             <p className="text-sm text-gray-500">Ajoutez le logo du partenaire pour cette campagne.</p>
             <div>
-              <label className="block text-sm font-medium mb-1">Logo partenaire (URL)</label>
-              <input
-                type="url"
-                value={form.partner_logo_url}
-                onChange={(e) => updateForm('partner_logo_url', e.target.value)}
-                className="w-full border rounded-lg px-3 py-2"
-                placeholder="https://example.com/logo-partenaire.png"
-              />
+              <label className="block text-sm font-medium mb-2">Logo partenaire</label>
+              <div className="flex items-start gap-4">
+                {form.partner_logo_url ? (
+                  <img src={form.partner_logo_url} alt="Logo partenaire" className="h-16 w-auto object-contain border rounded-lg p-2" onError={(e) => { e.target.style.display = 'none'; }} />
+                ) : (
+                  <div className="h-16 w-16 rounded-lg border-2 border-dashed border-gray-300 flex items-center justify-center text-gray-400">
+                    <Image size={24} />
+                  </div>
+                )}
+                <div className="flex flex-col gap-2">
+                  {form.org_id ? (
+                    <label className={`inline-flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium cursor-pointer transition-colors ${
+                      uploadingPartnerLogo ? 'bg-gray-100 text-gray-400' : 'bg-wine-50 text-wine-700 hover:bg-wine-100'
+                    }`}>
+                      <Upload size={16} />
+                      {uploadingPartnerLogo ? 'Upload...' : form.partner_logo_url ? 'Changer le logo' : 'Uploader un logo'}
+                      <input type="file" accept="image/jpeg,image/png,image/webp,image/svg+xml" className="hidden" disabled={uploadingPartnerLogo} onChange={async (e) => {
+                        const file = e.target.files?.[0];
+                        if (!file) return;
+                        setUploadingPartnerLogo(true);
+                        try {
+                          const { data } = await organizationsAPI.uploadLogo(form.org_id, file);
+                          updateForm('partner_logo_url', data.logo_url);
+                        } catch (err) {
+                          alert(err.response?.data?.message || 'Erreur upload logo');
+                        } finally { setUploadingPartnerLogo(false); }
+                      }} />
+                    </label>
+                  ) : (
+                    <p className="text-xs text-gray-400 italic">Sélectionnez d'abord une organisation</p>
+                  )}
+                  <p className="text-xs text-gray-400">JPG, PNG, WebP ou SVG — max 2 Mo</p>
+                </div>
+              </div>
             </div>
             <div className="p-4 bg-gray-50 rounded-xl">
               <p className="text-xs text-gray-500 mb-3">Aperçu des logos</p>

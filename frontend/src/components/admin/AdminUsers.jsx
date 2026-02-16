@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { usersAPI, invitationsAPI, campaignsAPI } from '../../services/api';
-import { Users, Shield, Mail, Copy, Check, Plus, Upload, Link, QrCode } from 'lucide-react';
+import { Users, Shield, Mail, Copy, Check, Plus, Upload, Link, QrCode, X, Download } from 'lucide-react';
 
 const ROLES = [
   { value: 'super_admin', label: 'Super Admin', color: 'bg-red-100 text-red-700' },
@@ -26,6 +26,7 @@ export default function AdminUsers() {
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showInviteModal, setShowInviteModal] = useState(false);
   const [copiedId, setCopiedId] = useState(null);
+  const [qrInvitation, setQrInvitation] = useState(null);
 
   useEffect(() => {
     loadData();
@@ -289,13 +290,21 @@ export default function AdminUsers() {
                       </td>
                       <td className="py-2 px-2">
                         {!isUsed && !isExpired && (
-                          <button
-                            onClick={() => copyLink(link, inv.id)}
-                            className="text-xs text-blue-600 hover:text-blue-800 flex items-center gap-1"
-                          >
-                            {copiedId === inv.id ? <Check size={12} /> : <Copy size={12} />}
-                            {copiedId === inv.id ? 'Copié' : 'Copier lien'}
-                          </button>
+                          <div className="flex items-center gap-2">
+                            <button
+                              onClick={() => copyLink(link, inv.id)}
+                              className="text-xs text-blue-600 hover:text-blue-800 flex items-center gap-1"
+                            >
+                              {copiedId === inv.id ? <Check size={12} /> : <Copy size={12} />}
+                              {copiedId === inv.id ? 'Copié' : 'Copier'}
+                            </button>
+                            <button
+                              onClick={() => setQrInvitation({ code: inv.code, link, campaign: inv.campaign_name })}
+                              className="text-xs text-purple-600 hover:text-purple-800 flex items-center gap-1"
+                            >
+                              <QrCode size={12} /> QR
+                            </button>
+                          </div>
                         )}
                       </td>
                     </tr>
@@ -313,6 +322,15 @@ export default function AdminUsers() {
               campaigns={campaigns}
               onClose={() => setShowInviteModal(false)}
               onCreated={loadData}
+            />
+          )}
+
+          {qrInvitation && (
+            <QRModal
+              link={qrInvitation.link}
+              code={qrInvitation.code}
+              campaign={qrInvitation.campaign}
+              onClose={() => setQrInvitation(null)}
             />
           )}
         </div>
@@ -411,6 +429,75 @@ function CreateInvitationModal({ campaigns, onClose, onCreated }) {
             <button type="submit" disabled={saving} className="btn-primary">{saving ? 'Création...' : 'Créer'}</button>
           </div>
         </form>
+      </div>
+    </div>
+  );
+}
+
+// ─── QR Code Modal ──────────────────────────────────
+function QRModal({ link, code, campaign, onClose }) {
+  const [QRCode, setQRCode] = useState(null);
+  const [copied, setCopied] = useState(false);
+
+  useEffect(() => {
+    import('react-qr-code').then((mod) => setQRCode(() => mod.default)).catch(() => {});
+  }, []);
+
+  const handleDownload = () => {
+    const svg = document.getElementById('qr-svg-container')?.querySelector('svg');
+    if (!svg) return;
+    const svgData = new XMLSerializer().serializeToString(svg);
+    const canvas = document.createElement('canvas');
+    canvas.width = 600;
+    canvas.height = 600;
+    const ctx = canvas.getContext('2d');
+    const img = new window.Image();
+    img.onload = () => {
+      ctx.fillStyle = '#FAF6F0';
+      ctx.fillRect(0, 0, 600, 600);
+      ctx.drawImage(img, 50, 50, 500, 500);
+      const a = document.createElement('a');
+      a.download = `qr-invitation-${code.substring(0, 8)}.png`;
+      a.href = canvas.toDataURL('image/png');
+      a.click();
+    };
+    img.src = 'data:image/svg+xml;base64,' + btoa(unescape(encodeURIComponent(svgData)));
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50" onClick={onClose}>
+      <div className="bg-white rounded-2xl p-8 w-full max-w-sm text-center" onClick={(e) => e.stopPropagation()}>
+        <div className="flex justify-between items-start mb-4">
+          <h3 className="font-semibold text-lg">QR Code d'invitation</h3>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600"><X size={20} /></button>
+        </div>
+        {campaign && <p className="text-sm text-gray-500 mb-4">{campaign}</p>}
+
+        <div id="qr-svg-container" className="bg-[#FAF6F0] rounded-xl p-6 inline-block mb-4">
+          {QRCode ? (
+            <QRCode value={link} size={240} bgColor="#FAF6F0" fgColor="#722F37" level="H" />
+          ) : (
+            <div className="w-60 h-60 flex items-center justify-center text-gray-400">Chargement...</div>
+          )}
+        </div>
+
+        <p className="text-xs text-gray-400 mb-4 font-mono break-all">{link}</p>
+
+        <div className="flex gap-2 justify-center">
+          <button
+            onClick={() => { navigator.clipboard.writeText(link); setCopied(true); setTimeout(() => setCopied(false), 2000); }}
+            className="flex items-center gap-1 px-4 py-2 text-sm rounded-lg border hover:bg-gray-50"
+          >
+            {copied ? <Check size={14} /> : <Copy size={14} />}
+            {copied ? 'Copié' : 'Copier le lien'}
+          </button>
+          <button
+            onClick={handleDownload}
+            className="flex items-center gap-1 px-4 py-2 text-sm rounded-lg bg-wine-700 text-white hover:bg-wine-800"
+          >
+            <Download size={14} /> PNG
+          </button>
+        </div>
       </div>
     </div>
   );

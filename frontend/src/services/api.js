@@ -301,11 +301,21 @@ export const appSettingsAPI = {
   stripeTest: () => api.get('/admin/settings/stripe-test'),
   stripePublicKey: () => api.get('/settings/stripe-public-key'),
   emailTest: () => api.post('/admin/settings/email-test'),
+  uploadLogo: (file) => {
+    const fd = new FormData();
+    fd.append('logo', file);
+    return api.put('/admin/settings/logo', fd, { headers: { 'Content-Type': 'multipart/form-data' } });
+  },
 };
 
 // ─── Organizations ────────────────────────────────
 export const organizationsAPI = {
   update: (id, data) => api.put(`/admin/settings/organizations/${id}`, data),
+  uploadLogo: (id, file) => {
+    const fd = new FormData();
+    fd.append('logo', file);
+    return api.put(`/admin/settings/organizations/${id}/logo`, fd, { headers: { 'Content-Type': 'multipart/form-data' } });
+  },
 };
 
 // ─── Boutique E-commerce ──────────────────────────
@@ -336,6 +346,12 @@ export const campaignResourcesAPI = {
   list: (campaignId) => api.get(`/campaigns/${campaignId}/resources`),
   adminList: (campaignId) => api.get(`/admin/campaign-resources/${campaignId}`),
   create: (data) => api.post('/admin/campaign-resources', data),
+  upload: (file, data) => {
+    const fd = new FormData();
+    fd.append('file', file);
+    Object.entries(data).forEach(([k, v]) => fd.append(k, typeof v === 'object' ? JSON.stringify(v) : v));
+    return api.post('/admin/campaign-resources/upload', fd, { headers: { 'Content-Type': 'multipart/form-data' } });
+  },
   update: (id, data) => api.put(`/admin/campaign-resources/${id}`, data),
   reorder: (items) => api.put('/admin/campaign-resources/reorder', { items }),
   delete: (id) => api.delete(`/admin/campaign-resources/${id}`),

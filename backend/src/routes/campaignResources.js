@@ -1,4 +1,6 @@
 const express = require('express');
+const path = require('path');
+const multer = require('multer');
 const Joi = require('joi');
 const db = require('../config/database');
 const { authenticate, requireRole, requireCampaignAccess } = require('../middleware/auth');
@@ -8,6 +10,25 @@ const logger = require('../utils/logger');
 
 const router = express.Router();
 const adminRouter = express.Router();
+
+// ─── Multer config for resource files ───────────────
+const resourceStorage = multer.diskStorage({
+  destination: path.join(__dirname, '../../uploads/resources'),
+  filename: (req, file, cb) => {
+    const ext = path.extname(file.originalname).toLowerCase() || '.pdf';
+    cb(null, `resource_${Date.now()}${ext}`);
+  },
+});
+
+const uploadResource = multer({
+  storage: resourceStorage,
+  limits: { fileSize: 10 * 1024 * 1024 },
+  fileFilter: (req, file, cb) => {
+    const allowed = ['.pdf', '.doc', '.docx', '.xls', '.xlsx', '.ppt', '.pptx', '.jpg', '.jpeg', '.png', '.webp'];
+    if (allowed.includes(path.extname(file.originalname).toLowerCase())) cb(null, true);
+    else cb(new Error('Format non supporté.'));
+  },
+});
 
 const resourceSchema = Joi.object({
   campaign_id: Joi.string().uuid().required(),
@@ -99,6 +120,51 @@ adminRouter.post(
       res.status(201).json(resource);
     } catch (err) {
       logger.error(`Admin campaign resources create error: ${err.message}`);
+      res.status(500).json({ error: 'SERVER_ERROR', message: err.message });
+    }
+  }
+);
+
+/**
+ * POST /api/v1/admin/campaign-resources/upload
+ * Admin: upload a file and create a resource
+ * NOTE: Must be BEFORE /:id
+ */
+adminRouter.post(
+  '/upload',
+  authenticate,
+  requireRole('super_admin', 'commercial'),
+  (req, res, next) => {
+    uploadResource.single('file')(req, res, (err) => {
+      if (err instanceof multer.MulterError) {
+        return res.status(400).json({ error: 'UPLOAD_ERROR', message: err.code === 'LIMIT_FILE_SIZE' ? 'Fichier trop volumineux (max 10 Mo)' : err.message });
+      }
+      if (err) return res.status(400).json({ error: 'UPLOAD_ERROR', message: err.message });
+      next();
+    });
+  },
+  async (req, res) => {
+    try {
+      if (!req.file) return res.status(400).json({ error: 'NO_FILE', message: 'Aucun fichier envoyé' });
+      const { campaign_id, title, description, visible_to_roles } = req.body;
+      if (!campaign_id || !title) {
+        return res.status(400).json({ error: 'VALIDATION_ERROR', message: 'campaign_id et title requis' });
+      }
+      const ext = path.extname(req.file.originalname).toLowerCase();
+      const type = ['.jpg', '.jpeg', '.png', '.webp'].includes(ext) ? 'image' : 'document';
+      const url = `/uploads/resources/${req.file.filename}`;
+      const roles = visible_to_roles ? (typeof visible_to_roles === 'string' ? JSON.parse(visible_to_roles) : visible_to_roles) : ['student', 'bts'];
+      const [resource] = await db('campaign_resources').insert({
+        campaign_id,
+        title,
+        type,
+        url,
+        description: description || null,
+        visible_to_roles: JSON.stringify(roles),
+      }).returning('*');
+      res.status(201).json(resource);
+    } catch (err) {
+      logger.error(`Resource upload error: ${err.message}`);
       res.status(500).json({ error: 'SERVER_ERROR', message: err.message });
     }
   }

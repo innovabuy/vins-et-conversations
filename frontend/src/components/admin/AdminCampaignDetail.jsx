@@ -1,10 +1,11 @@
 import { useState, useEffect } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
-import { campaignsAPI } from '../../services/api';
+import { campaignsAPI, campaignResourcesAPI } from '../../services/api';
 import {
   ArrowLeft, Users, ShoppingCart, Wine, TrendingUp, Calendar,
   Target, Package, BarChart3, Mail, CreditCard, ExternalLink,
-  Copy, Check, Store, FileText,
+  Copy, Check, Store, FileText, BookOpen, Plus, Trash2, Upload,
+  FileDown, Video, Image, Link as LinkIcon,
 } from 'lucide-react';
 import {
   ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip,
@@ -24,7 +25,142 @@ const TABS = [
   { key: 'participants', label: 'Participants', icon: Users },
   { key: 'products', label: 'Vins', icon: Wine },
   { key: 'classes', label: 'Classes', icon: Target },
+  { key: 'resources', label: 'Ressources', icon: BookOpen },
 ];
+
+const RESOURCE_ICONS = { pdf: FileDown, video: Video, image: Image, document: FileText, link: LinkIcon };
+const RESOURCE_COLORS = { pdf: 'bg-red-100 text-red-700', video: 'bg-purple-100 text-purple-700', image: 'bg-blue-100 text-blue-700', document: 'bg-orange-100 text-orange-700', link: 'bg-green-100 text-green-700' };
+const RESOURCE_CATEGORIES = ['formation', 'argumentaire', 'fiche_produit', 'autre'];
+
+function ResourcesTab({ campaignId }) {
+  const [resources, setResources] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [showForm, setShowForm] = useState(false);
+  const [form, setForm] = useState({ title: '', type: 'link', url: '', description: '', category: 'autre', visible_to_roles: ['student', 'bts'] });
+  const [file, setFile] = useState(null);
+  const [saving, setSaving] = useState(false);
+
+  const loadResources = async () => {
+    try {
+      const { data } = await campaignResourcesAPI.adminList(campaignId);
+      setResources(data.data || []);
+    } catch (e) { console.error(e); }
+    finally { setLoading(false); }
+  };
+
+  useEffect(() => { loadResources(); }, [campaignId]);
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setSaving(true);
+    try {
+      if (file && ['document', 'image', 'pdf'].includes(form.type)) {
+        await campaignResourcesAPI.upload(file, {
+          campaign_id: campaignId,
+          title: form.title,
+          description: form.description,
+          visible_to_roles: JSON.stringify(form.visible_to_roles),
+        });
+      } else {
+        await campaignResourcesAPI.create({
+          campaign_id: campaignId,
+          title: form.title,
+          type: form.type,
+          url: form.url,
+          description: form.description,
+          visible_to_roles: form.visible_to_roles,
+        });
+      }
+      setShowForm(false);
+      setForm({ title: '', type: 'link', url: '', description: '', category: 'autre', visible_to_roles: ['student', 'bts'] });
+      setFile(null);
+      loadResources();
+    } catch (err) {
+      alert(err.response?.data?.message || 'Erreur');
+    } finally { setSaving(false); }
+  };
+
+  const handleDelete = async (id) => {
+    if (!confirm('Supprimer cette ressource ?')) return;
+    try {
+      await campaignResourcesAPI.delete(id);
+      loadResources();
+    } catch (err) { alert('Erreur de suppression'); }
+  };
+
+  if (loading) return <div className="flex justify-center py-8"><div className="animate-spin rounded-full h-6 w-6 border-b-2 border-wine-700" /></div>;
+
+  return (
+    <div className="space-y-4">
+      <div className="flex justify-between items-center">
+        <p className="text-sm text-gray-500">{resources.length} ressource(s)</p>
+        <button onClick={() => setShowForm(!showForm)} className="btn-primary flex items-center gap-1 text-sm">
+          <Plus size={16} /> Ajouter
+        </button>
+      </div>
+
+      {showForm && (
+        <form onSubmit={handleSubmit} className="card space-y-3">
+          <input type="text" placeholder="Titre *" value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} className="w-full border rounded-lg px-3 py-2 text-sm" required />
+          <div className="grid grid-cols-2 gap-3">
+            <select value={form.type} onChange={(e) => setForm({ ...form, type: e.target.value })} className="border rounded-lg px-3 py-2 text-sm">
+              <option value="link">Lien externe</option>
+              <option value="video">Video (URL)</option>
+              <option value="document">Document (upload)</option>
+              <option value="pdf">PDF (upload)</option>
+              <option value="image">Image (upload)</option>
+            </select>
+            <select value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })} className="border rounded-lg px-3 py-2 text-sm">
+              <option value="formation">Formation</option>
+              <option value="argumentaire">Argumentaire</option>
+              <option value="fiche_produit">Fiche produit</option>
+              <option value="autre">Autre</option>
+            </select>
+          </div>
+          {['link', 'video'].includes(form.type) ? (
+            <input type="url" placeholder="URL *" value={form.url} onChange={(e) => setForm({ ...form, url: e.target.value })} className="w-full border rounded-lg px-3 py-2 text-sm" required />
+          ) : (
+            <div>
+              <label className="inline-flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium cursor-pointer bg-gray-100 hover:bg-gray-200 transition-colors">
+                <Upload size={16} />
+                {file ? file.name : 'Choisir un fichier'}
+                <input type="file" onChange={(e) => setFile(e.target.files?.[0] || null)} className="hidden" />
+              </label>
+              <p className="text-xs text-gray-400 mt-1">PDF, Word, Excel, images — max 10 Mo</p>
+            </div>
+          )}
+          <textarea placeholder="Description (optionnel)" value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} className="w-full border rounded-lg px-3 py-2 text-sm" rows={2} />
+          <div className="flex gap-2">
+            <button type="submit" disabled={saving} className="btn-primary text-sm">{saving ? 'Enregistrement...' : 'Enregistrer'}</button>
+            <button type="button" onClick={() => setShowForm(false)} className="btn-secondary text-sm">Annuler</button>
+          </div>
+        </form>
+      )}
+
+      <div className="space-y-2">
+        {resources.map((r) => {
+          const Icon = RESOURCE_ICONS[r.type] || FileText;
+          const color = RESOURCE_COLORS[r.type] || 'bg-gray-100 text-gray-700';
+          return (
+            <div key={r.id} className="card flex items-center gap-3">
+              <div className={`p-2 rounded-lg ${color}`}><Icon size={18} /></div>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-medium truncate">{r.title}</p>
+                {r.description && <p className="text-xs text-gray-400 truncate">{r.description}</p>}
+              </div>
+              <span className={`text-xs px-2 py-0.5 rounded ${color}`}>{r.type}</span>
+              {r.url && (
+                <a href={r.url} target="_blank" rel="noopener noreferrer" className="text-blue-500 hover:text-blue-700"><ExternalLink size={16} /></a>
+              )}
+              <button onClick={() => handleDelete(r.id)} className="text-gray-400 hover:text-red-500"><Trash2 size={16} /></button>
+            </div>
+          );
+        })}
+        {resources.length === 0 && <p className="text-center text-gray-400 py-6 text-sm">Aucune ressource pour cette campagne</p>}
+      </div>
+    </div>
+  );
+}
 
 const PIE_COLORS = ['#7f1d1d', '#991b1b', '#b91c1c', '#dc2626', '#ef4444', '#f87171', '#fca5a5', '#fecaca'];
 
@@ -481,6 +617,7 @@ export default function AdminCampaignDetail() {
       {tab === 'participants' && <ParticipantsTab participants={data.participants} campaignId={id} />}
       {tab === 'products' && <ProductsTab products={data.products} />}
       {tab === 'classes' && <ClassesTab classes={data.classes} />}
+      {tab === 'resources' && <ResourcesTab campaignId={id} />}
     </div>
   );
 }

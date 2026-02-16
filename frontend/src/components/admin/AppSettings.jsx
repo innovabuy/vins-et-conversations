@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { appSettingsAPI } from '../../services/api';
-import { Settings, Palette, Save, Image, Type, Check, CreditCard, AlertTriangle, Wifi, WifiOff, Eye, EyeOff, Mail, Send } from 'lucide-react';
+import { Settings, Palette, Save, Image, Type, Check, CreditCard, AlertTriangle, Wifi, WifiOff, Eye, EyeOff, Mail, Send, Upload } from 'lucide-react';
 
 export default function AppSettings() {
   const [settings, setSettings] = useState({
@@ -29,6 +29,7 @@ export default function AppSettings() {
   const [emailTest, setEmailTest] = useState(null);
   const [testingEmail, setTestingEmail] = useState(false);
   const [showSecrets, setShowSecrets] = useState({});
+  const [uploadingLogo, setUploadingLogo] = useState(false);
 
   useEffect(() => {
     appSettingsAPI.getAdmin()
@@ -67,6 +68,20 @@ export default function AppSettings() {
 
   const toggleSecret = (key) => {
     setShowSecrets((prev) => ({ ...prev, [key]: !prev[key] }));
+  };
+
+  const handleLogoUpload = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setUploadingLogo(true);
+    try {
+      const { data } = await appSettingsAPI.uploadLogo(file);
+      setSettings((prev) => ({ ...prev, app_logo_url: data.logo_url }));
+    } catch (err) {
+      alert(err.response?.data?.message || 'Erreur upload logo');
+    } finally {
+      setUploadingLogo(false);
+    }
   };
 
   const handleTestEmail = async () => {
@@ -114,28 +129,34 @@ export default function AppSettings() {
 
         <div className="space-y-5">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <label className="block text-sm font-medium text-gray-700 mb-2">
               <Image size={14} className="inline mr-1" />
-              Logo principal (URL)
+              Logo principal
             </label>
-            <input
-              type="url"
-              value={settings.app_logo_url}
-              onChange={(e) => setSettings({ ...settings, app_logo_url: e.target.value })}
-              className="w-full border rounded-lg px-3 py-2 text-sm"
-              placeholder="https://example.com/logo.png"
-            />
-            {settings.app_logo_url && (
-              <div className="mt-2 p-3 bg-gray-50 rounded-lg flex items-center gap-3">
+            <div className="flex items-start gap-4">
+              {settings.app_logo_url ? (
                 <img
                   src={settings.app_logo_url}
-                  alt="Logo preview"
-                  className="h-12 w-auto object-contain"
+                  alt="Logo"
+                  className="h-16 w-auto object-contain border rounded-lg p-2"
                   onError={(e) => { e.target.style.display = 'none'; }}
                 />
-                <span className="text-xs text-gray-500">Apercu du logo</span>
+              ) : (
+                <div className="h-16 w-16 rounded-lg border-2 border-dashed border-gray-300 flex items-center justify-center text-gray-400">
+                  <Image size={24} />
+                </div>
+              )}
+              <div className="flex flex-col gap-2">
+                <label className={`inline-flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium cursor-pointer transition-colors ${
+                  uploadingLogo ? 'bg-gray-100 text-gray-400' : 'bg-wine-50 text-wine-700 hover:bg-wine-100'
+                }`}>
+                  <Upload size={16} />
+                  {uploadingLogo ? 'Upload...' : settings.app_logo_url ? 'Changer le logo' : 'Uploader un logo'}
+                  <input type="file" accept="image/jpeg,image/png,image/webp,image/svg+xml" onChange={handleLogoUpload} className="hidden" disabled={uploadingLogo} />
+                </label>
+                <p className="text-xs text-gray-400">JPG, PNG, WebP ou SVG — max 2 Mo</p>
               </div>
-            )}
+            </div>
           </div>
 
           <div>
