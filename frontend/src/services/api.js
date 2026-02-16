@@ -66,6 +66,11 @@ export const productsAPI = {
   update: (id, data) => api.put(`/admin/products/${id}`, data),
   remove: (id) => api.delete(`/admin/products/${id}`),
   pdf: (id) => `${api.defaults.baseURL}/admin/products/${id}/pdf`,
+  uploadImage: (id, file) => {
+    const fd = new FormData();
+    fd.append('image', file);
+    return api.post(`/admin/products/${id}/image`, fd, { headers: { 'Content-Type': 'multipart/form-data' } });
+  },
 };
 
 // ─── Orders ───────────────────────────────────────────

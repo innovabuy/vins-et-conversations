@@ -3,7 +3,7 @@ import { productsAPI, catalogPdfAPI, categoriesAPI } from '../../services/api';
 import {
   RadarChart, Radar, PolarGrid, PolarAngleAxis, PolarRadiusAxis, ResponsiveContainer
 } from 'recharts';
-import { Wine, Plus, Pencil, Trash2, X, Save, ChevronLeft, Award, Thermometer, Grape, UtensilsCrossed, Download, Mail, FileText, Package, Eye, EyeOff, Star } from 'lucide-react';
+import { Wine, Plus, Pencil, Trash2, X, Save, ChevronLeft, Award, Thermometer, Grape, UtensilsCrossed, Download, Mail, FileText, Package, Eye, EyeOff, Star, Upload } from 'lucide-react';
 import { WINE_TYPE_OPTIONS, TASTING_CRITERIA, resolveWineType, getCriteriaForProduct, buildRadarData } from '../../config/tastingCriteria';
 
 const formatEur = (v) => new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR' }).format(v);
@@ -177,6 +177,7 @@ function ProductForm({ product, onSave, onCancel, allProducts = [], categoriesLi
   } : EMPTY_PRODUCT;
   const [form, setForm] = useState(initial);
   const [saving, setSaving] = useState(false);
+  const [uploading, setUploading] = useState(false);
 
   // Resolve wine type from color + category
   const wineType = resolveWineType(form.color, form.category);
@@ -248,6 +249,18 @@ function ProductForm({ product, onSave, onCancel, allProducts = [], categoriesLi
   const addAward = () => setForm(f => ({ ...f, awards: [...f.awards, { year: new Date().getFullYear(), name: '' }] }));
   const updateAward = (i, field, val) => setForm(f => ({ ...f, awards: f.awards.map((a, j) => j === i ? { ...a, [field]: field === 'year' ? parseInt(val) || '' : val } : a) }));
   const removeAward = (i) => setForm(f => ({ ...f, awards: f.awards.filter((_, j) => j !== i) }));
+
+  const handleImageUpload = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file || !product?.id) return;
+    setUploading(true);
+    try {
+      const { data } = await productsAPI.uploadImage(product.id, file);
+      setForm(f => ({ ...f, image_url: data.image_url }));
+    } catch (err) {
+      alert(err.response?.data?.message || 'Erreur upload image');
+    } finally { setUploading(false); }
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -336,6 +349,31 @@ function ProductForm({ product, onSave, onCancel, allProducts = [], categoriesLi
             <div>
               <span className="text-sm font-medium text-gray-700">Visible en boutique</span>
               <p className="text-xs text-gray-400">Ce produit sera affiché sur la vitrine publique</p>
+            </div>
+          </div>
+          {/* Image produit */}
+          <div className="md:col-span-2">
+            <label className="block text-xs font-medium text-gray-500 mb-2">Photo du produit</label>
+            <div className="flex items-start gap-4">
+              {form.image_url ? (
+                <img src={form.image_url} alt={form.name} className="w-24 h-24 object-contain rounded-lg border" />
+              ) : (
+                <div className="w-24 h-24 rounded-lg border-2 border-dashed border-gray-300 flex items-center justify-center text-gray-400">
+                  <Wine size={32} />
+                </div>
+              )}
+              <div className="flex flex-col gap-2">
+                {product?.id ? (
+                  <label className={`inline-flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium cursor-pointer transition-colors ${uploading ? 'bg-gray-100 text-gray-400' : 'bg-wine-50 text-wine-700 hover:bg-wine-100'}`}>
+                    <Upload size={16} />
+                    {uploading ? 'Upload...' : 'Changer la photo'}
+                    <input type="file" accept="image/jpeg,image/png,image/webp" onChange={handleImageUpload} className="hidden" disabled={uploading} />
+                  </label>
+                ) : (
+                  <p className="text-xs text-gray-400 italic">Enregistrez le produit d'abord pour ajouter une photo</p>
+                )}
+                <p className="text-xs text-gray-400">JPG, PNG ou WebP — max 5 Mo</p>
+              </div>
             </div>
           </div>
         </div>
