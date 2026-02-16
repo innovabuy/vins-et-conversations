@@ -29,7 +29,7 @@
   <link rel="stylesheet" href="assets/css/style.css?v=3">
 
   <!-- Favicon -->
-  <link rel="icon" href="assets/images/logo-vc.jpeg" type="image/jpeg">
+  <link rel="icon" href="assets/images/logo-vc.jpeg" type="image/jpeg" data-site-image="commun_favicon">
 
   <!-- Video preload -->
   <link rel="preload" as="video" href="assets/images/hero-video-720p.mp4">
@@ -74,7 +74,7 @@
   <header class="site-header">
     <div class="header-inner">
       <a href="index.html" class="header-logo">
-        <img src="assets/images/logo-vc.jpeg" alt="Vins & Conversations" loading="eager">
+        <img src="assets/images/logo-vc.jpeg" alt="Vins & Conversations" loading="eager" data-site-image="commun_logo_header">
         <span>Vins & Conversations</span>
       </a>
       <button class="menu-toggle" id="menu-toggle" aria-label="Menu" aria-expanded="false">
@@ -103,8 +103,8 @@
   <!-- Hero -->
   <section class="hero" id="hero">
     <div class="hero-video-wrap">
-      <video autoplay muted loop playsinline poster="assets/images/section-vignoble.png">
-        <source src="assets/images/hero-video-720p.mp4" type="video/mp4">
+      <video autoplay muted loop playsinline poster="assets/images/section-vignoble.png" data-site-image="accueil_hero_fallback">
+        <source src="assets/images/hero-video-720p.mp4" type="video/mp4" data-site-image="accueil_hero_video">
       </video>
     </div>
     <div class="hero-overlay"></div>
@@ -149,7 +149,7 @@
 
         <div class="prestation-card reveal">
           <div class="prestation-card-img">
-            <img src="assets/images/section-equipe-bts.jpg" alt="Partenariat écoles" loading="lazy">
+            <img src="assets/images/section-equipe-bts.jpg" alt="Partenariat écoles" loading="lazy" data-site-image="accueil_selection_bg">
           </div>
           <div class="prestation-card-body">
             <div class="subtitle">Écoles & étudiants</div>
@@ -171,7 +171,7 @@
 
         <div class="prestation-card reveal">
           <div class="prestation-card-img">
-            <img src="assets/images/section-vignoble.png" alt="Ambassadeurs" loading="lazy">
+            <img src="assets/images/section-vignoble.png" alt="Ambassadeurs" loading="lazy" data-site-image="accueil_vignoble_ambiance">
           </div>
           <div class="prestation-card-body">
             <div class="subtitle">Réseau ambassadeurs</div>
@@ -208,7 +208,7 @@
         <!-- Fallback statique (remplacé par l'API si disponible) -->
         <div class="wine-card reveal">
           <div class="wine-card-img">
-            <img src="assets/images/produits/oriolus-blanc.jpg" alt="Oriolus Blanc" loading="lazy">
+            <img src="assets/images/produits/oriolus-blanc.jpg" alt="Oriolus Blanc" loading="lazy" data-site-image="accueil_galerie_1">
           </div>
           <div class="wine-card-body">
             <h3>Oriolus Blanc</h3>
@@ -224,7 +224,7 @@
 
         <div class="wine-card reveal">
           <div class="wine-card-img">
-            <img src="assets/images/produits/cuvee-clemence.jpg" alt="Cuvée Clémence" loading="lazy">
+            <img src="assets/images/produits/cuvee-clemence.jpg" alt="Cuvée Clémence" loading="lazy" data-site-image="accueil_galerie_2">
           </div>
           <div class="wine-card-body">
             <h3>Cuvée Clémence</h3>
@@ -240,7 +240,7 @@
 
         <div class="wine-card reveal">
           <div class="wine-card-img">
-            <img src="assets/images/produits/carillon.jpg" alt="Carillon" loading="lazy">
+            <img src="assets/images/produits/carillon.jpg" alt="Carillon" loading="lazy" data-site-image="accueil_galerie_3">
           </div>
           <div class="wine-card-body">
             <h3>Carillon</h3>
@@ -255,7 +255,7 @@
 
         <div class="wine-card reveal">
           <div class="wine-card-img">
-            <img src="assets/images/produits/coteaux-du-layon.jpg" alt="Coteaux du Layon" loading="lazy">
+            <img src="assets/images/produits/coteaux-du-layon.jpg" alt="Coteaux du Layon" loading="lazy" data-site-image="accueil_galerie_4">
           </div>
           <div class="wine-card-body">
             <h3>Coteaux du Layon</h3>
@@ -335,7 +335,7 @@
     <div class="container">
       <div class="nicolas-layout">
         <div class="nicolas-photo reveal">
-          <img src="assets/images/section-equipe-bts.jpg" alt="Nicolas Froment" loading="lazy">
+          <img src="assets/images/section-equipe-bts.jpg" alt="Nicolas Froment" loading="lazy" data-site-image="accueil_nicolas_portrait">
         </div>
         <div class="nicolas-text reveal">
           <span class="section-label">Le fondateur</span>
@@ -366,7 +366,7 @@
     <div class="container">
       <div class="footer-grid">
         <div class="footer-brand">
-          <img src="assets/images/logo-vc.jpeg" alt="Vins & Conversations" class="footer-logo">
+          <img src="assets/images/logo-vc.jpeg" alt="Vins & Conversations" class="footer-logo" data-site-image="commun_logo_footer">
           <h3>Vins & Conversations</h3>
           <p>Vins de qualité sélectionnés avec passion, au service de vos projets éducatifs et de vos envies de partage.</p>
         </div>
@@ -416,6 +416,7 @@
     </div>
   </footer>
 
+  <script src="assets/js/site-images.js?v=1"></script>
   <script src="assets/js/main.js?v=3"></script>
 </body>
 </html>

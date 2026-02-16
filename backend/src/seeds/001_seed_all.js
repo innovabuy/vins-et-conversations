@@ -952,5 +952,29 @@ exports.seed = async function (knex) {
   const shippingResult = await importShippingGrid(knex);
   console.log(`✅ Grille transport: ${shippingResult.zones} zones, ${shippingResult.rates} tarifs`);
 
+  // ─── Site images (emplacements) ─────────────────────
+  await knex('site_images').del();
+  await knex('site_images').insert([
+    { page: 'accueil', slot: 'accueil_hero_video', label: 'Vidéo/image hero principale', alt_text: 'Vignoble Loire Valley' },
+    { page: 'accueil', slot: 'accueil_hero_fallback', label: 'Image de remplacement hero', alt_text: 'Vignoble en automne' },
+    { page: 'accueil', slot: 'accueil_nicolas_portrait', label: 'Photo de Nicolas', alt_text: 'Nicolas Froment, fondateur' },
+    { page: 'accueil', slot: 'accueil_vignoble_ambiance', label: 'Photo ambiance vignoble', alt_text: 'Vignoble' },
+    { page: 'accueil', slot: 'accueil_selection_bg', label: 'Fond section Sélection de Nicolas', alt_text: '' },
+    { page: 'accueil', slot: 'accueil_wizard_bg', label: 'Image fond wizard recommandation', alt_text: '' },
+    { page: 'accueil', slot: 'accueil_galerie_1', label: 'Photo galerie 1', alt_text: 'Galerie' },
+    { page: 'accueil', slot: 'accueil_galerie_2', label: 'Photo galerie 2', alt_text: 'Galerie' },
+    { page: 'accueil', slot: 'accueil_galerie_3', label: 'Photo galerie 3', alt_text: 'Galerie' },
+    { page: 'accueil', slot: 'accueil_galerie_4', label: 'Photo galerie 4', alt_text: 'Galerie' },
+    { page: 'boutique', slot: 'boutique_hero', label: 'Image hero page catalogue', alt_text: 'Nos vins' },
+    { page: 'boutique', slot: 'boutique_placeholder', label: 'Image placeholder produit sans photo', alt_text: 'Produit' },
+    { page: 'contact', slot: 'contact_hero', label: 'Image hero page contact', alt_text: 'Contactez-nous' },
+    { page: 'contact', slot: 'contact_map', label: 'Photo localisation', alt_text: 'Verrières-en-Anjou' },
+    { page: 'commun', slot: 'commun_logo_header', label: 'Logo V&C header', alt_text: 'Vins & Conversations' },
+    { page: 'commun', slot: 'commun_logo_footer', label: 'Logo V&C footer', alt_text: 'Vins & Conversations' },
+    { page: 'commun', slot: 'commun_favicon', label: 'Favicon', alt_text: '' },
+    { page: 'commun', slot: 'commun_og_image', label: 'Image Open Graph (partage réseaux)', alt_text: 'Vins & Conversations' },
+  ]);
+  console.log('✅ Site images: 18 emplacements créés');
+
   console.log('✅ Seed complet Vins & Conversations — Données CDC v4');
 };

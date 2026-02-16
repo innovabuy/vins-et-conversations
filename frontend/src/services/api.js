@@ -357,6 +357,18 @@ export const campaignResourcesAPI = {
   delete: (id) => api.delete(`/admin/campaign-resources/${id}`),
 };
 
+// ─── Site Images ─────────────────────────────────
+export const siteImagesAPI = {
+  list: () => api.get('/admin/site-images'),
+  upload: (id, file) => {
+    const fd = new FormData();
+    fd.append('image', file);
+    return api.put(`/admin/site-images/${id}/upload`, fd, { headers: { 'Content-Type': 'multipart/form-data' } });
+  },
+  update: (id, data) => api.put(`/admin/site-images/${id}`, data),
+  publicList: () => api.get('/public/site-images'),
+};
+
 // ─── Shipping ────────────────────────────────────
 export const shippingAPI = {
   calculate: (data) => api.post('/shipping/calculate', data),

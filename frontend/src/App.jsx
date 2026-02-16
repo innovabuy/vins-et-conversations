@@ -26,6 +26,7 @@ import AdminShipping from './components/admin/AdminShipping';
 import AppSettings from './components/admin/AppSettings';
 import AdminOrganizationTypes from './components/admin/AdminOrganizationTypes';
 import AdminCampaignTypes from './components/admin/AdminCampaignTypes';
+import SiteImages from './components/admin/SiteImages';
 import StudentDashboard from './components/student/StudentDashboard';
 import CSELayout from './components/layout/CSELayout';
 import CSEDashboard from './components/cse/CSEDashboard';
@@ -114,6 +115,7 @@ function AppRoutes() {
         <Route path="users" element={<AdminUsers />} />
         <Route path="organization-types" element={<AdminOrganizationTypes />} />
         <Route path="campaign-types" element={<AdminCampaignTypes />} />
+        <Route path="site-images" element={<SiteImages />} />
         <Route path="settings" element={<AppSettings />} />
       </Route>
 

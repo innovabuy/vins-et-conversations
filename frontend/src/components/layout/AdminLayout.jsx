@@ -4,7 +4,7 @@ import { Outlet, NavLink, useNavigate } from 'react-router-dom';
 import {
   LayoutDashboard, ShoppingCart, Truck, Factory, Package, Users,
   CreditCard, BarChart3, BookOpen, Bell, Map, FileText, Settings,
-  Download, Wine, LogOut, Menu, X, ChevronRight, Shield, Tag, Building2
+  Download, Wine, LogOut, Menu, X, ChevronRight, Shield, Tag, Building2, Image
 } from 'lucide-react';
 import NotificationBell from '../shared/NotificationBell';
 import { useAppSettings } from '../../contexts/AppSettingsContext';
@@ -31,6 +31,7 @@ const allNavItems = [
   { to: '/admin/organization-types', icon: Building2, label: "Types d'org.", adminOnly: true },
   { to: '/admin/campaign-types', icon: Tag, label: 'Types campagne', adminOnly: true },
   { to: '/admin/audit', icon: Shield, label: 'Audit', adminOnly: true },
+  { to: '/admin/site-images', icon: Image, label: 'Images site', adminOnly: true },
   { to: '/admin/settings', icon: Settings, label: 'Paramètres', adminOnly: true },
 ];
 

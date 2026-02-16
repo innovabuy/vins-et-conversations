@@ -132,6 +132,8 @@ app.use('/api/v1/campaigns', require('./routes/campaignResources'));
 app.use('/api/v1/admin/campaign-resources', require('./routes/campaignResources').adminRouter);
 app.use('/api/v1/admin/organization-types', require('./routes/organizationTypes'));
 app.use('/api/v1/admin/campaign-types', require('./routes/campaignTypes'));
+app.use('/api/v1/admin/site-images', require('./routes/siteImages'));
+app.use('/api/v1/public/site-images', require('./routes/siteImages').publicRouter);
 
 // ─── Health check ─────────────────────────────────────
 app.get('/api/health', async (req, res) => {
