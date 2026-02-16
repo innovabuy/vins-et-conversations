@@ -55,6 +55,9 @@ router.post('/cart', async (req, res) => {
     res.json({ session_id: sessionId, ...cart });
   } catch (err) {
     logger.error(`Cart update error: ${err.message}`);
+    if (err.message === 'INVALID_PRODUCTS') {
+      return res.status(400).json({ error: 'INVALID_PRODUCTS', message: 'Produits invalides ou indisponibles' });
+    }
     res.status(500).json({ error: 'SERVER_ERROR', message: err.message });
   }
 });

@@ -62,6 +62,10 @@ async function updateCart(sessionId, items) {
   let total_ttc = 0;
   let total_items = 0;
 
+  if (products.length === 0) {
+    throw new Error('INVALID_PRODUCTS');
+  }
+
   const cartItems = items
     .filter((i) => productMap[i.product_id] && i.qty > 0)
     .map((i) => {

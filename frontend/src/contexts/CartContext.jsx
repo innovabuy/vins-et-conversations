@@ -55,7 +55,8 @@ export function CartProvider({ children }) {
     }
   }, []);
 
-  const addToCart = useCallback(async (productId, qty = 1) => {
+  const addToCart = useCallback(async (productOrId, qty = 1) => {
+    const productId = typeof productOrId === 'object' && productOrId !== null ? productOrId.id : productOrId;
     const existing = cart.items.find((i) => i.product_id === productId);
     const newItems = existing
       ? cart.items.map((i) => i.product_id === productId ? { ...i, qty: i.qty + qty } : i)

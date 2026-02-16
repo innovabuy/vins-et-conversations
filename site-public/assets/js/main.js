@@ -348,7 +348,7 @@ function initWizard() {
       </div>
       <div class="wizard-nav">
         <button class="btn btn-outline wizard-prev">Recommencer</button>
-        <button class="btn btn-wine" onclick="document.getElementById('wizard-overlay').classList.remove('active');document.body.style.overflow=''">Fermer</button>
+        <a href="boutique.html" class="btn btn-wine">Voir tout le catalogue</a>
       </div>
     `;
     modal.querySelector('.wizard-close').addEventListener('click', close);
