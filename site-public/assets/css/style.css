@@ -2313,3 +2313,567 @@ h1, h2, h3, h4 {
 @media (max-width: 480px) {
   .catalogue-grid { grid-template-columns: 1fr; }
 }
+
+/* ─── Dropdown Navigation ─────────────────── */
+.nav-dropdown {
+  position: relative;
+}
+
+.nav-dropdown > a {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.nav-dropdown > a::after {
+  display: none !important;
+}
+
+.nav-dropdown .dropdown-arrow {
+  width: 12px;
+  height: 12px;
+  transition: transform var(--transition);
+}
+
+.nav-dropdown:hover .dropdown-arrow {
+  transform: rotate(180deg);
+}
+
+.nav-dropdown-menu {
+  display: none;
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--white);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-lg);
+  min-width: 220px;
+  padding: 12px 0;
+  z-index: 100;
+  border: 1px solid rgba(0,0,0,0.05);
+}
+
+.nav-dropdown:hover .nav-dropdown-menu {
+  display: block;
+}
+
+.nav-dropdown-menu a {
+  display: block;
+  padding: 10px 24px;
+  font-size: 0.9rem;
+  font-weight: 400;
+  color: var(--text);
+  transition: all var(--transition);
+}
+
+.nav-dropdown-menu a:hover {
+  background: var(--cream);
+  color: var(--wine);
+}
+
+@media (max-width: 768px) {
+  .nav-dropdown-menu {
+    position: static;
+    transform: none;
+    box-shadow: none;
+    border: none;
+    background: var(--cream);
+    border-radius: var(--radius);
+    padding: 8px 0;
+    margin-top: 8px;
+    display: none;
+  }
+
+  .nav-dropdown.open .nav-dropdown-menu {
+    display: block;
+  }
+
+  .nav-dropdown-menu a {
+    padding: 8px 20px;
+    font-size: 0.85rem;
+  }
+}
+
+/* ─── Page Hero (Interior Pages) ──────────── */
+.page-hero {
+  padding: 140px 0 60px;
+  background: var(--cream);
+  text-align: center;
+  position: relative;
+  overflow: hidden;
+}
+
+.page-hero::before {
+  content: '';
+  position: absolute;
+  top: -100px;
+  right: -100px;
+  width: 400px;
+  height: 400px;
+  background: radial-gradient(circle, rgba(196,165,90,0.1), transparent 70%);
+  border-radius: 50%;
+}
+
+.page-hero::after {
+  content: '';
+  position: absolute;
+  bottom: -80px;
+  left: -80px;
+  width: 300px;
+  height: 300px;
+  background: radial-gradient(circle, rgba(114,47,55,0.06), transparent 70%);
+  border-radius: 50%;
+}
+
+.page-hero .container {
+  position: relative;
+  z-index: 1;
+}
+
+.page-hero h1 {
+  font-size: clamp(2rem, 5vw, 3rem);
+  color: var(--wine);
+  margin-bottom: 16px;
+}
+
+.page-hero p {
+  font-size: 1.15rem;
+  color: var(--text-light);
+  max-width: 700px;
+  margin: 0 auto;
+  line-height: 1.7;
+}
+
+.page-hero .section-label {
+  margin-bottom: 12px;
+}
+
+/* ─── Page Content (Interior Pages) ───────── */
+.page-content {
+  padding: 80px 0;
+}
+
+.page-content.alt {
+  background: var(--cream);
+}
+
+.page-content h2 {
+  font-size: clamp(1.6rem, 3vw, 2.2rem);
+  color: var(--wine);
+  margin-bottom: 20px;
+}
+
+.page-content h3 {
+  font-size: 1.3rem;
+  color: var(--wine);
+  margin-bottom: 12px;
+}
+
+.page-content p {
+  font-size: 1.05rem;
+  color: var(--text-light);
+  line-height: 1.7;
+  margin-bottom: 16px;
+}
+
+.page-content .lead {
+  font-size: 1.15rem;
+  max-width: 800px;
+  margin: 0 auto 40px;
+  text-align: center;
+}
+
+/* Two column layout */
+.two-col {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 60px;
+  align-items: center;
+}
+
+.two-col.reverse {
+  direction: rtl;
+}
+
+.two-col.reverse > * {
+  direction: ltr;
+}
+
+.two-col img {
+  border-radius: var(--radius-lg);
+  width: 100%;
+  height: auto;
+}
+
+@media (max-width: 768px) {
+  .two-col { grid-template-columns: 1fr; gap: 32px; }
+  .two-col.reverse { direction: ltr; }
+}
+
+/* ─── Process Steps ───────────────────────── */
+.process-steps {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 32px;
+  margin: 40px 0;
+}
+
+.process-step {
+  text-align: center;
+  padding: 32px 20px;
+  background: var(--white);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow);
+  position: relative;
+}
+
+.alt .process-step {
+  background: var(--white);
+}
+
+.process-step .step-num {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  background: var(--wine);
+  color: var(--white);
+  font-weight: 700;
+  font-size: 1.2rem;
+  margin-bottom: 16px;
+}
+
+.process-step h3 {
+  font-size: 1.1rem;
+  color: var(--wine);
+  margin-bottom: 8px;
+}
+
+.process-step p {
+  font-size: 0.95rem;
+  color: var(--text-light);
+  margin-bottom: 0;
+}
+
+/* ─── Benefits List ───────────────────────── */
+.benefits-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 20px;
+  margin: 32px 0;
+}
+
+.benefit-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 16px;
+  padding: 20px;
+  background: var(--white);
+  border-radius: var(--radius);
+  border: 1px solid rgba(0,0,0,0.05);
+  transition: all var(--transition);
+}
+
+.alt .benefit-item {
+  background: var(--white);
+}
+
+.benefit-item:hover {
+  box-shadow: var(--shadow);
+  transform: translateY(-2px);
+}
+
+.benefit-icon {
+  width: 40px;
+  height: 40px;
+  background: var(--cream);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  color: var(--wine);
+  font-size: 1.2rem;
+}
+
+.benefit-item h4 {
+  font-family: 'Jost', sans-serif;
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--text);
+  margin-bottom: 4px;
+}
+
+.benefit-item p {
+  font-size: 0.9rem;
+  color: var(--text-light);
+  margin-bottom: 0;
+}
+
+/* ─── Team Grid ───────────────────────────── */
+.team-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  gap: 32px;
+  margin: 40px 0;
+}
+
+.team-card {
+  background: var(--white);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  box-shadow: var(--shadow);
+  text-align: center;
+  transition: all var(--transition);
+}
+
+.team-card:hover {
+  transform: translateY(-6px);
+  box-shadow: var(--shadow-lg);
+}
+
+.team-card-img {
+  height: 320px;
+  overflow: hidden;
+}
+
+.team-card-img img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transition: transform 0.6s ease;
+}
+
+.team-card:hover .team-card-img img {
+  transform: scale(1.05);
+}
+
+.team-card-body {
+  padding: 24px 20px;
+}
+
+.team-card-body h3 {
+  font-size: 1.3rem;
+  color: var(--wine);
+  margin-bottom: 4px;
+}
+
+.team-card-body .team-role {
+  font-size: 0.85rem;
+  color: var(--gold);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  margin-bottom: 12px;
+}
+
+.team-card-body p {
+  font-size: 0.9rem;
+  color: var(--text-light);
+  line-height: 1.6;
+  margin-bottom: 12px;
+}
+
+.team-card-body .team-email {
+  font-size: 0.85rem;
+  color: var(--wine);
+  font-weight: 500;
+}
+
+.team-card-body .team-email:hover {
+  color: var(--gold);
+}
+
+/* ─── FAQ Accordion ───────────────────────── */
+.faq-list {
+  max-width: 800px;
+  margin: 0 auto;
+}
+
+.faq-item {
+  border-bottom: 1px solid var(--cream-dark);
+}
+
+.faq-question {
+  width: 100%;
+  background: none;
+  border: none;
+  padding: 24px 0;
+  text-align: left;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  font-family: 'Cormorant Garamond', serif;
+  font-size: 1.2rem;
+  font-weight: 600;
+  color: var(--text);
+  transition: color var(--transition);
+}
+
+.faq-question:hover {
+  color: var(--wine);
+}
+
+.faq-question .faq-icon {
+  width: 24px;
+  height: 24px;
+  flex-shrink: 0;
+  transition: transform var(--transition);
+  color: var(--gold);
+}
+
+.faq-item.open .faq-question .faq-icon {
+  transform: rotate(45deg);
+}
+
+.faq-answer {
+  max-height: 0;
+  overflow: hidden;
+  transition: max-height 0.4s ease, padding 0.4s ease;
+}
+
+.faq-item.open .faq-answer {
+  max-height: 500px;
+  padding-bottom: 24px;
+}
+
+.faq-answer p {
+  font-size: 1rem;
+  color: var(--text-light);
+  line-height: 1.7;
+}
+
+/* ─── Prestations Cards (clickable) ───────── */
+.prestations-grid a.prestation-card {
+  text-decoration: none;
+  color: inherit;
+  display: block;
+}
+
+/* ─── CTA Banner ──────────────────────────── */
+.cta-banner {
+  background: var(--wine);
+  padding: 60px 0;
+  text-align: center;
+  color: var(--white);
+}
+
+.cta-banner h2 {
+  color: var(--white);
+  margin-bottom: 16px;
+}
+
+.cta-banner p {
+  color: rgba(255,255,255,0.8);
+  font-size: 1.1rem;
+  max-width: 600px;
+  margin: 0 auto 32px;
+}
+
+.cta-banner .btn-primary {
+  display: inline-flex;
+}
+
+/* ─── Avis / Testimonials ─────────────────── */
+.testimonials-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 24px;
+  margin: 40px 0;
+}
+
+.testimonial-card {
+  background: var(--white);
+  border-radius: var(--radius-lg);
+  padding: 32px;
+  box-shadow: var(--shadow);
+  position: relative;
+}
+
+.testimonial-card::before {
+  content: '\201C';
+  font-family: 'Cormorant Garamond', serif;
+  font-size: 4rem;
+  color: var(--gold);
+  opacity: 0.3;
+  position: absolute;
+  top: 12px;
+  left: 20px;
+  line-height: 1;
+}
+
+.testimonial-card p {
+  font-size: 1rem;
+  color: var(--text-light);
+  line-height: 1.7;
+  font-style: italic;
+  margin-bottom: 16px;
+  position: relative;
+  z-index: 1;
+}
+
+.testimonial-author {
+  font-weight: 600;
+  color: var(--text);
+  font-size: 0.9rem;
+}
+
+.testimonial-role {
+  font-size: 0.8rem;
+  color: var(--gold);
+}
+
+/* ─── Ambassador Cards ────────────────────── */
+.ambassadors-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 24px;
+  margin: 40px 0;
+}
+
+.ambassador-card {
+  background: var(--white);
+  border-radius: var(--radius-lg);
+  padding: 32px;
+  box-shadow: var(--shadow);
+}
+
+.ambassador-info h3 {
+  font-family: 'Cormorant Garamond', serif;
+  font-size: 1.3rem;
+  color: var(--text);
+  margin-bottom: 8px;
+}
+
+.ambassador-sectors {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  font-size: 0.95rem;
+  color: var(--text-light);
+}
+
+.ambassador-sectors svg {
+  flex-shrink: 0;
+  margin-top: 3px;
+  color: var(--wine);
+}
+
+/* ─── Responsive for new components ───────── */
+@media (max-width: 768px) {
+  .page-hero { padding: 120px 0 40px; }
+  .page-content { padding: 50px 0; }
+  .team-grid { grid-template-columns: 1fr 1fr; }
+  .team-card-img { height: 240px; }
+  .process-steps { grid-template-columns: 1fr; }
+}
+
+@media (max-width: 480px) {
+  .team-grid { grid-template-columns: 1fr; }
+  .benefits-grid { grid-template-columns: 1fr; }
+}

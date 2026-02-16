@@ -973,8 +973,37 @@ exports.seed = async function (knex) {
     { page: 'commun', slot: 'commun_logo_footer', label: 'Logo V&C footer', alt_text: 'Vins & Conversations' },
     { page: 'commun', slot: 'commun_favicon', label: 'Favicon', alt_text: '' },
     { page: 'commun', slot: 'commun_og_image', label: 'Image Open Graph (partage réseaux)', alt_text: 'Vins & Conversations' },
+    // Prestations
+    { page: 'prestations', slot: 'prestations_hero', label: 'Image hero page prestations', alt_text: 'Nos prestations' },
+    { page: 'prestations', slot: 'prestations_carte_cse', label: 'Image carte CSE', alt_text: 'Offres CSE' },
+    { page: 'prestations', slot: 'prestations_carte_ecoles', label: 'Image carte Écoles', alt_text: 'Partenariat écoles' },
+    { page: 'prestations', slot: 'prestations_carte_ambassadeurs', label: 'Image carte Ambassadeurs', alt_text: 'Réseau ambassadeurs' },
+    { page: 'prestations', slot: 'prestations_carte_repas', label: 'Image carte Repas/Soirées', alt_text: 'Fournisseur événements' },
+    // CSE
+    { page: 'cse', slot: 'cse_hero', label: 'Image hero page CSE', alt_text: 'Espace CSE' },
+    { page: 'cse', slot: 'cse_processus', label: 'Image processus CSE', alt_text: 'Comment ça marche' },
+    // Écoles
+    { page: 'ecoles', slot: 'ecoles_hero', label: 'Image hero page Écoles', alt_text: 'Partenariat écoles' },
+    { page: 'ecoles', slot: 'ecoles_concept', label: 'Image concept financement', alt_text: 'Financement projets' },
+    // Ambassadeurs
+    { page: 'ambassadeurs', slot: 'ambassadeurs_hero', label: 'Image hero page Ambassadeurs', alt_text: 'Devenir ambassadeur' },
+    { page: 'ambassadeurs', slot: 'ambassadeurs_paliers', label: 'Image paliers', alt_text: 'Paliers récompenses' },
+    // Repas/Soirées
+    { page: 'repas', slot: 'repas_hero', label: 'Image hero page Repas', alt_text: 'Fournisseur événements' },
+    // À propos
+    { page: 'apropos', slot: 'apropos_hero', label: 'Image hero page À propos', alt_text: 'Notre histoire' },
+    { page: 'apropos', slot: 'apropos_nicolas_grand', label: 'Grande photo Nicolas', alt_text: 'Nicolas Froment' },
+    // Équipe
+    { page: 'equipe', slot: 'equipe_nicolas', label: 'Photo Nicolas Froment', alt_text: 'Nicolas Froment, fondateur' },
+    { page: 'equipe', slot: 'equipe_matheo', label: 'Photo Mathéo Benoit', alt_text: 'Mathéo Benoit' },
+    { page: 'equipe', slot: 'equipe_malone', label: 'Photo Malone Froment', alt_text: 'Malone Froment' },
+    { page: 'equipe', slot: 'equipe_martin', label: 'Photo Martin Hery', alt_text: 'Martin Hery' },
+    // Coffrets
+    { page: 'coffrets', slot: 'coffrets_hero', label: 'Image hero page Coffrets', alt_text: 'Nos coffrets' },
+    // FAQ
+    { page: 'faq', slot: 'faq_hero', label: 'Image hero page FAQ', alt_text: 'Questions fréquentes' },
   ]);
-  console.log('✅ Site images: 18 emplacements créés');
+  console.log('✅ Site images: 38 emplacements créés');
 
   console.log('✅ Seed complet Vins & Conversations — Données CDC v4');
 };

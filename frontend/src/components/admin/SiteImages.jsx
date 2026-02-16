@@ -7,9 +7,18 @@ const PAGE_LABELS = {
   boutique: 'Boutique',
   contact: 'Contact',
   commun: 'Éléments communs',
+  prestations: 'Prestations',
+  cse: 'Espace CSE',
+  ecoles: 'Partenariat Écoles',
+  ambassadeurs: 'Ambassadeurs',
+  repas: 'Repas & Soirées',
+  apropos: 'À propos',
+  equipe: 'Équipe',
+  coffrets: 'Coffrets',
+  faq: 'FAQ',
 };
 
-const PAGE_ORDER = ['commun', 'accueil', 'boutique', 'contact'];
+const PAGE_ORDER = ['commun', 'accueil', 'boutique', 'prestations', 'cse', 'ecoles', 'ambassadeurs', 'repas', 'coffrets', 'apropos', 'equipe', 'faq', 'contact'];
 
 export default function SiteImages() {
   const [grouped, setGrouped] = useState({});
