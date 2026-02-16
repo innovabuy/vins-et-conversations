@@ -3,7 +3,7 @@ const fs = require('fs');
 const path = require('path');
 const logger = require('../utils/logger');
 
-const BASE_URL = process.env.BASE_URL || 'http://localhost:5173';
+const BASE_URL = process.env.BASE_URL || process.env.FRONTEND_URL || '';
 
 // ─── Dynamic SMTP configuration ──────────────────────
 
@@ -242,7 +242,7 @@ async function sendInvitation({ email, campaignName, orgName, role, code, expire
     ORG_NAME: orgName || '—',
     ROLE: ROLE_LABELS[role] || role,
     CODE: code,
-    REGISTER_URL: `${BASE_URL}/login?register=1&code=${encodeURIComponent(code)}`,
+    REGISTER_URL: `${BASE_URL}/invite/${encodeURIComponent(code)}`,
     EXPIRES_AT: formatDate(expiresAt),
   });
   return sendEmail({ to: email, subject: `Invitation à rejoindre ${campaignName}`, html });

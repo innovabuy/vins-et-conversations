@@ -9,7 +9,7 @@ const db = require('../config/database');
 const emailService = require('../services/emailService');
 const logger = require('../utils/logger');
 
-const BASE_URL = process.env.BASE_URL || 'http://localhost:5173';
+const BASE_URL = process.env.BASE_URL || process.env.FRONTEND_URL || '';
 
 const router = express.Router();
 

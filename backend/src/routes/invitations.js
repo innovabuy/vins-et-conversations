@@ -75,7 +75,7 @@ router.post(
 
         invitations.push({
           ...inv,
-          link: `${process.env.FRONTEND_URL || 'http://localhost:5173'}/invite/${code}`,
+          link: `${process.env.BASE_URL || process.env.FRONTEND_URL || ''}/invite/${code}`,
         });
       }
 

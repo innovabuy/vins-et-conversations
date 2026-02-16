@@ -30,8 +30,8 @@ router.get('/my-link', authenticate, requireRole('etudiant'), async (req, res) =
       await db('participations').where({ id: participation.id }).update({ referral_code: referralCode });
     }
 
-    const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
-    const referralLink = `${frontendUrl}/boutique?ref=${referralCode}`;
+    const siteUrl = process.env.SITE_PUBLIC_URL || process.env.FRONTEND_URL || '';
+    const referralLink = `${siteUrl}/boutique?ref=${referralCode}`;
 
     res.json({ referral_code: referralCode, referral_link: referralLink });
   } catch (err) {
