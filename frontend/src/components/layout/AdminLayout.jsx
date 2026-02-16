@@ -4,7 +4,7 @@ import { Outlet, NavLink, useNavigate } from 'react-router-dom';
 import {
   LayoutDashboard, ShoppingCart, Truck, Factory, Package, Users,
   CreditCard, BarChart3, BookOpen, Bell, Map, FileText, Settings,
-  Download, Wine, LogOut, Menu, X, ChevronRight, Shield, Tag
+  Download, Wine, LogOut, Menu, X, ChevronRight, Shield, Tag, Building2
 } from 'lucide-react';
 import NotificationBell from '../shared/NotificationBell';
 import { useAppSettings } from '../../contexts/AppSettingsContext';
