@@ -183,7 +183,7 @@ export default function PublicLayout() {
                 <span className="font-bold">{app_name}</span>
               </div>
               <p className="text-sm text-gray-400 leading-relaxed">
-                Nicolas Froment — Angers<br />
+                Nicolas Froment — Saint-Sylvain-d'Anjou — Maine-et-Loire (49)<br />
                 Vente de vins à travers des campagnes solidaires et conviviales.
               </p>
             </div>
@@ -207,7 +207,7 @@ export default function PublicLayout() {
                   <Mail size={14} /> nicolas@vins-conversations.fr
                 </a>
                 <div className="flex items-center gap-2">
-                  <Phone size={14} /> Angers, France
+                  <Phone size={14} /> Saint-Sylvain-d'Anjou (49)
                 </div>
               </div>
             </div>
