@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { dashboardAPI, productsAPI, ordersAPI, campaignResourcesAPI } from '../../services/api';
 import { useAuth } from '../../contexts/AuthContext';
-import { Flame, Trophy, ShoppingCart, User, ChevronUp, Wine, Package, Clock, Award, Zap, Heart, Target, DollarSign, ArrowLeft, ArrowRight, Check, Phone, Mail, FileText, CreditCard, Banknote, Building, HelpCircle, Users, TrendingUp, TrendingDown, Minus, BarChart3, PiggyBank, BookOpen, ExternalLink, Video, Image, FileDown } from 'lucide-react';
+import { Flame, Trophy, ShoppingCart, User, ChevronUp, Wine, Package, Clock, Award, Zap, Heart, Target, DollarSign, ArrowLeft, ArrowRight, Check, Phone, Mail, FileText, CreditCard, Banknote, Building, HelpCircle, Users, TrendingUp, TrendingDown, Minus, BarChart3, PiggyBank, BookOpen, ExternalLink, Video, Image, FileDown, LogOut } from 'lucide-react';
 import WinePiggyBank from '../shared/WinePiggyBank';
 import ReferralSection from './ReferralSection';
 
@@ -393,7 +393,7 @@ function OrderFlow({ campaignId, products, customers, onComplete }) {
 
 // ========== MAIN DASHBOARD ==========
 export default function StudentDashboard() {
-  const { user } = useAuth();
+  const { user, logout } = useAuth();
   const [tab, setTab] = useState('home');
   const [data, setData] = useState(null);
   const [products, setProducts] = useState([]);
@@ -453,7 +453,12 @@ export default function StudentDashboard() {
             <p className="text-wine-200 text-sm">Bonjour</p>
             <h1 className="text-lg font-bold">{user?.name}</h1>
           </div>
-          <span className="badge bg-white/20 text-white">{data?.classGroup}</span>
+          <div className="flex items-center gap-2">
+            <span className="badge bg-white/20 text-white">{data?.classGroup}</span>
+            <button onClick={logout} className="p-2 rounded-full hover:bg-white/10 transition-colors" title="Deconnexion">
+              <LogOut size={18} />
+            </button>
+          </div>
         </div>
 
         {tab === 'home' && data && (
