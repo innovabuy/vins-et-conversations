@@ -126,7 +126,7 @@
             <div class="subtitle">Découverte</div>
             <h3>1 bouteille + 2 épiceries</h3>
             <p>À partir de 23,50 €</p>
-            <a href="#" data-add-to-cart="d10c4ff3-3fa3-4b50-a9c8-320aa8385955" class="btn-add-cart">
+            <a href="#" data-add-to-cart="d10c4ff3-3fa3-4b50-a9c8-320aa8385955" class="btn btn-wine btn-sm btn-add-cart">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 002 1.61h9.72a2 2 0 002-1.61L23 6H6"/></svg>
               Ajouter au panier
             </a>
@@ -141,7 +141,7 @@
             <div class="subtitle">Gourmand</div>
             <h3>1 bouteille + 3 épiceries</h3>
             <p>À partir de 34,50 €</p>
-            <a href="#" data-add-to-cart="6292e608-c640-433a-83f2-8c976acd9f42" class="btn-add-cart">
+            <a href="#" data-add-to-cart="6292e608-c640-433a-83f2-8c976acd9f42" class="btn btn-wine btn-sm btn-add-cart">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 002 1.61h9.72a2 2 0 002-1.61L23 6H6"/></svg>
               Ajouter au panier
             </a>
@@ -156,7 +156,7 @@
             <div class="subtitle">Duo</div>
             <h3>2 bouteilles + 1 épicerie</h3>
             <p>À partir de 27,00 €</p>
-            <a href="#" data-add-to-cart="e872522d-7acb-425a-927f-087594eb1ddd" class="btn-add-cart">
+            <a href="#" data-add-to-cart="e872522d-7acb-425a-927f-087594eb1ddd" class="btn btn-wine btn-sm btn-add-cart">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 002 1.61h9.72a2 2 0 002-1.61L23 6H6"/></svg>
               Ajouter au panier
             </a>
@@ -171,7 +171,7 @@
             <div class="subtitle">Partage</div>
             <h3>2 bouteilles + 2 épiceries</h3>
             <p>À partir de 30,50 €</p>
-            <a href="#" data-add-to-cart="e90618e6-1974-4549-a284-0ed9dc8ebd7c" class="btn-add-cart">
+            <a href="#" data-add-to-cart="e90618e6-1974-4549-a284-0ed9dc8ebd7c" class="btn btn-wine btn-sm btn-add-cart">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 002 1.61h9.72a2 2 0 002-1.61L23 6H6"/></svg>
               Ajouter au panier
             </a>
@@ -186,7 +186,7 @@
             <div class="subtitle">Prestige</div>
             <h3>2 bouteilles + 3 épiceries</h3>
             <p>À partir de 42,50 €</p>
-            <a href="#" data-add-to-cart="1eb2f165-0b2e-48d8-a183-23f75af12617" class="btn-add-cart">
+            <a href="#" data-add-to-cart="1eb2f165-0b2e-48d8-a183-23f75af12617" class="btn btn-wine btn-sm btn-add-cart">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 002 1.61h9.72a2 2 0 002-1.61L23 6H6"/></svg>
               Ajouter au panier
             </a>
@@ -273,10 +273,9 @@
   <script src="assets/js/main.js?v=3"></script>
   <script>
     (function() {
-      var BOUTIQUE_URL = window.location.protocol + '//' + window.location.hostname + ':5173';
       document.querySelectorAll('[data-add-to-cart]').forEach(function(btn) {
         var productId = btn.getAttribute('data-add-to-cart');
-        btn.href = BOUTIQUE_URL + '/boutique?add_to_cart=' + productId;
+        btn.href = '/app/boutique?add_to_cart=' + productId;
       });
     })();
   </script>
