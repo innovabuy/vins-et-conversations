@@ -58,7 +58,7 @@ app.use(morgan('combined', {
 if (process.env.NODE_ENV !== 'test' && !process.env.JEST_WORKER_ID && !process.env.LOAD_TEST) {
   const limiter = rateLimit({
     windowMs: 15 * 60 * 1000,
-    max: 100,
+    max: 500,
     standardHeaders: true,
     legacyHeaders: false,
     message: { error: 'RATE_LIMITED', message: 'Trop de requêtes' },
@@ -68,18 +68,18 @@ if (process.env.NODE_ENV !== 'test' && !process.env.JEST_WORKER_ID && !process.e
   // Rate limit plus strict pour l'auth
   const authLimiter = rateLimit({
     windowMs: 15 * 60 * 1000,
-    max: 20,
+    max: 30,
     message: { error: 'RATE_LIMITED', message: 'Trop de tentatives de connexion' },
   });
   app.use('/api/v1/auth/', authLimiter);
 
-  // Rate limit API publique (30 req/min)
+  // Rate limit API publique (100 req/min)
   const publicLimiter = rateLimit({
     windowMs: 60 * 1000,
-    max: 30,
+    max: 100,
     standardHeaders: true,
     legacyHeaders: false,
-    message: { error: 'RATE_LIMITED', message: 'Limite de requêtes API publique atteinte (30/min)' },
+    message: { error: 'RATE_LIMITED', message: 'Limite de requêtes API publique atteinte (100/min)' },
   });
   app.use('/api/v1/public/', publicLimiter);
 }

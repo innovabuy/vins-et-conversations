@@ -50,9 +50,11 @@ import OrderTrackingPage from './components/public/OrderTrackingPage';
 import CGVPage from './components/public/CGVPage';
 import MentionsLegalesPage from './components/public/MentionsLegalesPage';
 import TasteWizard from './components/public/TasteWizard';
+import SelectionPage from './components/public/SelectionPage';
 import { CartProvider } from './contexts/CartContext';
 import CustomerDashboard from './components/customer/CustomerDashboard';
 import { AppSettingsProvider } from './contexts/AppSettingsContext';
+import { SiteImagesProvider } from './contexts/SiteImagesContext';
 import InviteRegisterPage from './pages/InviteRegisterPage';
 
 function ProtectedRoute({ children, roles }) {
@@ -82,6 +84,7 @@ function AppRoutes() {
         <Route path="confirmation/:ref" element={<ConfirmationPage />} />
         <Route path="suivi" element={<OrderTrackingPage />} />
         <Route path="wizard" element={<TasteWizard />} />
+        <Route path="selection" element={<SelectionPage />} />
         <Route path="cgv" element={<CGVPage />} />
         <Route path="mentions-legales" element={<MentionsLegalesPage />} />
       </Route>
@@ -191,12 +194,14 @@ export default function App() {
   return (
     <BrowserRouter>
       <AppSettingsProvider>
-        <AuthProvider>
-          <ToastProvider>
-            <AppRoutes />
-            <InstallPrompt />
-          </ToastProvider>
-        </AuthProvider>
+        <SiteImagesProvider>
+          <AuthProvider>
+            <ToastProvider>
+              <AppRoutes />
+              <InstallPrompt />
+            </ToastProvider>
+          </AuthProvider>
+        </SiteImagesProvider>
       </AppSettingsProvider>
     </BrowserRouter>
   );

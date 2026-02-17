@@ -1,9 +1,10 @@
-import { useState, useEffect } from 'react';
-import { Link, useSearchParams } from 'react-router-dom';
+import { useState, useEffect, useRef } from 'react';
+import { Link, useSearchParams, useNavigate } from 'react-router-dom';
 import { Wine, Search, Filter, ChevronRight, ShoppingCart, Check, Star } from 'lucide-react';
 import api from '../../services/api';
 import { featuredAPI } from '../../services/api';
 import { useCart } from '../../contexts/CartContext';
+import { useToast } from '../shared/Toast';
 
 const formatEur = (v) => new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR' }).format(v);
 
@@ -18,6 +19,7 @@ const COLOR_MAP = {
 
 export default function BoutiqueHome() {
   const [searchParams] = useSearchParams();
+  const navigate = useNavigate();
   const campaignId = searchParams.get('campagne');
   const [products, setProducts] = useState([]);
   const [filters, setFilters] = useState(null);
@@ -30,6 +32,20 @@ export default function BoutiqueHome() {
   const [referrerName, setReferrerName] = useState(null);
   const [featured, setFeatured] = useState([]);
   const { addToCart, getReferralCode } = useCart();
+  const toast = useToast();
+  const addToCartHandled = useRef(false);
+
+  // Handle add_to_cart URL parameter (from coffrets.html)
+  useEffect(() => {
+    const productId = searchParams.get('add_to_cart');
+    if (productId && !addToCartHandled.current) {
+      addToCartHandled.current = true;
+      addToCart(productId, 1)
+        .then(() => toast.success('Produit ajouté au panier'))
+        .catch(() => toast.error('Erreur lors de l\'ajout au panier'));
+      navigate('/boutique', { replace: true });
+    }
+  }, [searchParams]);
 
   // Detect referral (ambassador or student)
   useEffect(() => {
@@ -109,25 +125,35 @@ export default function BoutiqueHome() {
       {/* Featured — Sélection du moment */}
       {featured.length > 0 && (
         <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-          <div className="flex items-center gap-2 mb-6">
-            <Star size={20} className="text-yellow-500 fill-yellow-500" />
-            <h2 className="text-xl font-bold text-gray-900">Notre sélection du moment</h2>
+          <div className="flex items-center justify-between mb-6">
+            <div className="flex items-center gap-2">
+              <Star size={20} className="text-yellow-500 fill-yellow-500" />
+              <h2 className="text-xl font-bold text-gray-900">Notre sélection du moment</h2>
+            </div>
+            <Link to="/boutique/selection" className="text-sm text-wine-700 hover:text-wine-800 font-medium flex items-center gap-1">
+              Tout voir <ChevronRight size={16} />
+            </Link>
           </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+          <div className="flex gap-6 overflow-x-auto pb-4 snap-x snap-mandatory scrollbar-hide sm:overflow-visible sm:pb-0 sm:grid sm:gap-6"
+            style={{ gridTemplateColumns: `repeat(${Math.min(featured.length, 4)}, minmax(0, 1fr))` }}
+          >
             {featured.map((p) => (
               <Link
                 key={p.id}
                 to={`/boutique/vin/${p.id}`}
-                className="group relative bg-white border-2 border-yellow-200 rounded-2xl overflow-hidden hover:shadow-lg transition-all hover:-translate-y-1 flex flex-col"
+                className="group relative bg-white border-2 border-yellow-200 rounded-2xl overflow-hidden hover:shadow-lg transition-all hover:-translate-y-1 flex flex-col min-w-[260px] flex-shrink-0 snap-start sm:min-w-0 sm:flex-shrink"
               >
                 <div className="absolute top-3 right-3 z-10 bg-yellow-400 text-yellow-900 px-2 py-0.5 rounded-full text-xs font-semibold flex items-center gap-1">
                   <Star size={12} className="fill-yellow-900" /> Sélection
                 </div>
-                <div className="aspect-[4/3] bg-gradient-to-br from-yellow-50 to-wine-50 flex items-center justify-center">
+                <div className="aspect-[3/4] overflow-hidden bg-gradient-to-br from-yellow-50 to-wine-50 flex items-center justify-center">
                   {p.image_url ? (
                     <img src={p.image_url} alt={p.name} className="w-full h-full object-cover" />
                   ) : (
-                    <Wine size={48} className="text-wine-300" />
+                    <div className="flex flex-col items-center justify-center gap-2 text-wine-300">
+                      <Wine size={48} />
+                      <span className="text-sm font-medium text-wine-400 text-center px-4">{p.name}</span>
+                    </div>
                   )}
                 </div>
                 <div className="p-4 flex-1 flex flex-col">
@@ -224,18 +250,21 @@ export default function BoutiqueHome() {
             <p className="text-lg">Aucun vin trouvé</p>
           </div>
         ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
             {products.map((p) => (
               <Link
                 key={p.id}
                 to={`/boutique/vin/${p.id}`}
-                className="group bg-white border border-gray-100 rounded-2xl overflow-hidden hover:shadow-lg transition-all hover:-translate-y-1 flex flex-col"
+                className="group bg-white border border-gray-100 rounded-2xl overflow-hidden hover:shadow-lg transition-all hover:-translate-y-1 flex flex-col h-full"
               >
-                <div className="aspect-[4/3] bg-gradient-to-br from-wine-50 to-wine-100 flex items-center justify-center">
+                <div className="aspect-[3/4] overflow-hidden bg-gradient-to-br from-wine-50 to-wine-100 flex items-center justify-center">
                   {p.image_url ? (
                     <img src={p.image_url} alt={p.name} className="w-full h-full object-cover" />
                   ) : (
-                    <Wine size={48} className="text-wine-300" />
+                    <div className="flex flex-col items-center justify-center gap-2 text-wine-300">
+                      <Wine size={48} />
+                      <span className="text-sm font-medium text-wine-400 text-center px-4">{p.name}</span>
+                    </div>
                   )}
                 </div>
                 <div className="p-4 flex-1 flex flex-col">
@@ -248,9 +277,9 @@ export default function BoutiqueHome() {
                     {p.region && <span className="text-xs text-gray-400">{p.region}</span>}
                   </div>
                   <h3 className="font-semibold text-gray-900 group-hover:text-wine-700 transition-colors">{p.name}</h3>
-                  {p.appellation && <p className="text-xs text-gray-500 mt-1">{p.appellation}</p>}
-                  {p.description && <p className="text-xs text-gray-500 mt-1 line-clamp-2">{p.description}</p>}
-                  <div className="flex items-center justify-between mt-auto pt-3">
+                  <p className="text-xs text-gray-500 mt-1">{p.appellation || '\u00A0'}</p>
+                  <p className="text-xs text-gray-400 mt-1 line-clamp-2 flex-1">{p.description || '\u00A0'}</p>
+                  <div className="flex items-center justify-between mt-3 pt-3 border-t border-gray-100">
                     <span className="text-lg font-bold text-wine-700">{formatEur(p.price_ttc)}</span>
                     <button
                       onClick={(e) => {

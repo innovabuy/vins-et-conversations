@@ -3,6 +3,7 @@ import { Wine, Mail, Phone, Menu, X, ShoppingCart, Gift, Star, ChevronDown } fro
 import { useState, useEffect, useRef } from 'react';
 import { boutiqueAPI } from '../../services/api';
 import { useAppSettings } from '../../contexts/AppSettingsContext';
+import { useSiteImage } from '../../contexts/SiteImagesContext';
 
 function useCartBadge() {
   try {
@@ -60,6 +61,10 @@ export default function PublicLayout() {
   const cartCount = useCartBadge();
   const ambassador = useReferral();
   const { app_logo_url, app_name } = useAppSettings();
+  const headerImage = useSiteImage('commun_logo_header');
+  const footerImage = useSiteImage('commun_logo_footer');
+  const headerLogo = headerImage?.image_url || app_logo_url;
+  const footerLogo = footerImage?.image_url || app_logo_url;
 
   return (
     <div className="min-h-screen flex flex-col bg-white">
@@ -68,8 +73,8 @@ export default function PublicLayout() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between h-16">
             <Link to="/boutique" className="flex items-center gap-2">
-              {app_logo_url ? (
-                <img src={app_logo_url} alt={app_name} className="h-8 w-auto object-contain" />
+              {headerLogo ? (
+                <img src={headerLogo} alt={headerImage?.alt_text || app_name} className="h-8 w-auto object-contain" />
               ) : (
                 <div className="bg-wine-700 p-1.5 rounded-lg">
                   <Wine size={20} className="text-white" />
@@ -170,8 +175,8 @@ export default function PublicLayout() {
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
             <div>
               <div className="flex items-center gap-2 mb-4">
-                {app_logo_url ? (
-                  <img src={app_logo_url} alt={app_name} className="h-8 w-auto object-contain bg-white rounded-md p-0.5" />
+                {footerLogo ? (
+                  <img src={footerLogo} alt={footerImage?.alt_text || app_name} className="h-8 w-auto object-contain bg-white rounded-md p-0.5" />
                 ) : (
                   <div className="bg-wine-700 p-1.5 rounded-lg"><Wine size={18} className="text-white" /></div>
                 )}

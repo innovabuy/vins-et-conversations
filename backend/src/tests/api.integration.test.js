@@ -2216,8 +2216,11 @@ describe('API Integration Tests', () => {
     });
 
     test('Full flow: 2 products → cart → checkout → confirm → contact + notification', async () => {
-      // 1. Get 2 visible products
-      const products = await db('products').where({ visible_boutique: true, active: true }).limit(2);
+      // 1. Get 2 visible seed products (avoid coffrets that may lack campaign_products)
+      const products = await db('products')
+        .where({ visible_boutique: true, active: true })
+        .whereIn('name', ['Oriolus Blanc', 'Cuvée Clémence'])
+        .limit(2);
       expect(products.length).toBeGreaterThanOrEqual(1);
 
       // 2. Add to cart
