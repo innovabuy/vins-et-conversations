@@ -1,8 +1,9 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Wine, ShoppingCart, Check, ArrowRight, ArrowLeft, Sparkles } from 'lucide-react';
+import { Wine, ShoppingCart, Check, ArrowRight, ArrowLeft, Sparkles, Eye } from 'lucide-react';
 import api from '../../services/api';
 import { useCart } from '../../contexts/CartContext';
+import ProductModal from './ProductModal';
 
 const formatEur = (v) => new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR' }).format(v);
 
@@ -53,6 +54,7 @@ export default function TasteWizard() {
   const [results, setResults] = useState(null);
   const [loading, setLoading] = useState(false);
   const [addedId, setAddedId] = useState(null);
+  const [selectedIndex, setSelectedIndex] = useState(null);
   const { addToCart } = useCart();
 
   const handleCompute = async () => {
@@ -80,6 +82,8 @@ export default function TasteWizard() {
       setLoading(false);
     }
   };
+
+  const displayedResults = results ? results.slice(0, 10) : [];
 
   return (
     <div className="max-w-3xl mx-auto px-4 sm:px-6 py-12">
@@ -207,23 +211,29 @@ export default function TasteWizard() {
             </div>
           ) : (
             <div className="space-y-3">
-              {results.slice(0, 10).map((p, index) => (
-                <div key={p.id} className="bg-white border rounded-xl p-4 flex items-center gap-4">
-                  <div className="flex-shrink-0 w-12 h-12 rounded-full bg-wine-50 flex items-center justify-center">
+              {displayedResults.map((p, index) => (
+                <div key={p.id} className="bg-white border rounded-xl p-4 flex items-center gap-4 hover:border-wine-200 transition-colors">
+                  <button
+                    onClick={() => setSelectedIndex(index)}
+                    className="flex-shrink-0 w-12 h-12 rounded-full bg-wine-50 flex items-center justify-center cursor-pointer hover:ring-2 hover:ring-wine-300 transition-all"
+                  >
                     {p.image_url ? (
                       <img src={p.image_url} alt="" className="w-12 h-12 rounded-full object-cover" />
                     ) : (
                       <Wine size={20} className="text-wine-400" />
                     )}
-                  </div>
+                  </button>
 
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2">
-                      <Link to={`/boutique/vin/${p.id}`} className="font-semibold text-gray-900 hover:text-wine-700 truncate">
+                      <button
+                        onClick={() => setSelectedIndex(index)}
+                        className="font-semibold text-gray-900 hover:text-wine-700 truncate text-left"
+                      >
                         {p.name}
-                      </Link>
+                      </button>
                       {index === 0 && (
-                        <span className="bg-yellow-100 text-yellow-800 text-xs px-2 py-0.5 rounded-full font-medium">
+                        <span className="bg-yellow-100 text-yellow-800 text-xs px-2 py-0.5 rounded-full font-medium whitespace-nowrap">
                           Top match
                         </span>
                       )}
@@ -246,6 +256,13 @@ export default function TasteWizard() {
                       </div>
                       <div className="text-[10px] text-gray-400">match</div>
                     </div>
+                    <button
+                      onClick={() => setSelectedIndex(index)}
+                      className="hidden sm:flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-medium bg-gray-100 text-gray-600 hover:bg-gray-200 transition-all"
+                      title="Voir la fiche"
+                    >
+                      <Eye size={14} />
+                    </button>
                     <button
                       onClick={() => {
                         addToCart({ id: p.id, name: p.name, price_ttc: p.price_ttc });
@@ -272,6 +289,18 @@ export default function TasteWizard() {
             </Link>
           </div>
         </div>
+      )}
+
+      {/* Product Modal */}
+      {selectedIndex !== null && displayedResults[selectedIndex] && (
+        <ProductModal
+          product={displayedResults[selectedIndex]}
+          onClose={() => setSelectedIndex(null)}
+          onPrev={() => setSelectedIndex(Math.max(0, selectedIndex - 1))}
+          onNext={() => setSelectedIndex(Math.min(displayedResults.length - 1, selectedIndex + 1))}
+          hasPrev={selectedIndex > 0}
+          hasNext={selectedIndex < displayedResults.length - 1}
+        />
       )}
     </div>
   );
