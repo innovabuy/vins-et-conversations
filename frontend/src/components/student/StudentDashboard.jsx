@@ -541,8 +541,8 @@ export default function StudentDashboard() {
               </div>
             )}
 
-            {/* Referral section */}
-            <ReferralSection campaignId={campaignId} />
+            {/* Referral section — hidden for alcohol-free campaigns */}
+            {!campaign?.alcohol_free && <ReferralSection campaignId={campaignId} />}
 
             {/* Campaign collective stats */}
             {campaign && (

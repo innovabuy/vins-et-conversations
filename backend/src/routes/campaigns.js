@@ -658,6 +658,7 @@ const campaignSchema = Joi.object({
   goal: Joi.number().min(0).default(0),
   start_date: Joi.date().allow(null),
   end_date: Joi.date().allow(null),
+  alcohol_free: Joi.boolean().default(false),
   config: Joi.object().default({}),
   products: Joi.array().items(Joi.object({
     product_id: Joi.string().uuid().required(),

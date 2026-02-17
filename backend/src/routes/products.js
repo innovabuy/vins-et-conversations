@@ -122,6 +122,9 @@ campaignProductsRouter.get(
   requireCampaignAccess,
   async (req, res) => {
     try {
+      // Check if campaign is alcohol_free
+      const campaign = await db('campaigns').where({ id: req.params.campaignId }).select('alcohol_free').first();
+
       let query = db('products')
         .join('campaign_products', 'products.id', 'campaign_products.product_id')
         .leftJoin('product_categories', 'products.category_id', 'product_categories.id')
@@ -131,6 +134,12 @@ campaignProductsRouter.get(
           'product_categories.name as category_name', 'product_categories.type as category_type',
           'product_categories.tasting_axes as category_tasting_axes',
           'product_categories.has_tasting_profile as category_has_tasting');
+
+      // Filter out alcoholic products for alcohol_free campaigns
+      if (campaign && campaign.alcohol_free) {
+        query = query.where('product_categories.type', '!=', 'wine');
+      }
+
       if (req.query.category_id) query = query.where('products.category_id', req.query.category_id);
       const products = await query.orderBy('campaign_products.sort_order');
       res.json({ data: products });

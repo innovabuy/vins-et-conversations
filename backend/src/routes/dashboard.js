@@ -174,12 +174,20 @@ router.get(
       const minOrder = pricingRules?.min_order || 0;
 
       // Products with original + CSE prices
-      const products = await db('products')
+      let productsQuery = db('products')
         .join('campaign_products', 'products.id', 'campaign_products.product_id')
+        .leftJoin('product_categories', 'products.category_id', 'product_categories.id')
         .where('campaign_products.campaign_id', campaignId)
         .where('campaign_products.active', true)
         .select('products.*', 'campaign_products.custom_price')
         .orderBy('products.sort_order');
+
+      // Filter out alcoholic products for alcohol_free campaigns
+      if (campaign.alcohol_free) {
+        productsQuery = productsQuery.where('product_categories.type', '!=', 'wine');
+      }
+
+      const products = await productsQuery;
 
       const productsWithCSE = products.map((p) => {
         const originalTTC = p.custom_price ? parseFloat(p.custom_price) : parseFloat(p.price_ttc);
@@ -224,6 +232,7 @@ router.get(
         minOrder,
         discountPct,
         paymentTerms,
+        alcohol_free: campaign.alcohol_free || false,
       });
     } catch (err) {
       res.status(500).json({ error: 'SERVER_ERROR', message: err.message });
@@ -298,8 +307,12 @@ router.get(
         amountToNext: tier.next ? Math.max(0, tier.next.threshold - tier.ca) : 0,
       };
 
+      // Alcohol-free flag
+      const campaignData = await db('campaigns').where({ id: campaignId }).select('alcohol_free').first();
+
       res.json({
         campaignId,
+        alcohol_free: campaignData?.alcohol_free || false,
         tier,
         tiers: rules.tier?.tiers || [],
         sales: { caTTC, caHT, bottles, orderCount },

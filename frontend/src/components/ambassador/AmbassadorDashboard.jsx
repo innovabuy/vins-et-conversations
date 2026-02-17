@@ -108,8 +108,8 @@ export default function AmbassadorDashboard() {
         </div>
       </div>
 
-      {/* Section 2 — Partage / QR */}
-      <div className="card">
+      {/* Section 2 — Partage / QR (hidden for alcohol-free campaigns) */}
+      {!data.alcohol_free && <div className="card">
         <div className="flex items-center gap-2 mb-4">
           <Share2 size={20} className="text-wine-700" />
           <h2 className="font-semibold text-lg">Partage & Parrainage</h2>
@@ -147,7 +147,7 @@ export default function AmbassadorDashboard() {
             Email
           </a>
         </div>
-      </div>
+      </div>}
 
       {/* Section 3 — Ventes */}
       <div className="card">
@@ -196,8 +196,8 @@ export default function AmbassadorDashboard() {
         )}
       </div>
 
-      {/* Section 4 — Ventes via mon lien */}
-      {referralData?.referredOrders?.length > 0 && (
+      {/* Section 4 — Ventes via mon lien (hidden for alcohol-free) */}
+      {!data.alcohol_free && referralData?.referredOrders?.length > 0 && (
         <div className="card">
           <div className="flex items-center gap-2 mb-4">
             <ExternalLink size={20} className="text-wine-700" />

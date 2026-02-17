@@ -190,6 +190,7 @@ export default function CampaignWizard() {
     goal: 0,
     start_date: '',
     end_date: '',
+    alcohol_free: false,
     config: {},
     fund_collective_pct: '',
     fund_individual_pct: '',
@@ -218,6 +219,7 @@ export default function CampaignWizard() {
             goal: c.goal || 0,
             start_date: c.start_date ? c.start_date.split('T')[0] : '',
             end_date: c.end_date ? c.end_date.split('T')[0] : '',
+            alcohol_free: c.alcohol_free || false,
             config: campConfig,
             fund_collective_pct: campConfig.fund_collective_pct ?? '',
             fund_individual_pct: campConfig.fund_individual_pct ?? '',
@@ -531,6 +533,29 @@ export default function CampaignWizard() {
               </div>
             </div>
 
+            {/* Alcohol-free toggle */}
+            <div className="mt-4 p-4 bg-amber-50 border border-amber-200 rounded-xl">
+              <label className="flex items-center gap-3 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={form.alcohol_free}
+                  onChange={(e) => updateForm('alcohol_free', e.target.checked)}
+                  className="w-5 h-5 rounded border-amber-300 text-amber-600 focus:ring-amber-500"
+                />
+                <div>
+                  <span className="font-medium text-sm text-amber-900">Campagne sans alcool (public mineur)</span>
+                  <p className="text-xs text-amber-700 mt-0.5">Seuls les produits du terroir seront proposes (conformite loi Evin)</p>
+                </div>
+              </label>
+            </div>
+
+            {form.alcohol_free && (
+              <div className="flex items-start gap-2 p-3 bg-blue-50 rounded-lg text-sm text-blue-800">
+                <svg className="w-4 h-4 mt-0.5 shrink-0" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" /></svg>
+                <span>Les produits contenant de l'alcool seront automatiquement masques dans le catalogue et les dashboards de cette campagne.</span>
+              </div>
+            )}
+
             {/* Commission % inputs — visible for types with commission rules */}
             {(selectedCampaignType ? ['scolaire', 'bts_ndrc'].includes(selectedCampaignType.code) : selectedType && ['scolaire', 'bts_ndrc'].includes(selectedType.name)) && (
               <div className="mt-6 p-4 bg-wine-50 rounded-xl space-y-4">
@@ -586,9 +611,20 @@ export default function CampaignWizard() {
         {step === 4 && (
           <div className="space-y-4">
             <h2 className="font-bold text-lg">Sélection des produits</h2>
+            {form.alcohol_free && (
+              <div className="flex items-start gap-2 p-3 bg-amber-50 border border-amber-200 rounded-lg text-sm text-amber-800">
+                <svg className="w-4 h-4 mt-0.5 shrink-0" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" /></svg>
+                <span>Campagne sans alcool — seuls les produits du terroir sont affiches</span>
+              </div>
+            )}
             <p className="text-sm text-gray-500">{form.products.length} produit(s) sélectionné(s)</p>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 max-h-[400px] overflow-y-auto">
-              {resources.products.map((p) => {
+              {resources.products.filter((p) => {
+                if (!form.alcohol_free) return true;
+                // Hide wine products when alcohol_free — use category field to detect
+                const cat = (p.category || '').toLowerCase();
+                return cat.includes('jus') || cat.includes('soft') || cat.includes('coffret') || cat.includes('terroir') || cat.includes('sans alcool');
+              }).map((p) => {
                 const selected = form.products.some((sp) => sp.id === p.id);
                 return (
                   <button

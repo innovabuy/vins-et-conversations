@@ -207,6 +207,7 @@ async function getStudentDashboard(userId, campaignId) {
     campaign: {
       name: campaign?.name,
       goal: campaignGoal,
+      alcohol_free: campaign?.alcohol_free || false,
       total_ca: totalCa,
       progress_pct: progressPct,
       days_remaining: daysRemaining,
