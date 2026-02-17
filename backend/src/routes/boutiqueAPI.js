@@ -22,15 +22,24 @@ const cartSchema = Joi.object({
 
 const checkoutSchema = Joi.object({
   session_id: Joi.string().uuid().required(),
+  delivery_type: Joi.string().valid('home_delivery', 'click_and_collect').default('home_delivery'),
   customer: Joi.object({
     name: Joi.string().min(2).max(100).required(),
     email: Joi.string().email().required(),
     phone: Joi.string().allow('', null).optional(),
-    address: Joi.string().min(5).max(200).required(),
-    city: Joi.string().min(2).max(100).required(),
-    postal_code: Joi.string().pattern(/^\d{5}$/).required(),
+    address: Joi.string().min(5).max(200).allow('', null).optional(),
+    city: Joi.string().min(2).max(100).allow('', null).optional(),
+    postal_code: Joi.string().pattern(/^\d{5}$/).allow('', null).optional(),
   }).required(),
   referral_code: Joi.string().allow('', null).optional(),
+}).custom((value, helpers) => {
+  // Address required for home delivery
+  if (value.delivery_type === 'home_delivery') {
+    if (!value.customer.address || !value.customer.city || !value.customer.postal_code) {
+      return helpers.error('any.custom', { message: 'Adresse requise pour la livraison a domicile' });
+    }
+  }
+  return value;
 });
 
 const confirmSchema = Joi.object({
@@ -92,6 +101,7 @@ router.post('/checkout', async (req, res) => {
       cartItems: cart.items,
       customer: value.customer,
       referralCode: value.referral_code || null,
+      delivery_type: value.delivery_type || 'home_delivery',
     });
 
     // Create Stripe PaymentIntent
@@ -118,6 +128,8 @@ router.post('/checkout', async (req, res) => {
       order_id: order.id,
       ref: order.ref,
       total_ttc: order.total_ttc,
+      shipping_ht: order.shipping_ht,
+      shipping_ttc: order.shipping_ttc,
       client_secret: clientSecret,
     });
   } catch (err) {

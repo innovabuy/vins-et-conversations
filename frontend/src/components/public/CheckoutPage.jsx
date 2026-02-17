@@ -4,8 +4,9 @@ import { loadStripe } from '@stripe/stripe-js';
 import { Elements, CardElement, useStripe, useElements } from '@stripe/react-stripe-js';
 import { useCart } from '../../contexts/CartContext';
 import { useAuth } from '../../contexts/AuthContext';
+import { useAppSettings } from '../../contexts/AppSettingsContext';
 import { boutiqueAPI, shippingAPI, authAPI, appSettingsAPI } from '../../services/api';
-import { ArrowLeft, Lock, ShoppingCart, Truck, Loader2, User, MapPin, CreditCard, Check, LogIn, UserPlus, UserX } from 'lucide-react';
+import { ArrowLeft, Lock, ShoppingCart, Truck, Loader2, User, MapPin, CreditCard, Check, LogIn, UserPlus, UserX, Store } from 'lucide-react';
 
 const formatEur = (v) => new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR' }).format(v);
 
@@ -86,6 +87,11 @@ export default function CheckoutPage() {
   const [form, setForm] = useState({
     name: '', email: '', phone: '', address: '', city: '', postal_code: '',
   });
+  const [deliveryType, setDeliveryType] = useState('home_delivery');
+  const { settings } = useAppSettings();
+  const pickupEnabled = settings?.pickup_enabled === 'true';
+  const pickupAddress = settings?.pickup_address || "Saint-Sylvain-d'Anjou — Maine-et-Loire (49)";
+  const pickupDetails = settings?.pickup_details || 'Sur rendez-vous, du lundi au vendredi de 9h a 18h';
   const [loginForm, setLoginForm] = useState({ email: '', password: '' });
   const [registerForm, setRegisterForm] = useState({ name: '', email: '', password: '', phone: '', age_verified: false, cgv_accepted: false });
   const [errors, setErrors] = useState({});
@@ -115,8 +121,13 @@ export default function CheckoutPage() {
     }
   }, [user]);
 
-  // Fetch shipping when postal code is 5 digits
+  // Fetch shipping when postal code is 5 digits (not for click & collect)
   useEffect(() => {
+    if (deliveryType === 'click_and_collect') {
+      setShipping(null);
+      setShippingError('');
+      return;
+    }
     if (!/^\d{5}$/.test(form.postal_code) || cart.total_items === 0) {
       setShipping(null);
       setShippingError('');
@@ -136,9 +147,9 @@ export default function CheckoutPage() {
         }
       })
       .finally(() => setShippingLoading(false));
-  }, [form.postal_code, cart.total_items]);
+  }, [form.postal_code, cart.total_items, deliveryType]);
 
-  const grandTotalTTC = cart.total_ttc + (shipping?.price_ttc || 0);
+  const grandTotalTTC = cart.total_ttc + (deliveryType === 'click_and_collect' ? 0 : (shipping?.price_ttc || 0));
 
   if (cart.items.length === 0 && !orderData) {
     return (
@@ -209,6 +220,7 @@ export default function CheckoutPage() {
 
   // Step 2: Address validation + create order
   const validateAddress = () => {
+    if (deliveryType === 'click_and_collect') return true; // No address needed
     const e = {};
     if (!form.address || form.address.length < 5) e.address = 'Adresse requise';
     if (!form.city || form.city.length < 2) e.city = 'Ville requise';
@@ -224,7 +236,8 @@ export default function CheckoutPage() {
     try {
       const res = await boutiqueAPI.checkout({
         session_id: getSessionId(),
-        customer: form,
+        delivery_type: deliveryType,
+        customer: deliveryType === 'click_and_collect' ? { name: form.name, email: form.email, phone: form.phone } : form,
         referral_code: getReferralCode() || undefined,
       });
       setOrderData(res.data);
@@ -409,11 +422,11 @@ export default function CheckoutPage() {
             </div>
           )}
 
-          {/* ═══ STEP 2: ADDRESS ═══ */}
+          {/* ═══ STEP 2: DELIVERY + ADDRESS ═══ */}
           {step === 2 && (
             <div className="space-y-4">
               <div className="flex items-center justify-between">
-                <h2 className="font-semibold text-gray-900">Adresse de livraison</h2>
+                <h2 className="font-semibold text-gray-900">Mode de livraison</h2>
                 <button onClick={() => setStep(1)} className="text-sm text-wine-700 hover:underline">Modifier identification</button>
               </div>
 
@@ -421,24 +434,75 @@ export default function CheckoutPage() {
                 <User size={14} className="inline mr-1" /> {form.name} ({form.email})
               </div>
 
-              <div>
-                <label className="block text-xs font-medium text-gray-500 mb-1">Adresse *</label>
-                <input value={form.address} onChange={(e) => setForm({ ...form, address: e.target.value })} className={inputClass('address')} />
-                {errors.address && <p className="text-xs text-red-500 mt-1">{errors.address}</p>}
+              {/* Delivery type selection */}
+              <div className="space-y-2">
+                <button
+                  onClick={() => setDeliveryType('home_delivery')}
+                  className={`w-full flex items-start gap-3 p-4 rounded-xl border-2 transition-all text-left ${
+                    deliveryType === 'home_delivery' ? 'border-wine-600 bg-wine-50' : 'border-gray-200 hover:border-gray-300'
+                  }`}
+                >
+                  <Truck size={20} className={deliveryType === 'home_delivery' ? 'text-wine-700 mt-0.5' : 'text-gray-400 mt-0.5'} />
+                  <div className="flex-1">
+                    <p className="font-medium text-sm">Livraison a domicile</p>
+                    <p className="text-xs text-gray-500">Frais de port calcules selon votre departement</p>
+                  </div>
+                  {shipping && deliveryType === 'home_delivery' && (
+                    <span className="text-sm font-semibold text-wine-700">{formatEur(shipping.price_ttc)}</span>
+                  )}
+                </button>
+
+                {pickupEnabled && (
+                  <button
+                    onClick={() => setDeliveryType('click_and_collect')}
+                    className={`w-full flex items-start gap-3 p-4 rounded-xl border-2 transition-all text-left ${
+                      deliveryType === 'click_and_collect' ? 'border-wine-600 bg-wine-50' : 'border-gray-200 hover:border-gray-300'
+                    }`}
+                  >
+                    <Store size={20} className={deliveryType === 'click_and_collect' ? 'text-wine-700 mt-0.5' : 'text-gray-400 mt-0.5'} />
+                    <div className="flex-1">
+                      <p className="font-medium text-sm">Retrait sur place — <span className="text-green-600">Gratuit</span></p>
+                      <p className="text-xs text-gray-500">{pickupAddress}</p>
+                      <p className="text-xs text-gray-400">{pickupDetails}</p>
+                    </div>
+                    <span className="text-sm font-semibold text-green-600">0,00 EUR</span>
+                  </button>
+                )}
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-xs font-medium text-gray-500 mb-1">Ville *</label>
-                  <input value={form.city} onChange={(e) => setForm({ ...form, city: e.target.value })} className={inputClass('city')} />
-                  {errors.city && <p className="text-xs text-red-500 mt-1">{errors.city}</p>}
+              {/* Address form — only for home delivery */}
+              {deliveryType === 'home_delivery' && (
+                <>
+                  <h3 className="font-medium text-sm text-gray-700 mt-2">Adresse de livraison</h3>
+                  <div>
+                    <label className="block text-xs font-medium text-gray-500 mb-1">Adresse *</label>
+                    <input value={form.address} onChange={(e) => setForm({ ...form, address: e.target.value })} className={inputClass('address')} />
+                    {errors.address && <p className="text-xs text-red-500 mt-1">{errors.address}</p>}
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-xs font-medium text-gray-500 mb-1">Ville *</label>
+                      <input value={form.city} onChange={(e) => setForm({ ...form, city: e.target.value })} className={inputClass('city')} />
+                      {errors.city && <p className="text-xs text-red-500 mt-1">{errors.city}</p>}
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-gray-500 mb-1">Code postal *</label>
+                      <input value={form.postal_code} onChange={(e) => setForm({ ...form, postal_code: e.target.value })} className={inputClass('postal_code')} maxLength={5} />
+                      {errors.postal_code && <p className="text-xs text-red-500 mt-1">{errors.postal_code}</p>}
+                    </div>
+                  </div>
+                </>
+              )}
+
+              {/* Click & Collect info */}
+              {deliveryType === 'click_and_collect' && (
+                <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+                  <p className="text-sm font-medium text-green-800">Retrait sur place</p>
+                  <p className="text-sm text-green-700 mt-1">{pickupAddress}</p>
+                  <p className="text-xs text-green-600 mt-1">{pickupDetails}</p>
                 </div>
-                <div>
-                  <label className="block text-xs font-medium text-gray-500 mb-1">Code postal *</label>
-                  <input value={form.postal_code} onChange={(e) => setForm({ ...form, postal_code: e.target.value })} className={inputClass('postal_code')} maxLength={5} />
-                  {errors.postal_code && <p className="text-xs text-red-500 mt-1">{errors.postal_code}</p>}
-                </div>
-              </div>
+              )}
 
               {orderError && <div className="bg-red-50 text-red-700 text-sm p-3 rounded-lg">{orderError}</div>}
 

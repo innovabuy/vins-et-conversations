@@ -85,6 +85,7 @@ router.put('/', authenticate, requireRole('super_admin'), auditAction('app_setti
       'stripe_mode', 'stripe_test_publishable_key', 'stripe_test_secret_key',
       'stripe_live_publishable_key', 'stripe_live_secret_key', 'stripe_webhook_secret',
       'smtp_host', 'smtp_port', 'smtp_user', 'smtp_password', 'smtp_from_name', 'smtp_from_email', 'smtp_mode',
+      'pickup_enabled', 'pickup_address', 'pickup_details',
     ];
 
     for (const [key, value] of Object.entries(updates)) {
@@ -244,7 +245,7 @@ router.put('/organizations/:id', authenticate, requireRole('super_admin', 'comme
 publicRouter.get('/public', async (req, res) => {
   try {
     const settings = await db('app_settings')
-      .whereIn('key', ['app_logo_url', 'app_name', 'app_primary_color']);
+      .whereIn('key', ['app_logo_url', 'app_name', 'app_primary_color', 'pickup_enabled', 'pickup_address', 'pickup_details']);
     const result = {};
     for (const s of settings) result[s.key] = s.value;
     res.json(result);

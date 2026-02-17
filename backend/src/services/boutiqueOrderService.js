@@ -64,7 +64,7 @@ async function upsertContact({ name, email, phone, address, city, postal_code, r
 /**
  * Create a boutique order (status: pending_payment)
  */
-async function createBoutiqueOrder({ cartItems, customer, referralCode }) {
+async function createBoutiqueOrder({ cartItems, customer, referralCode, delivery_type }) {
   const campaignId = await getBoutiqueWebCampaignId();
   const orderId = uuidv4();
   // ref generated inside transaction below for concurrency safety
@@ -154,8 +154,10 @@ async function createBoutiqueOrder({ cartItems, customer, referralCode }) {
   let shippingHT = 0;
   let shippingTTC = 0;
   let shippingBreakdown = null;
+  const isClickAndCollect = delivery_type === 'click_and_collect';
 
-  if (customer.postal_code) {
+  // Skip shipping for Click & Collect — free pickup
+  if (!isClickAndCollect && customer.postal_code) {
     const deptCode = customer.postal_code.substring(0, 2);
     const calcDate = new Date().toISOString().slice(0, 10);
 
@@ -202,6 +204,9 @@ async function createBoutiqueOrder({ cartItems, customer, referralCode }) {
   let ref;
   await db.transaction(async (trx) => {
     ref = await generateOrderRef(trx);
+    const orderFlags = {};
+    if (isClickAndCollect) orderFlags.delivery_type = 'click_and_collect';
+
     await trx('orders').insert({
       id: orderId,
       ref,
@@ -216,6 +221,7 @@ async function createBoutiqueOrder({ cartItems, customer, referralCode }) {
       total_ht: parseFloat(totalHT.toFixed(2)),
       total_ttc: parseFloat(totalTTC.toFixed(2)),
       total_items: totalItems,
+      flags: JSON.stringify(orderFlags),
     });
 
     // Insert product items
