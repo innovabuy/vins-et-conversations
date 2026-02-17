@@ -53,7 +53,7 @@ async function getStudentDashboard(userId, campaignId) {
   const position = rankingRows.findIndex((r) => r.user_id === userId) + 1;
   const totalParticipants = rankingRows.length;
 
-  // Règles bouteilles gratuites + cagnottes (V4.1)
+  // Règles bouteilles gratuites + parts des anges (V4.1)
   const rules = await rulesEngine.loadRulesForCampaign(campaignId);
   const freeBottles = await rulesEngine.calculateFreeBottles(userId, campaignId, rules.freeBottle);
   const funds = await rulesEngine.calculateFunds(campaignId, userId, rules.commission);

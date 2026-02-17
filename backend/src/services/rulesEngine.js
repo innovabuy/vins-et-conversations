@@ -98,10 +98,10 @@ async function calculateAssociationCommission(campaignId, commissionRules) {
   };
 }
 
-// ─── §3.2b Double cagnotte (V4.1) ────────────────────
+// ─── §3.2b Part des anges (V4.1) ────────────────────
 
 /**
- * Calcule les cagnottes collective et individuelle
+ * Calcule les parts des anges collective et individuelle
  * Backward compat: si seul "association" existe, il est traité comme fund_collective
  * @param {string} campaignId
  * @param {string} userId - Student user ID (for individual fund)
@@ -130,7 +130,7 @@ async function calculateFunds(campaignId, userId, commissionRules) {
       amount: parseFloat((base * rate).toFixed(2)),
       rate: collectiveRule.value,
       base_amount: base,
-      label: collectiveRule.label || 'Cagnotte collective',
+      label: collectiveRule.label || 'Part des anges collective',
     };
   }
 
@@ -146,7 +146,7 @@ async function calculateFunds(campaignId, userId, commissionRules) {
       amount: parseFloat((base * rate).toFixed(2)),
       rate: individualRule.value,
       base_amount: base,
-      label: individualRule.label || 'Cagnotte individuelle',
+      label: individualRule.label || 'Part des anges individuelle',
     };
   }
 
@@ -270,7 +270,7 @@ async function loadRulesForCampaign(campaignId) {
       type: 'percentage',
       value: campConfig.fund_collective_pct,
       base: 'ca_ht_global',
-      label: commission.fund_collective?.label || 'Cagnotte collective',
+      label: commission.fund_collective?.label || 'Part des anges collective',
     };
   }
   if (campConfig.fund_individual_pct != null) {
@@ -278,7 +278,7 @@ async function loadRulesForCampaign(campaignId) {
       type: 'percentage',
       value: campConfig.fund_individual_pct,
       base: 'ca_ht_student',
-      label: commission.fund_individual?.label || 'Cagnotte individuelle',
+      label: commission.fund_individual?.label || 'Part des anges individuelle',
     };
   }
 

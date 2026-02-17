@@ -1,8 +1,8 @@
 import { useState, useEffect, useMemo } from 'react';
 import { dashboardAPI, productsAPI, ordersAPI, campaignResourcesAPI } from '../../services/api';
 import { useAuth } from '../../contexts/AuthContext';
-import { Flame, Trophy, ShoppingCart, User, ChevronUp, Wine, Package, Clock, Award, Zap, Heart, Target, DollarSign, ArrowLeft, ArrowRight, Check, Phone, Mail, FileText, CreditCard, Banknote, Building, HelpCircle, Users, TrendingUp, TrendingDown, Minus, BarChart3, PiggyBank, BookOpen, ExternalLink, Video, Image, FileDown, LogOut } from 'lucide-react';
-import WinePiggyBank from '../shared/WinePiggyBank';
+import { Flame, Trophy, ShoppingCart, User, ChevronUp, Wine, Package, Clock, Award, Zap, Heart, Target, DollarSign, ArrowLeft, ArrowRight, Check, Phone, Mail, FileText, CreditCard, Banknote, Building, HelpCircle, Users, TrendingUp, TrendingDown, Minus, BarChart3, BookOpen, ExternalLink, Video, Image, FileDown, LogOut } from 'lucide-react';
+import WineBarrel from '../shared/WineBarrel';
 import ReferralSection from './ReferralSection';
 
 const formatEur = (v) => new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR' }).format(v);
@@ -510,15 +510,15 @@ export default function StudentDashboard() {
               </p>
             </div>
 
-            {/* Piggy banks — Cagnottes (V4.1) */}
+            {/* Barriques — Part des anges (V4.1) */}
             {(data.fund_collective || data.fund_individual) && (
               <div className="card">
                 <h3 className="font-semibold text-sm mb-3 flex items-center gap-2">
-                  <PiggyBank size={16} className="text-wine-700" /> Mes cagnottes
+                  <Wine size={16} className="text-wine-700" /> Mes parts des anges
                 </h3>
                 <div className={`grid gap-4 ${data.fund_collective && data.fund_individual ? 'grid-cols-2' : 'grid-cols-1'}`}>
                   {data.fund_collective && (
-                    <WinePiggyBank
+                    <WineBarrel
                       amount={data.fund_collective.amount}
                       label={data.fund_collective.label}
                       fillPct={campaign?.goal > 0 ? Math.min(95, (data.fund_collective.base_amount / campaign.goal) * 100) : 50}
@@ -526,7 +526,7 @@ export default function StudentDashboard() {
                     />
                   )}
                   {data.fund_individual && (
-                    <WinePiggyBank
+                    <WineBarrel
                       amount={data.fund_individual.amount}
                       label={data.fund_individual.label}
                       fillPct={data.fund_individual.base_amount > 0 ? Math.min(95, (data.ca / (campaign?.avg_ca_per_student || data.ca)) * 50 + 20) : 10}
