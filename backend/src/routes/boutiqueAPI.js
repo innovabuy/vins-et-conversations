@@ -104,21 +104,23 @@ router.post('/checkout', async (req, res) => {
       delivery_type: value.delivery_type || 'home_delivery',
     });
 
-    // Create Stripe PaymentIntent
+    // Skip Stripe for backorder (pending_stock) — payment will happen when stock arrives
     let clientSecret = null;
-    const stripe = await getStripe();
-    if (stripe) {
-      const amountCents = Math.round(order.total_ttc * 100);
-      const paymentIntent = await stripe.paymentIntents.create({
-        amount: amountCents,
-        currency: 'eur',
-        metadata: {
-          order_id: order.id,
-          order_ref: order.ref,
-          source: 'boutique_web',
-        },
-      });
-      clientSecret = paymentIntent.client_secret;
+    if (!order.backorder) {
+      const stripe = await getStripe();
+      if (stripe) {
+        const amountCents = Math.round(order.total_ttc * 100);
+        const paymentIntent = await stripe.paymentIntents.create({
+          amount: amountCents,
+          currency: 'eur',
+          metadata: {
+            order_id: order.id,
+            order_ref: order.ref,
+            source: 'boutique_web',
+          },
+        });
+        clientSecret = paymentIntent.client_secret;
+      }
     }
 
     // Clear cart
@@ -130,6 +132,7 @@ router.post('/checkout', async (req, res) => {
       total_ttc: order.total_ttc,
       shipping_ht: order.shipping_ht,
       shipping_ttc: order.shipping_ttc,
+      backorder: order.backorder || false,
       client_secret: clientSecret,
     });
   } catch (err) {

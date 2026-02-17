@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { Link, useSearchParams, useNavigate } from 'react-router-dom';
-import { Wine, Search, Filter, ChevronRight, ShoppingCart, Check, Star } from 'lucide-react';
+import { Wine, Search, Filter, ChevronRight, ShoppingCart, Check, Star, Clock } from 'lucide-react';
 import api from '../../services/api';
 import { featuredAPI } from '../../services/api';
 import { useCart } from '../../contexts/CartContext';
@@ -255,15 +255,26 @@ export default function BoutiqueHome() {
               <Link
                 key={p.id}
                 to={`/boutique/vin/${p.id}`}
-                className="group bg-white border border-gray-100 rounded-2xl overflow-hidden hover:shadow-lg transition-all hover:-translate-y-1 flex flex-col h-full"
+                className="group relative bg-white border border-gray-100 rounded-2xl overflow-hidden hover:shadow-lg transition-all hover:-translate-y-1 flex flex-col h-full"
               >
-                <div className="aspect-[3/4] overflow-hidden bg-gradient-to-br from-wine-50 to-wine-100 flex items-center justify-center">
+                {/* Pré-commande badge */}
+                {!p.in_stock && p.allow_backorder && (
+                  <div className="absolute top-3 left-3 z-10 bg-amber-100 text-amber-800 px-2 py-0.5 rounded-full text-xs font-semibold flex items-center gap-1">
+                    <Clock size={12} /> Pré-commande
+                  </div>
+                )}
+                <div className="aspect-[3/4] overflow-hidden bg-gradient-to-br from-wine-50 to-wine-100 flex items-center justify-center relative">
                   {p.image_url ? (
                     <img src={p.image_url} alt={p.name} className="w-full h-full object-cover" />
                   ) : (
                     <div className="flex flex-col items-center justify-center gap-2 text-wine-300">
                       <Wine size={48} />
                       <span className="text-sm font-medium text-wine-400 text-center px-4">{p.name}</span>
+                    </div>
+                  )}
+                  {!p.in_stock && !p.allow_backorder && (
+                    <div className="absolute inset-0 bg-gray-200/60 flex items-center justify-center">
+                      <span className="bg-white/90 px-3 py-1 rounded-lg text-sm font-medium text-gray-600">Rupture de stock</span>
                     </div>
                   )}
                 </div>
@@ -281,6 +292,9 @@ export default function BoutiqueHome() {
                   <p className="text-xs text-gray-400 mt-1 line-clamp-2 flex-1">{p.description || '\u00A0'}</p>
                   <div className="flex items-center justify-between mt-3 pt-3 border-t border-gray-100">
                     <span className="text-lg font-bold text-wine-700">{formatEur(p.price_ttc)}</span>
+                    {(!p.in_stock && !p.allow_backorder) ? (
+                      <span className="text-xs text-gray-400 font-medium">Indisponible</span>
+                    ) : (
                     <button
                       onClick={(e) => {
                         e.preventDefault();
@@ -292,11 +306,12 @@ export default function BoutiqueHome() {
                       className={`flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
                         addedId === p.id
                           ? 'bg-green-100 text-green-700'
-                          : 'bg-wine-50 text-wine-700 hover:bg-wine-100'
+                          : !p.in_stock ? 'bg-amber-50 text-amber-700 hover:bg-amber-100' : 'bg-wine-50 text-wine-700 hover:bg-wine-100'
                       }`}
                     >
-                      {addedId === p.id ? <><Check size={14} /> Ajouté</> : <><ShoppingCart size={14} /> Ajouter</>}
+                      {addedId === p.id ? <><Check size={14} /> Ajouté</> : !p.in_stock ? <><Clock size={14} /> Pré-commander</> : <><ShoppingCart size={14} /> Ajouter</>}
                     </button>
+                    )}
                   </div>
                 </div>
               </Link>

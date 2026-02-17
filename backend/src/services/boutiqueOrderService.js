@@ -95,7 +95,7 @@ async function createBoutiqueOrder({ cartItems, customer, referralCode, delivery
   const products = await db('products')
     .whereIn('id', productIds)
     .where({ active: true })
-    .select('id', 'name', 'price_ht', 'price_ttc', 'tva_rate');
+    .select('id', 'name', 'price_ht', 'price_ttc', 'tva_rate', 'allow_backorder');
 
   const productMap = {};
   products.forEach((p) => { productMap[p.id] = p; });
@@ -115,12 +115,17 @@ async function createBoutiqueOrder({ cartItems, customer, referralCode, delivery
     stockMap[s.product_id] = parseInt(s.total_in) - parseInt(s.total_out);
   });
 
+  let hasBackorderItems = false;
   for (const item of cartItems) {
     const product = productMap[item.product_id];
     if (!product) continue;
     const available = stockMap[item.product_id] || 0;
     if (item.qty > available) {
-      throw new Error(`INSUFFICIENT_STOCK:${product.name}:${available}`);
+      if (product.allow_backorder) {
+        hasBackorderItems = true;
+      } else {
+        throw new Error(`INSUFFICIENT_STOCK:${product.name}:${available}`);
+      }
     }
   }
 
@@ -201,11 +206,14 @@ async function createBoutiqueOrder({ cartItems, customer, referralCode, delivery
   totalHT += shippingHT;
   totalTTC += shippingTTC;
 
+  const orderStatus = hasBackorderItems ? 'pending_stock' : 'pending_payment';
+
   let ref;
   await db.transaction(async (trx) => {
     ref = await generateOrderRef(trx);
     const orderFlags = {};
     if (isClickAndCollect) orderFlags.delivery_type = 'click_and_collect';
+    if (hasBackorderItems) orderFlags.backorder = true;
 
     await trx('orders').insert({
       id: orderId,
@@ -213,7 +221,7 @@ async function createBoutiqueOrder({ cartItems, customer, referralCode, delivery
       campaign_id: campaignId,
       user_id: null, // No logged-in user for boutique
       customer_id: contact.id,
-      status: 'pending_payment',
+      status: orderStatus,
       source,
       referral_code: referralCode || null,
       referred_by: referredBy,
@@ -260,7 +268,8 @@ async function createBoutiqueOrder({ cartItems, customer, referralCode, delivery
     shipping_ht: shippingHT,
     shipping_ttc: shippingTTC,
     shipping: shippingBreakdown,
-    status: 'pending_payment',
+    status: orderStatus,
+    backorder: hasBackorderItems,
     source,
     customer_email: contact.email,
   };

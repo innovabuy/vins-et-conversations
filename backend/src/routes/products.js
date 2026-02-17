@@ -46,6 +46,7 @@ const productSchema = Joi.object({
   active: Joi.boolean().default(true),
   visible_boutique: Joi.boolean().default(false),
   is_featured: Joi.boolean().default(false),
+  allow_backorder: Joi.boolean().default(false),
   sort_order: Joi.number().integer().default(0),
   // Enriched fields
   region: Joi.string().max(100).allow(null, ''),

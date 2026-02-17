@@ -49,19 +49,37 @@ router.get('/catalog', async (req, res) => {
         'products.region', 'products.appellation', 'products.color', 'products.vintage',
         'products.grape_varieties', 'products.serving_temp', 'products.food_pairing',
         'products.tasting_notes', 'products.winemaker_notes', 'products.awards', 'products.sort_order',
-        'products.is_featured',
+        'products.is_featured', 'products.allow_backorder',
         'product_categories.name as cat_name', 'product_categories.icon as cat_icon', 'product_categories.color as cat_color', 'product_categories.slug as cat_slug'
       )
       .orderBy('products.sort_order')
       .limit(limit)
       .offset(offset);
 
+    // Fetch stock levels for all returned products
+    const productIds = products.map(p => p.id);
+    const stockBalances = productIds.length > 0 ? await db('stock_movements')
+      .whereIn('product_id', productIds)
+      .groupBy('product_id')
+      .select(
+        'product_id',
+        db.raw("SUM(CASE WHEN type IN ('initial', 'entry', 'return') THEN qty ELSE 0 END) as total_in"),
+        db.raw("SUM(CASE WHEN type IN ('exit', 'adjustment') THEN qty ELSE 0 END) as total_out")
+      ) : [];
+    const stockMap = {};
+    stockBalances.forEach(s => { stockMap[s.product_id] = parseInt(s.total_in) - parseInt(s.total_out); });
+
     res.json({
-      data: products.map(p => ({
-        ...p,
-        category_details: p.category_id ? { id: p.category_id, name: p.cat_name, slug: p.cat_slug, icon: p.cat_icon, color: p.cat_color } : null,
-        cat_name: undefined, cat_icon: undefined, cat_color: undefined, cat_slug: undefined,
-      })),
+      data: products.map(p => {
+        const stock = stockMap[p.id] || 0;
+        return {
+          ...p,
+          in_stock: stock > 0,
+          allow_backorder: p.allow_backorder || false,
+          category_details: p.category_id ? { id: p.category_id, name: p.cat_name, slug: p.cat_slug, icon: p.cat_icon, color: p.cat_color } : null,
+          cat_name: undefined, cat_icon: undefined, cat_color: undefined, cat_slug: undefined,
+        };
+      }),
       pagination: {
         page,
         limit,
@@ -93,6 +111,19 @@ router.get('/catalog/:id', async (req, res) => {
       )
       .first();
     if (!product) return res.status(404).json({ error: 'NOT_FOUND' });
+
+    // Add stock info
+    const stockRow = await db('stock_movements')
+      .where('product_id', product.id)
+      .select(
+        db.raw("COALESCE(SUM(CASE WHEN type IN ('initial', 'entry', 'return') THEN qty ELSE 0 END), 0) as total_in"),
+        db.raw("COALESCE(SUM(CASE WHEN type IN ('exit', 'adjustment') THEN qty ELSE 0 END), 0) as total_out")
+      )
+      .first();
+    const stock = parseInt(stockRow.total_in) - parseInt(stockRow.total_out);
+    product.in_stock = stock > 0;
+    product.allow_backorder = product.allow_backorder || false;
+
     res.json(product);
   } catch (err) {
     res.status(500).json({ error: 'SERVER_ERROR' });

@@ -241,6 +241,12 @@ export default function CheckoutPage() {
         referral_code: getReferralCode() || undefined,
       });
       setOrderData(res.data);
+      // Backorder: skip payment, go to confirmation directly
+      if (res.data.backorder) {
+        await clearCart();
+        navigate(`/boutique/confirmation/${res.data.ref}?backorder=1`);
+        return;
+      }
       setStep(3);
     } catch (err) {
       setOrderError(err.response?.data?.message || 'Erreur lors de la commande');

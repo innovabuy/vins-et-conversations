@@ -31,7 +31,7 @@ const EMPTY_PRODUCT = {
   tva_rate: 20, category: '', label: '', image_url: '', description: '', active: true,
   region: '', appellation: '', color: '', vintage: '', grape_varieties: [],
   serving_temp: '', food_pairing: [], tasting_notes: null, winemaker_notes: '', awards: [],
-  visible_boutique: false, bundle_products: [],
+  visible_boutique: false, allow_backorder: false, bundle_products: [],
 };
 
 function parseJsonField(val) {
@@ -349,6 +349,16 @@ function ProductForm({ product, onSave, onCancel, allProducts = [], categoriesLi
             <div>
               <span className="text-sm font-medium text-gray-700">Visible en boutique</span>
               <p className="text-xs text-gray-400">Ce produit sera affiché sur la vitrine publique</p>
+            </div>
+          </div>
+          <div className="md:col-span-2 flex items-center gap-3">
+            <button type="button" onClick={() => handleChange('allow_backorder', !form.allow_backorder)}
+              className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${form.allow_backorder ? 'bg-amber-500' : 'bg-gray-300'}`}>
+              <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${form.allow_backorder ? 'translate-x-6' : 'translate-x-1'}`} />
+            </button>
+            <div>
+              <span className="text-sm font-medium text-gray-700">Autoriser la pré-commande</span>
+              <p className="text-xs text-gray-400">Ce produit peut être commandé même si le stock est à 0</p>
             </div>
           </div>
           {/* Image produit */}
