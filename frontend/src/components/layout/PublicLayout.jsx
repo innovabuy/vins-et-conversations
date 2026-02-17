@@ -1,5 +1,5 @@
 import { Outlet, Link, NavLink } from 'react-router-dom';
-import { Wine, Mail, Phone, Menu, X, ShoppingCart, Gift } from 'lucide-react';
+import { Wine, Mail, Phone, Menu, X, ShoppingCart, Gift, Star } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { boutiqueAPI } from '../../services/api';
 import { useAppSettings } from '../../contexts/AppSettingsContext';
@@ -55,6 +55,9 @@ export default function PublicLayout() {
               <NavLink to="/boutique" end className={({ isActive }) => `text-sm font-medium transition-colors ${isActive ? 'text-wine-700' : 'text-gray-600 hover:text-gray-900'}`}>
                 Nos vins
               </NavLink>
+              <NavLink to="/boutique/selection" className={({ isActive }) => `text-sm font-medium transition-colors flex items-center gap-1 ${isActive ? 'text-wine-700' : 'text-gray-600 hover:text-gray-900'}`}>
+                <Star size={14} className="text-yellow-500 fill-yellow-500" /> S&eacute;lection
+              </NavLink>
               <NavLink to="/boutique/contact" className={({ isActive }) => `text-sm font-medium transition-colors ${isActive ? 'text-wine-700' : 'text-gray-600 hover:text-gray-900'}`}>
                 Contact
               </NavLink>
@@ -80,6 +83,7 @@ export default function PublicLayout() {
         {menuOpen && (
           <div className="md:hidden border-t bg-white px-4 py-4 space-y-3">
             <NavLink to="/boutique" end onClick={() => setMenuOpen(false)} className="block py-2 text-sm font-medium text-gray-700 hover:text-wine-700">Nos vins</NavLink>
+            <NavLink to="/boutique/selection" onClick={() => setMenuOpen(false)} className="flex items-center gap-1 py-2 text-sm font-medium text-gray-700 hover:text-wine-700"><Star size={14} className="text-yellow-500 fill-yellow-500" /> S&eacute;lection du moment</NavLink>
             <NavLink to="/boutique/contact" onClick={() => setMenuOpen(false)} className="block py-2 text-sm font-medium text-gray-700 hover:text-wine-700">Contact</NavLink>
             <Link to="/boutique/panier" onClick={() => setMenuOpen(false)} className="flex items-center gap-2 py-2 text-sm font-medium text-gray-700 hover:text-wine-700">
               <ShoppingCart size={16} /> Panier {cartCount > 0 && <span className="bg-wine-700 text-white text-xs px-1.5 py-0.5 rounded-full">{cartCount}</span>}
@@ -126,6 +130,7 @@ export default function PublicLayout() {
               <h3 className="font-semibold mb-3 text-sm uppercase tracking-wider text-gray-400">Navigation</h3>
               <div className="space-y-2">
                 <Link to="/boutique" className="block text-sm text-gray-300 hover:text-white">Nos vins</Link>
+                <Link to="/boutique/selection" className="block text-sm text-gray-300 hover:text-white">S&eacute;lection du moment</Link>
                 <Link to="/boutique/contact" className="block text-sm text-gray-300 hover:text-white">Contact</Link>
                 <Link to="/boutique/panier" className="block text-sm text-gray-300 hover:text-white">Panier</Link>
                 <Link to="/boutique/suivi" className="block text-sm text-gray-300 hover:text-white">Suivi commande</Link>
@@ -151,6 +156,14 @@ export default function PublicLayout() {
               <Link to="/boutique/mentions-legales" className="hover:text-white">Mentions légales</Link>
             </div>
             <span>L'abus d'alcool est dangereux pour la santé.</span>
+          </div>
+          <div className="border-t border-gray-800 mt-4 pt-4 text-center">
+            <p className="text-[0.7rem] text-gray-600">
+              Conception &amp; développement{' '}
+              <a href="https://www.cap-performances.fr" target="_blank" rel="noopener noreferrer" className="text-gray-500 hover:text-gray-400 no-underline">cap-performances.fr</a> · {' '}
+              <a href="https://www.cap-numerik.fr" target="_blank" rel="noopener noreferrer" className="text-gray-500 hover:text-gray-400 no-underline">cap-numerik.fr</a> · {' '}
+              <a href="https://www.vendmieux.fr" target="_blank" rel="noopener noreferrer" className="text-gray-500 hover:text-gray-400 no-underline">vendmieux.fr</a>
+            </p>
           </div>
         </div>
       </footer>
