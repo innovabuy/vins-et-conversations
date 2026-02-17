@@ -171,7 +171,7 @@ export default function PublicLayout() {
             <div>
               <div className="flex items-center gap-2 mb-4">
                 {app_logo_url ? (
-                  <img src={app_logo_url} alt={app_name} className="h-7 w-auto object-contain" />
+                  <img src={app_logo_url} alt={app_name} className="h-8 w-auto object-contain bg-white rounded-md p-0.5" />
                 ) : (
                   <div className="bg-wine-700 p-1.5 rounded-lg"><Wine size={18} className="text-white" /></div>
                 )}
