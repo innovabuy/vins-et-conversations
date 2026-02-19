@@ -962,9 +962,13 @@ exports.seed = async function (knex) {
   // ═══════════════════════════════════════════════════════
   const referralContact1 = uuidv4();
   const referralContact2 = uuidv4();
+  const ambassadorContact1 = uuidv4();
+  const ambassadorContact2 = uuidv4();
   await knex('contacts').insert([
     { id: referralContact1, name: 'Marie Referral', email: 'marie.ref@example.fr', phone: '0612345678', source: 'referral:ACKAVONG Mathéo' },
     { id: referralContact2, name: 'Pierre Referral', email: 'pierre.ref@example.fr', phone: '0698765432', source: 'referral:ACKAVONG Mathéo' },
+    { id: ambassadorContact1, name: 'Sophie Laurent', email: 'sophie.laurent@example.fr', phone: '0611223344', type: 'ambassadeur', show_on_public_page: true, ambassador_bio: 'Passionnée de vins de Loire depuis 15 ans, je partage ma passion avec mon réseau.', region_id: regionPDL?.id || null },
+    { id: ambassadorContact2, name: 'Marc Dupont', email: 'marc.dupont@example.fr', phone: '0655667788', type: 'ambassadeur', show_on_public_page: true, ambassador_bio: 'Amateur de vins et entrepreneur, je recommande les cuvées Vins & Conversations à mes partenaires.', region_id: regionBretagne?.id || null },
   ]);
 
   const refOrder1Id = uuidv4();

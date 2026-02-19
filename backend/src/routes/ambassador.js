@@ -98,78 +98,39 @@ router.get(
   }
 );
 
-// GET /api/v1/ambassador/public — Public ambassador listing with region + tier filters
+// GET /api/v1/ambassador/public — Public ambassador listing from contacts table
 router.get('/public', cacheMiddleware(300), async (req, res) => {
   try {
-    const { region_id, tier } = req.query;
+    const { region_id } = req.query;
 
-    let query = db('users')
-      .leftJoin('regions', 'users.region_id', 'regions.id')
-      .where('users.role', 'ambassadeur')
-      .where('users.status', 'active')
-      .where('users.show_on_public_page', true)
+    let query = db('contacts')
+      .leftJoin('regions', 'contacts.region_id', 'regions.id')
+      .where('contacts.type', 'ambassadeur')
+      .where('contacts.show_on_public_page', true)
       .select(
-        'users.id', 'users.name', 'users.ambassador_photo_url',
-        'users.ambassador_bio', 'users.region_id',
+        'contacts.id', 'contacts.name', 'contacts.ambassador_photo_url',
+        'contacts.ambassador_bio', 'contacts.region_id',
         'regions.name as region_name'
       );
 
-    if (region_id) query = query.where('users.region_id', region_id);
+    if (region_id) query = query.where('contacts.region_id', region_id);
 
-    const ambassadors = await query.orderBy('users.name');
+    const ambassadors = await query.orderBy('contacts.name');
 
-    // Calculate tier for each ambassador
-    const validStatuses = ['validated', 'preparing', 'shipped', 'delivered'];
-    const tierRulesRow = await db('client_types')
-      .where('name', 'ambassadeur')
-      .select('tier_rules')
-      .first();
+    // Also return available filters
+    const regions = await db('regions').orderBy('sort_order').select('id', 'name');
 
-    const tierRules = tierRulesRow?.tier_rules
-      ? (typeof tierRulesRow.tier_rules === 'string' ? JSON.parse(tierRulesRow.tier_rules) : tierRulesRow.tier_rules)
-      : { tiers: [] };
-
-    const tiers = (tierRules.tiers || []).sort((a, b) => a.threshold - b.threshold);
-
-    // Get CA for all ambassadors in one query
-    const caResults = await db('orders')
-      .whereIn('user_id', ambassadors.map(a => a.id))
-      .whereIn('status', validStatuses)
-      .groupBy('user_id')
-      .select('user_id', db.raw('SUM(total_ttc) as ca'));
-
-    const caMap = {};
-    for (const r of caResults) caMap[r.user_id] = parseFloat(r.ca);
-
-    const result = ambassadors.map((a) => {
-      const ca = caMap[a.id] || 0;
-      let currentTier = null;
-      for (const t of tiers) {
-        if (ca >= t.threshold) currentTier = t;
-      }
-
-      return {
+    res.json({
+      ambassadors: ambassadors.map((a) => ({
         id: a.id,
         name: a.name,
         photo_url: a.ambassador_photo_url,
         bio: a.ambassador_bio,
         region: a.region_name,
         region_id: a.region_id,
-        tier: currentTier ? { label: currentTier.label, color: currentTier.color } : null,
-      };
-    });
-
-    // Filter by tier label if requested
-    const filtered = tier ? result.filter(a => a.tier?.label === tier) : result;
-
-    // Also return available filters
-    const regions = await db('regions').orderBy('sort_order').select('id', 'name');
-
-    res.json({
-      ambassadors: filtered,
+      })),
       filters: {
         regions,
-        tiers: tiers.map(t => ({ label: t.label, color: t.color })),
       },
     });
   } catch (err) {

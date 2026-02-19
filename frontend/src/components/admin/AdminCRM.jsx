@@ -1,10 +1,10 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { contactsAPI, campaignsAPI } from '../../services/api';
+import { contactsAPI, campaignsAPI, ambassadorAPI } from '../../services/api';
 import {
   Users, Plus, Search, Pencil, X, Phone, Mail, MapPin,
   ChevronLeft, ChevronRight, UserPlus, GraduationCap, Building2, Award,
-  ShoppingCart, ExternalLink, TrendingUp,
+  ShoppingCart, ExternalLink, TrendingUp, Upload, Eye, EyeOff,
 } from 'lucide-react';
 
 const formatEur = (v) => new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR' }).format(v);
@@ -106,9 +106,23 @@ function ContactPanel({ contact, onClose }) {
               <span className="text-green-600 font-medium">Entreprise :</span> {contact.notes.company}
             </div>
           )}
-          {contact.type === 'ambassadeur' && contact.notes?.network && (
-            <div className="text-sm bg-purple-50 rounded-lg p-3">
-              <span className="text-purple-600 font-medium">Réseau :</span> {contact.notes.network}
+          {contact.type === 'ambassadeur' && (
+            <div className="text-sm bg-purple-50 rounded-lg p-3 space-y-2">
+              {contact.ambassador_photo_url && (
+                <div className="flex items-center gap-3">
+                  <img src={contact.ambassador_photo_url} alt="Photo" className="w-10 h-10 rounded-full object-cover border border-purple-300" />
+                  <span className="text-purple-600 font-medium">Ambassadeur</span>
+                </div>
+              )}
+              {contact.ambassador_bio && <div><span className="text-purple-600 font-medium">Bio :</span> {contact.ambassador_bio}</div>}
+              {contact.notes?.network && <div><span className="text-purple-600 font-medium">Réseau :</span> {contact.notes.network}</div>}
+              <div className="flex items-center gap-1 text-xs">
+                {contact.show_on_public_page ? (
+                  <><Eye size={12} className="text-green-600" /> <span className="text-green-600">Visible sur la page publique</span></>
+                ) : (
+                  <><EyeOff size={12} className="text-gray-400" /> <span className="text-gray-400">Non visible</span></>
+                )}
+              </div>
             </div>
           )}
           {contact.type === 'professionnel' && (
@@ -210,16 +224,42 @@ function ContactFormModal({ contact, onClose, onSaved }) {
     source: contact.source || '',
     type: contact.type || 'particulier',
     notes: contactNotes,
-  } : { ...EMPTY_FORM, notes: {} });
+    show_on_public_page: contact.show_on_public_page || false,
+    ambassador_bio: contact.ambassador_bio || '',
+    region_id: contact.region_id || '',
+  } : { ...EMPTY_FORM, notes: {}, show_on_public_page: false, ambassador_bio: '', region_id: '' });
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
+  const [regions, setRegions] = useState([]);
+  const [uploading, setUploading] = useState(false);
+  const [photoUrl, setPhotoUrl] = useState(contact?.ambassador_photo_url || '');
+  const fileInputRef = useRef(null);
+
+  useEffect(() => {
+    ambassadorAPI.regions().then(res => setRegions(res.data || [])).catch(() => {});
+  }, []);
 
   const handleChange = (e) => setForm(f => ({ ...f, [e.target.name]: e.target.value }));
   const handleNotesChange = (key, value) => setForm(f => ({ ...f, notes: { ...f.notes, [key]: value } }));
 
   const handleTypeChange = (e) => {
     const newType = e.target.value;
-    setForm(f => ({ ...f, type: newType, notes: {} }));
+    setForm(f => ({ ...f, type: newType, notes: {}, show_on_public_page: false, ambassador_bio: '', region_id: '' }));
+    if (newType !== 'ambassadeur') setPhotoUrl('');
+  };
+
+  const handlePhotoUpload = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file || !isEdit) return;
+    setUploading(true);
+    try {
+      const fd = new FormData();
+      fd.append('photo', file);
+      const res = await contactsAPI.uploadPhoto(contact.id, fd);
+      setPhotoUrl(res.data.ambassador_photo_url);
+    } catch (err) {
+      setError('Erreur lors de l\'upload de la photo.');
+    } finally { setUploading(false); }
   };
 
   const handleSubmit = async (e) => {
@@ -298,9 +338,59 @@ function ContactFormModal({ contact, onClose, onSaved }) {
           )}
 
           {form.type === 'ambassadeur' && (
-            <div>
-              <label className="block text-xs font-medium text-gray-500 mb-1">Réseau</label>
-              <input type="text" value={form.notes.network || ''} onChange={e => handleNotesChange('network', e.target.value)} className="w-full border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-wine-700 outline-none" placeholder="Ex: Réseau Ambassadeurs Loire" />
+            <div className="space-y-4 p-4 bg-purple-50 rounded-lg border border-purple-200">
+              <h4 className="text-sm font-semibold text-purple-800 flex items-center gap-2"><Award size={14} /> Ambassadeur</h4>
+
+              {/* Toggle visible on public page */}
+              <div className="flex items-center justify-between">
+                <label className="text-xs font-medium text-gray-700">Visible sur la page publique</label>
+                <button type="button" onClick={() => setForm(f => ({ ...f, show_on_public_page: !f.show_on_public_page }))}
+                  className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${form.show_on_public_page ? 'bg-purple-600' : 'bg-gray-300'}`}>
+                  <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${form.show_on_public_page ? 'translate-x-6' : 'translate-x-1'}`} />
+                </button>
+              </div>
+
+              {/* Photo upload (only in edit mode) */}
+              {isEdit && (
+                <div>
+                  <label className="block text-xs font-medium text-gray-500 mb-1">Photo ambassadeur</label>
+                  <div className="flex items-center gap-3">
+                    {photoUrl ? (
+                      <img src={photoUrl} alt="Photo" className="w-12 h-12 rounded-full object-cover border-2 border-purple-300" />
+                    ) : (
+                      <div className="w-12 h-12 rounded-full bg-purple-200 flex items-center justify-center text-purple-600"><Award size={20} /></div>
+                    )}
+                    <input type="file" ref={fileInputRef} onChange={handlePhotoUpload} accept=".jpg,.jpeg,.png,.webp" className="hidden" />
+                    <button type="button" onClick={() => fileInputRef.current?.click()} disabled={uploading}
+                      className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-purple-700 bg-white border border-purple-300 rounded-lg hover:bg-purple-50 disabled:opacity-50">
+                      <Upload size={12} /> {uploading ? 'Envoi...' : 'Changer la photo'}
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* Bio */}
+              <div>
+                <label className="block text-xs font-medium text-gray-500 mb-1">Biographie</label>
+                <textarea value={form.ambassador_bio} onChange={e => setForm(f => ({ ...f, ambassador_bio: e.target.value }))}
+                  className="w-full border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-wine-700 outline-none" rows={3} placeholder="Courte présentation de l'ambassadeur..." />
+              </div>
+
+              {/* Region */}
+              <div>
+                <label className="block text-xs font-medium text-gray-500 mb-1">Région</label>
+                <select value={form.region_id} onChange={e => setForm(f => ({ ...f, region_id: e.target.value ? parseInt(e.target.value, 10) : '' }))}
+                  className="w-full border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-wine-700 outline-none">
+                  <option value="">Sélectionner une région...</option>
+                  {regions.map(r => <option key={r.id} value={r.id}>{r.name}</option>)}
+                </select>
+              </div>
+
+              {/* Network (legacy) */}
+              <div>
+                <label className="block text-xs font-medium text-gray-500 mb-1">Réseau</label>
+                <input type="text" value={form.notes.network || ''} onChange={e => handleNotesChange('network', e.target.value)} className="w-full border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-wine-700 outline-none" placeholder="Ex: Réseau Ambassadeurs Loire" />
+              </div>
             </div>
           )}
 

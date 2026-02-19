@@ -135,6 +135,7 @@ export const contactsAPI = {
   history: (id) => api.get(`/admin/contacts/${id}/history`),
   create: (data) => api.post('/admin/contacts', data),
   update: (id, data) => api.put(`/admin/contacts/${id}`, data),
+  uploadPhoto: (id, formData) => api.put(`/admin/contacts/${id}/ambassador-photo`, formData, { headers: { 'Content-Type': 'multipart/form-data' } }),
 };
 
 // ─── Suppliers ───────────────────────────────────────

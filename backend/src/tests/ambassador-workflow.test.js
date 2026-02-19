@@ -1,11 +1,13 @@
 /**
  * Ambassador Workflow Tests — Vins & Conversations
- * Tests: ambassador orders, campaigns, admin route blocking, participation
+ * Tests: ambassador orders, campaigns, admin route blocking, participation,
+ *        public page from contacts table, contact photo upload
  */
 
 const request = require('supertest');
 const app = require('../index');
 const db = require('../config/database');
+const { invalidateCache } = require('../middleware/cache');
 
 let adminToken, ambassadorToken;
 let ambassadorUserId;
@@ -122,7 +124,6 @@ describe('Ambassador Workflow', () => {
     const after = await db('users').where({ id: ambassadorUserId }).first();
     expect(after.ambassador_bio).toBe(originalBio);
     expect(after.region_id).toBe(originalRegion);
-    expect(after.show_on_public_page).toBe(true);
 
     // Restore
     await db('users').where({ id: ambassadorUserId }).update({ name: before.name });
@@ -142,7 +143,9 @@ describe('Ambassador Workflow', () => {
     expect(ambassador).toHaveProperty('show_on_public_page');
   });
 
-  test('Public ambassador page returns correct data', async () => {
+  // ─── Public page now queries contacts table ────────────
+
+  test('Public ambassador page returns contacts with type=ambassadeur', async () => {
     const res = await request(app).get('/api/v1/ambassador/public');
     expect(res.status).toBe(200);
     expect(res.body.ambassadors).toBeInstanceOf(Array);
@@ -154,11 +157,129 @@ describe('Ambassador Workflow', () => {
       expect(amb).toHaveProperty('bio');
       expect(amb).toHaveProperty('region');
     }
+
+    // Verify these are contacts, not users — check known seed names
+    const names = res.body.ambassadors.map(a => a.name).sort();
+    expect(names).toEqual(['Marc Dupont', 'Sophie Laurent']);
   });
 
-  test('Ambassador photo upload works and invalidates cache', async () => {
+  test('Public page filters by region_id', async () => {
+    await invalidateCache('vc:cache:*');
+    // Ensure Sophie has PDL region assigned
+    const region = await db('regions').where({ code: 'PDL' }).first();
+    const sophie = await db('contacts').where('name', 'Sophie Laurent').first();
+    if (!sophie.region_id) {
+      await db('contacts').where({ id: sophie.id }).update({ region_id: region.id });
+    }
+    const res = await request(app).get(`/api/v1/ambassador/public?region_id=${region.id}`);
+    expect(res.status).toBe(200);
+    expect(res.body.ambassadors.length).toBeGreaterThanOrEqual(1);
+    const sophieResult = res.body.ambassadors.find(a => a.name === 'Sophie Laurent');
+    expect(sophieResult).toBeDefined();
+    expect(sophieResult.region).toBe('Pays de la Loire');
+  });
+
+  test('Public page returns available region filters', async () => {
+    const res = await request(app).get('/api/v1/ambassador/public');
+    expect(res.status).toBe(200);
+    expect(res.body.filters).toBeDefined();
+    expect(res.body.filters.regions).toBeInstanceOf(Array);
+    expect(res.body.filters.regions.length).toBeGreaterThan(0);
+  });
+
+  test('Contact with show_on_public_page=false is NOT returned', async () => {
+    // Set one ambassador contact to hidden
+    const sophie = await db('contacts').where('name', 'Sophie Laurent').first();
+    await db('contacts').where({ id: sophie.id }).update({ show_on_public_page: false });
+    await invalidateCache('vc:cache:*/ambassador/*');
+
+    const res = await request(app).get('/api/v1/ambassador/public');
+    expect(res.status).toBe(200);
+    expect(res.body.ambassadors.length).toBe(1);
+    expect(res.body.ambassadors[0].name).toBe('Marc Dupont');
+
+    // Restore
+    await db('contacts').where({ id: sophie.id }).update({ show_on_public_page: true });
+    await invalidateCache('vc:cache:*/ambassador/*');
+  });
+
+  // ─── Contact ambassador CRM operations ────────────
+
+  test('Admin can update contact ambassador fields via PUT', async () => {
+    const sophie = await db('contacts').where('name', 'Sophie Laurent').first();
+    const res = await request(app)
+      .put(`/api/v1/admin/contacts/${sophie.id}`)
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send({
+        name: 'Sophie Laurent',
+        type: 'ambassadeur',
+        ambassador_bio: 'Nouvelle bio mise à jour',
+        show_on_public_page: true,
+      });
+
+    expect(res.status).toBe(200);
+    expect(res.body.ambassador_bio).toBe('Nouvelle bio mise à jour');
+    expect(res.body.show_on_public_page).toBe(true);
+
+    // Restore original bio
+    await db('contacts').where({ id: sophie.id }).update({ ambassador_bio: sophie.ambassador_bio });
+  });
+
+  test('Changing contact type from ambassadeur resets ambassador fields', async () => {
+    const sophie = await db('contacts').where('name', 'Sophie Laurent').first();
+    const originalBio = sophie.ambassador_bio;
+    const originalRegion = sophie.region_id;
+
+    // Change type to particulier
+    await request(app)
+      .put(`/api/v1/admin/contacts/${sophie.id}`)
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send({ name: 'Sophie Laurent', type: 'particulier' });
+
+    const after = await db('contacts').where({ id: sophie.id }).first();
+    expect(after.show_on_public_page).toBe(false);
+    expect(after.ambassador_photo_url).toBeNull();
+    expect(after.ambassador_bio).toBeNull();
+
+    // Restore all ambassador fields
+    await db('contacts').where({ id: sophie.id }).update({
+      type: 'ambassadeur',
+      show_on_public_page: true,
+      ambassador_bio: originalBio,
+      region_id: originalRegion,
+    });
+  });
+
+  test('Contact ambassador photo upload works', async () => {
     const fs = require('fs');
-    const path = require('path');
+    const sophie = await db('contacts').where('name', 'Sophie Laurent').first();
+
+    // Create a minimal valid image
+    const testPath = '/tmp/test-contact-ambassador-photo.jpg';
+    const buf = Buffer.alloc(200);
+    buf[0] = 0xFF; buf[1] = 0xD8;
+    fs.writeFileSync(testPath, buf);
+
+    const res = await request(app)
+      .put(`/api/v1/admin/contacts/${sophie.id}/ambassador-photo`)
+      .set('Authorization', `Bearer ${adminToken}`)
+      .attach('photo', testPath);
+
+    expect(res.status).toBe(200);
+    expect(res.body.ambassador_photo_url).toMatch(/\/uploads\/ambassadors\/contact-.+\.jpg/);
+
+    // Verify in DB
+    const updated = await db('contacts').where({ id: sophie.id }).first();
+    expect(updated.ambassador_photo_url).toBe(res.body.ambassador_photo_url);
+
+    // Clean up test file
+    fs.unlinkSync(testPath);
+  });
+
+  // ─── User ambassador photo upload (still works) ────
+
+  test('Ambassador user photo upload works and invalidates cache', async () => {
+    const fs = require('fs');
 
     // Create a minimal valid image
     const testPath = '/tmp/test-ambassador-photo.jpg';
