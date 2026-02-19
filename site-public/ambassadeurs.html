@@ -180,6 +180,26 @@
     </div>
   </section>
 
+  <!-- Nos ambassadeurs — section dynamique -->
+  <section class="page-content alt" id="ambassadeurs-section" style="display:none">
+    <div class="container">
+      <div class="section-header">
+        <span class="section-label">Notre réseau</span>
+        <h2>Nos Ambassadeurs</h2>
+        <p>Retrouvez nos ambassadeurs dans toute la France.</p>
+      </div>
+
+      <!-- Filtre par région -->
+      <div style="display:flex; justify-content:center; margin-bottom:2rem;">
+        <select id="ambassador-region-filter" style="border:1px solid #ddd; border-radius:8px; padding:0.5rem 1rem; font-size:0.9rem; font-family:inherit; background:#fff; cursor:pointer;">
+          <option value="">Toutes les régions</option>
+        </select>
+      </div>
+
+      <div id="ambassadors-grid" class="benefits-grid" style="grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 2rem;"></div>
+    </div>
+  </section>
+
   <!-- CTA Banner -->
   <section class="cta-banner">
     <div class="container">
@@ -254,5 +274,61 @@
 
   <script src="assets/js/site-images.js?v=1"></script>
   <script src="assets/js/main.js?v=3"></script>
+  <script>
+  /* Ambassadeurs dynamiques */
+  (function() {
+    var COLORS = ['#7C3AED','#2563EB','#059669','#D97706','#DC2626','#8B5CF6','#0891B2','#65A30D'];
+    function initials(n) { var p = (n||'').trim().split(/\s+/); return p.length >= 2 ? (p[0][0]+p[p.length-1][0]).toUpperCase() : (p[0]||'?')[0].toUpperCase(); }
+    function color(n) { var h=0; for(var i=0;i<(n||'').length;i++) h=n.charCodeAt(i)+((h<<5)-h); return COLORS[Math.abs(h)%COLORS.length]; }
+
+    function renderCards(ambassadors) {
+      var grid = document.getElementById('ambassadors-grid');
+      if (!ambassadors.length) { grid.innerHTML = '<p style="text-align:center;color:#999;grid-column:1/-1;">Aucun ambassadeur dans cette région.</p>'; return; }
+      grid.innerHTML = ambassadors.map(function(a) {
+        var avatar = a.photo_url
+          ? '<img src="'+a.photo_url+'" alt="'+a.name+'" style="width:100%;height:100%;object-fit:cover;">'
+          : '<div style="width:80px;height:80px;border-radius:50%;display:flex;align-items:center;justify-content:center;color:#fff;font-size:1.8rem;font-weight:700;background:'+color(a.name)+'">'+initials(a.name)+'</div>';
+        return '<div style="background:#fff;border-radius:16px;box-shadow:0 2px 12px rgba(0,0,0,.08);overflow:hidden;transition:box-shadow .2s">'
+          + '<div style="height:180px;background:linear-gradient(135deg,#f3f4f6,#f9fafb);display:flex;align-items:center;justify-content:center">'+avatar+'</div>'
+          + '<div style="padding:1.2rem">'
+          + '<h4 style="margin:0 0 .3rem;font-size:1.05rem">'+a.name+'</h4>'
+          + (a.region ? '<p style="font-size:.85rem;color:#888;margin:0 0 .5rem;display:flex;align-items:center;gap:4px"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0118 0z"/><circle cx="12" cy="10" r="3"/></svg>'+a.region+'</p>' : '')
+          + (a.bio ? '<p style="font-size:.88rem;color:#555;margin:0;line-height:1.5">'+a.bio+'</p>' : '')
+          + '</div></div>';
+      }).join('');
+    }
+
+    function loadAmbassadors(regionId) {
+      var url = '/api/v1/ambassador/public';
+      if (regionId) url += '?region_id=' + regionId;
+      fetch(url).then(function(r){return r.json()}).then(function(data) {
+        var section = document.getElementById('ambassadeurs-section');
+        if (data.ambassadors && data.ambassadors.length > 0) {
+          section.style.display = '';
+          renderCards(data.ambassadors);
+          // Populate region filter
+          var sel = document.getElementById('ambassador-region-filter');
+          if (sel.options.length <= 1 && data.filters && data.filters.regions) {
+            data.filters.regions.forEach(function(r) {
+              var opt = document.createElement('option');
+              opt.value = r.id; opt.textContent = r.name;
+              sel.appendChild(opt);
+            });
+          }
+        } else if (!regionId) {
+          section.style.display = 'none';
+        } else {
+          section.style.display = '';
+          renderCards([]);
+        }
+      }).catch(function(){});
+    }
+
+    document.getElementById('ambassador-region-filter').addEventListener('change', function() {
+      loadAmbassadors(this.value);
+    });
+    loadAmbassadors();
+  })();
+  </script>
 </body>
 </html>
