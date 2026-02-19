@@ -46,9 +46,15 @@ function NavDropdown({ label, items }) {
       {open && (
         <div className="absolute top-full left-0 mt-2 bg-white rounded-lg shadow-lg border py-2 min-w-[180px] z-50">
           {items.map((item) => (
-            <a key={item.href} href={item.href} onClick={() => setOpen(false)} className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 hover:text-wine-700">
-              {item.label}
-            </a>
+            item.href.startsWith('/') ? (
+              <Link key={item.href} to={item.href} onClick={() => setOpen(false)} className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 hover:text-wine-700">
+                {item.label}
+              </Link>
+            ) : (
+              <a key={item.href} href={item.href} onClick={() => setOpen(false)} className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 hover:text-wine-700">
+                {item.label}
+              </a>
+            )
           ))}
         </div>
       )}
@@ -99,6 +105,7 @@ export default function PublicLayout() {
               <NavDropdown label="À Propos" items={[
                 { href: `${SITE_URL}/apropos.html`, label: 'Notre histoire' },
                 { href: `${SITE_URL}/equipe.html`, label: "L'équipe" },
+                { href: '/boutique/ambassadeurs', label: 'Nos Ambassadeurs' },
                 { href: `${SITE_URL}/faq.html`, label: 'FAQ' },
                 { href: `${SITE_URL}/avis.html`, label: 'Avis' },
                 { href: `${SITE_URL}/partenaires.html`, label: 'Nos partenaires' },
@@ -141,6 +148,7 @@ export default function PublicLayout() {
             <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider pt-3 pb-1">À Propos</p>
             <a href={`${SITE_URL}/apropos.html`} onClick={() => setMenuOpen(false)} className="block py-2 pl-3 text-sm text-gray-700 hover:text-wine-700">Notre histoire</a>
             <a href={`${SITE_URL}/equipe.html`} onClick={() => setMenuOpen(false)} className="block py-2 pl-3 text-sm text-gray-700 hover:text-wine-700">L'équipe</a>
+            <NavLink to="/boutique/ambassadeurs" onClick={() => setMenuOpen(false)} className="block py-2 pl-3 text-sm text-gray-700 hover:text-wine-700">Nos Ambassadeurs</NavLink>
             <a href={`${SITE_URL}/faq.html`} onClick={() => setMenuOpen(false)} className="block py-2 pl-3 text-sm text-gray-700 hover:text-wine-700">FAQ</a>
 
             <div className="border-t border-gray-100 mt-3 pt-3 space-y-2">
@@ -196,6 +204,7 @@ export default function PublicLayout() {
                 <a href={`${SITE_URL}/cse.html`} className="block text-sm text-gray-300 hover:text-white">Espace CSE</a>
                 <a href={`${SITE_URL}/ecoles.html`} className="block text-sm text-gray-300 hover:text-white">Partenariat Écoles</a>
                 <a href={`${SITE_URL}/ambassadeurs.html`} className="block text-sm text-gray-300 hover:text-white">Devenir Ambassadeur</a>
+                <Link to="/boutique/ambassadeurs" className="block text-sm text-gray-300 hover:text-white">Nos Ambassadeurs</Link>
                 <Link to="/boutique/contact" className="block text-sm text-gray-300 hover:text-white">Contact</Link>
                 <Link to="/login" className="block text-sm text-gray-300 hover:text-white">Espace membre</Link>
               </div>
