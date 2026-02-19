@@ -676,6 +676,7 @@ router.post('/:id/duplicate', authenticate, requireRole('super_admin'), auditAct
 // Campaign creation schema
 const campaignSchema = Joi.object({
   name: Joi.string().min(3).max(200).required(),
+  brand_name: Joi.string().max(100).allow(null, '').optional(),
   org_id: Joi.string().uuid().required(),
   client_type_id: Joi.string().uuid().required(),
   campaign_type_id: Joi.string().uuid().allow(null),
@@ -972,6 +973,7 @@ router.get('/:campaignId/export-excel', authenticate, requireRole('super_admin',
       .leftJoin('product_categories', 'products.category_id', 'product_categories.id')
       .leftJoin('contacts', 'orders.customer_id', 'contacts.id')
       .leftJoin('users', 'orders.user_id', 'users.id')
+      .leftJoin('payments', 'orders.id', 'payments.order_id')
       .where('orders.campaign_id', campaignId)
       .whereIn('orders.status', validStatuses)
       .where('order_items.type', 'product')
@@ -980,30 +982,18 @@ router.get('/:campaignId/export-excel', authenticate, requireRole('super_admin',
         'orders.created_at as order_date',
         'orders.status',
         'orders.payment_method',
+        'orders.total_ht as order_total_ht',
+        'orders.total_ttc as order_total_ttc',
         'users.name as seller_name',
         'contacts.name as contact_name',
-        'product_categories.name as category',
         'products.name as product_name',
         'order_items.qty',
+        'order_items.free_qty',
         'order_items.unit_price_ttc',
         db.raw('order_items.qty * order_items.unit_price_ttc as line_total_ttc'),
-        'order_items.unit_price_ht',
-        db.raw('order_items.qty * order_items.unit_price_ht as line_total_ht'),
-        'products.tva_rate'
+        'payments.status as payment_status'
       )
       .orderBy('orders.created_at', 'desc');
-
-    // Free bottles per order
-    const freeBottleRows = await db('order_items')
-      .join('orders', 'order_items.order_id', 'orders.id')
-      .where('orders.campaign_id', campaignId)
-      .whereIn('orders.status', validStatuses)
-      .where('order_items.free_qty', '>', 0)
-      .groupBy('orders.ref')
-      .select('orders.ref', db.raw('SUM(order_items.free_qty) as free_qty'));
-
-    const freeMap = {};
-    for (const f of freeBottleRows) freeMap[f.ref] = parseInt(f.free_qty);
 
     // Summary stats
     const summary = await db('orders')
@@ -1015,12 +1005,15 @@ router.get('/:campaignId/export-excel', authenticate, requireRole('super_admin',
         db.raw('COALESCE(SUM(total_ttc), 0) as total_ttc')
       ).first();
 
-    const totalBottles = await db('order_items')
+    const bottleTotals = await db('order_items')
       .join('orders', 'order_items.order_id', 'orders.id')
       .where('orders.campaign_id', campaignId)
       .whereIn('orders.status', validStatuses)
       .where('order_items.type', 'product')
-      .select(db.raw('COALESCE(SUM(order_items.qty), 0) as total')).first();
+      .select(
+        db.raw('COALESCE(SUM(order_items.qty), 0) as total'),
+        db.raw('COALESCE(SUM(order_items.free_qty), 0) as total_free')
+      ).first();
 
     const activeParticipants = await db('orders')
       .where({ campaign_id: campaignId })
@@ -1042,11 +1035,14 @@ router.get('/:campaignId/export-excel', authenticate, requireRole('super_admin',
       { header: 'Client final', key: 'contact', width: 22 },
       { header: 'Produit', key: 'product', width: 28 },
       { header: 'Quantité', key: 'qty', width: 10 },
-      { header: 'Bt gratuites', key: 'free', width: 12 },
+      { header: 'Bt gratuites', key: 'free', width: 14 },
       { header: 'PU TTC', key: 'unit_price_ttc', width: 12 },
-      { header: 'Total TTC', key: 'total_ttc', width: 14 },
+      { header: 'Total ligne TTC', key: 'line_ttc', width: 16 },
+      { header: 'Total cmd HT', key: 'order_ht', width: 14 },
+      { header: 'Total cmd TTC', key: 'order_ttc', width: 14 },
       { header: 'Statut', key: 'status', width: 12 },
       { header: 'Paiement', key: 'payment', width: 12 },
+      { header: 'Statut paiement', key: 'pay_status', width: 16 },
     ];
 
     // Style header
@@ -1056,12 +1052,7 @@ router.get('/:campaignId/export-excel', authenticate, requireRole('super_admin',
     headerRow1.alignment = { vertical: 'middle' };
     ws1.views = [{ state: 'frozen', ySplit: 1 }];
 
-    // Track which refs already showed free bottles (show once per order)
-    const freeShown = {};
     for (const r of rows) {
-      const freeQty = (!freeShown[r.reference] && freeMap[r.reference]) ? freeMap[r.reference] : '';
-      if (freeMap[r.reference]) freeShown[r.reference] = true;
-
       ws1.addRow({
         date: new Date(r.order_date).toLocaleDateString('fr-FR'),
         reference: r.reference,
@@ -1069,17 +1060,22 @@ router.get('/:campaignId/export-excel', authenticate, requireRole('super_admin',
         contact: r.contact_name || '',
         product: r.product_name,
         qty: parseInt(r.qty),
-        free: freeQty,
+        free: parseInt(r.free_qty) || '',
         unit_price_ttc: parseFloat(r.unit_price_ttc),
-        total_ttc: parseFloat(r.line_total_ttc),
+        line_ttc: parseFloat(r.line_total_ttc),
+        order_ht: parseFloat(r.order_total_ht),
+        order_ttc: parseFloat(r.order_total_ttc),
         status: r.status,
         payment: r.payment_method || '',
+        pay_status: r.payment_status || '',
       });
     }
 
     // Format currency columns
     ws1.getColumn('unit_price_ttc').numFmt = '#,##0.00 €';
-    ws1.getColumn('total_ttc').numFmt = '#,##0.00 €';
+    ws1.getColumn('line_ttc').numFmt = '#,##0.00 €';
+    ws1.getColumn('order_ht').numFmt = '#,##0.00 €';
+    ws1.getColumn('order_ttc').numFmt = '#,##0.00 €';
 
     // --- Sheet 2: Résumé ---
     const ws2 = wb.addWorksheet('Résumé');
@@ -1095,7 +1091,8 @@ router.get('/:campaignId/export-excel', authenticate, requireRole('super_admin',
     ws2.addRow({ label: 'CA TTC', value: parseFloat(summary.total_ttc) });
     ws2.addRow({ label: 'CA HT', value: parseFloat(summary.total_ht) });
     ws2.addRow({ label: 'Nombre de commandes', value: parseInt(summary.orders_count) });
-    ws2.addRow({ label: 'Bouteilles vendues', value: parseInt(totalBottles.total) });
+    ws2.addRow({ label: 'Bouteilles vendues', value: parseInt(bottleTotals.total) });
+    ws2.addRow({ label: 'Bouteilles gratuites', value: parseInt(bottleTotals.total_free) });
     ws2.addRow({ label: 'Participants actifs', value: parseInt(activeParticipants.count) });
 
     ws2.getCell('B3').numFmt = '#,##0.00 €';
@@ -1136,6 +1133,7 @@ router.get('/:campaignId/participants/:userId/export-excel', authenticate, requi
       .join('products', 'order_items.product_id', 'products.id')
       .leftJoin('product_categories', 'products.category_id', 'product_categories.id')
       .leftJoin('contacts', 'orders.customer_id', 'contacts.id')
+      .leftJoin('payments', 'orders.id', 'payments.order_id')
       .where('orders.campaign_id', campaignId)
       .where('orders.user_id', userId)
       .whereIn('orders.status', validStatuses)
@@ -1145,16 +1143,20 @@ router.get('/:campaignId/participants/:userId/export-excel', authenticate, requi
         'orders.created_at as order_date',
         'orders.status',
         'orders.payment_method',
+        'orders.total_ht as order_total_ht',
+        'orders.total_ttc as order_total_ttc',
         'contacts.name as contact_name',
         'contacts.email as contact_email',
         'contacts.phone as contact_phone',
         'product_categories.name as category',
         'products.name as product_name',
         'order_items.qty',
+        'order_items.free_qty',
         'order_items.unit_price_ht',
         'order_items.unit_price_ttc',
-        db.raw('order_items.qty * order_items.unit_price_ht as line_total_ht'),
-        'products.tva_rate'
+        db.raw('order_items.qty * order_items.unit_price_ttc as line_total_ttc'),
+        'products.tva_rate',
+        'payments.status as payment_status'
       )
       .orderBy('orders.created_at', 'desc');
 
@@ -1174,7 +1176,10 @@ router.get('/:campaignId/participants/:userId/export-excel', authenticate, requi
       .where('orders.user_id', userId)
       .whereIn('orders.status', validStatuses)
       .where('order_items.type', 'product')
-      .select(db.raw('COALESCE(SUM(order_items.qty), 0) as total')).first();
+      .select(
+        db.raw('COALESCE(SUM(order_items.qty), 0) as total'),
+        db.raw('COALESCE(SUM(order_items.free_qty), 0) as total_free')
+      ).first();
 
     // Build workbook
     const wb = new ExcelJS.Workbook();
@@ -1183,19 +1188,22 @@ router.get('/:campaignId/participants/:userId/export-excel', authenticate, requi
     // --- Sheet 1: Ventes (detail) ---
     const ws1 = wb.addWorksheet('Ventes');
     ws1.columns = [
-      { header: 'Référence', key: 'reference', width: 16 },
       { header: 'Date', key: 'date', width: 14 },
-      { header: 'Statut', key: 'status', width: 12 },
-      { header: 'Contact', key: 'contact', width: 22 },
+      { header: 'Réf commande', key: 'reference', width: 16 },
+      { header: 'Client final', key: 'contact', width: 22 },
       { header: 'Email contact', key: 'contact_email', width: 24 },
       { header: 'Téléphone', key: 'phone', width: 14 },
       { header: 'Catégorie', key: 'category', width: 16 },
       { header: 'Produit', key: 'product', width: 28 },
-      { header: 'Qté', key: 'qty', width: 8 },
-      { header: 'PU HT', key: 'unit_price', width: 10 },
-      { header: 'Total HT', key: 'total_ht', width: 12 },
-      { header: 'TVA %', key: 'tva', width: 8 },
+      { header: 'Quantité', key: 'qty', width: 10 },
+      { header: 'Bt gratuites', key: 'free', width: 14 },
+      { header: 'PU TTC', key: 'unit_price_ttc', width: 12 },
+      { header: 'Total ligne TTC', key: 'line_ttc', width: 16 },
+      { header: 'Total cmd HT', key: 'order_ht', width: 14 },
+      { header: 'Total cmd TTC', key: 'order_ttc', width: 14 },
+      { header: 'Statut', key: 'status', width: 12 },
       { header: 'Paiement', key: 'payment', width: 12 },
+      { header: 'Statut paiement', key: 'pay_status', width: 16 },
     ];
 
     // Style header
@@ -1207,25 +1215,30 @@ router.get('/:campaignId/participants/:userId/export-excel', authenticate, requi
 
     for (const r of rows) {
       ws1.addRow({
-        reference: r.reference,
         date: new Date(r.order_date).toLocaleDateString('fr-FR'),
-        status: r.status,
+        reference: r.reference,
         contact: r.contact_name || '',
         contact_email: r.contact_email || '',
         phone: r.contact_phone || '',
         category: r.category || '',
         product: r.product_name,
         qty: parseInt(r.qty),
-        unit_price: parseFloat(r.unit_price_ht),
-        total_ht: parseFloat(r.line_total_ht),
-        tva: parseFloat(r.tva_rate || 20),
+        free: parseInt(r.free_qty) || '',
+        unit_price_ttc: parseFloat(r.unit_price_ttc),
+        line_ttc: parseFloat(r.line_total_ttc),
+        order_ht: parseFloat(r.order_total_ht),
+        order_ttc: parseFloat(r.order_total_ttc),
+        status: r.status,
         payment: r.payment_method || '',
+        pay_status: r.payment_status || '',
       });
     }
 
     // Format currency columns
-    ws1.getColumn('unit_price').numFmt = '#,##0.00 €';
-    ws1.getColumn('total_ht').numFmt = '#,##0.00 €';
+    ws1.getColumn('unit_price_ttc').numFmt = '#,##0.00 €';
+    ws1.getColumn('line_ttc').numFmt = '#,##0.00 €';
+    ws1.getColumn('order_ht').numFmt = '#,##0.00 €';
+    ws1.getColumn('order_ttc').numFmt = '#,##0.00 €';
 
     // --- Sheet 2: Résumé ---
     const ws2 = wb.addWorksheet('Résumé');
@@ -1240,14 +1253,15 @@ router.get('/:campaignId/participants/:userId/export-excel', authenticate, requi
     ws2.addRow({ label: 'Participant', value: user.name });
     ws2.addRow({ label: 'Email', value: user.email });
     ws2.addRow({ label: 'Campagne', value: campaign.name });
+    ws2.addRow({ label: 'CA TTC', value: parseFloat(summary.total_ttc) });
+    ws2.addRow({ label: 'CA HT', value: parseFloat(summary.total_ht) });
     ws2.addRow({ label: 'Nombre de commandes', value: parseInt(summary.orders_count) });
     ws2.addRow({ label: 'Bouteilles vendues', value: parseInt(totalBottles.total) });
-    ws2.addRow({ label: 'CA HT', value: parseFloat(summary.total_ht) });
-    ws2.addRow({ label: 'CA TTC', value: parseFloat(summary.total_ttc) });
+    ws2.addRow({ label: 'Bouteilles gratuites', value: parseInt(totalBottles.total_free) });
 
     // Format currency cells in Résumé
-    ws2.getCell('B7').numFmt = '#,##0.00 €';
-    ws2.getCell('B8').numFmt = '#,##0.00 €';
+    ws2.getCell('B5').numFmt = '#,##0.00 €';
+    ws2.getCell('B6').numFmt = '#,##0.00 €';
 
     // Generate filename
     const safeName = user.name.replace(/[^a-zA-ZÀ-ÿ0-9 -]/g, '').replace(/\s+/g, '-').toLowerCase();
