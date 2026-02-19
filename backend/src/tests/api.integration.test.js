@@ -2225,10 +2225,16 @@ describe('API Integration Tests', () => {
         .limit(2);
       expect(products.length).toBeGreaterThanOrEqual(1);
 
-      // Ensure stock is available (earlier tests may have depleted it)
+      // Clean up leftover stock from previous failed runs, then ensure positive stock
+      await db('stock_movements').where({ reference: 'az-boutique-test-stock' }).delete();
       for (const p of products) {
+        const [row] = await db('stock_movements').where({ product_id: p.id }).select(
+          db.raw("COALESCE(SUM(CASE WHEN type IN ('initial','entry','return') THEN qty ELSE 0 END),0) - COALESCE(SUM(CASE WHEN type IN ('exit','adjustment') THEN qty ELSE 0 END),0) as available")
+        );
+        const available = parseInt(row.available) || 0;
+        const needed = Math.max(100, 100 - available);
         await db('stock_movements').insert({
-          product_id: p.id, type: 'entry', qty: 100,
+          product_id: p.id, type: 'entry', qty: needed,
           reference: 'az-boutique-test-stock',
         });
       }
