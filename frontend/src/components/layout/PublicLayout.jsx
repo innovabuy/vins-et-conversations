@@ -222,10 +222,10 @@ export default function PublicLayout() {
           </div>
           <div className="border-t border-gray-800 mt-4 pt-4 text-center">
             <p className="text-[0.7rem] text-gray-600">
-              Conception &amp; développement{' '}
-              <a href="https://www.cap-performances.fr" target="_blank" rel="noopener noreferrer" className="text-gray-500 hover:text-gray-400 no-underline">cap-performances.fr</a> · {' '}
-              <a href="https://www.cap-numerik.fr" target="_blank" rel="noopener noreferrer" className="text-gray-500 hover:text-gray-400 no-underline">cap-numerik.fr</a> · {' '}
-              <a href="https://www.vendmieux.fr" target="_blank" rel="noopener noreferrer" className="text-gray-500 hover:text-gray-400 no-underline">vendmieux.fr</a>
+              Réalisation{' '}
+              <a href="https://www.cap-numerik.fr" target="_blank" rel="noopener noreferrer" className="text-gray-500 hover:text-gray-400 no-underline font-medium">Cap-Numerik Angers</a>
+              {' · '}
+              <a href="tel:+33760403966" className="text-gray-500 hover:text-gray-400 no-underline">07 60 40 39 66</a>
             </p>
           </div>
         </div>

@@ -2,6 +2,7 @@ import { Outlet } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { LogOut, Wine, GraduationCap } from 'lucide-react';
 import NotificationBell from '../shared/NotificationBell';
+import CapNumerikCredit from '../shared/CapNumerikCredit';
 import { useAppSettings } from '../../contexts/AppSettingsContext';
 
 export default function BTSLayout() {
@@ -34,6 +35,7 @@ export default function BTSLayout() {
       <main className="max-w-[400px] mx-auto px-4 py-4">
         <Outlet />
       </main>
+      <CapNumerikCredit />
     </div>
   );
 }

@@ -3,6 +3,7 @@ import { dashboardAPI, productsAPI, ordersAPI, campaignResourcesAPI } from '../.
 import { useAuth } from '../../contexts/AuthContext';
 import { Flame, Trophy, ShoppingCart, User, ChevronUp, Wine, Package, Clock, Award, Zap, Heart, Target, DollarSign, ArrowLeft, ArrowRight, Check, Phone, Mail, FileText, CreditCard, Banknote, Building, HelpCircle, Users, TrendingUp, TrendingDown, Minus, BarChart3, BookOpen, ExternalLink, Video, Image, FileDown, LogOut } from 'lucide-react';
 import WineBarrel from '../shared/WineBarrel';
+import CapNumerikCredit from '../shared/CapNumerikCredit';
 import ReferralSection from './ReferralSection';
 import useCampaignBrandName from '../../utils/useCampaignBrandName';
 
@@ -805,6 +806,8 @@ export default function StudentDashboard() {
           </div>
         )}
       </div>
+
+      <CapNumerikCredit />
 
       {/* Bottom nav */}
       <nav className="fixed bottom-0 left-0 right-0 max-w-[390px] mx-auto bg-white border-t border-gray-200" role="navigation" aria-label="Navigation principale">

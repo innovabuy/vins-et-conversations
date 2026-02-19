@@ -231,6 +231,7 @@ function generatePremiumPDF(doc, products, { segment = 'public', pricingRules = 
 
     // Footer
     doc.fontSize(7).fillColor('#d1d5db').text(appName, 50, 780, { align: 'center', width: 495 });
+    doc.fillColor('#c0c0c0').fontSize(6).text('Réalisation Cap-Numerik Angers — 07 60 40 39 66 — www.cap-numerik.fr', 50, 792, { align: 'center', width: 495 });
   }
 
   // ─── Conditions commerciales ──────────────────────

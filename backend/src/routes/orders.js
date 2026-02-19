@@ -335,6 +335,7 @@ router.get('/:id/invoice', authenticate, async (req, res) => {
     if (tva55Amount > 0) doc.text(`TVA 5.5%: ${tva55Amount.toFixed(2)} EUR`, 350);
     doc.text(`Total TTC: ${parseFloat(order.total_ttc).toFixed(2)} EUR`, 350);
 
+    doc.fillColor('#c0c0c0').fontSize(6).text('Réalisation Cap-Numerik Angers — 07 60 40 39 66 — www.cap-numerik.fr', 50, 780, { align: 'center', width: 495 });
     doc.end();
   } catch (err) {
     res.status(500).json({ error: 'SERVER_ERROR', message: err.message });
@@ -536,6 +537,7 @@ router.get('/:id/pdf', authenticate, async (req, res) => {
     doc.fontSize(8).fillColor('#999').font('Helvetica');
     doc.text(`Conditions : paiement à réception sauf accord préalable. ${brandingBon.app_name} — SIRET 000 000 000 00000`, 50);
 
+    doc.fillColor('#c0c0c0').fontSize(6).text('Réalisation Cap-Numerik Angers — 07 60 40 39 66 — www.cap-numerik.fr', 50, 780, { align: 'center', width: 495 });
     doc.end();
   } catch (err) {
     res.status(500).json({ error: 'SERVER_ERROR', message: err.message });

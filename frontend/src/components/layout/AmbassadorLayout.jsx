@@ -2,6 +2,7 @@ import { Outlet } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { LogOut, Wine } from 'lucide-react';
 import NotificationBell from '../shared/NotificationBell';
+import CapNumerikCredit from '../shared/CapNumerikCredit';
 import { useAppSettings } from '../../contexts/AppSettingsContext';
 
 export default function AmbassadorLayout() {
@@ -33,6 +34,7 @@ export default function AmbassadorLayout() {
       <main className="max-w-[600px] mx-auto px-4 py-6">
         <Outlet />
       </main>
+      <CapNumerikCredit />
     </div>
   );
 }

@@ -480,6 +480,8 @@ router.get('/:id/report-pdf', authenticate, requireRole('super_admin', 'commerci
       doc.switchToPage(i);
       doc.fillColor(GRAY).fontSize(7).font('Helvetica');
       doc.text(`Vins & Conversations — Rapport ${campaign.name} — ${now} — Page ${i + 1}/${range.count}`, 50, 780, { align: 'center', width: 495 });
+      doc.fillColor('#c0c0c0').fontSize(6);
+      doc.text('Réalisation Cap-Numerik Angers — 07 60 40 39 66 — www.cap-numerik.fr', 50, 792, { align: 'center', width: 495 });
     }
 
     doc.end();

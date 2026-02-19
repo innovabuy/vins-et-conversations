@@ -2,6 +2,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { Outlet, useNavigate } from 'react-router-dom';
 import { Wine, LogOut } from 'lucide-react';
 import NotificationBell from '../shared/NotificationBell';
+import CapNumerikCredit from '../shared/CapNumerikCredit';
 import { useAppSettings } from '../../contexts/AppSettingsContext';
 
 export default function CSELayout() {
@@ -54,6 +55,7 @@ export default function CSELayout() {
       <main className="max-w-[900px] mx-auto px-4 py-6">
         <Outlet />
       </main>
+      <CapNumerikCredit />
     </div>
   );
 }

@@ -265,6 +265,7 @@ router.get('/delivery-notes', async (req, res) => {
       doc.fontSize(12).text('Aucun bon de livraison pour la période sélectionnée.', { align: 'center' });
     }
 
+    doc.fillColor('#c0c0c0').fontSize(6).text('Réalisation Cap-Numerik Angers — 07 60 40 39 66 — www.cap-numerik.fr', 50, 780, { align: 'center', width: 495 });
     doc.end();
   } catch (err) {
     res.status(500).json({ error: 'SERVER_ERROR', message: err.message });
@@ -419,6 +420,7 @@ router.get('/activity-report', async (req, res) => {
       doc.text(`${s.name} — ${parseFloat(s.ca).toFixed(2)} EUR — ${parseInt(s.orders_count, 10)} commandes`);
     }
 
+    doc.fillColor('#c0c0c0').fontSize(6).text('Réalisation Cap-Numerik Angers — 07 60 40 39 66 — www.cap-numerik.fr', 50, 780, { align: 'center', width: 495 });
     doc.end();
   } catch (err) {
     res.status(500).json({ error: 'SERVER_ERROR', message: err.message });

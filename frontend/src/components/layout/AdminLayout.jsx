@@ -7,6 +7,7 @@ import {
   Download, Wine, LogOut, Menu, X, ChevronRight, Shield, Tag, Building2, Image, ExternalLink
 } from 'lucide-react';
 import NotificationBell from '../shared/NotificationBell';
+import CapNumerikCredit from '../shared/CapNumerikCredit';
 import { useAppSettings } from '../../contexts/AppSettingsContext';
 
 const allNavItems = [
@@ -149,6 +150,7 @@ export default function AdminLayout() {
       <main className="lg:ml-64 p-4 lg:p-8">
         <Outlet />
       </main>
+      <div className="lg:ml-64"><CapNumerikCredit /></div>
     </div>
   );
 }

@@ -2,6 +2,7 @@ import { Outlet } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { LogOut, Wine, BookOpen } from 'lucide-react';
 import NotificationBell from '../shared/NotificationBell';
+import CapNumerikCredit from '../shared/CapNumerikCredit';
 import { useAppSettings } from '../../contexts/AppSettingsContext';
 
 export default function TeacherLayout() {
@@ -34,6 +35,7 @@ export default function TeacherLayout() {
       <main className="max-w-[700px] mx-auto px-4 py-6">
         <Outlet />
       </main>
+      <CapNumerikCredit />
     </div>
   );
 }

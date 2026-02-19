@@ -548,6 +548,8 @@ router.get('/:id/pdf', ...adminAuth, async (req, res) => {
         `Vins & Conversations — ${printDate} — Page ${i + 1}/${range.count}`,
         50, 800, { align: 'center', width: 495 }
       );
+      doc.fillColor('#c0c0c0').fontSize(6);
+      doc.text('Réalisation Cap-Numerik Angers — 07 60 40 39 66 — www.cap-numerik.fr', 50, 812, { align: 'center', width: 495 });
     }
 
     doc.end();

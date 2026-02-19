@@ -273,6 +273,8 @@ router.get('/:id/pdf', authenticate, requireRole('super_admin', 'commercial'), a
       doc.fontSize(8).fillColor('#999').text(`Date : ___/___/______          Nom : ________________________`, 50);
     }
 
+    doc.moveDown(2);
+    doc.fillColor('#c0c0c0').fontSize(6).text('Réalisation Cap-Numerik Angers — 07 60 40 39 66 — www.cap-numerik.fr', 50, 780, { align: 'center', width: 495 });
     doc.end();
   } catch (err) {
     res.status(500).json({ error: 'SERVER_ERROR', message: err.message });
