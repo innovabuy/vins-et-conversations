@@ -32,6 +32,8 @@ const EMPTY_PRODUCT = {
   region: '', appellation: '', color: '', vintage: '', grape_varieties: [],
   serving_temp: '', food_pairing: [], tasting_notes: null, winemaker_notes: '', awards: [],
   visible_boutique: false, allow_backorder: false, bundle_products: [],
+  // Dynamic fields per category type
+  weight: '', allergens: '', conservation: '', volume: '', bottle_count: '',
 };
 
 function parseJsonField(val) {
@@ -185,6 +187,9 @@ function ProductForm({ product, onSave, onCancel, allProducts = [], categoriesLi
   const isCoffret = wineType === 'coffret';
   const selectedCategory = categoriesList.find(c => c.id === form.category_id);
   const isWineProduct = !selectedCategory || ['wine', 'sparkling'].includes(selectedCategory.product_type);
+  const isFoodProduct = selectedCategory?.product_type === 'food';
+  const isBeverageProduct = selectedCategory?.product_type === 'beverage';
+  const isGiftSet = selectedCategory?.product_type === 'gift_set';
 
   // Auto-enable tasting for new products when criteria exist
   useEffect(() => {
@@ -421,10 +426,16 @@ function ProductForm({ product, onSave, onCancel, allProducts = [], categoriesLi
         </div>
       </fieldset>
 
-      {/* Section Dégustation / Coffret */}
-      {isCoffret ? (
+      {/* Section type-specific: Coffret / Alimentaire / Boisson / Dégustation */}
+      {isCoffret || isGiftSet ? (
         <fieldset className="border rounded-lg p-4 space-y-4">
           <legend className="text-sm font-semibold text-gray-700 px-2">Contenu du coffret</legend>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-xs font-medium text-gray-500 mb-1">Nombre de bouteilles</label>
+              <input type="number" min="1" value={form.bottle_count || ''} onChange={e => handleChange('bottle_count', e.target.value)} className="w-full border rounded-lg px-3 py-2 text-sm" placeholder="Ex: 3, 6" />
+            </div>
+          </div>
           <p className="text-xs text-gray-500">Sélectionnez les produits inclus dans ce coffret :</p>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
             {allProducts.filter(p => p.id !== product?.id && p.color !== null).map(p => (
@@ -435,6 +446,38 @@ function ProductForm({ product, onSave, onCancel, allProducts = [], categoriesLi
                 {p.color && <span className={`ml-auto px-1.5 py-0.5 rounded-full text-[10px] ${COLOR_BADGES[p.color] || 'bg-gray-100'}`}>{p.color}</span>}
               </label>
             ))}
+          </div>
+        </fieldset>
+      ) : isFoodProduct ? (
+        <fieldset className="border rounded-lg p-4 space-y-4">
+          <legend className="text-sm font-semibold text-gray-700 px-2">Caractéristiques alimentaires</legend>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-xs font-medium text-gray-500 mb-1">Poids</label>
+              <input value={form.weight || ''} onChange={e => handleChange('weight', e.target.value)} className="w-full border rounded-lg px-3 py-2 text-sm" placeholder="Ex: 180g, 250g" />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-gray-500 mb-1">Conservation</label>
+              <input value={form.conservation || ''} onChange={e => handleChange('conservation', e.target.value)} className="w-full border rounded-lg px-3 py-2 text-sm" placeholder="Ex: À conserver au frais, DLC 6 mois" />
+            </div>
+            <div className="md:col-span-2">
+              <label className="block text-xs font-medium text-gray-500 mb-1">Allergènes</label>
+              <textarea value={form.allergens || ''} onChange={e => handleChange('allergens', e.target.value)} className="w-full border rounded-lg px-3 py-2 text-sm" rows={2} placeholder="Ex: Contient du lait, gluten. Peut contenir des traces de fruits à coque." />
+            </div>
+          </div>
+        </fieldset>
+      ) : isBeverageProduct ? (
+        <fieldset className="border rounded-lg p-4 space-y-4">
+          <legend className="text-sm font-semibold text-gray-700 px-2">Caractéristiques boisson</legend>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-xs font-medium text-gray-500 mb-1">Volume</label>
+              <input value={form.volume || ''} onChange={e => handleChange('volume', e.target.value)} className="w-full border rounded-lg px-3 py-2 text-sm" placeholder="Ex: 75cl, 1L, 33cl" />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-gray-500 mb-1">Variété</label>
+              <input value={form.grape_varieties?.join?.(', ') || (Array.isArray(form.grape_varieties) ? '' : form.grape_varieties || '')} onChange={e => handleChange('grape_varieties', e.target.value ? e.target.value.split(',').map(s => s.trim()) : [])} className="w-full border rounded-lg px-3 py-2 text-sm" placeholder="Ex: Pomme Gala, Raisin Muscat" />
+            </div>
           </div>
         </fieldset>
       ) : (
@@ -475,7 +518,8 @@ function ProductForm({ product, onSave, onCancel, allProducts = [], categoriesLi
         </fieldset>
       )}
 
-      {/* Section Accords */}
+      {/* Section Accords & Service — wine/sparkling only */}
+      {isWineProduct && (
       <fieldset className="border rounded-lg p-4 space-y-4">
         <legend className="text-sm font-semibold text-gray-700 px-2">Accords & Service</legend>
         <div>
@@ -487,8 +531,10 @@ function ProductForm({ product, onSave, onCancel, allProducts = [], categoriesLi
           <input value={form.serving_temp || ''} onChange={e => handleChange('serving_temp', e.target.value)} className="w-full border rounded-lg px-3 py-2 text-sm" placeholder="Ex: 8-10°C" />
         </div>
       </fieldset>
+      )}
 
-      {/* Section Distinctions */}
+      {/* Section Distinctions — wine/sparkling only */}
+      {isWineProduct && (
       <fieldset className="border rounded-lg p-4 space-y-4">
         <legend className="text-sm font-semibold text-gray-700 px-2">Distinctions</legend>
         {form.awards.map((a, i) => (
@@ -500,6 +546,7 @@ function ProductForm({ product, onSave, onCancel, allProducts = [], categoriesLi
         ))}
         <button type="button" onClick={addAward} className="text-xs text-wine-700 hover:text-wine-800 font-medium">+ Ajouter une distinction</button>
       </fieldset>
+      )}
 
       <div className="flex justify-end gap-3 pt-2">
         <button type="button" onClick={onCancel} className="px-4 py-2 text-sm text-gray-600 hover:bg-gray-100 rounded-lg">Annuler</button>

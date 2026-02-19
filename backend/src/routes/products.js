@@ -71,6 +71,12 @@ const productSchema = Joi.object({
   }).allow(null),
   winemaker_notes: Joi.string().allow(null, ''),
   awards: Joi.array().items(Joi.object({ year: Joi.number(), name: Joi.string() })).default([]),
+  // Dynamic fields per category type
+  weight: Joi.string().max(50).allow(null, ''),
+  allergens: Joi.string().allow(null, ''),
+  conservation: Joi.string().max(200).allow(null, ''),
+  volume: Joi.string().max(50).allow(null, ''),
+  bottle_count: Joi.number().integer().min(1).allow(null),
 });
 
 // GET /api/v1/products — Catalogue (with filters)
