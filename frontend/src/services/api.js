@@ -102,6 +102,7 @@ export const campaignsAPI = {
   listActive: () => api.get('/admin/campaigns', { params: { status: 'active' } }),
   reportPdf: (id) => `${api.defaults.baseURL}/admin/campaigns/${id}/report-pdf`,
   participantExcel: (campaignId, userId) => api.get(`/admin/campaigns/${campaignId}/participants/${userId}/export-excel`, { responseType: 'blob' }),
+  campaignExcel: (campaignId) => api.get(`/admin/campaigns/${campaignId}/export-excel`, { responseType: 'blob' }),
 };
 
 // ─── Stock ────────────────────────────────────────────

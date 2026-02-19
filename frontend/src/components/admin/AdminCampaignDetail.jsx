@@ -512,6 +512,24 @@ export default function AdminCampaignDetail() {
   const [tab, setTab] = useState('overview');
   const [sendingReport, setSendingReport] = useState(false);
   const [linkCopied, setLinkCopied] = useState(false);
+  const [exportingCampaign, setExportingCampaign] = useState(false);
+
+  const handleExportCampaignExcel = async () => {
+    setExportingCampaign(true);
+    try {
+      const { data: blob } = await campaignsAPI.campaignExcel(id);
+      const url = URL.createObjectURL(new Blob([blob]));
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `ventes-campagne-${id.slice(0, 8)}.xlsx`;
+      link.click();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      alert(err.response?.data?.message || 'Erreur lors de l\'export');
+    } finally {
+      setExportingCampaign(false);
+    }
+  };
 
   const handleSendReport = async () => {
     if (!confirm('Envoyer le rapport à tous les participants ?')) return;
@@ -561,6 +579,14 @@ export default function AdminCampaignDetail() {
           <p className="text-sm text-gray-500">{campaign.org_name} — {campaign.type_label}</p>
         </div>
         <div className="flex items-center gap-2">
+          <button
+            onClick={handleExportCampaignExcel}
+            disabled={exportingCampaign}
+            className="flex items-center gap-2 px-4 py-2 border rounded-lg hover:bg-gray-50 text-sm disabled:opacity-50"
+          >
+            {exportingCampaign ? <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-wine-700" /> : <Download size={16} />}
+            Export Excel
+          </button>
           <button
             onClick={() => { const url = campaignsAPI.reportPdf(id); window.open(url + '?token=' + localStorage.getItem('accessToken'), '_blank'); }}
             className="flex items-center gap-2 px-4 py-2 border rounded-lg hover:bg-gray-50 text-sm"

@@ -954,6 +954,168 @@ router.delete('/:id', authenticate, requireRole('super_admin'), auditAction('cam
   }
 });
 
+// GET /api/v1/admin/campaigns/:campaignId/export-excel — Global campaign sales export
+router.get('/:campaignId/export-excel', authenticate, requireRole('super_admin', 'commercial'), async (req, res) => {
+  try {
+    const ExcelJS = require('exceljs');
+    const { campaignId } = req.params;
+
+    const campaign = await db('campaigns').where({ id: campaignId }).first();
+    if (!campaign) return res.status(404).json({ error: 'NOT_FOUND', message: 'Campagne introuvable' });
+
+    const validStatuses = ['submitted', 'validated', 'preparing', 'shipped', 'delivered'];
+
+    // Fetch all orders for this campaign with line items
+    const rows = await db('orders')
+      .join('order_items', 'orders.id', 'order_items.order_id')
+      .join('products', 'order_items.product_id', 'products.id')
+      .leftJoin('product_categories', 'products.category_id', 'product_categories.id')
+      .leftJoin('contacts', 'orders.customer_id', 'contacts.id')
+      .leftJoin('users', 'orders.user_id', 'users.id')
+      .where('orders.campaign_id', campaignId)
+      .whereIn('orders.status', validStatuses)
+      .where('order_items.type', 'product')
+      .select(
+        'orders.ref as reference',
+        'orders.created_at as order_date',
+        'orders.status',
+        'orders.payment_method',
+        'users.name as seller_name',
+        'contacts.name as contact_name',
+        'product_categories.name as category',
+        'products.name as product_name',
+        'order_items.qty',
+        'order_items.unit_price_ttc',
+        db.raw('order_items.qty * order_items.unit_price_ttc as line_total_ttc'),
+        'order_items.unit_price_ht',
+        db.raw('order_items.qty * order_items.unit_price_ht as line_total_ht'),
+        'products.tva_rate'
+      )
+      .orderBy('orders.created_at', 'desc');
+
+    // Free bottles per order
+    const freeBottleRows = await db('order_items')
+      .join('orders', 'order_items.order_id', 'orders.id')
+      .where('orders.campaign_id', campaignId)
+      .whereIn('orders.status', validStatuses)
+      .where('order_items.free_qty', '>', 0)
+      .groupBy('orders.ref')
+      .select('orders.ref', db.raw('SUM(order_items.free_qty) as free_qty'));
+
+    const freeMap = {};
+    for (const f of freeBottleRows) freeMap[f.ref] = parseInt(f.free_qty);
+
+    // Summary stats
+    const summary = await db('orders')
+      .where({ campaign_id: campaignId })
+      .whereIn('status', validStatuses)
+      .select(
+        db.raw('COUNT(id) as orders_count'),
+        db.raw('COALESCE(SUM(total_ht), 0) as total_ht'),
+        db.raw('COALESCE(SUM(total_ttc), 0) as total_ttc')
+      ).first();
+
+    const totalBottles = await db('order_items')
+      .join('orders', 'order_items.order_id', 'orders.id')
+      .where('orders.campaign_id', campaignId)
+      .whereIn('orders.status', validStatuses)
+      .where('order_items.type', 'product')
+      .select(db.raw('COALESCE(SUM(order_items.qty), 0) as total')).first();
+
+    const activeParticipants = await db('orders')
+      .where({ campaign_id: campaignId })
+      .whereIn('status', validStatuses)
+      .whereNotNull('user_id')
+      .countDistinct('user_id as count')
+      .first();
+
+    // Build workbook
+    const wb = new ExcelJS.Workbook();
+    wb.creator = 'Vins & Conversations';
+
+    // --- Sheet 1: Ventes (detail) ---
+    const ws1 = wb.addWorksheet('Ventes');
+    ws1.columns = [
+      { header: 'Date', key: 'date', width: 14 },
+      { header: 'Réf commande', key: 'reference', width: 16 },
+      { header: 'Vendeur', key: 'seller', width: 22 },
+      { header: 'Client final', key: 'contact', width: 22 },
+      { header: 'Produit', key: 'product', width: 28 },
+      { header: 'Quantité', key: 'qty', width: 10 },
+      { header: 'Bt gratuites', key: 'free', width: 12 },
+      { header: 'PU TTC', key: 'unit_price_ttc', width: 12 },
+      { header: 'Total TTC', key: 'total_ttc', width: 14 },
+      { header: 'Statut', key: 'status', width: 12 },
+      { header: 'Paiement', key: 'payment', width: 12 },
+    ];
+
+    // Style header
+    const headerRow1 = ws1.getRow(1);
+    headerRow1.font = { bold: true, color: { argb: 'FFFFFFFF' } };
+    headerRow1.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF722F37' } };
+    headerRow1.alignment = { vertical: 'middle' };
+    ws1.views = [{ state: 'frozen', ySplit: 1 }];
+
+    // Track which refs already showed free bottles (show once per order)
+    const freeShown = {};
+    for (const r of rows) {
+      const freeQty = (!freeShown[r.reference] && freeMap[r.reference]) ? freeMap[r.reference] : '';
+      if (freeMap[r.reference]) freeShown[r.reference] = true;
+
+      ws1.addRow({
+        date: new Date(r.order_date).toLocaleDateString('fr-FR'),
+        reference: r.reference,
+        seller: r.seller_name || 'Boutique web',
+        contact: r.contact_name || '',
+        product: r.product_name,
+        qty: parseInt(r.qty),
+        free: freeQty,
+        unit_price_ttc: parseFloat(r.unit_price_ttc),
+        total_ttc: parseFloat(r.line_total_ttc),
+        status: r.status,
+        payment: r.payment_method || '',
+      });
+    }
+
+    // Format currency columns
+    ws1.getColumn('unit_price_ttc').numFmt = '#,##0.00 €';
+    ws1.getColumn('total_ttc').numFmt = '#,##0.00 €';
+
+    // --- Sheet 2: Résumé ---
+    const ws2 = wb.addWorksheet('Résumé');
+    ws2.columns = [
+      { header: 'Indicateur', key: 'label', width: 30 },
+      { header: 'Valeur', key: 'value', width: 20 },
+    ];
+    const headerRow2 = ws2.getRow(1);
+    headerRow2.font = { bold: true, color: { argb: 'FFFFFFFF' } };
+    headerRow2.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF722F37' } };
+
+    ws2.addRow({ label: 'Campagne', value: campaign.name });
+    ws2.addRow({ label: 'CA TTC', value: parseFloat(summary.total_ttc) });
+    ws2.addRow({ label: 'CA HT', value: parseFloat(summary.total_ht) });
+    ws2.addRow({ label: 'Nombre de commandes', value: parseInt(summary.orders_count) });
+    ws2.addRow({ label: 'Bouteilles vendues', value: parseInt(totalBottles.total) });
+    ws2.addRow({ label: 'Participants actifs', value: parseInt(activeParticipants.count) });
+
+    ws2.getCell('B3').numFmt = '#,##0.00 €';
+    ws2.getCell('B4').numFmt = '#,##0.00 €';
+
+    // Generate filename
+    const safeCampaign = campaign.name.replace(/[^a-zA-ZÀ-ÿ0-9 -]/g, '').replace(/\s+/g, '-').toLowerCase();
+    const dateStr = new Date().toISOString().split('T')[0];
+    const filename = `ventes-${safeCampaign}-${dateStr}.xlsx`;
+
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    await wb.xlsx.write(res);
+    res.end();
+  } catch (err) {
+    logger.error(`Campaign export-excel error: ${err.message}`);
+    res.status(500).json({ error: 'SERVER_ERROR', message: err.message });
+  }
+});
+
 // GET /api/v1/admin/campaigns/:campaignId/participants/:userId/export-excel
 router.get('/:campaignId/participants/:userId/export-excel', authenticate, requireRole('super_admin', 'commercial'), async (req, res) => {
   try {
