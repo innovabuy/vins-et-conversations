@@ -236,7 +236,7 @@
           ? '<p class="ambassador-sectors"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0118 0z"/><circle cx="12" cy="10" r="3"/></svg> ' + escapeHtml(a.region) + '</p>'
           : '';
         var bio = a.bio ? '<p style="font-size:0.9rem;color:#666;margin-top:0.5rem;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;">' + escapeHtml(a.bio) + '</p>' : '';
-        return '<div class="ambassador-card reveal">'
+        return '<div class="ambassador-card reveal visible">'
           + '<div style="display:flex;align-items:center;gap:1rem;">' + photo
           + '<div class="ambassador-info"><div style="display:flex;align-items:center;gap:0.5rem;"><h3>' + escapeHtml(a.name) + '</h3>' + tier + '</div>' + region + bio + '</div>'
           + '</div></div>';
