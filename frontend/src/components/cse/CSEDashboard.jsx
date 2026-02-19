@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import { cseDashboardAPI, ordersAPI, invoicesAPI } from '../../services/api';
-import { ShoppingCart, Package, FileText, Truck, AlertTriangle, RefreshCw } from 'lucide-react';
+import { ShoppingCart, Package, FileText, Truck, AlertTriangle, RefreshCw, Wine } from 'lucide-react';
 
 export default function CSEDashboard() {
   const { user } = useAuth();
@@ -145,11 +145,29 @@ export default function CSEDashboard() {
       {activeTab === 'products' && (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {data.products.map((p) => (
-            <div key={p.id} className="card">
-              <h3 className="font-semibold text-sm mb-1">{p.name}</h3>
-              <p className="text-xs text-gray-500">{p.category} {p.label ? `— ${p.label}` : ''}</p>
-              {p.description && <p className="text-xs text-gray-600 mb-2 line-clamp-2">{p.description}</p>}
-              <div className="flex items-baseline gap-2 mb-3">
+            <div key={p.id} className="card flex flex-col">
+              <div className="flex gap-3 mb-2">
+                {p.image_url ? (
+                  <img
+                    src={p.image_url}
+                    alt={p.name}
+                    className="w-16 h-20 object-cover rounded flex-shrink-0"
+                    loading="lazy"
+                    onError={(e) => { e.target.style.display = 'none'; e.target.nextSibling && (e.target.nextSibling.style.display = 'flex'); }}
+                  />
+                ) : null}
+                {!p.image_url && (
+                  <div className="w-16 h-20 bg-gray-100 rounded flex items-center justify-center flex-shrink-0">
+                    <Wine size={24} className="text-gray-300" />
+                  </div>
+                )}
+                <div className="min-w-0">
+                  <h3 className="font-semibold text-sm mb-1">{p.name}</h3>
+                  <p className="text-xs text-gray-500">{p.category} {p.label ? `— ${p.label}` : ''}</p>
+                  {p.description && <p className="text-xs text-gray-600 line-clamp-2">{p.description}</p>}
+                </div>
+              </div>
+              <div className="flex items-baseline gap-2 mb-3 mt-auto">
                 <span className="text-lg font-bold text-wine-700">{p.cse_price_ttc.toFixed(2)} EUR</span>
                 <span className="text-sm text-gray-400 line-through">{p.original_price_ttc.toFixed(2)} EUR</span>
                 <span className="text-xs bg-green-100 text-green-700 px-1.5 py-0.5 rounded">-{data.discountPct}%</span>

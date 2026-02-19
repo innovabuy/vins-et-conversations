@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { exportsAPI, campaignsAPI } from '../../services/api';
-import { Download, FileText, FileSpreadsheet, Calendar, Users } from 'lucide-react';
+import { Download, FileText, FileSpreadsheet, Calendar, Users, BarChart3 } from 'lucide-react';
 
 function downloadBlob(res, filename) {
   const url = window.URL.createObjectURL(new Blob([res.data]));
@@ -17,6 +17,7 @@ export default function AdminExports() {
   const [campaignId, setCampaignId] = useState('');
   const [contactType, setContactType] = useState('');
   const [campaigns, setCampaigns] = useState([]);
+  const [includeFree, setIncludeFree] = useState(false);
   const [loading, setLoading] = useState({});
 
   useEffect(() => {
@@ -105,6 +106,20 @@ export default function AdminExports() {
       action: () => exportsAPI.salesByContact(start, end, contactType),
       filename: 'ventes-par-contact.xlsx',
     },
+    {
+      key: 'campaign-pivot',
+      title: 'Récap Campagne — Tableau croisé',
+      description: 'Tableau pivot Étudiants × Produits : quantités, montants TTC/HT, récap par étudiant et produit (5 onglets Excel)',
+      icon: BarChart3,
+      type: 'xlsx',
+      needsCampaign: true,
+      hasIncludeFree: true,
+      action: () => {
+        if (!campaignId) { alert('Veuillez sélectionner une campagne'); return Promise.reject(new Error('no campaign')); }
+        return exportsAPI.campaignPivot(campaignId, includeFree);
+      },
+      filename: 'recap-campagne-pivot.xlsx',
+    },
   ];
 
   return (
@@ -146,6 +161,10 @@ export default function AdminExports() {
               <option value="etudiant">Etudiant</option>
             </select>
           </div>
+          <label className="flex items-center gap-2 text-sm text-gray-600 cursor-pointer">
+            <input type="checkbox" checked={includeFree} onChange={(e) => setIncludeFree(e.target.checked)} className="rounded" />
+            Inclure gratuites (12+1)
+          </label>
         </div>
       </div>
 

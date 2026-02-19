@@ -7,7 +7,552 @@ const { getAppBranding } = require('../utils/appBranding');
 
 const router = express.Router();
 
-// All exports require auth + super_admin/comptable
+// ═══════════════════════════════════════════════════════════════════
+// HELPER FUNCTIONS — Pivot export
+// ═══════════════════════════════════════════════════════════════════
+
+/**
+ * Construit la structure de données pivot à partir des rows SQL
+ */
+function buildPivotData(rows, includeGratuite = false) {
+  const studentsMap = new Map();
+  const productsMap = new Map();
+  const cells = new Map();
+
+  for (const row of rows) {
+    if (!studentsMap.has(row.user_id)) {
+      studentsMap.set(row.user_id, { id: row.user_id, name: row.etudiant, email: row.email });
+    }
+    if (!productsMap.has(row.product_id)) {
+      productsMap.set(row.product_id, { id: row.product_id, name: row.produit, price_ttc: parseFloat(row.price_ttc), price_ht: parseFloat(row.price_ht) });
+    }
+
+    const cellKey = `${row.user_id}__${row.product_id}`;
+    const qty = parseInt(row.qty_vendue) || 0;
+    const qtyGratuite = parseInt(row.qty_gratuite) || 0;
+    const effectiveQty = includeGratuite ? qty + qtyGratuite : qty;
+
+    cells.set(cellKey, {
+      qty: effectiveQty,
+      qty_commerciale: qty,
+      qty_gratuite: qtyGratuite,
+      montant_ttc: parseFloat(row.montant_ttc) || 0,
+      montant_ht: parseFloat(row.montant_ht) || 0,
+    });
+  }
+
+  const students = Array.from(studentsMap.values()).sort((a, b) => a.name.localeCompare(b.name, 'fr'));
+  const products = Array.from(productsMap.values()).sort((a, b) => a.name.localeCompare(b.name, 'fr'));
+
+  const totalsByStudent = new Map();
+  for (const s of students) {
+    let totalQty = 0, totalTtc = 0, totalHt = 0;
+    for (const p of products) {
+      const cell = cells.get(`${s.id}__${p.id}`);
+      if (cell) { totalQty += cell.qty; totalTtc += cell.montant_ttc; totalHt += cell.montant_ht; }
+    }
+    totalsByStudent.set(s.id, { total_qty: totalQty, total_ttc: totalTtc, total_ht: totalHt });
+  }
+
+  const totalsByProduct = new Map();
+  for (const p of products) {
+    let totalQty = 0, totalTtc = 0, totalHt = 0;
+    for (const s of students) {
+      const cell = cells.get(`${s.id}__${p.id}`);
+      if (cell) { totalQty += cell.qty; totalTtc += cell.montant_ttc; totalHt += cell.montant_ht; }
+    }
+    totalsByProduct.set(p.id, { total_qty: totalQty, total_ttc: totalTtc, total_ht: totalHt });
+  }
+
+  const grandTotal = { qty: 0, ttc: 0, ht: 0 };
+  for (const [, t] of totalsByStudent) {
+    grandTotal.qty += t.total_qty; grandTotal.ttc += t.total_ttc; grandTotal.ht += t.total_ht;
+  }
+
+  return { students, products, cells, totalsByStudent, totalsByProduct, grandTotal };
+}
+
+/** Onglet Quantités vendues */
+function buildQuantiteSheet(workbook, pivotData, campaign) {
+  const { students, products, cells, totalsByStudent, totalsByProduct, grandTotal } = pivotData;
+  const sheet = workbook.addWorksheet('Quantités vendues');
+
+  const headerFill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF722F37' } };
+  const totalFill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFE4B5' } };
+  const grandTotalFill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFCD7F32' } };
+  const boldWhite = { bold: true, color: { argb: 'FFFFFFFF' } };
+  const bold = { bold: true };
+  const border = { style: 'thin', color: { argb: 'FFD0D0D0' } };
+  const allBorders = { top: border, left: border, bottom: border, right: border };
+
+  sheet.mergeCells(1, 1, 1, products.length + 2);
+  const titleCell = sheet.getCell(1, 1);
+  titleCell.value = `Récapitulatif des ventes — ${campaign.name} — Quantités vendues`;
+  titleCell.font = { bold: true, size: 14, color: { argb: 'FF722F37' } };
+  titleCell.alignment = { horizontal: 'center' };
+
+  sheet.mergeCells(2, 1, 2, products.length + 2);
+  sheet.getCell(2, 1).value = `Export généré le ${new Date().toLocaleDateString('fr-FR', { day: '2-digit', month: 'long', year: 'numeric' })}`;
+  sheet.getCell(2, 1).font = { italic: true, color: { argb: 'FF666666' } };
+  sheet.getCell(2, 1).alignment = { horizontal: 'center' };
+  sheet.addRow([]);
+
+  const headerRow = sheet.getRow(4);
+  headerRow.getCell(1).value = 'Étudiant';
+  headerRow.getCell(1).fill = headerFill;
+  headerRow.getCell(1).font = boldWhite;
+  headerRow.getCell(1).border = allBorders;
+
+  for (let i = 0; i < products.length; i++) {
+    const cell = headerRow.getCell(i + 2);
+    cell.value = products[i].name;
+    cell.fill = headerFill;
+    cell.font = boldWhite;
+    cell.alignment = { horizontal: 'center', wrapText: true };
+    cell.border = allBorders;
+  }
+
+  const totalHeaderCell = headerRow.getCell(products.length + 2);
+  totalHeaderCell.value = 'TOTAL Btl';
+  totalHeaderCell.fill = totalFill;
+  totalHeaderCell.font = bold;
+  totalHeaderCell.alignment = { horizontal: 'center' };
+  totalHeaderCell.border = allBorders;
+  headerRow.height = 45;
+  headerRow.commit();
+
+  let dataRowIndex = 5;
+  for (const student of students) {
+    const row = sheet.getRow(dataRowIndex);
+    row.getCell(1).value = student.name;
+    row.getCell(1).border = allBorders;
+
+    for (let i = 0; i < products.length; i++) {
+      const cell = cells.get(`${student.id}__${products[i].id}`);
+      const qtyCell = row.getCell(i + 2);
+      qtyCell.value = cell ? cell.qty : 0;
+      qtyCell.alignment = { horizontal: 'center' };
+      qtyCell.border = allBorders;
+      if (cell && cell.qty > 0) {
+        qtyCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE8F5E9' } };
+        qtyCell.font = { bold: true, color: { argb: 'FF2E7D32' } };
+      }
+    }
+
+    const studentTotal = totalsByStudent.get(student.id);
+    const totalCell = row.getCell(products.length + 2);
+    totalCell.value = studentTotal ? studentTotal.total_qty : 0;
+    totalCell.fill = totalFill;
+    totalCell.font = bold;
+    totalCell.alignment = { horizontal: 'center' };
+    totalCell.border = allBorders;
+    row.commit();
+    dataRowIndex++;
+  }
+
+  const totalRow = sheet.getRow(dataRowIndex);
+  totalRow.getCell(1).value = 'TOTAL';
+  totalRow.getCell(1).fill = grandTotalFill;
+  totalRow.getCell(1).font = { bold: true, color: { argb: 'FFFFFFFF' } };
+  totalRow.getCell(1).border = allBorders;
+
+  for (let i = 0; i < products.length; i++) {
+    const productTotal = totalsByProduct.get(products[i].id);
+    const cell = totalRow.getCell(i + 2);
+    cell.value = productTotal ? productTotal.total_qty : 0;
+    cell.fill = grandTotalFill;
+    cell.font = { bold: true, color: { argb: 'FFFFFFFF' } };
+    cell.alignment = { horizontal: 'center' };
+    cell.border = allBorders;
+  }
+
+  const grandTotalCell = totalRow.getCell(products.length + 2);
+  grandTotalCell.value = grandTotal.qty;
+  grandTotalCell.fill = grandTotalFill;
+  grandTotalCell.font = { bold: true, size: 12, color: { argb: 'FFFFFFFF' } };
+  grandTotalCell.alignment = { horizontal: 'center' };
+  grandTotalCell.border = allBorders;
+  totalRow.commit();
+
+  sheet.getColumn(1).width = 25;
+  for (let i = 2; i <= products.length + 1; i++) {
+    sheet.getColumn(i).width = Math.max(12, (products[i - 2]?.name?.length || 10) * 0.8);
+  }
+  sheet.getColumn(products.length + 2).width = 14;
+  sheet.views = [{ state: 'frozen', xSplit: 1, ySplit: 4 }];
+}
+
+/** Onglet Montants (TTC ou HT) */
+function buildMontantSheet(workbook, pivotData, campaign, type) {
+  const { students, products, cells, totalsByStudent, totalsByProduct, grandTotal } = pivotData;
+  const isTtc = type === 'ttc';
+  const sheet = workbook.addWorksheet(isTtc ? 'Montants TTC' : 'Montants HT');
+
+  const headerFill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF2C3E50' } };
+  const totalFill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFE4B5' } };
+  const grandTotalFill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFCD7F32' } };
+  const boldWhite = { bold: true, color: { argb: 'FFFFFFFF' } };
+  const bold = { bold: true };
+  const border = { style: 'thin', color: { argb: 'FFD0D0D0' } };
+  const allBorders = { top: border, left: border, bottom: border, right: border };
+  const euroFmt = '#,##0.00 "€"';
+
+  sheet.mergeCells(1, 1, 1, products.length + 2);
+  sheet.getCell(1, 1).value = `Récapitulatif des ventes — ${campaign.name} — Montants ${isTtc ? 'TTC' : 'HT'}`;
+  sheet.getCell(1, 1).font = { bold: true, size: 14 };
+  sheet.getCell(1, 1).alignment = { horizontal: 'center' };
+
+  sheet.mergeCells(2, 1, 2, products.length + 2);
+  sheet.getCell(2, 1).value = `Export généré le ${new Date().toLocaleDateString('fr-FR', { day: '2-digit', month: 'long', year: 'numeric' })}`;
+  sheet.getCell(2, 1).font = { italic: true, color: { argb: 'FF666666' } };
+  sheet.getCell(2, 1).alignment = { horizontal: 'center' };
+  sheet.addRow([]);
+
+  const headerRow = sheet.getRow(4);
+  headerRow.getCell(1).value = 'Étudiant';
+  headerRow.getCell(1).fill = headerFill;
+  headerRow.getCell(1).font = boldWhite;
+  headerRow.getCell(1).border = allBorders;
+
+  for (let i = 0; i < products.length; i++) {
+    const cell = headerRow.getCell(i + 2);
+    cell.value = products[i].name;
+    cell.fill = headerFill;
+    cell.font = boldWhite;
+    cell.alignment = { horizontal: 'center', wrapText: true };
+    cell.border = allBorders;
+  }
+
+  const totalHeaderCell = headerRow.getCell(products.length + 2);
+  totalHeaderCell.value = `TOTAL ${isTtc ? 'TTC' : 'HT'}`;
+  totalHeaderCell.fill = totalFill;
+  totalHeaderCell.font = bold;
+  totalHeaderCell.alignment = { horizontal: 'center' };
+  totalHeaderCell.border = allBorders;
+  headerRow.height = 45;
+  headerRow.commit();
+
+  let dataRowIndex = 5;
+  for (const student of students) {
+    const row = sheet.getRow(dataRowIndex);
+    row.getCell(1).value = student.name;
+    row.getCell(1).border = allBorders;
+
+    for (let i = 0; i < products.length; i++) {
+      const cellData = cells.get(`${student.id}__${products[i].id}`);
+      const excelCell = row.getCell(i + 2);
+      const val = cellData ? (isTtc ? cellData.montant_ttc : cellData.montant_ht) : 0;
+      excelCell.value = val;
+      excelCell.numFmt = euroFmt;
+      excelCell.alignment = { horizontal: 'right' };
+      excelCell.border = allBorders;
+      if (val > 0) {
+        excelCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF3E5F5' } };
+        excelCell.font = { bold: true, color: { argb: 'FF6A1B9A' } };
+      }
+    }
+
+    const studentTotal = totalsByStudent.get(student.id);
+    const totalExcelCell = row.getCell(products.length + 2);
+    totalExcelCell.value = studentTotal ? (isTtc ? studentTotal.total_ttc : studentTotal.total_ht) : 0;
+    totalExcelCell.numFmt = euroFmt;
+    totalExcelCell.fill = totalFill;
+    totalExcelCell.font = bold;
+    totalExcelCell.alignment = { horizontal: 'right' };
+    totalExcelCell.border = allBorders;
+    row.commit();
+    dataRowIndex++;
+  }
+
+  const totalRow = sheet.getRow(dataRowIndex);
+  totalRow.getCell(1).value = 'TOTAL';
+  totalRow.getCell(1).fill = grandTotalFill;
+  totalRow.getCell(1).font = { bold: true, color: { argb: 'FFFFFFFF' } };
+  totalRow.getCell(1).border = allBorders;
+
+  for (let i = 0; i < products.length; i++) {
+    const productTotal = totalsByProduct.get(products[i].id);
+    const cell = totalRow.getCell(i + 2);
+    cell.value = productTotal ? (isTtc ? productTotal.total_ttc : productTotal.total_ht) : 0;
+    cell.numFmt = euroFmt;
+    cell.fill = grandTotalFill;
+    cell.font = { bold: true, color: { argb: 'FFFFFFFF' } };
+    cell.alignment = { horizontal: 'right' };
+    cell.border = allBorders;
+  }
+
+  const gtCell = totalRow.getCell(products.length + 2);
+  gtCell.value = isTtc ? grandTotal.ttc : grandTotal.ht;
+  gtCell.numFmt = euroFmt;
+  gtCell.fill = grandTotalFill;
+  gtCell.font = { bold: true, size: 12, color: { argb: 'FFFFFFFF' } };
+  gtCell.alignment = { horizontal: 'right' };
+  gtCell.border = allBorders;
+  totalRow.commit();
+
+  sheet.getColumn(1).width = 25;
+  for (let i = 2; i <= products.length + 1; i++) {
+    sheet.getColumn(i).width = Math.max(14, (products[i - 2]?.name?.length || 10) * 0.9);
+  }
+  sheet.getColumn(products.length + 2).width = 16;
+  sheet.views = [{ state: 'frozen', xSplit: 1, ySplit: 4 }];
+}
+
+/** Onglet Récap par étudiant */
+function buildRecapEtudiantSheet(workbook, pivotData, campaign) {
+  const { students, totalsByStudent } = pivotData;
+  const sheet = workbook.addWorksheet('Récap par étudiant');
+
+  const headerFill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF722F37' } };
+  const boldWhite = { bold: true, color: { argb: 'FFFFFFFF' } };
+  const border = { style: 'thin', color: { argb: 'FFD0D0D0' } };
+  const allBorders = { top: border, left: border, bottom: border, right: border };
+  const euroFmt = '#,##0.00 "€"';
+
+  sheet.mergeCells(1, 1, 1, 5);
+  sheet.getCell(1, 1).value = `Récap par étudiant — ${campaign.name}`;
+  sheet.getCell(1, 1).font = { bold: true, size: 13, color: { argb: 'FF722F37' } };
+  sheet.getCell(1, 1).alignment = { horizontal: 'center' };
+  sheet.addRow([]);
+
+  const headers = ['Rang', 'Étudiant', 'Bouteilles vendues', 'CA TTC', 'CA HT'];
+  const headerRow = sheet.addRow(headers);
+  headerRow.eachCell((cell) => {
+    cell.fill = headerFill;
+    cell.font = boldWhite;
+    cell.border = allBorders;
+    cell.alignment = { horizontal: 'center' };
+  });
+
+  const sorted = [...students].sort((a, b) => {
+    const ta = totalsByStudent.get(a.id)?.total_ttc || 0;
+    const tb = totalsByStudent.get(b.id)?.total_ttc || 0;
+    return tb - ta;
+  });
+
+  sorted.forEach((student, index) => {
+    const total = totalsByStudent.get(student.id) || { total_qty: 0, total_ttc: 0, total_ht: 0 };
+    const row = sheet.addRow([index + 1, student.name, total.total_qty, total.total_ttc, total.total_ht]);
+
+    row.getCell(3).numFmt = '0';
+    row.getCell(3).alignment = { horizontal: 'center' };
+    row.getCell(4).numFmt = euroFmt;
+    row.getCell(4).alignment = { horizontal: 'right' };
+    row.getCell(5).numFmt = euroFmt;
+    row.getCell(5).alignment = { horizontal: 'right' };
+
+    if (index % 2 === 0) {
+      row.eachCell((cell) => {
+        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF9F3EE' } };
+      });
+    }
+    row.eachCell((cell) => { cell.border = allBorders; });
+  });
+
+  const grandTotals = { qty: 0, ttc: 0, ht: 0 };
+  for (const [, t] of totalsByStudent) {
+    grandTotals.qty += t.total_qty; grandTotals.ttc += t.total_ttc; grandTotals.ht += t.total_ht;
+  }
+  const totalRow = sheet.addRow(['', 'TOTAL CAMPAGNE', grandTotals.qty, grandTotals.ttc, grandTotals.ht]);
+  totalRow.eachCell((cell) => {
+    cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFCD7F32' } };
+    cell.font = { bold: true, color: { argb: 'FFFFFFFF' } };
+    cell.border = allBorders;
+  });
+  totalRow.getCell(3).numFmt = '0';
+  totalRow.getCell(3).alignment = { horizontal: 'center' };
+  totalRow.getCell(4).numFmt = euroFmt;
+  totalRow.getCell(4).alignment = { horizontal: 'right' };
+  totalRow.getCell(5).numFmt = euroFmt;
+  totalRow.getCell(5).alignment = { horizontal: 'right' };
+
+  sheet.getColumn(1).width = 8;
+  sheet.getColumn(2).width = 28;
+  sheet.getColumn(3).width = 20;
+  sheet.getColumn(4).width = 16;
+  sheet.getColumn(5).width = 16;
+}
+
+/** Onglet Récap par produit */
+function buildRecapProduitSheet(workbook, pivotData, campaign) {
+  const { products, totalsByProduct, grandTotal } = pivotData;
+  const sheet = workbook.addWorksheet('Récap par produit');
+
+  const headerFill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF2C3E50' } };
+  const boldWhite = { bold: true, color: { argb: 'FFFFFFFF' } };
+  const border = { style: 'thin', color: { argb: 'FFD0D0D0' } };
+  const allBorders = { top: border, left: border, bottom: border, right: border };
+  const euroFmt = '#,##0.00 "€"';
+
+  sheet.mergeCells(1, 1, 1, 6);
+  sheet.getCell(1, 1).value = `Récap par produit — ${campaign.name}`;
+  sheet.getCell(1, 1).font = { bold: true, size: 13 };
+  sheet.getCell(1, 1).alignment = { horizontal: 'center' };
+  sheet.addRow([]);
+
+  const headerRow = sheet.addRow(['Produit', 'Prix TTC', 'Prix HT', 'Bouteilles vendues', 'CA TTC', 'CA HT']);
+  headerRow.eachCell((cell) => {
+    cell.fill = headerFill;
+    cell.font = boldWhite;
+    cell.border = allBorders;
+    cell.alignment = { horizontal: 'center' };
+  });
+
+  const sorted = [...products].sort((a, b) => {
+    const ta = totalsByProduct.get(a.id)?.total_ttc || 0;
+    const tb = totalsByProduct.get(b.id)?.total_ttc || 0;
+    return tb - ta;
+  });
+
+  sorted.forEach((product, index) => {
+    const total = totalsByProduct.get(product.id) || { total_qty: 0, total_ttc: 0, total_ht: 0 };
+    const row = sheet.addRow([product.name, product.price_ttc, product.price_ht, total.total_qty, total.total_ttc, total.total_ht]);
+
+    row.getCell(2).numFmt = euroFmt;
+    row.getCell(3).numFmt = euroFmt;
+    row.getCell(4).numFmt = '0';
+    row.getCell(4).alignment = { horizontal: 'center' };
+    row.getCell(5).numFmt = euroFmt;
+    row.getCell(5).alignment = { horizontal: 'right' };
+    row.getCell(6).numFmt = euroFmt;
+    row.getCell(6).alignment = { horizontal: 'right' };
+
+    if (index % 2 === 0) {
+      row.eachCell((cell) => {
+        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF0F4F8' } };
+      });
+    }
+    row.eachCell((cell) => { cell.border = allBorders; });
+  });
+
+  const totalRow = sheet.addRow(['TOTAL', '', '', grandTotal.qty, grandTotal.ttc, grandTotal.ht]);
+  totalRow.eachCell((cell) => {
+    cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFCD7F32' } };
+    cell.font = { bold: true, color: { argb: 'FFFFFFFF' } };
+    cell.border = allBorders;
+  });
+  totalRow.getCell(4).numFmt = '0';
+  totalRow.getCell(4).alignment = { horizontal: 'center' };
+  totalRow.getCell(5).numFmt = euroFmt;
+  totalRow.getCell(5).alignment = { horizontal: 'right' };
+  totalRow.getCell(6).numFmt = euroFmt;
+  totalRow.getCell(6).alignment = { horizontal: 'right' };
+
+  sheet.getColumn(1).width = 30;
+  sheet.getColumn(2).width = 12;
+  sheet.getColumn(3).width = 12;
+  sheet.getColumn(4).width = 20;
+  sheet.getColumn(5).width = 16;
+  sheet.getColumn(6).width = 16;
+}
+
+/** Export CSV basique (quantités uniquement) */
+function buildCsvPivot(pivotData) {
+  const { students, products, cells, totalsByStudent } = pivotData;
+  const lines = [];
+
+  const header = ['Étudiant', ...products.map((p) => p.name), 'TOTAL'];
+  lines.push(header.join(';'));
+
+  for (const student of students) {
+    const values = [student.name];
+    for (const product of products) {
+      const cell = cells.get(`${student.id}__${product.id}`);
+      values.push(cell ? cell.qty : 0);
+    }
+    const total = totalsByStudent.get(student.id);
+    values.push(total ? total.total_qty : 0);
+    lines.push(values.join(';'));
+  }
+
+  return lines.join('\r\n');
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// CAMPAIGN PIVOT — broader role access (before global middleware)
+// ═══════════════════════════════════════════════════════════════════
+
+/**
+ * GET /api/v1/admin/exports/campaign-pivot
+ * Export tableau croisé étudiants × produits pour une campagne
+ * Query params: campaign_id (requis), format: xlsx|csv, include_free: true|false
+ */
+router.get('/campaign-pivot', authenticate, requireRole('super_admin', 'admin', 'comptable', 'commercial'), async (req, res) => {
+  try {
+    const { campaign_id, format = 'xlsx', include_free = 'false' } = req.query;
+
+    if (!campaign_id) {
+      return res.status(400).json({ error: true, code: 'MISSING_CAMPAIGN_ID', message: 'campaign_id requis' });
+    }
+
+    const campaign = await db('campaigns').where('id', campaign_id).first();
+    if (!campaign) {
+      return res.status(404).json({ error: true, code: 'CAMPAIGN_NOT_FOUND', message: 'Campagne introuvable' });
+    }
+
+    const rows = await db('order_items as oi')
+      .join('orders as o', 'o.id', 'oi.order_id')
+      .join('products as p', 'p.id', 'oi.product_id')
+      .join('users as u', 'u.id', 'o.user_id')
+      .where('o.campaign_id', campaign_id)
+      .whereNotIn('o.status', ['cancelled', 'draft'])
+      .where('oi.type', 'product')
+      .select(
+        'u.id as user_id',
+        'u.name as etudiant',
+        'u.email',
+        'p.id as product_id',
+        'p.name as produit',
+        'p.price_ttc',
+        'p.price_ht',
+        db.raw('SUM(oi.qty) as qty_vendue'),
+        db.raw('COALESCE(SUM(oi.free_qty), 0) as qty_gratuite'),
+        db.raw('SUM(oi.qty * oi.unit_price_ttc) as montant_ttc'),
+        db.raw('SUM(oi.qty * oi.unit_price_ht) as montant_ht')
+      )
+      .groupBy('u.id', 'u.name', 'u.email', 'p.id', 'p.name', 'p.price_ttc', 'p.price_ht')
+      .orderBy(['etudiant', 'produit']);
+
+    if (rows.length === 0) {
+      return res.status(404).json({ error: true, code: 'NO_DATA', message: 'Aucune commande pour cette campagne' });
+    }
+
+    const pivotData = buildPivotData(rows, include_free === 'true');
+
+    if (format === 'csv') {
+      const csv = buildCsvPivot(pivotData);
+      res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+      res.setHeader('Content-Disposition', `attachment; filename="recap-campagne-${campaign_id}-${Date.now()}.csv"`);
+      return res.send('\uFEFF' + csv);
+    }
+
+    const ExcelJS = require('exceljs');
+    const workbook = new ExcelJS.Workbook();
+    workbook.creator = 'Vins & Conversations';
+    workbook.created = new Date();
+
+    buildQuantiteSheet(workbook, pivotData, campaign);
+    buildMontantSheet(workbook, pivotData, campaign, 'ttc');
+    buildMontantSheet(workbook, pivotData, campaign, 'ht');
+    buildRecapEtudiantSheet(workbook, pivotData, campaign);
+    buildRecapProduitSheet(workbook, pivotData, campaign);
+
+    const safeName = campaign.name.normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9 ]/gi, '-').replace(/-+/g, '-').replace(/^-|-$/g, '');
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.setHeader('Content-Disposition', `attachment; filename="recap-${safeName}-${Date.now()}.xlsx"`);
+
+    await workbook.xlsx.write(res);
+    res.end();
+  } catch (err) {
+    console.error('[exports/campaign-pivot]', err);
+    res.status(500).json({ error: true, code: 'EXPORT_FAILED', message: err.message });
+  }
+});
+
+// Expose buildPivotData for unit testing
+router.buildPivotData = buildPivotData;
+
+// All other exports require auth + super_admin/comptable
 router.use(authenticate, requireRole('super_admin', 'comptable'));
 
 // 1. GET /api/v1/admin/exports/pennylane?start&end — Pennylane CSV
