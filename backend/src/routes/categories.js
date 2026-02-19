@@ -14,6 +14,10 @@ const categorySchema = Joi.object({
   color: Joi.string().max(20).allow('', null),
   icon: Joi.string().max(10).allow('', null),
   type: Joi.string().valid('wine', 'non_alcoholic', 'bundle').default('wine'),
+  // V4.2 adaptive category fields
+  product_type: Joi.string().valid('wine', 'sparkling', 'food', 'beverage', 'gift_set', 'other').allow(null),
+  is_alcohol: Joi.boolean().default(true),
+  icon_emoji: Joi.string().max(10).allow('', null),
   has_tasting_profile: Joi.boolean().default(true),
   tasting_axes: Joi.array().items(Joi.object({ key: Joi.string(), label: Joi.string() })).allow(null),
   icon_url: Joi.string().max(500).allow('', null),
@@ -35,6 +39,7 @@ router.get('/', cacheMiddleware(120), async (req, res) => {
       .where({ active: true })
       .orderBy('sort_order')
       .select('id', 'name', 'slug', 'description', 'color', 'icon', 'type',
+        'product_type', 'is_alcohol', 'icon_emoji',
         'has_tasting_profile', 'tasting_axes', 'icon_url', 'sort_order');
 
     const counts = await db('products')

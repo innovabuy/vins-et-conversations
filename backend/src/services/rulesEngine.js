@@ -164,18 +164,30 @@ async function calculateFunds(campaignId, userId, commissionRules) {
  */
 async function calculateFreeBottles(userId, campaignId, freeBottleRules) {
   if (!freeBottleRules?.trigger || freeBottleRules.trigger !== 'every_n_sold') {
-    return { earned: 0, used: 0, available: 0, totalSold: 0, threshold: 0, nextIn: 0 };
+    return { earned: 0, used: 0, available: 0, totalSold: 0, threshold: 0, nextIn: 0, cost_per_bottle: 0 };
   }
 
   const n = freeBottleRules.n || 12;
+  const alcoholOnly = freeBottleRules.applies_to_alcohol_only !== false;
 
   // Total bouteilles vendues par l'étudiant dans la campagne
-  const soldResult = await db('orders')
-    .where({ user_id: userId, campaign_id: campaignId })
-    .whereIn('status', ['validated', 'preparing', 'shipped', 'delivered'])
-    .sum('total_items as total')
-    .first();
+  // V4.2: filter by is_alcohol when applies_to_alcohol_only is set
+  let soldQuery = db('order_items')
+    .join('orders', 'order_items.order_id', 'orders.id')
+    .where({ 'orders.user_id': userId, 'orders.campaign_id': campaignId })
+    .whereIn('orders.status', ['validated', 'preparing', 'shipped', 'delivered'])
+    .where('order_items.type', 'product');
 
+  if (alcoholOnly) {
+    soldQuery = soldQuery
+      .join('products', 'order_items.product_id', 'products.id')
+      .leftJoin('product_categories', 'products.category_id', 'product_categories.id')
+      .where(function () {
+        this.where('product_categories.is_alcohol', true).orWhereNull('product_categories.is_alcohol');
+      });
+  }
+
+  const soldResult = await soldQuery.sum('order_items.qty as total').first();
   const totalSold = parseInt(soldResult?.total || 0, 10);
   const earned = Math.floor(totalSold / n);
 
@@ -190,7 +202,74 @@ async function calculateFreeBottles(userId, campaignId, freeBottleRules) {
   const available = Math.max(0, earned - used);
   const nextIn = n - (totalSold % n);
 
-  return { earned, used, available, totalSold, threshold: n, nextIn };
+  // V4.2: cost_per_bottle = cheapest purchase_price among alcohol items in student's orders
+  let costQuery = db('order_items')
+    .join('orders', 'order_items.order_id', 'orders.id')
+    .join('products', 'order_items.product_id', 'products.id')
+    .where({ 'orders.user_id': userId, 'orders.campaign_id': campaignId })
+    .whereIn('orders.status', ['validated', 'preparing', 'shipped', 'delivered'])
+    .where('order_items.type', 'product');
+
+  if (alcoholOnly) {
+    costQuery = costQuery
+      .leftJoin('product_categories', 'products.category_id', 'product_categories.id')
+      .where(function () {
+        this.where('product_categories.is_alcohol', true).orWhereNull('product_categories.is_alcohol');
+      });
+  }
+
+  const costResult = await costQuery.min('products.purchase_price as min_cost').first();
+  const cost_per_bottle = parseFloat(costResult?.min_cost || 0);
+
+  return { earned, used, available, totalSold, threshold: n, nextIn, cost_per_bottle };
+}
+
+// ─── §3.3b Coût gratuite par commande (V4.2 BLOC 3) ──
+
+/**
+ * Calcule le coût de la bouteille gratuite pour une commande donnée.
+ * Formule CDC V4.2: coût_gratuite = prix_achat de la bouteille au plus bas prix_achat.
+ * Si applies_to_alcohol_only, ne considère que les produits alcoolisés.
+ * @param {string} orderId
+ * @param {Object} freeBottleRules - Rules JSONB du client_type
+ * @returns {Object} { cost, productId, productName } ou { cost: 0 } si non applicable
+ */
+async function calculateFreeBottleCost(orderId, freeBottleRules) {
+  if (!freeBottleRules?.trigger || freeBottleRules.trigger !== 'every_n_sold') {
+    return { cost: 0, productId: null, productName: null };
+  }
+
+  const costMethod = freeBottleRules.cost_method || 'cheapest_in_order';
+  const alcoholOnly = freeBottleRules.applies_to_alcohol_only ?? true;
+
+  if (costMethod !== 'cheapest_in_order') {
+    return { cost: 0, productId: null, productName: null };
+  }
+
+  // Find cheapest product (by purchase_price) in order, optionally alcohol-only
+  const query = db('order_items')
+    .join('products', 'order_items.product_id', 'products.id')
+    .leftJoin('product_categories', 'products.category_id', 'product_categories.id')
+    .where('order_items.order_id', orderId)
+    .where('order_items.qty', '>', 0)
+    .orderBy('products.purchase_price', 'asc')
+    .select('products.id as product_id', 'products.name', 'products.purchase_price')
+    .first();
+
+  if (alcoholOnly) {
+    query.where(function () {
+      this.where('product_categories.is_alcohol', true).orWhereNull('product_categories.is_alcohol');
+    });
+  }
+
+  const cheapest = await query;
+  if (!cheapest) return { cost: 0, productId: null, productName: null };
+
+  return {
+    cost: parseFloat(cheapest.purchase_price),
+    productId: cheapest.product_id,
+    productName: cheapest.name,
+  };
 }
 
 // ─── §3.4 Paliers ambassadeurs ───────────────────────
@@ -296,6 +375,7 @@ module.exports = {
   calculateAssociationCommission,
   calculateFunds,
   calculateFreeBottles,
+  calculateFreeBottleCost,
   calculateTier,
   loadRulesForCampaign,
 };

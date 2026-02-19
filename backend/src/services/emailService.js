@@ -2,6 +2,7 @@ const nodemailer = require('nodemailer');
 const fs = require('fs');
 const path = require('path');
 const logger = require('../utils/logger');
+const { getAppBranding } = require('../utils/appBranding');
 
 const BASE_URL = process.env.BASE_URL || process.env.FRONTEND_URL || '';
 
@@ -112,7 +113,7 @@ function renderTemplate(name, vars = {}) {
   // Inject content into layout
   let html = layout
     .replace('{{CONTENT}}', content)
-    .replace(/\{\{SUBJECT\}\}/g, vars.SUBJECT || 'Vins & Conversations')
+    .replace(/\{\{SUBJECT\}\}/g, vars.SUBJECT || vars.APP_NAME || 'Vins & Conversations')
     .replace(/\{\{YEAR\}\}/g, String(new Date().getFullYear()))
     .replace(/\{\{BASE_URL\}\}/g, BASE_URL);
 
@@ -171,14 +172,15 @@ const ROLE_LABELS = {
 // ─── 8 specialized send functions ─────────────────────
 
 async function sendWelcome({ email, name, role }) {
+  const branding = await getAppBranding();
   const html = renderTemplate('welcome', {
-    SUBJECT: 'Bienvenue sur Vins & Conversations',
+    SUBJECT: `Bienvenue sur ${branding.app_name}`,
     NAME: name,
     EMAIL: email,
     ROLE: ROLE_LABELS[role] || role,
     LOGIN_URL: `${BASE_URL}/login`,
   });
-  return sendEmail({ to: email, subject: 'Bienvenue sur Vins & Conversations', html });
+  return sendEmail({ to: email, subject: `Bienvenue sur ${branding.app_name}`, html });
 }
 
 async function sendOrderConfirmation({ email, name, orderRef, campaignName, totalItems, totalTTC, items }) {
@@ -283,7 +285,8 @@ async function sendBoutiqueOrderConfirmation({ email, name, orderRef, totalTTC, 
     ITEMS_ROWS: itemsRows,
     TRACKING_URL: `${BASE_URL}/boutique/suivi`,
   });
-  return sendEmail({ to: email, subject: `Commande ${orderRef} confirmée — Vins & Conversations`, html });
+  const brandingBoutique = await getAppBranding();
+  return sendEmail({ to: email, subject: `Commande ${orderRef} confirmée — ${brandingBoutique.app_name}`, html });
 }
 
 async function sendBoutiquePaymentConfirmed({ email, name, orderRef, totalTTC }) {

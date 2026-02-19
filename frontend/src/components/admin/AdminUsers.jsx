@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
-import { usersAPI, invitationsAPI, campaignsAPI } from '../../services/api';
-import { Users, Shield, Mail, Copy, Check, Plus, Upload, Link, QrCode, X, Download } from 'lucide-react';
+import { usersAPI, invitationsAPI, campaignsAPI, ambassadorAPI } from '../../services/api';
+import { Users, Shield, Mail, Copy, Check, Plus, Upload, Link, QrCode, X, Download, Pencil } from 'lucide-react';
 
 const ROLES = [
   { value: 'super_admin', label: 'Super Admin', color: 'bg-red-100 text-red-700' },
@@ -25,6 +25,7 @@ export default function AdminUsers() {
   const [roleFilter, setRoleFilter] = useState('');
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showInviteModal, setShowInviteModal] = useState(false);
+  const [editUser, setEditUser] = useState(null);
   const [copiedId, setCopiedId] = useState(null);
   const [qrInvitation, setQrInvitation] = useState(null);
 
@@ -175,6 +176,13 @@ export default function AdminUsers() {
                       </td>
                       <td className="py-2 px-2">
                         <button
+                          onClick={() => setEditUser(u)}
+                          className="text-xs px-2 py-1 rounded bg-blue-50 text-blue-600 hover:bg-blue-100 mr-1"
+                          title="Modifier"
+                        >
+                          <Pencil size={12} className="inline" />
+                        </button>
+                        <button
                           onClick={() => toggleStatus(u.id)}
                           className={`text-xs px-2 py-1 rounded ${
                             u.status === 'active' ? 'bg-red-50 text-red-600 hover:bg-red-100' : 'bg-green-50 text-green-600 hover:bg-green-100'
@@ -201,6 +209,7 @@ export default function AdminUsers() {
 
           {/* Create User Modal */}
           {showCreateModal && <CreateUserModal onClose={() => setShowCreateModal(false)} onCreated={loadData} />}
+          {editUser && <EditUserModal user={editUser} onClose={() => setEditUser(null)} onSaved={loadData} />}
         </div>
       )}
 
@@ -375,6 +384,135 @@ function CreateUserModal({ onClose, onCreated }) {
           <div className="flex gap-2 justify-end">
             <button type="button" onClick={onClose} className="btn-secondary">Annuler</button>
             <button type="submit" disabled={saving} className="btn-primary">{saving ? 'Création...' : 'Créer'}</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
+// ─── Edit User Modal ──────────────────────────────────
+function EditUserModal({ user, onClose, onSaved }) {
+  const [form, setForm] = useState({
+    name: user.name || '',
+    role: user.role || 'etudiant',
+    ambassador_photo_url: user.ambassador_photo_url || '',
+    ambassador_bio: user.ambassador_bio || '',
+    region_id: user.region_id || '',
+    show_on_public_page: user.show_on_public_page !== false,
+  });
+  const [regions, setRegions] = useState([]);
+  const [error, setError] = useState('');
+  const [saving, setSaving] = useState(false);
+  const [photoFile, setPhotoFile] = useState(null);
+  const [photoPreview, setPhotoPreview] = useState(user.ambassador_photo_url || '');
+  const [photoUploading, setPhotoUploading] = useState(false);
+
+  useEffect(() => {
+    ambassadorAPI.regions().then(r => setRegions(r.data)).catch(() => {});
+  }, []);
+
+  const isAmbassadeur = form.role === 'ambassadeur';
+
+  const handlePhotoChange = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setPhotoFile(file);
+    setPhotoPreview(URL.createObjectURL(file));
+  };
+
+  const handlePhotoUpload = async () => {
+    if (!photoFile) return;
+    setPhotoUploading(true);
+    try {
+      const res = await usersAPI.uploadAmbassadorPhoto(user.id, photoFile);
+      setForm(f => ({ ...f, ambassador_photo_url: res.data.ambassador_photo_url }));
+      setPhotoPreview(res.data.ambassador_photo_url);
+      setPhotoFile(null);
+    } catch (err) {
+      setError(err.response?.data?.message || 'Erreur upload photo');
+    } finally {
+      setPhotoUploading(false);
+    }
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setSaving(true);
+    setError('');
+    try {
+      const payload = { name: form.name, role: form.role };
+      if (isAmbassadeur) {
+        payload.ambassador_photo_url = form.ambassador_photo_url || null;
+        payload.ambassador_bio = form.ambassador_bio || null;
+        payload.region_id = form.region_id || null;
+        payload.show_on_public_page = form.show_on_public_page;
+      }
+      await usersAPI.update(user.id, payload);
+      onSaved();
+      onClose();
+    } catch (err) {
+      setError(err.response?.data?.message || 'Erreur');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50" onClick={onClose}>
+      <div className="bg-white rounded-xl p-6 w-full max-w-md max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+        <h3 className="font-semibold text-lg mb-4">Modifier {user.name}</h3>
+        <form onSubmit={handleSubmit} className="space-y-3">
+          <input type="text" placeholder="Nom" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} className="input-field" required />
+          <select value={form.role} onChange={(e) => setForm({ ...form, role: e.target.value })} className="input-field">
+            {ROLES.map((r) => <option key={r.value} value={r.value}>{r.label}</option>)}
+          </select>
+
+          {isAmbassadeur && (
+            <div className="border-t pt-3 space-y-3">
+              <p className="text-xs font-medium text-gray-500 uppercase">Profil ambassadeur</p>
+              <div>
+                <label className="block text-xs text-gray-500 mb-1">Photo</label>
+                <div className="flex items-center gap-3">
+                  <div className="w-16 h-16 rounded-full bg-gray-100 flex items-center justify-center overflow-hidden shrink-0 border">
+                    {photoPreview ? (
+                      <img src={photoPreview} alt="" className="w-full h-full object-cover" />
+                    ) : (
+                      <Upload size={20} className="text-gray-400" />
+                    )}
+                  </div>
+                  <div className="flex-1 space-y-1">
+                    <input type="file" accept="image/jpeg,image/png,image/webp" onChange={handlePhotoChange} className="text-sm w-full" />
+                    {photoFile && (
+                      <button type="button" onClick={handlePhotoUpload} disabled={photoUploading} className="text-xs px-3 py-1 rounded bg-wine-700 text-white hover:bg-wine-800 disabled:opacity-50">
+                        {photoUploading ? 'Upload...' : 'Enregistrer la photo'}
+                      </button>
+                    )}
+                  </div>
+                </div>
+              </div>
+              <div>
+                <label className="block text-xs text-gray-500 mb-1">Region</label>
+                <select value={form.region_id} onChange={(e) => setForm({ ...form, region_id: e.target.value })} className="input-field">
+                  <option value="">-- Aucune --</option>
+                  {regions.map((r) => <option key={r.id} value={r.id}>{r.name}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs text-gray-500 mb-1">Bio</label>
+                <textarea placeholder="Biographie..." value={form.ambassador_bio} onChange={(e) => setForm({ ...form, ambassador_bio: e.target.value })} className="input-field" rows={3} maxLength={1000} />
+              </div>
+              <label className="flex items-center gap-2 text-sm">
+                <input type="checkbox" checked={form.show_on_public_page} onChange={(e) => setForm({ ...form, show_on_public_page: e.target.checked })} className="rounded text-wine-700" />
+                Visible sur la page publique
+              </label>
+            </div>
+          )}
+
+          {error && <p className="text-sm text-red-600">{error}</p>}
+          <div className="flex gap-2 justify-end">
+            <button type="button" onClick={onClose} className="btn-secondary">Annuler</button>
+            <button type="submit" disabled={saving} className="btn-primary">{saving ? 'Enregistrement...' : 'Enregistrer'}</button>
           </div>
         </form>
       </div>

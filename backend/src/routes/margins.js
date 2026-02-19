@@ -8,6 +8,78 @@ const router = express.Router();
 const VALID_STATUSES = ['validated', 'preparing', 'shipped', 'delivered'];
 const adminAuth = [authenticate, requireRole('super_admin', 'commercial', 'comptable')];
 
+// ─── V4.2 BLOC 3: Free bottle cost calculation ─────────────────
+// coût_gratuite = floor(alcohol_qty / n) × min(purchase_price) per order
+// Only for campaigns with free_bottle_rules.trigger = 'every_n_sold'
+
+async function calculateFreeBottleCosts(filters) {
+  const query = db('order_items')
+    .join('orders', 'order_items.order_id', 'orders.id')
+    .join('products', 'order_items.product_id', 'products.id')
+    .leftJoin('product_categories as pc', 'products.category_id', 'pc.id')
+    .join('campaigns', 'orders.campaign_id', 'campaigns.id')
+    .join('client_types', 'campaigns.client_type_id', 'client_types.id')
+    .whereIn('orders.status', VALID_STATUSES)
+    .where('order_items.type', 'product')
+    .whereRaw("client_types.free_bottle_rules->>'trigger' = 'every_n_sold'")
+    .groupBy('orders.id', 'client_types.free_bottle_rules')
+    .select(
+      'orders.id as order_id',
+      db.raw(`
+        FLOOR(
+          SUM(CASE WHEN COALESCE(pc.is_alcohol, true) THEN order_items.qty ELSE 0 END)::numeric /
+          GREATEST(COALESCE((client_types.free_bottle_rules->>'n')::int, 12), 1)
+        ) * MIN(CASE WHEN COALESCE(pc.is_alcohol, true) THEN products.purchase_price END)
+        as free_bottle_cost
+      `)
+    );
+
+  // Apply date/campaign filters to the subquery
+  if (filters.campaign_id) query.where('orders.campaign_id', filters.campaign_id);
+  if (filters.date_from) query.where('orders.created_at', '>=', filters.date_from);
+  if (filters.date_to) query.where('orders.created_at', '<=', filters.date_to);
+
+  const rows = await query;
+  const total = rows.reduce((sum, r) => sum + parseFloat(r.free_bottle_cost || 0), 0);
+  return { total: parseFloat(total.toFixed(2)), byOrder: rows };
+}
+
+// Same but grouped by segment (client_type)
+async function calculateFreeBottleCostsBySegment(filters) {
+  const query = db('order_items')
+    .join('orders', 'order_items.order_id', 'orders.id')
+    .join('products', 'order_items.product_id', 'products.id')
+    .leftJoin('product_categories as pc', 'products.category_id', 'pc.id')
+    .join('campaigns', 'orders.campaign_id', 'campaigns.id')
+    .join('client_types', 'campaigns.client_type_id', 'client_types.id')
+    .whereIn('orders.status', VALID_STATUSES)
+    .where('order_items.type', 'product')
+    .whereRaw("client_types.free_bottle_rules->>'trigger' = 'every_n_sold'")
+    .groupBy('orders.id', 'client_types.name', 'client_types.free_bottle_rules')
+    .select(
+      'orders.id as order_id',
+      'client_types.name as segment',
+      db.raw(`
+        FLOOR(
+          SUM(CASE WHEN COALESCE(pc.is_alcohol, true) THEN order_items.qty ELSE 0 END)::numeric /
+          GREATEST(COALESCE((client_types.free_bottle_rules->>'n')::int, 12), 1)
+        ) * MIN(CASE WHEN COALESCE(pc.is_alcohol, true) THEN products.purchase_price END)
+        as free_bottle_cost
+      `)
+    );
+
+  if (filters.campaign_id) query.where('orders.campaign_id', filters.campaign_id);
+  if (filters.date_from) query.where('orders.created_at', '>=', filters.date_from);
+  if (filters.date_to) query.where('orders.created_at', '<=', filters.date_to);
+
+  const rows = await query;
+  const bySegment = {};
+  for (const r of rows) {
+    bySegment[r.segment] = (bySegment[r.segment] || 0) + parseFloat(r.free_bottle_cost || 0);
+  }
+  return bySegment;
+}
+
 // GET /api/v1/admin/margins/filter-options — Dropdown values for filter bar
 router.get('/filter-options', ...adminAuth, async (req, res) => {
   try {
@@ -77,12 +149,16 @@ router.get('/', ...adminAuth, async (req, res) => {
     applyMarginFilters(bySegmentQ, filters, { hasCampaignsJoin: true, hasClientTypesJoin: true });
     const bySegment = await bySegmentQ;
 
-    // Apply 5% commission deduction for scolaire/bts segments
+    // V4.2 BLOC 3: Free bottle cost by segment
+    const fbcBySegment = await calculateFreeBottleCostsBySegment(filters);
+
+    // Apply 5% commission deduction + free bottle cost for scolaire/bts segments
     const segmentsWithCommission = bySegment.map((s) => {
       const caHT = parseFloat(s.ca_ht);
       const marginBrut = parseFloat(s.margin_brut);
       const hasCommission = ['scolaire', 'bts_ndrc'].includes(s.segment);
       const commission = hasCommission ? caHT * 0.05 : 0;
+      const freeBottleCost = parseFloat((fbcBySegment[s.segment] || 0).toFixed(2));
       return {
         segment: s.segment,
         segment_label: s.segment_label,
@@ -90,7 +166,8 @@ router.get('/', ...adminAuth, async (req, res) => {
         cost: parseFloat(s.cost),
         margin_brut: marginBrut,
         commission,
-        margin_net: parseFloat((marginBrut - commission).toFixed(2)),
+        free_bottle_cost: freeBottleCost,
+        margin_net: parseFloat((marginBrut - commission - freeBottleCost).toFixed(2)),
       };
     });
 
@@ -119,15 +196,19 @@ router.get('/', ...adminAuth, async (req, res) => {
       segments.add(row.segment);
     }
 
-    // Global KPIs
+    // Global KPIs — V4.2: include free bottle cost deduction
     const globalCA = byProduct.reduce((sum, p) => sum + parseFloat(p.ca_ht), 0);
-    const globalMargin = byProduct.reduce((sum, p) => sum + parseFloat(p.margin), 0);
+    const globalMarginBrut = byProduct.reduce((sum, p) => sum + parseFloat(p.margin), 0);
+    const fbcData = await calculateFreeBottleCosts(filters);
+    const globalMarginNet = globalMarginBrut - fbcData.total;
 
     res.json({
       global: {
         ca_ht: parseFloat(globalCA.toFixed(2)),
-        margin: parseFloat(globalMargin.toFixed(2)),
-        margin_pct: globalCA > 0 ? parseFloat(((globalMargin / globalCA) * 100).toFixed(1)) : 0,
+        margin_brut: parseFloat(globalMarginBrut.toFixed(2)),
+        margin: parseFloat(globalMarginNet.toFixed(2)),
+        free_bottle_cost: fbcData.total,
+        margin_pct: globalCA > 0 ? parseFloat(((globalMarginNet / globalCA) * 100).toFixed(1)) : 0,
       },
       byProduct: byProduct.map((p) => ({
         ...p,
@@ -211,14 +292,18 @@ router.get('/by-campaign', ...adminAuth, async (req, res) => {
     const byProduct = await byProductQ;
 
     const globalCA = byProduct.reduce((sum, p) => sum + parseFloat(p.ca_ht), 0);
-    const globalMargin = byProduct.reduce((sum, p) => sum + parseFloat(p.margin), 0);
+    const globalMarginBrut = byProduct.reduce((sum, p) => sum + parseFloat(p.margin), 0);
+    const campFbc = await calculateFreeBottleCosts(filters);
+    const globalMarginNet = globalMarginBrut - campFbc.total;
 
     res.json({
       campaign_id: filters.campaign_id || null,
       global: {
         ca_ht: parseFloat(globalCA.toFixed(2)),
-        margin: parseFloat(globalMargin.toFixed(2)),
-        margin_pct: globalCA > 0 ? parseFloat(((globalMargin / globalCA) * 100).toFixed(1)) : 0,
+        margin_brut: parseFloat(globalMarginBrut.toFixed(2)),
+        margin: parseFloat(globalMarginNet.toFixed(2)),
+        free_bottle_cost: campFbc.total,
+        margin_pct: globalCA > 0 ? parseFloat(((globalMarginNet / globalCA) * 100).toFixed(1)) : 0,
       },
       byProduct: byProduct.map((p) => ({
         ...p,
@@ -400,6 +485,28 @@ router.get('/overview', ...adminAuth, async (req, res) => {
     applyOrderOnlyFilters(byCampaignQ, filters, { hasCampaignsJoin: true });
     const byCampaign = await byCampaignQ;
 
+    // V4.2 BLOC 3: Free bottle cost deduction for overview
+    const overviewFbc = await calculateFreeBottleCosts(filters);
+    // Commission totale (fund_collective) for overview
+    let commOverviewQuery = db('orders')
+      .join('campaigns', 'orders.campaign_id', 'campaigns.id')
+      .join('client_types', 'campaigns.client_type_id', 'client_types.id')
+      .whereIn('orders.status', VALID_STATUSES)
+      .select(db.raw(`COALESCE(SUM(
+        orders.total_ht * COALESCE(
+          (campaigns.config->>'fund_collective_pct')::numeric,
+          (client_types.commission_rules->'fund_collective'->>'value')::numeric,
+          (client_types.commission_rules->'association'->>'value')::numeric,
+          0
+        ) / 100
+      ), 0) as commission`));
+    applyOrderOnlyFilters(commOverviewQuery, filters, { hasCampaignsJoin: true, hasClientTypesJoin: true });
+    const commOverviewResult = await commOverviewQuery;
+    const overviewCommission = parseFloat(commOverviewResult[0]?.commission || 0);
+
+    const marginBrutOverview = parseFloat(sales.total_ht) - parseFloat(purchases.total_cost);
+    const marginNetOverview = marginBrutOverview - overviewFbc.total - overviewCommission;
+
     res.json({
       sales: {
         total_ttc: parseFloat(sales.total_ttc),
@@ -410,9 +517,12 @@ router.get('/overview', ...adminAuth, async (req, res) => {
         total_cost: parseFloat(purchases.total_cost),
         total_bottles: parseInt(purchases.total_bottles, 10),
       },
-      margin: parseFloat(sales.total_ht) - parseFloat(purchases.total_cost),
+      margin_brut: parseFloat(marginBrutOverview.toFixed(2)),
+      margin: parseFloat(marginNetOverview.toFixed(2)),
+      free_bottle_cost: overviewFbc.total,
+      commission: parseFloat(overviewCommission.toFixed(2)),
       margin_pct: parseFloat(sales.total_ht) > 0
-        ? parseFloat((((parseFloat(sales.total_ht) - parseFloat(purchases.total_cost)) / parseFloat(sales.total_ht)) * 100).toFixed(1))
+        ? parseFloat(((marginNetOverview / parseFloat(sales.total_ht)) * 100).toFixed(1))
         : 0,
       pl,
       byCampaign: byCampaign.map(c => ({

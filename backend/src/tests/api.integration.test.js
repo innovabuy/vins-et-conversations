@@ -13,8 +13,9 @@ beforeAll(async () => {
   // Wait for DB to be ready
   await db.raw('SELECT 1');
 
-  // Get a campaign ID from seeded data
-  const campaign = await db('campaigns').first();
+  // Get Sacré-Cœur campaign (used by student ackavong in tests)
+  const campaign = await db('campaigns').where('name', 'like', '%Sacr%').first()
+    || await db('campaigns').first();
   campaignId = campaign?.id;
 });
 
@@ -2381,10 +2382,12 @@ describe('API Integration Tests', () => {
 
       expect(statsRes.status).toBe(200);
       expect(statsRes.body).toHaveProperty('referredOrders');
-      expect(statsRes.body.referredOrders.count).toBeGreaterThanOrEqual(1);
-      expect(statsRes.body.referredOrders.revenue).toBeGreaterThan(0);
+      // referredOrders is now an array of order objects (V4.2 BLOC 1.3)
+      expect(Array.isArray(statsRes.body.referredOrders)).toBe(true);
+      expect(statsRes.body.referredOrders.length).toBeGreaterThanOrEqual(1);
+      expect(parseFloat(statsRes.body.referredOrders[0].total_ttc)).toBeGreaterThan(0);
       // Conversions total should include referred orders
-      expect(statsRes.body.conversions.orders).toBeGreaterThanOrEqual(statsRes.body.referredOrders.count);
+      expect(statsRes.body.conversions.orders).toBeGreaterThanOrEqual(statsRes.body.referredOrders.length);
     });
 
     test('Ambassador dashboard sales include referred order CA', async () => {
@@ -3615,7 +3618,7 @@ describe('API Integration Tests', () => {
 
     test('GET /referral/my-link returns code and URL', async () => {
       const campaign = await db('campaigns')
-        .whereNot({ name: 'Boutique Web' })
+        .where('name', 'like', '%Sacr%')
         .where({ status: 'active' })
         .first();
 
@@ -3632,7 +3635,7 @@ describe('API Integration Tests', () => {
 
     test('GET /referral/stats returns referral statistics', async () => {
       const campaign = await db('campaigns')
-        .whereNot({ name: 'Boutique Web' })
+        .where('name', 'like', '%Sacr%')
         .where({ status: 'active' })
         .first();
 
@@ -3751,7 +3754,7 @@ describe('API Integration Tests', () => {
 
     test('Dashboard student includes ca_referred and ca_total', async () => {
       const campaign = await db('campaigns')
-        .whereNot({ name: 'Boutique Web' })
+        .where('name', 'like', '%Sacr%')
         .where({ status: 'active' })
         .first();
 
@@ -3871,8 +3874,9 @@ describe('API Integration Tests', () => {
     let resourceCampaignId;
 
     beforeAll(async () => {
+      // Sacré-Cœur has seeded resources and student participates in it
       const campaign = await db('campaigns')
-        .whereNot({ name: 'Boutique Web' })
+        .where('name', 'like', '%Sacr%')
         .where({ status: 'active' })
         .first();
       resourceCampaignId = campaign?.id;
@@ -3985,6 +3989,154 @@ describe('API Integration Tests', () => {
         });
 
       expect(res.status).toBe(403);
+    });
+  });
+
+  // ═══════════════════════════════════════════════════════
+  // V4.2 BLOC 1 — Ambassador referral-stats returns order array
+  // ═══════════════════════════════════════════════════════
+  describe('V4.2 BLOC 1 — Ambassador referral-stats order array', () => {
+    let ambToken;
+
+    beforeAll(async () => {
+      const res = await request(app)
+        .post('/api/v1/auth/login')
+        .send({ email: 'ambassadeur@example.fr', password: 'VinsConv2026!' });
+      ambToken = res.body.accessToken;
+    });
+
+    test('referral-stats returns referredOrders as array with order fields', async () => {
+      if (!ambToken) return;
+
+      const res = await request(app)
+        .get('/api/v1/ambassador/referral-stats')
+        .set('Authorization', `Bearer ${ambToken}`);
+
+      expect(res.status).toBe(200);
+      expect(res.body).toHaveProperty('referredOrders');
+      expect(Array.isArray(res.body.referredOrders)).toBe(true);
+      expect(res.body).toHaveProperty('referralCode');
+      expect(res.body).toHaveProperty('conversions');
+      expect(res.body.conversions).toHaveProperty('orders');
+      expect(res.body.conversions).toHaveProperty('revenue');
+
+      // If there are referred orders, verify structure
+      if (res.body.referredOrders.length > 0) {
+        const order = res.body.referredOrders[0];
+        expect(order).toHaveProperty('id');
+        expect(order).toHaveProperty('ref');
+        expect(order).toHaveProperty('total_ttc');
+        expect(order).toHaveProperty('created_at');
+      }
+    });
+
+    test('Ambassador dashboard includes tiers array from rules', async () => {
+      if (!ambToken) return;
+
+      const participation = await db('participations')
+        .join('users', 'participations.user_id', 'users.id')
+        .where('users.email', 'ambassadeur@example.fr')
+        .first();
+      if (!participation) return;
+
+      const res = await request(app)
+        .get('/api/v1/dashboard/ambassador')
+        .set('Authorization', `Bearer ${ambToken}`)
+        .query({ campaign_id: participation.campaign_id });
+
+      expect(res.status).toBe(200);
+      // Verify tiers array is returned for frontend tier display
+      expect(Array.isArray(res.body.tiers)).toBe(true);
+      expect(res.body.tiers.length).toBeGreaterThan(0);
+      // Each tier has label, threshold, reward
+      const t = res.body.tiers[0];
+      expect(t).toHaveProperty('label');
+      expect(t).toHaveProperty('threshold');
+      expect(t).toHaveProperty('reward');
+    });
+  });
+
+  // ═══════════════════════════════════════════════════════
+  // V4.2 BLOC 3 — Margin calculation with free bottle cost
+  // ═══════════════════════════════════════════════════════
+  describe('V4.2 BLOC 3 — Margin free bottle cost deduction', () => {
+    test('Global margins endpoint returns free_bottle_cost and margin_brut', async () => {
+      const res = await request(app)
+        .get('/api/v1/admin/margins')
+        .set('Authorization', `Bearer ${adminToken}`);
+
+      expect(res.status).toBe(200);
+      expect(res.body.global).toHaveProperty('margin_brut');
+      expect(res.body.global).toHaveProperty('free_bottle_cost');
+      expect(res.body.global).toHaveProperty('margin');
+      // margin = margin_brut - free_bottle_cost
+      expect(res.body.global.margin).toBe(
+        parseFloat((res.body.global.margin_brut - res.body.global.free_bottle_cost).toFixed(2))
+      );
+    });
+
+    test('By-segment margins include free_bottle_cost per segment', async () => {
+      const res = await request(app)
+        .get('/api/v1/admin/margins')
+        .set('Authorization', `Bearer ${adminToken}`);
+
+      expect(res.status).toBe(200);
+      for (const seg of res.body.bySegment) {
+        expect(seg).toHaveProperty('free_bottle_cost');
+        expect(seg).toHaveProperty('margin_brut');
+        expect(seg).toHaveProperty('margin_net');
+        // margin_net = margin_brut - commission - free_bottle_cost
+        expect(seg.margin_net).toBe(
+          parseFloat((seg.margin_brut - seg.commission - seg.free_bottle_cost).toFixed(2))
+        );
+      }
+    });
+
+    test('Overview margins endpoint returns free_bottle_cost', async () => {
+      const res = await request(app)
+        .get('/api/v1/admin/margins/overview')
+        .set('Authorization', `Bearer ${adminToken}`);
+
+      expect(res.status).toBe(200);
+      expect(res.body).toHaveProperty('free_bottle_cost');
+      expect(res.body).toHaveProperty('margin_brut');
+      expect(res.body).toHaveProperty('margin');
+      expect(res.body).toHaveProperty('commission');
+      // margin = margin_brut - free_bottle_cost - commission
+      expect(res.body.margin).toBe(
+        parseFloat((res.body.margin_brut - res.body.free_bottle_cost - res.body.commission).toFixed(2))
+      );
+    });
+
+    test('By-campaign margins include free_bottle_cost', async () => {
+      const res = await request(app)
+        .get('/api/v1/admin/margins/by-campaign')
+        .set('Authorization', `Bearer ${adminToken}`);
+
+      expect(res.status).toBe(200);
+      expect(res.body.global).toHaveProperty('free_bottle_cost');
+      expect(res.body.global).toHaveProperty('margin_brut');
+    });
+
+    test('Free bottles calculated with alcohol-only filter', async () => {
+      // The rulesEngine should filter out non-alcohol products
+      const { calculateFreeBottles, loadRulesForCampaign } = require('../services/rulesEngine');
+      const student = await db('users').where({ email: 'ackavong@eleve.sc.fr' }).first();
+      if (!student) return;
+
+      const campaign = await db('campaigns').where('name', 'like', '%Sacr%').first();
+      if (!campaign) return;
+
+      const rules = await loadRulesForCampaign(campaign.id);
+      const result = await calculateFreeBottles(student.id, campaign.id, rules.freeBottle);
+
+      expect(result).toHaveProperty('cost_per_bottle');
+      expect(typeof result.cost_per_bottle).toBe('number');
+      expect(result.cost_per_bottle).toBeGreaterThanOrEqual(0);
+      // If any free bottles earned, cost_per_bottle should be > 0
+      if (result.earned > 0) {
+        expect(result.cost_per_bottle).toBeGreaterThan(0);
+      }
     });
   });
 });

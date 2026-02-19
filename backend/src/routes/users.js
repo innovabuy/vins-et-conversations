@@ -1,4 +1,6 @@
 const express = require('express');
+const path = require('path');
+const multer = require('multer');
 const db = require('../config/database');
 const bcrypt = require('bcryptjs');
 const Joi = require('joi');
@@ -9,6 +11,25 @@ const emailService = require('../services/emailService');
 const logger = require('../utils/logger');
 
 const router = express.Router();
+
+// Multer config for ambassador photos
+const ambassadorStorage = multer.diskStorage({
+  destination: path.join(__dirname, '../../uploads/ambassadors'),
+  filename: (req, file, cb) => {
+    const ext = path.extname(file.originalname).toLowerCase() || '.jpg';
+    cb(null, req.params.id + ext);
+  },
+});
+const ambassadorUpload = multer({
+  storage: ambassadorStorage,
+  limits: { fileSize: 5 * 1024 * 1024 },
+  fileFilter: (req, file, cb) => {
+    const allowed = ['.jpg', '.jpeg', '.png', '.webp'];
+    const ext = path.extname(file.originalname).toLowerCase();
+    if (allowed.includes(ext)) return cb(null, true);
+    cb(new Error('Format non supporté. Utilisez JPG, PNG ou WebP.'));
+  },
+});
 
 // GET /api/v1/admin/users — List all users
 router.get(
@@ -107,6 +128,10 @@ const updateSchema = Joi.object({
   role: Joi.string().valid('super_admin', 'commercial', 'comptable', 'enseignant', 'etudiant', 'cse', 'ambassadeur', 'lecture_seule'),
   status: Joi.string().valid('active', 'disabled', 'pending'),
   permissions: Joi.object(),
+  ambassador_photo_url: Joi.string().uri().allow('', null),
+  ambassador_bio: Joi.string().max(1000).allow('', null),
+  region_id: Joi.number().integer().allow(null),
+  show_on_public_page: Joi.boolean(),
 }).min(1);
 
 router.put(
@@ -126,6 +151,11 @@ router.put(
       if (req.body.role) updates.role = req.body.role;
       if (req.body.status) updates.status = req.body.status;
       if (req.body.permissions) updates.permissions = JSON.stringify(req.body.permissions);
+      // Ambassador-specific fields
+      if (req.body.ambassador_photo_url !== undefined) updates.ambassador_photo_url = req.body.ambassador_photo_url || null;
+      if (req.body.ambassador_bio !== undefined) updates.ambassador_bio = req.body.ambassador_bio || null;
+      if (req.body.region_id !== undefined) updates.region_id = req.body.region_id || null;
+      if (req.body.show_on_public_page !== undefined) updates.show_on_public_page = req.body.show_on_public_page;
       updates.updated_at = new Date();
 
       const [updated] = await db('users').where({ id }).update(updates)
@@ -221,6 +251,41 @@ router.post(
       }
 
       res.status(201).json(results);
+    } catch (err) {
+      res.status(500).json({ error: 'SERVER_ERROR', message: err.message });
+    }
+  }
+);
+
+// PUT /api/v1/admin/users/:id/ambassador-photo — Upload ambassador photo
+router.put(
+  '/:id/ambassador-photo',
+  authenticate,
+  (req, res, next) => {
+    // Accessible by admin OR the ambassador themselves
+    if (req.user.roles?.includes('super_admin') || req.user.role === 'super_admin') return next();
+    if (req.user.userId === req.params.id) return next();
+    return res.status(403).json({ error: 'FORBIDDEN' });
+  },
+  (req, res, next) => {
+    ambassadorUpload.single('photo')(req, res, (err) => {
+      if (err instanceof multer.MulterError) {
+        return res.status(400).json({ error: 'UPLOAD_ERROR', message: err.code === 'LIMIT_FILE_SIZE' ? 'Fichier trop volumineux (max 5 Mo)' : err.message });
+      }
+      if (err) return res.status(400).json({ error: 'UPLOAD_ERROR', message: err.message });
+      next();
+    });
+  },
+  async (req, res) => {
+    try {
+      const { id } = req.params;
+      const user = await db('users').where({ id }).first();
+      if (!user) return res.status(404).json({ error: 'USER_NOT_FOUND' });
+      if (!req.file) return res.status(400).json({ error: 'NO_FILE', message: 'Aucun fichier envoyé' });
+
+      const ambassador_photo_url = `/uploads/ambassadors/${req.file.filename}`;
+      await db('users').where({ id }).update({ ambassador_photo_url, updated_at: new Date() });
+      res.json({ ambassador_photo_url });
     } catch (err) {
       res.status(500).json({ error: 'SERVER_ERROR', message: err.message });
     }

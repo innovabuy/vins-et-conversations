@@ -182,9 +182,9 @@ router.get(
         .select('products.*', 'campaign_products.custom_price')
         .orderBy('products.sort_order');
 
-      // Filter out alcoholic products for alcohol_free campaigns
+      // Filter out alcoholic products for alcohol_free campaigns (V4.2: use is_alcohol)
       if (campaign.alcohol_free) {
-        productsQuery = productsQuery.where('product_categories.type', '!=', 'wine');
+        productsQuery = productsQuery.where('product_categories.is_alcohol', false);
       }
 
       const products = await productsQuery;

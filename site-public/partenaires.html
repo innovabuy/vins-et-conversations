@@ -110,28 +110,20 @@
         <h2>Nos Ambassadeurs</h2>
         <p>Chez Vins et Conversations nous développons un réseau d'ambassadeurs engagés, disponible sur plusieurs départements de France pour faire déguster nos sélections de vins.</p>
       </div>
-      <div class="ambassadors-list">
-
-        <div class="ambassador-card reveal">
-          <div class="ambassador-info">
-            <h3>Justin Landreau</h3>
-            <p class="ambassador-sectors">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0118 0z"/><circle cx="12" cy="10" r="3"/></svg>
-              Secteurs : Cholet et ses alentours jusqu'à Saumur (49)
-            </p>
+      <!-- Filters -->
+      <div id="ambassadors-filters" style="display:none;margin-bottom:2rem;">
+        <div style="display:flex;flex-wrap:wrap;gap:1rem;align-items:center;justify-content:space-between;">
+          <div style="display:flex;flex-wrap:wrap;gap:0.75rem;align-items:center;">
+            <select id="filter-region" style="padding:0.5rem 1rem;border-radius:8px;border:1px solid #ddd;font-size:0.9rem;font-family:inherit;background:#fff;">
+              <option value="">Toutes les regions</option>
+            </select>
+            <div id="filter-tiers" style="display:flex;gap:0.5rem;flex-wrap:wrap;"></div>
           </div>
+          <p id="ambassadors-count" style="font-size:0.9rem;color:#666;font-weight:500;margin:0;"></p>
         </div>
-
-        <div class="ambassador-card reveal">
-          <div class="ambassador-info">
-            <h3>Alexis Ricard</h3>
-            <p class="ambassador-sectors">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0118 0z"/><circle cx="12" cy="10" r="3"/></svg>
-              Secteurs : Eure (27), Calvados (14), Seine-Maritime (76)
-            </p>
-          </div>
-        </div>
-
+      </div>
+      <div class="ambassadors-list" id="ambassadors-dynamic">
+        <p style="text-align:center;color:#999;">Chargement des ambassadeurs...</p>
       </div>
     </div>
   </section>
@@ -210,5 +202,128 @@
 
   <script src="assets/js/site-images.js?v=1"></script>
   <script src="assets/js/main.js?v=3"></script>
+  <script>
+  (function() {
+    var container = document.getElementById('ambassadors-dynamic');
+    var filtersEl = document.getElementById('ambassadors-filters');
+    var regionSelect = document.getElementById('filter-region');
+    var tiersEl = document.getElementById('filter-tiers');
+    var countEl = document.getElementById('ambassadors-count');
+    if (!container) return;
+
+    var allAmbassadors = [];
+    var activeRegion = '';
+    var activeTier = '';
+    var TIER_COLORS = { Bronze: '#CD7F32', Argent: '#C0C0C0', Or: '#C4A35A', Platine: '#E5E4E2' };
+
+    function escapeHtml(str) { var d = document.createElement('div'); d.textContent = str; return d.innerHTML; }
+
+    function getInitials(name) {
+      return name.split(' ').map(function(w) { return w[0]; }).join('').substring(0, 2).toUpperCase();
+    }
+
+    function renderCards(list) {
+      countEl.textContent = list.length + ' ambassadeur' + (list.length !== 1 ? 's' : '');
+      if (!list.length) {
+        container.innerHTML = '<p style="text-align:center;color:#999;">Aucun ambassadeur ne correspond aux filtres.</p>';
+        return;
+      }
+      container.innerHTML = list.map(function(a) {
+        var photo = a.photo_url
+          ? '<img src="' + escapeHtml(a.photo_url) + '" alt="' + escapeHtml(a.name) + '" style="width:80px;height:80px;border-radius:50%;object-fit:cover;" loading="lazy">'
+          : '<div style="width:80px;height:80px;border-radius:50%;background:#f3e8ea;display:flex;align-items:center;justify-content:center;font-size:1.4rem;font-weight:600;color:#a0616a;">' + getInitials(a.name) + '</div>';
+        var tierColor = a.tier ? (TIER_COLORS[a.tier.label] || a.tier.color) : '';
+        var tier = a.tier ? '<span style="display:inline-block;padding:2px 10px;border-radius:12px;font-size:0.75rem;font-weight:600;background:' + tierColor + '22;color:' + tierColor + ';">' + escapeHtml(a.tier.label) + '</span>' : '';
+        var region = a.region
+          ? '<p class="ambassador-sectors"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0118 0z"/><circle cx="12" cy="10" r="3"/></svg> ' + escapeHtml(a.region) + '</p>'
+          : '';
+        var bio = a.bio ? '<p style="font-size:0.9rem;color:#666;margin-top:0.5rem;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;">' + escapeHtml(a.bio) + '</p>' : '';
+        return '<div class="ambassador-card reveal">'
+          + '<div style="display:flex;align-items:center;gap:1rem;">' + photo
+          + '<div class="ambassador-info"><div style="display:flex;align-items:center;gap:0.5rem;"><h3>' + escapeHtml(a.name) + '</h3>' + tier + '</div>' + region + bio + '</div>'
+          + '</div></div>';
+      }).join('');
+    }
+
+    function applyFilters() {
+      var filtered = allAmbassadors.filter(function(a) {
+        if (activeRegion && String(a.region_id) !== activeRegion) return false;
+        if (activeTier && (!a.tier || a.tier.label !== activeTier)) return false;
+        return true;
+      });
+      renderCards(filtered);
+    }
+
+    function buildTierButtons(tiers) {
+      var allBtn = document.createElement('button');
+      allBtn.textContent = 'Tous';
+      allBtn.className = 'tier-filter-btn active';
+      allBtn.style.cssText = 'padding:6px 14px;border-radius:20px;border:1px solid #ddd;font-size:0.8rem;font-weight:600;cursor:pointer;background:#722F37;color:#fff;font-family:inherit;';
+      allBtn.onclick = function() { activeTier = ''; updateTierBtns(); applyFilters(); };
+      tiersEl.appendChild(allBtn);
+
+      tiers.forEach(function(t) {
+        var btn = document.createElement('button');
+        btn.textContent = t.label;
+        btn.className = 'tier-filter-btn';
+        btn.dataset.tier = t.label;
+        var color = TIER_COLORS[t.label] || t.color;
+        btn.style.cssText = 'padding:6px 14px;border-radius:20px;border:2px solid ' + color + ';font-size:0.8rem;font-weight:600;cursor:pointer;background:#fff;color:' + color + ';font-family:inherit;transition:all 0.2s;';
+        btn.onclick = function() { activeTier = activeTier === t.label ? '' : t.label; updateTierBtns(); applyFilters(); };
+        tiersEl.appendChild(btn);
+      });
+    }
+
+    function updateTierBtns() {
+      var btns = tiersEl.querySelectorAll('button');
+      btns.forEach(function(btn) {
+        var tier = btn.dataset.tier;
+        if (!tier) {
+          // "Tous" button
+          btn.style.background = !activeTier ? '#722F37' : '#fff';
+          btn.style.color = !activeTier ? '#fff' : '#722F37';
+          btn.style.border = '1px solid ' + (!activeTier ? '#722F37' : '#ddd');
+        } else {
+          var color = TIER_COLORS[tier] || '#666';
+          var isActive = activeTier === tier;
+          btn.style.background = isActive ? color : '#fff';
+          btn.style.color = isActive ? '#fff' : color;
+        }
+      });
+    }
+
+    fetch('/api/v1/ambassador/public')
+      .then(function(r) { return r.json(); })
+      .then(function(data) {
+        if (!data.ambassadors || !data.ambassadors.length) {
+          container.innerHTML = '<p style="text-align:center;color:#999;">Aucun ambassadeur pour le moment.</p>';
+          return;
+        }
+        allAmbassadors = data.ambassadors;
+        filtersEl.style.display = 'block';
+
+        // Build region select
+        if (data.filters && data.filters.regions) {
+          data.filters.regions.forEach(function(r) {
+            var opt = document.createElement('option');
+            opt.value = r.id;
+            opt.textContent = r.name;
+            regionSelect.appendChild(opt);
+          });
+        }
+        regionSelect.onchange = function() { activeRegion = this.value; applyFilters(); };
+
+        // Build tier buttons
+        if (data.filters && data.filters.tiers) {
+          buildTierButtons(data.filters.tiers);
+        }
+
+        renderCards(allAmbassadors);
+      })
+      .catch(function() {
+        container.innerHTML = '<p style="text-align:center;color:#999;">Impossible de charger les ambassadeurs.</p>';
+      });
+  })();
+  </script>
 </body>
 </html>

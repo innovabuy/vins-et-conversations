@@ -450,27 +450,6 @@ h1, h2, h3, h4 {
   line-height: 1.6;
 }
 
-.btn-add-cart {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  background: var(--wine);
-  color: var(--white);
-  padding: 10px 20px;
-  border-radius: 8px;
-  text-decoration: none;
-  font-weight: 600;
-  font-size: 0.9rem;
-  margin-top: 16px;
-  transition: background 0.2s, transform 0.2s;
-}
-
-.btn-add-cart:hover {
-  background: var(--wine-dark);
-  transform: translateY(-1px);
-  color: var(--white);
-}
-
 /* ─── Sélection Nicolas (Featured Wines) ──── */
 .selection {
   background: var(--white);

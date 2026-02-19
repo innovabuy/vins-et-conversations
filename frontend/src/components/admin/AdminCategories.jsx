@@ -6,7 +6,7 @@ export default function AdminCategories() {
   const [categories, setCategories] = useState([]);
   const [loading, setLoading] = useState(true);
   const [editing, setEditing] = useState(null);
-  const [form, setForm] = useState({ name: '', description: '', icon: '', color: '#7a1c3b', sort_order: 0, type: 'wine', has_tasting_profile: true, tasting_axes: [] });
+  const [form, setForm] = useState({ name: '', description: '', icon: '', icon_emoji: '', color: '#7a1c3b', sort_order: 0, type: 'wine', product_type: 'wine', is_alcohol: true, has_tasting_profile: true, tasting_axes: [] });
   const [saving, setSaving] = useState(false);
   const [axeInput, setAxeInput] = useState('');
 
@@ -21,14 +21,19 @@ export default function AdminCategories() {
   useEffect(() => { fetchCategories(); }, [fetchCategories]);
 
   const openNew = () => {
-    setForm({ name: '', description: '', icon: '', color: '#7a1c3b', sort_order: categories.length + 1, type: 'wine', has_tasting_profile: true, tasting_axes: [] });
+    setForm({ name: '', description: '', icon: '', icon_emoji: '', color: '#7a1c3b', sort_order: categories.length + 1, type: 'wine', product_type: 'wine', is_alcohol: true, has_tasting_profile: true, tasting_axes: [] });
     setAxeInput('');
     setEditing('new');
   };
 
   const openEdit = (cat) => {
     const axes = typeof cat.tasting_axes === 'string' ? JSON.parse(cat.tasting_axes) : (cat.tasting_axes || []);
-    setForm({ name: cat.name, description: cat.description || '', icon: cat.icon || '', color: cat.color || '#7a1c3b', sort_order: cat.sort_order, type: cat.type || 'wine', has_tasting_profile: cat.has_tasting_profile ?? true, tasting_axes: axes });
+    setForm({
+      name: cat.name, description: cat.description || '', icon: cat.icon || '', icon_emoji: cat.icon_emoji || '',
+      color: cat.color || '#7a1c3b', sort_order: cat.sort_order, type: cat.type || 'wine',
+      product_type: cat.product_type || 'wine', is_alcohol: cat.is_alcohol ?? true,
+      has_tasting_profile: cat.has_tasting_profile ?? true, tasting_axes: axes,
+    });
     setAxeInput('');
     setEditing(cat.id);
   };
@@ -116,7 +121,7 @@ export default function AdminCategories() {
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block text-xs font-medium text-gray-500 mb-1">Icône (emoji)</label>
-                  <input type="text" value={form.icon} onChange={e => setForm(f => ({ ...f, icon: e.target.value }))} className="w-full border rounded-lg px-3 py-2 text-sm text-xl" maxLength={4} placeholder="🍷" />
+                  <input type="text" value={form.icon_emoji || form.icon} onChange={e => setForm(f => ({ ...f, icon_emoji: e.target.value, icon: e.target.value }))} className="w-full border rounded-lg px-3 py-2 text-sm text-xl" maxLength={4} placeholder="🍷" />
                 </div>
                 <div>
                   <label className="block text-xs font-medium text-gray-500 mb-1">Couleur</label>
@@ -128,14 +133,26 @@ export default function AdminCategories() {
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-xs font-medium text-gray-500 mb-1">Type</label>
-                  <select value={form.type} onChange={e => setForm(f => ({ ...f, type: e.target.value, has_tasting_profile: e.target.value === 'wine' }))} className="w-full border rounded-lg px-3 py-2 text-sm">
+                  <label className="block text-xs font-medium text-gray-500 mb-1">Type de produit</label>
+                  <select value={form.product_type} onChange={e => {
+                    const pt = e.target.value;
+                    const isAlc = !['food', 'beverage', 'other'].includes(pt);
+                    const typeMap = { wine: 'wine', sparkling: 'wine', food: 'non_alcoholic', beverage: 'non_alcoholic', gift_set: 'bundle', other: 'non_alcoholic' };
+                    setForm(f => ({ ...f, product_type: pt, is_alcohol: isAlc, type: typeMap[pt] || 'wine', has_tasting_profile: ['wine', 'sparkling'].includes(pt) }));
+                  }} className="w-full border rounded-lg px-3 py-2 text-sm">
                     <option value="wine">Vin</option>
-                    <option value="non_alcoholic">Sans alcool</option>
-                    <option value="bundle">Coffret</option>
+                    <option value="sparkling">Effervescent</option>
+                    <option value="food">Alimentaire</option>
+                    <option value="beverage">Boisson sans alcool</option>
+                    <option value="gift_set">Coffret</option>
+                    <option value="other">Autre</option>
                   </select>
                 </div>
-                <div className="flex items-end">
+                <div className="space-y-2">
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input type="checkbox" checked={form.is_alcohol} onChange={e => setForm(f => ({ ...f, is_alcohol: e.target.checked }))} className="rounded text-wine-700" />
+                    <span className="text-sm">Contient de l'alcool</span>
+                  </label>
                   <label className="flex items-center gap-2 cursor-pointer">
                     <input type="checkbox" checked={form.has_tasting_profile} onChange={e => setForm(f => ({ ...f, has_tasting_profile: e.target.checked }))} className="rounded text-wine-700" />
                     <span className="text-sm">Profil de degustation</span>
@@ -184,14 +201,22 @@ export default function AdminCategories() {
                   <button onClick={() => moveCategory(idx, -1)} disabled={idx === 0} className="text-gray-400 hover:text-gray-600 disabled:opacity-30"><ArrowUp size={14} /></button>
                   <button onClick={() => moveCategory(idx, 1)} disabled={idx === categories.length - 1} className="text-gray-400 hover:text-gray-600 disabled:opacity-30"><ArrowDown size={14} /></button>
                 </div>
-                <span className="text-2xl w-8 text-center">{cat.icon || '📦'}</span>
+                <span className="text-2xl w-8 text-center">{cat.icon_emoji || cat.icon || '📦'}</span>
                 <div className="w-4 h-4 rounded-full flex-shrink-0" style={{ backgroundColor: cat.color || '#999' }} />
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2">
                     <p className="font-medium text-sm">{cat.name}</p>
-                    <span className={`text-[10px] px-1.5 py-0.5 rounded-full ${cat.type === 'wine' ? 'bg-purple-100 text-purple-700' : cat.type === 'bundle' ? 'bg-amber-100 text-amber-700' : 'bg-green-100 text-green-700'}`}>
-                      {cat.type === 'wine' ? 'Vin' : cat.type === 'bundle' ? 'Coffret' : 'Sans alcool'}
+                    <span className={`text-[10px] px-1.5 py-0.5 rounded-full ${
+                      cat.product_type === 'wine' ? 'bg-purple-100 text-purple-700' :
+                      cat.product_type === 'sparkling' ? 'bg-pink-100 text-pink-700' :
+                      cat.product_type === 'gift_set' ? 'bg-amber-100 text-amber-700' :
+                      cat.product_type === 'food' ? 'bg-orange-100 text-orange-700' :
+                      cat.product_type === 'beverage' ? 'bg-green-100 text-green-700' :
+                      'bg-gray-100 text-gray-700'
+                    }`}>
+                      {{ wine: 'Vin', sparkling: 'Effervescent', food: 'Alimentaire', beverage: 'Boisson', gift_set: 'Coffret', other: 'Autre' }[cat.product_type] || cat.product_type || 'Vin'}
                     </span>
+                    {cat.is_alcohol === false && <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-green-100 text-green-700">Sans alcool</span>}
                   </div>
                   {cat.description && <p className="text-xs text-gray-400 truncate">{cat.description}</p>}
                 </div>

@@ -64,8 +64,8 @@ describe('Backorder / Pré-commande', () => {
   });
 
   test('backorder product can be ordered even with 0 stock', async () => {
-    // Find a product and set allow_backorder=true
-    const product = await db('products').where({ active: true }).first();
+    // Find a visible boutique product and set allow_backorder=true
+    const product = await db('products').where({ active: true, visible_boutique: true }).first();
     await db('products').where({ id: product.id }).update({ allow_backorder: true });
 
     // Ensure stock is 0 by checking current stock and adjusting
@@ -120,7 +120,7 @@ describe('Backorder / Pré-commande', () => {
   });
 
   test('product without allow_backorder still blocked when stock=0', async () => {
-    const product = await db('products').where({ active: true, allow_backorder: false }).first();
+    const product = await db('products').where({ active: true, visible_boutique: true, allow_backorder: false }).first();
 
     // Drain stock
     const stockRow = await db('stock_movements')

@@ -1,4 +1,6 @@
 const express = require('express');
+const path = require('path');
+const multer = require('multer');
 const Joi = require('joi');
 const crypto = require('crypto');
 const bcrypt = require('bcryptjs');
@@ -10,6 +12,25 @@ const emailService = require('../services/emailService');
 const logger = require('../utils/logger');
 
 const BASE_URL = process.env.BASE_URL || process.env.FRONTEND_URL || '';
+
+// Multer for ambassador self-upload
+const ambassadorStorage = multer.diskStorage({
+  destination: path.join(__dirname, '../../uploads/ambassadors'),
+  filename: (req, file, cb) => {
+    const ext = path.extname(file.originalname).toLowerCase() || '.jpg';
+    cb(null, req.user.userId + ext);
+  },
+});
+const ambassadorUpload = multer({
+  storage: ambassadorStorage,
+  limits: { fileSize: 5 * 1024 * 1024 },
+  fileFilter: (req, file, cb) => {
+    const allowed = ['.jpg', '.jpeg', '.png', '.webp'];
+    const ext = path.extname(file.originalname).toLowerCase();
+    if (allowed.includes(ext)) return cb(null, true);
+    cb(new Error('Format non supporté. Utilisez JPG, PNG ou WebP.'));
+  },
+});
 
 const router = express.Router();
 
@@ -249,19 +270,58 @@ router.post('/reset-password', validate(resetSchema), async (req, res) => {
   }
 });
 
+// PUT /auth/profile/photo — upload ambassador own photo
+router.put(
+  '/profile/photo',
+  authenticate,
+  (req, res, next) => {
+    ambassadorUpload.single('photo')(req, res, (err) => {
+      if (err instanceof multer.MulterError) {
+        return res.status(400).json({ error: 'UPLOAD_ERROR', message: err.code === 'LIMIT_FILE_SIZE' ? 'Fichier trop volumineux (max 5 Mo)' : err.message });
+      }
+      if (err) return res.status(400).json({ error: 'UPLOAD_ERROR', message: err.message });
+      next();
+    });
+  },
+  async (req, res) => {
+    try {
+      const user = await db('users').where({ id: req.user.userId }).first();
+      if (!user || user.role !== 'ambassadeur') return res.status(403).json({ error: 'FORBIDDEN' });
+      if (!req.file) return res.status(400).json({ error: 'NO_FILE', message: 'Aucun fichier envoyé' });
+
+      const ambassador_photo_url = `/uploads/ambassadors/${req.file.filename}`;
+      await db('users').where({ id: req.user.userId }).update({ ambassador_photo_url, updated_at: new Date() });
+      res.json({ ambassador_photo_url });
+    } catch (err) {
+      logger.error(`Photo upload error: ${err.message}`);
+      res.status(500).json({ error: 'SERVER_ERROR' });
+    }
+  }
+);
+
 // PUT /auth/profile — update own name/phone
 router.put('/profile', authenticate, async (req, res) => {
   try {
-    const { name, phone } = req.body;
+    const { name, phone, ambassador_photo_url, ambassador_bio, region_id } = req.body;
     const updates = {};
     if (name) updates.name = name.trim();
     if (phone !== undefined) updates.phone = phone.trim() || null;
+    // Ambassador-specific fields (only for ambassadeur role)
+    const currentUser = await db('users').where({ id: req.user.userId }).first();
+    if (currentUser.role === 'ambassadeur') {
+      if (ambassador_photo_url !== undefined) updates.ambassador_photo_url = ambassador_photo_url || null;
+      if (ambassador_bio !== undefined) updates.ambassador_bio = ambassador_bio || null;
+      if (region_id !== undefined) updates.region_id = region_id || null;
+    }
     if (Object.keys(updates).length === 0) {
       return res.status(400).json({ error: 'NO_FIELDS' });
     }
     await db('users').where({ id: req.user.userId }).update(updates);
     const user = await db('users').where({ id: req.user.userId }).first();
-    res.json({ id: user.id, name: user.name, email: user.email, phone: user.phone, role: user.role });
+    res.json({
+      id: user.id, name: user.name, email: user.email, phone: user.phone, role: user.role,
+      ambassador_photo_url: user.ambassador_photo_url, ambassador_bio: user.ambassador_bio, region_id: user.region_id,
+    });
   } catch (err) {
     logger.error(`Profile update error: ${err.message}`);
     res.status(500).json({ error: 'SERVER_ERROR' });

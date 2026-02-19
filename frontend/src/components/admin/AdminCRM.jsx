@@ -227,9 +227,10 @@ function ContactFormModal({ contact, onClose, onSaved }) {
     if (!form.name.trim()) { setError('Le nom est obligatoire.'); return; }
     setSaving(true); setError('');
     try {
-      if (isEdit) await contactsAPI.update(contact.id, form);
-      else await contactsAPI.create(form);
-      onSaved();
+      let result;
+      if (isEdit) result = await contactsAPI.update(contact.id, form);
+      else result = await contactsAPI.create(form);
+      onSaved(result?.data || form);
     } catch (err) {
       setError(err.response?.data?.message || 'Erreur lors de la sauvegarde.');
     } finally { setSaving(false); }
@@ -378,12 +379,23 @@ export default function AdminCRM() {
   const clearSearch = () => { setSearchQuery(''); setIsSearching(false); if (debounceRef.current) clearTimeout(debounceRef.current); };
   const openCreate = () => { setEditContact(null); setShowForm(true); };
   const openEdit = (contact, e) => { e.stopPropagation(); setEditContact(contact); setShowForm(true); };
-  const handleFormSaved = () => {
+  const handleFormSaved = (savedContact) => {
+    const wasEdit = !!editContact;
+    const previousId = editContact?.id;
     setShowForm(false); setEditContact(null);
+
+    // Update selected panel if showing this contact
+    if (wasEdit && previousId && selectedContact?.id === previousId && savedContact) {
+      setSelectedContact(prev => prev ? { ...prev, ...savedContact } : prev);
+    }
+
+    // Refetch with current filters and pagination (never reset)
     if (isSearching && searchQuery.trim()) {
       setLoading(true);
       contactsAPI.search(searchQuery).then(res => { setContacts(res.data.data || res.data); setPagination({ page: 1, pages: 1, total: (res.data.data || res.data).length }); }).catch(console.error).finally(() => setLoading(false));
-    } else fetchContacts();
+    } else {
+      fetchContacts();
+    }
   };
 
   return (

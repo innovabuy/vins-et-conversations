@@ -83,6 +83,8 @@ router.get('/', cacheMiddleware(60), async (req, res) => {
         'product_categories.id as cat_id', 'product_categories.name as cat_name',
         'product_categories.slug as cat_slug', 'product_categories.icon as cat_icon',
         'product_categories.color as cat_color', 'product_categories.type as cat_type',
+        'product_categories.product_type as cat_product_type', 'product_categories.is_alcohol as cat_is_alcohol',
+        'product_categories.icon_emoji as cat_icon_emoji',
         'product_categories.has_tasting_profile as cat_has_tasting',
         'product_categories.tasting_axes as cat_tasting_axes');
     if (req.query.color) query.where('products.color', req.query.color);
@@ -95,8 +97,14 @@ router.get('/', cacheMiddleware(60), async (req, res) => {
       data: products.map(p => ({
         ...p,
         category_name: p.cat_name || p.category,
-        category_details: p.cat_id ? { id: p.cat_id, name: p.cat_name, slug: p.cat_slug, icon: p.cat_icon, color: p.cat_color, type: p.cat_type, has_tasting_profile: p.cat_has_tasting, tasting_axes: p.cat_tasting_axes } : null,
-        cat_id: undefined, cat_name: undefined, cat_slug: undefined, cat_icon: undefined, cat_color: undefined, cat_type: undefined, cat_has_tasting: undefined, cat_tasting_axes: undefined,
+        category_details: p.cat_id ? {
+          id: p.cat_id, name: p.cat_name, slug: p.cat_slug,
+          icon: p.cat_icon_emoji || p.cat_icon, color: p.cat_color,
+          type: p.cat_type, product_type: p.cat_product_type, is_alcohol: p.cat_is_alcohol, icon_emoji: p.cat_icon_emoji,
+          has_tasting_profile: p.cat_has_tasting, tasting_axes: p.cat_tasting_axes,
+        } : null,
+        cat_id: undefined, cat_name: undefined, cat_slug: undefined, cat_icon: undefined, cat_color: undefined, cat_type: undefined,
+        cat_product_type: undefined, cat_is_alcohol: undefined, cat_icon_emoji: undefined, cat_has_tasting: undefined, cat_tasting_axes: undefined,
       })),
     });
   } catch (err) {
@@ -133,12 +141,14 @@ campaignProductsRouter.get(
         .where('campaign_products.active', true)
         .select('products.*', 'campaign_products.custom_price', 'campaign_products.sort_order as campaign_sort',
           'product_categories.name as category_name', 'product_categories.type as category_type',
+          'product_categories.product_type as category_product_type', 'product_categories.is_alcohol as category_is_alcohol',
+          'product_categories.icon_emoji as category_icon_emoji',
           'product_categories.tasting_axes as category_tasting_axes',
           'product_categories.has_tasting_profile as category_has_tasting');
 
-      // Filter out alcoholic products for alcohol_free campaigns
+      // Filter out alcoholic products for alcohol_free campaigns (V4.2: use is_alcohol)
       if (campaign && campaign.alcohol_free) {
-        query = query.where('product_categories.type', '!=', 'wine');
+        query = query.where('product_categories.is_alcohol', false);
       }
 
       if (req.query.category_id) query = query.where('products.category_id', req.query.category_id);

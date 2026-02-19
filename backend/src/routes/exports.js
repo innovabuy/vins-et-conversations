@@ -3,6 +3,7 @@ const { stringify } = require('csv-stringify/sync');
 const PDFDocument = require('pdfkit');
 const db = require('../config/database');
 const { authenticate, requireRole } = require('../middleware/auth');
+const { getAppBranding } = require('../utils/appBranding');
 
 const router = express.Router();
 
@@ -14,9 +15,11 @@ router.get('/pennylane', async (req, res) => {
   try {
     const { start, end } = req.query;
     let query = db('orders')
-      .join('users', 'orders.user_id', 'users.id')
+      .leftJoin('users', 'orders.user_id', 'users.id')
+      .leftJoin('contacts', 'orders.customer_id', 'contacts.id')
       .whereIn('orders.status', ['validated', 'preparing', 'shipped', 'delivered'])
-      .select('orders.ref', 'orders.created_at', 'orders.total_ht', 'orders.total_ttc', 'users.name as client');
+      .select('orders.ref', 'orders.created_at', 'orders.total_ht', 'orders.total_ttc',
+        db.raw("COALESCE(users.name, contacts.name, 'Boutique Web') as client"));
 
     if (start) query = query.where('orders.created_at', '>=', start);
     if (end) query = query.where('orders.created_at', '<=', end);
@@ -58,10 +61,13 @@ router.get('/sales-journal', async (req, res) => {
     let query = db('order_items')
       .join('orders', 'order_items.order_id', 'orders.id')
       .join('products', 'order_items.product_id', 'products.id')
-      .join('users', 'orders.user_id', 'users.id')
+      .leftJoin('users', 'orders.user_id', 'users.id')
+      .leftJoin('contacts', 'orders.customer_id', 'contacts.id')
       .whereIn('orders.status', ['validated', 'preparing', 'shipped', 'delivered'])
+      .where('order_items.type', 'product')
       .select(
-        'orders.ref', 'orders.created_at', 'users.name as client',
+        'orders.ref', 'orders.created_at',
+        db.raw("COALESCE(users.name, contacts.name, 'Boutique Web') as client"),
         'order_items.qty', 'order_items.unit_price_ht', 'order_items.unit_price_ttc',
         'products.tva_rate'
       );
@@ -177,16 +183,21 @@ router.get('/stock', async (req, res) => {
   try {
     const stockData = await db.raw(`
       SELECT p.name as product, p.purchase_price,
+        COALESCE(pc.name, 'Sans catégorie') as category,
+        COALESCE(pc.product_type, 'other') as product_type,
         COALESCE(SUM(CASE WHEN sm.type IN ('initial','entry','return') THEN sm.qty ELSE -sm.qty END), 0) as qty
       FROM products p
+      LEFT JOIN product_categories pc ON p.category_id = pc.id
       LEFT JOIN stock_movements sm ON p.id = sm.product_id
       WHERE p.active = true
-      GROUP BY p.id, p.name, p.purchase_price
-      ORDER BY p.name
+      GROUP BY p.id, p.name, p.purchase_price, pc.name, pc.product_type
+      ORDER BY pc.name, p.name
     `);
 
     const rows = stockData.rows.map((r) => ({
+      category: r.category,
       product: r.product,
+      type: r.product_type,
       qty: r.qty,
       purchase_price: parseFloat(r.purchase_price).toFixed(2),
       valorization: (r.qty * parseFloat(r.purchase_price)).toFixed(2),
@@ -194,7 +205,7 @@ router.get('/stock', async (req, res) => {
 
     const csv = '\uFEFF' + stringify(rows, {
       header: true,
-      columns: ['product', 'qty', 'purchase_price', 'valorization'],
+      columns: ['category', 'product', 'type', 'qty', 'purchase_price', 'valorization'],
     });
 
     res.setHeader('Content-Type', 'text/csv; charset=utf-8');
@@ -211,10 +222,12 @@ router.get('/delivery-notes', async (req, res) => {
     const { start, end } = req.query;
     let query = db('delivery_notes')
       .join('orders', 'delivery_notes.order_id', 'orders.id')
-      .join('users', 'orders.user_id', 'users.id')
+      .leftJoin('users', 'orders.user_id', 'users.id')
+      .leftJoin('contacts', 'orders.customer_id', 'contacts.id')
       .select(
         'delivery_notes.*', 'orders.ref as order_ref',
-        'orders.total_ttc', 'users.name as user_name'
+        'orders.total_ttc',
+        db.raw("COALESCE(users.name, contacts.name, 'Boutique Web') as user_name")
       );
 
     if (start) query = query.where('delivery_notes.created_at', '>=', start);
@@ -227,8 +240,9 @@ router.get('/delivery-notes', async (req, res) => {
     res.setHeader('Content-Disposition', 'attachment; filename=bons-livraison.pdf');
     doc.pipe(res);
 
+    const brandingBL = await getAppBranding();
     doc.fontSize(18).text('Bons de Livraison', { align: 'center' });
-    doc.fontSize(10).text(`Vins & Conversations — Export du ${new Date().toLocaleDateString('fr-FR')}`, { align: 'center' });
+    doc.fontSize(10).text(`${brandingBL.app_name} — Export du ${new Date().toLocaleDateString('fr-FR')}`, { align: 'center' });
     doc.moveDown();
 
     for (const note of notes) {
@@ -277,17 +291,61 @@ router.get('/activity-report', async (req, res) => {
     const caTTC = parseFloat(stats?.ca_ttc || 0);
     const totalOrders = parseInt(stats?.total_orders || 0, 10);
 
-    // Margin
-    const marginResult = await db.raw(`
-      SELECT COALESCE(SUM(oi.qty * (oi.unit_price_ht - p.purchase_price)), 0) as marge
-      FROM order_items oi
-      JOIN products p ON oi.product_id = p.id
-      JOIN orders o ON oi.order_id = o.id
-      WHERE o.status IN ('validated', 'preparing', 'shipped', 'delivered')
-      ${start ? `AND o.created_at >= '${start}'` : ''}
-      ${end ? `AND o.created_at <= '${end}'` : ''}
-    `);
-    const marge = parseFloat(marginResult.rows?.[0]?.marge || 0);
+    // Margin (parameterized query — no SQL injection)
+    let marginQuery = db('order_items as oi')
+      .join('products as p', 'oi.product_id', 'p.id')
+      .join('orders as o', 'oi.order_id', 'o.id')
+      .whereIn('o.status', ['validated', 'preparing', 'shipped', 'delivered'])
+      .where('oi.type', 'product');
+    if (start) marginQuery = marginQuery.where('o.created_at', '>=', start);
+    if (end) marginQuery = marginQuery.where('o.created_at', '<=', end);
+
+    const marginResult = await marginQuery
+      .select(db.raw('COALESCE(SUM(oi.qty * (oi.unit_price_ht - p.purchase_price)), 0) as marge_brute'));
+    const margeBrute = parseFloat(marginResult[0]?.marge_brute || 0);
+
+    // Free bottle cost deduction (V4.2)
+    let freeBottleQuery = db('order_items as oi')
+      .join('orders as o', 'oi.order_id', 'o.id')
+      .join('products as p', 'oi.product_id', 'p.id')
+      .leftJoin('product_categories as pc', 'p.category_id', 'pc.id')
+      .join('campaigns as camp', 'o.campaign_id', 'camp.id')
+      .join('client_types as ct', 'camp.client_type_id', 'ct.id')
+      .whereIn('o.status', ['validated', 'preparing', 'shipped', 'delivered'])
+      .where('oi.type', 'product')
+      .whereRaw("COALESCE(pc.is_alcohol, true) = true")
+      .whereRaw("ct.free_bottle_rules IS NOT NULL AND ct.free_bottle_rules::text != '{}'");
+    if (start) freeBottleQuery = freeBottleQuery.where('o.created_at', '>=', start);
+    if (end) freeBottleQuery = freeBottleQuery.where('o.created_at', '<=', end);
+
+    const freeBottleResult = await freeBottleQuery.select(
+      db.raw(`COALESCE(SUM(
+        FLOOR(oi.qty::numeric / COALESCE((ct.free_bottle_rules->>'n')::numeric, 12))
+        * p.purchase_price
+      ), 0) as free_bottle_cost`)
+    );
+    const freeBottleCost = parseFloat(freeBottleResult[0]?.free_bottle_cost || 0);
+
+    // Commission totale
+    let commQuery = db('orders')
+      .join('campaigns', 'orders.campaign_id', 'campaigns.id')
+      .join('client_types', 'campaigns.client_type_id', 'client_types.id')
+      .whereIn('orders.status', ['validated', 'preparing', 'shipped', 'delivered']);
+    if (start) commQuery = commQuery.where('orders.created_at', '>=', start);
+    if (end) commQuery = commQuery.where('orders.created_at', '<=', end);
+
+    const commResult = await commQuery.select(
+      db.raw(`COALESCE(SUM(
+        orders.total_ht * COALESCE(
+          (campaigns.config->>'fund_collective_pct')::numeric,
+          (client_types.commission_rules->'fund_collective'->>'value')::numeric,
+          (client_types.commission_rules->'association'->>'value')::numeric,
+          0
+        ) / 100
+      ), 0) as commission`)
+    );
+    const commission = parseFloat(commResult[0]?.commission || 0);
+    const margeNette = margeBrute - freeBottleCost - commission;
 
     // Top products
     let topQuery = db('order_items')
@@ -303,10 +361,11 @@ router.get('/activity-report', async (req, res) => {
       .orderBy('qty', 'desc')
       .limit(5);
 
-    // Top sellers
+    // Top sellers (only user-linked orders, not boutique)
     let sellerQuery = db('orders')
       .join('users', 'orders.user_id', 'users.id')
-      .whereIn('orders.status', ['validated', 'preparing', 'shipped', 'delivered']);
+      .whereIn('orders.status', ['validated', 'preparing', 'shipped', 'delivered'])
+      .whereNotNull('orders.user_id');
     if (start) sellerQuery = sellerQuery.where('orders.created_at', '>=', start);
     if (end) sellerQuery = sellerQuery.where('orders.created_at', '<=', end);
 
@@ -322,8 +381,9 @@ router.get('/activity-report', async (req, res) => {
     res.setHeader('Content-Disposition', 'attachment; filename=rapport-activite.pdf');
     doc.pipe(res);
 
+    const brandingAR = await getAppBranding();
     doc.fontSize(20).text('Rapport d\'Activité', { align: 'center' });
-    doc.fontSize(10).text(`Vins & Conversations — ${new Date().toLocaleDateString('fr-FR')}`, { align: 'center' });
+    doc.fontSize(10).text(`${brandingAR.app_name} — ${new Date().toLocaleDateString('fr-FR')}`, { align: 'center' });
     if (start || end) {
       doc.text(`Période: ${start || '...'} — ${end || '...'}`, { align: 'center' });
     }
@@ -335,7 +395,10 @@ router.get('/activity-report', async (req, res) => {
     doc.fontSize(10).font('Helvetica');
     doc.text(`CA TTC: ${caTTC.toFixed(2)} EUR`);
     doc.text(`CA HT: ${caHT.toFixed(2)} EUR`);
-    doc.text(`Marge: ${marge.toFixed(2)} EUR (${caHT > 0 ? ((marge / caHT) * 100).toFixed(1) : 0}%)`);
+    doc.text(`Marge brute: ${margeBrute.toFixed(2)} EUR (${caHT > 0 ? ((margeBrute / caHT) * 100).toFixed(1) : 0}%)`);
+    doc.text(`Coût gratuités: -${freeBottleCost.toFixed(2)} EUR`);
+    doc.text(`Commission: -${commission.toFixed(2)} EUR`);
+    doc.text(`Marge nette: ${margeNette.toFixed(2)} EUR (${caHT > 0 ? ((margeNette / caHT) * 100).toFixed(1) : 0}%)`);
     doc.text(`Commandes: ${totalOrders}`);
     doc.moveDown();
 
@@ -357,6 +420,169 @@ router.get('/activity-report', async (req, res) => {
     }
 
     doc.end();
+  } catch (err) {
+    res.status(500).json({ error: 'SERVER_ERROR', message: err.message });
+  }
+});
+
+// 7. GET /api/v1/admin/exports/campaign-sales?campaign_id — Ventes par campagne CSV
+router.get('/campaign-sales', async (req, res) => {
+  try {
+    const { campaign_id, start, end } = req.query;
+    if (!campaign_id) return res.status(400).json({ error: 'MISSING_CAMPAIGN_ID' });
+
+    let query = db('order_items')
+      .join('orders', 'order_items.order_id', 'orders.id')
+      .join('products', 'order_items.product_id', 'products.id')
+      .leftJoin('users', 'orders.user_id', 'users.id')
+      .leftJoin('contacts', 'orders.customer_id', 'contacts.id')
+      .leftJoin('product_categories as pc', 'products.category_id', 'pc.id')
+      .where('orders.campaign_id', campaign_id)
+      .whereIn('orders.status', ['validated', 'preparing', 'shipped', 'delivered'])
+      .where('order_items.type', 'product');
+    if (start) query = query.where('orders.created_at', '>=', start);
+    if (end) query = query.where('orders.created_at', '<=', end);
+
+    const items = await query.select(
+      db.raw("COALESCE(users.name, contacts.name, 'Boutique Web') as vendeur"),
+      'products.name as produit',
+      'pc.name as categorie',
+      'order_items.qty',
+      'order_items.unit_price_ht',
+      'order_items.unit_price_ttc',
+      'products.purchase_price',
+      'orders.ref',
+      'orders.created_at'
+    ).orderBy('orders.created_at');
+
+    const rows = items.map((i) => ({
+      date: new Date(i.created_at).toLocaleDateString('fr-FR'),
+      ref: i.ref,
+      vendeur: i.vendeur,
+      categorie: i.categorie || '',
+      produit: i.produit,
+      qty: i.qty,
+      prix_ht: parseFloat(i.unit_price_ht).toFixed(2),
+      prix_ttc: parseFloat(i.unit_price_ttc).toFixed(2),
+      ca_ht: (parseFloat(i.unit_price_ht) * i.qty).toFixed(2),
+      ca_ttc: (parseFloat(i.unit_price_ttc) * i.qty).toFixed(2),
+      cout: (parseFloat(i.purchase_price) * i.qty).toFixed(2),
+      marge: ((parseFloat(i.unit_price_ht) - parseFloat(i.purchase_price)) * i.qty).toFixed(2),
+    }));
+
+    const csv = '\uFEFF' + stringify(rows, {
+      header: true,
+      columns: ['date', 'ref', 'vendeur', 'categorie', 'produit', 'qty', 'prix_ht', 'prix_ttc', 'ca_ht', 'ca_ttc', 'cout', 'marge'],
+    });
+
+    res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+    res.setHeader('Content-Disposition', 'attachment; filename=ventes-campagne.csv');
+    res.send(csv);
+  } catch (err) {
+    res.status(500).json({ error: 'SERVER_ERROR', message: err.message });
+  }
+});
+
+// 8. GET /api/v1/admin/exports/seller-detail?campaign_id — Excel par vendeur avec détail références
+router.get('/seller-detail', async (req, res) => {
+  try {
+    const ExcelJS = require('exceljs');
+    const { campaign_id, start, end } = req.query;
+
+    let query = db('order_items')
+      .join('orders', 'order_items.order_id', 'orders.id')
+      .join('products', 'order_items.product_id', 'products.id')
+      .leftJoin('users', 'orders.user_id', 'users.id')
+      .leftJoin('contacts', 'orders.customer_id', 'contacts.id')
+      .whereIn('orders.status', ['validated', 'preparing', 'shipped', 'delivered'])
+      .where('order_items.type', 'product');
+    if (campaign_id) query = query.where('orders.campaign_id', campaign_id);
+    if (start) query = query.where('orders.created_at', '>=', start);
+    if (end) query = query.where('orders.created_at', '<=', end);
+
+    const items = await query.select(
+      db.raw("COALESCE(users.name, contacts.name, 'Boutique Web') as vendeur"),
+      'users.email as vendeur_email',
+      'products.name as produit',
+      'products.id as product_id',
+      'order_items.qty',
+      'order_items.unit_price_ht',
+      'order_items.unit_price_ttc',
+      'products.purchase_price',
+      'orders.ref',
+      'orders.created_at'
+    ).orderBy([{ column: 'vendeur' }, { column: 'orders.created_at' }]);
+
+    // Group by seller
+    const sellers = {};
+    for (const item of items) {
+      const key = item.vendeur;
+      if (!sellers[key]) sellers[key] = { email: item.vendeur_email || '', items: [] };
+      sellers[key].items.push(item);
+    }
+
+    const workbook = new ExcelJS.Workbook();
+    workbook.creator = 'Vins & Conversations';
+
+    // Summary sheet
+    const summary = workbook.addWorksheet('Récapitulatif');
+    summary.columns = [
+      { header: 'Vendeur', key: 'vendeur', width: 25 },
+      { header: 'Email', key: 'email', width: 30 },
+      { header: 'Commandes', key: 'orders', width: 12 },
+      { header: 'Bouteilles', key: 'qty', width: 12 },
+      { header: 'CA HT', key: 'ca_ht', width: 14 },
+      { header: 'CA TTC', key: 'ca_ttc', width: 14 },
+      { header: 'Marge', key: 'marge', width: 14 },
+    ];
+    summary.getRow(1).font = { bold: true };
+
+    for (const [name, data] of Object.entries(sellers)) {
+      const uniqueOrders = new Set(data.items.map(i => i.ref)).size;
+      const totalQty = data.items.reduce((s, i) => s + i.qty, 0);
+      const totalHT = data.items.reduce((s, i) => s + parseFloat(i.unit_price_ht) * i.qty, 0);
+      const totalTTC = data.items.reduce((s, i) => s + parseFloat(i.unit_price_ttc) * i.qty, 0);
+      const totalMarge = data.items.reduce((s, i) => s + (parseFloat(i.unit_price_ht) - parseFloat(i.purchase_price)) * i.qty, 0);
+      summary.addRow({
+        vendeur: name, email: data.email, orders: uniqueOrders,
+        qty: totalQty, ca_ht: parseFloat(totalHT.toFixed(2)),
+        ca_ttc: parseFloat(totalTTC.toFixed(2)), marge: parseFloat(totalMarge.toFixed(2)),
+      });
+    }
+
+    // Detail sheet
+    const detail = workbook.addWorksheet('Détail');
+    detail.columns = [
+      { header: 'Vendeur', key: 'vendeur', width: 25 },
+      { header: 'Date', key: 'date', width: 12 },
+      { header: 'Ref', key: 'ref', width: 15 },
+      { header: 'Produit', key: 'produit', width: 30 },
+      { header: 'Qté', key: 'qty', width: 8 },
+      { header: 'PU HT', key: 'pu_ht', width: 12 },
+      { header: 'PU TTC', key: 'pu_ttc', width: 12 },
+      { header: 'CA HT', key: 'ca_ht', width: 14 },
+      { header: 'Marge', key: 'marge', width: 14 },
+    ];
+    detail.getRow(1).font = { bold: true };
+
+    for (const item of items) {
+      detail.addRow({
+        vendeur: item.vendeur,
+        date: new Date(item.created_at).toLocaleDateString('fr-FR'),
+        ref: item.ref,
+        produit: item.produit,
+        qty: item.qty,
+        pu_ht: parseFloat(parseFloat(item.unit_price_ht).toFixed(2)),
+        pu_ttc: parseFloat(parseFloat(item.unit_price_ttc).toFixed(2)),
+        ca_ht: parseFloat((parseFloat(item.unit_price_ht) * item.qty).toFixed(2)),
+        marge: parseFloat(((parseFloat(item.unit_price_ht) - parseFloat(item.purchase_price)) * item.qty).toFixed(2)),
+      });
+    }
+
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.setHeader('Content-Disposition', 'attachment; filename=detail-vendeurs.xlsx');
+    await workbook.xlsx.write(res);
+    res.end();
   } catch (err) {
     res.status(500).json({ error: 'SERVER_ERROR', message: err.message });
   }

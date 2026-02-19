@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import { Wine, ShoppingCart, Check, ArrowRight, ArrowLeft, Sparkles, Eye } from 'lucide-react';
 import api from '../../services/api';
 import { useCart } from '../../contexts/CartContext';
-import ProductModal from './ProductModal';
+import ProductModal from '../shared/ProductModal';
 
 const formatEur = (v) => new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR' }).format(v);
 

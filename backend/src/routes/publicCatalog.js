@@ -6,6 +6,7 @@ const emailService = require('../services/emailService');
 const notificationService = require('../services/notificationService');
 const logger = require('../utils/logger');
 const { drawRadarSimple } = require('./catalogPdf');
+const { getAppBranding } = require('../utils/appBranding');
 
 const router = express.Router();
 
@@ -50,7 +51,8 @@ router.get('/catalog', async (req, res) => {
         'products.grape_varieties', 'products.serving_temp', 'products.food_pairing',
         'products.tasting_notes', 'products.winemaker_notes', 'products.awards', 'products.sort_order',
         'products.is_featured', 'products.allow_backorder',
-        'product_categories.name as cat_name', 'product_categories.icon as cat_icon', 'product_categories.color as cat_color', 'product_categories.slug as cat_slug'
+        'product_categories.name as cat_name', 'product_categories.icon as cat_icon', 'product_categories.color as cat_color', 'product_categories.slug as cat_slug',
+        'product_categories.product_type as cat_product_type', 'product_categories.is_alcohol as cat_is_alcohol', 'product_categories.icon_emoji as cat_icon_emoji'
       )
       .orderBy('products.sort_order')
       .limit(limit)
@@ -76,8 +78,13 @@ router.get('/catalog', async (req, res) => {
           ...p,
           in_stock: stock > 0,
           allow_backorder: p.allow_backorder || false,
-          category_details: p.category_id ? { id: p.category_id, name: p.cat_name, slug: p.cat_slug, icon: p.cat_icon, color: p.cat_color } : null,
+          category_details: p.category_id ? {
+            id: p.category_id, name: p.cat_name, slug: p.cat_slug,
+            icon: p.cat_icon_emoji || p.cat_icon, color: p.cat_color,
+            product_type: p.cat_product_type, is_alcohol: p.cat_is_alcohol, icon_emoji: p.cat_icon_emoji,
+          } : null,
           cat_name: undefined, cat_icon: undefined, cat_color: undefined, cat_slug: undefined,
+          cat_product_type: undefined, cat_is_alcohol: undefined, cat_icon_emoji: undefined,
         };
       }),
       pagination: {
@@ -107,7 +114,9 @@ router.get('/catalog/:id', async (req, res) => {
         'product_categories.name as category_name', 'product_categories.type as category_type',
         'product_categories.has_tasting_profile as category_has_tasting',
         'product_categories.tasting_axes as category_tasting_axes',
-        'product_categories.icon as category_icon', 'product_categories.color as category_color'
+        'product_categories.icon as category_icon', 'product_categories.color as category_color',
+        'product_categories.product_type as category_product_type', 'product_categories.is_alcohol as category_is_alcohol',
+        'product_categories.icon_emoji as category_icon_emoji'
       )
       .first();
     if (!product) return res.status(404).json({ error: 'NOT_FOUND' });
@@ -141,15 +150,21 @@ router.get('/featured', async (req, res) => {
         'products.category', 'products.category_id', 'products.label', 'products.image_url', 'products.description',
         'products.region', 'products.appellation', 'products.color', 'products.vintage', 'products.is_featured',
         'product_categories.name as cat_name', 'product_categories.icon as cat_icon',
-        'product_categories.color as cat_color', 'product_categories.slug as cat_slug'
+        'product_categories.color as cat_color', 'product_categories.slug as cat_slug',
+        'product_categories.product_type as cat_product_type', 'product_categories.is_alcohol as cat_is_alcohol', 'product_categories.icon_emoji as cat_icon_emoji'
       )
       .orderBy('products.sort_order');
 
     res.json({
       data: products.map(p => ({
         ...p,
-        category_details: p.category_id ? { id: p.category_id, name: p.cat_name, slug: p.cat_slug, icon: p.cat_icon, color: p.cat_color } : null,
+        category_details: p.category_id ? {
+          id: p.category_id, name: p.cat_name, slug: p.cat_slug,
+          icon: p.cat_icon_emoji || p.cat_icon, color: p.cat_color,
+          product_type: p.cat_product_type, is_alcohol: p.cat_is_alcohol, icon_emoji: p.cat_icon_emoji,
+        } : null,
         cat_name: undefined, cat_icon: undefined, cat_color: undefined, cat_slug: undefined,
+        cat_product_type: undefined, cat_is_alcohol: undefined, cat_icon_emoji: undefined,
       })),
     });
   } catch (err) {
@@ -165,7 +180,8 @@ router.get('/filters', async (req, res) => {
     const categories = await db('products').where({ active: true }).whereNotNull('category').distinct('category').pluck('category');
     const labels = await db('products').where({ active: true }).whereNotNull('label').distinct('label').pluck('label');
     const categoryObjects = await db('product_categories').where({ active: true }).orderBy('sort_order')
-      .select('id', 'name', 'slug', 'icon', 'color', 'type', 'has_tasting_profile');
+      .select('id', 'name', 'slug', 'icon', 'color', 'type',
+        'product_type', 'is_alcohol', 'icon_emoji', 'has_tasting_profile');
     res.json({ colors, regions, categories, labels, categoryObjects });
   } catch (err) {
     res.status(500).json({ error: 'SERVER_ERROR' });
@@ -243,7 +259,8 @@ router.get('/catalog/:id/pdf', async (req, res) => {
     doc.pipe(res);
 
     // Header
-    doc.fontSize(9).fillColor('#9ca3af').text('Vins & Conversations', 50, 30, { align: 'right' });
+    const brandingPC = await getAppBranding();
+    doc.fontSize(9).fillColor('#9ca3af').text(brandingPC.app_name, 50, 30, { align: 'right' });
 
     // Name
     doc.fontSize(26).fillColor('#7f1d1d').text(product.name, 50, 60);
@@ -331,7 +348,7 @@ router.get('/catalog/:id/pdf', async (req, res) => {
     doc.fontSize(9).fillColor('#6b7280').text(`${formatEur(product.price_ht)} HT — TVA ${product.tva_rate}%`);
 
     // Footer
-    doc.fontSize(7).fillColor('#d1d5db').text('Vins & Conversations — nicolas@vins-conversations.fr', 50, 780, { align: 'center', width: 495 });
+    doc.fontSize(7).fillColor('#d1d5db').text(`${brandingPC.app_name} — nicolas@vins-conversations.fr`, 50, 780, { align: 'center', width: 495 });
 
     doc.end();
   } catch (err) {

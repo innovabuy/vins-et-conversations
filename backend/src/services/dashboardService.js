@@ -225,15 +225,26 @@ async function getStudentDashboard(userId, campaignId) {
     },
     leaderboard_preview: leaderboardPreview,
     class_ranking: classRanking,
-    recent_orders: recentOrdersData.map((o) => ({
-      id: o.id,
-      ref: o.ref,
-      total_ttc: parseFloat(o.total_ttc),
-      total_items: parseInt(o.total_items, 10),
-      created_at: o.created_at,
-      payment_method: o.payment_method,
-      customer_name: o.customer_name,
-      is_referred: o.referred_by === userId && o.source === 'student_referral',
+    recent_orders: await Promise.all(recentOrdersData.map(async (o) => {
+      // Fetch top product images for this order
+      const orderProducts = await db('order_items')
+        .join('products', 'order_items.product_id', 'products.id')
+        .where('order_items.order_id', o.id)
+        .where('order_items.type', 'product')
+        .orderBy('order_items.qty', 'desc')
+        .limit(3)
+        .select('products.name', 'products.image_url');
+      return {
+        id: o.id,
+        ref: o.ref,
+        total_ttc: parseFloat(o.total_ttc),
+        total_items: parseInt(o.total_items, 10),
+        created_at: o.created_at,
+        payment_method: o.payment_method,
+        customer_name: o.customer_name,
+        is_referred: o.referred_by === userId && o.source === 'student_referral',
+        products: orderProducts.map(p => ({ name: p.name, image_url: p.image_url })),
+      };
     })),
   };
 }

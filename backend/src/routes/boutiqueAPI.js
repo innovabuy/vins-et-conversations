@@ -1,6 +1,8 @@
 const express = require('express');
 const Joi = require('joi');
+const crypto = require('crypto');
 const { v4: uuidv4 } = require('uuid');
+const db = require('../config/database');
 const cartService = require('../services/cartService');
 const boutiqueOrderService = require('../services/boutiqueOrderService');
 const { getStripe } = require('../services/stripeService');
@@ -285,6 +287,90 @@ router.post('/register', async (req, res) => {
     res.status(201).json({ id: contact.id, name: contact.name, email: contact.email, registered: true });
   } catch (err) {
     logger.error(`Register error: ${err.message}`);
+    res.status(500).json({ error: 'SERVER_ERROR', message: err.message });
+  }
+});
+
+// ─── POST /join-school — Auto-create student account from school campaign link ───
+
+const joinSchoolSchema = Joi.object({
+  name: Joi.string().min(2).max(100).required(),
+  email: Joi.string().email().required(),
+  campaign_code: Joi.string().required(),
+  class_group: Joi.string().allow('', null).optional(),
+});
+
+router.post('/join-school', async (req, res) => {
+  try {
+    const { error, value } = joinSchoolSchema.validate(req.body);
+    if (error) return res.status(400).json({ error: 'VALIDATION_ERROR', message: error.details[0].message });
+
+    // Find campaign by join_code in config, or by id/name
+    const campaign = await db('campaigns')
+      .where(function () {
+        this.whereRaw("config->>'join_code' = ?", [value.campaign_code])
+          .orWhere('id', value.campaign_code)
+          .orWhere('name', value.campaign_code);
+      })
+      .where('active', true)
+      .first();
+
+    if (!campaign) return res.status(404).json({ error: 'CAMPAIGN_NOT_FOUND', message: 'Code campagne invalide' });
+
+    // Check if user already exists
+    let user = await db('users').where({ email: value.email }).first();
+    const bcrypt = require('bcryptjs');
+
+    if (user) {
+      // If user already exists, just add participation if missing
+      const existing = await db('participations')
+        .where({ user_id: user.id, campaign_id: campaign.id })
+        .first();
+      if (existing) {
+        return res.json({ message: 'Déjà inscrit', user_id: user.id, referral_code: existing.referral_code, already_registered: true });
+      }
+    } else {
+      // Create new student account with random password (must reset)
+      const tempPassword = crypto.randomBytes(8).toString('hex');
+      const passwordHash = await bcrypt.hash(tempPassword, 10);
+      const userId = require('uuid').v4();
+
+      await db('users').insert({
+        id: userId,
+        name: value.name,
+        email: value.email,
+        password_hash: passwordHash,
+        role: 'etudiant',
+        status: 'active',
+      });
+      user = { id: userId, name: value.name, isNew: true };
+    }
+
+    // Create participation with referral code
+    const { generateUniqueReferralCode } = require('../utils/referralCode');
+    const referralCode = await generateUniqueReferralCode(campaign.name, value.name);
+
+    await db('participations').insert({
+      user_id: user.id,
+      campaign_id: campaign.id,
+      role: 'student',
+      class_group: value.class_group || null,
+      referral_code: referralCode,
+      config: JSON.stringify({}),
+    });
+
+    res.status(201).json({
+      user_id: user.id,
+      name: value.name,
+      campaign_name: campaign.name,
+      referral_code: referralCode,
+      new_account: !!user.isNew,
+    });
+  } catch (err) {
+    if (err.code === '23505') {
+      return res.status(409).json({ error: 'DUPLICATE', message: 'Participation déjà existante' });
+    }
+    logger.error(`Join school error: ${err.message}`);
     res.status(500).json({ error: 'SERVER_ERROR', message: err.message });
   }
 });

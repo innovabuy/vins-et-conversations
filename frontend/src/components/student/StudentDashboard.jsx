@@ -649,15 +649,23 @@ export default function StudentDashboard() {
               <div className="card">
                 <h3 className="font-semibold text-sm mb-2 flex items-center gap-2"><Clock size={14} /> Dernieres commandes</h3>
                 {data.recent_orders.map((o) => (
-                  <div key={o.id} className="flex items-center justify-between py-2 border-b last:border-0 text-sm">
-                    <div>
-                      <p className="font-medium">
+                  <div key={o.id} className="flex items-center gap-3 py-2 border-b last:border-0 text-sm">
+                    {o.products?.length > 0 && (
+                      <div className="flex -space-x-2 flex-shrink-0">
+                        {o.products.slice(0, 2).map((p, i) => (
+                          p.image_url ? <img key={i} src={p.image_url} alt={p.name} className="w-8 h-8 rounded-full object-cover border-2 border-white" />
+                            : <div key={i} className="w-8 h-8 rounded-full bg-wine-100 flex items-center justify-center text-wine-700 text-xs font-bold border-2 border-white">{p.name?.charAt(0)}</div>
+                        ))}
+                      </div>
+                    )}
+                    <div className="flex-1 min-w-0">
+                      <p className="font-medium truncate">
                         {o.customer_name || 'Client'}
                         {o.is_referred && <span className="ml-1.5 px-1.5 py-0.5 bg-indigo-100 text-indigo-700 text-[10px] rounded-full font-medium">Référé</span>}
                       </p>
                       <p className="text-xs text-gray-400">{formatDate(o.created_at)} · {o.total_items} art.</p>
                     </div>
-                    <div className="text-right">
+                    <div className="text-right flex-shrink-0">
                       <p className="font-semibold">{formatEur(o.total_ttc)}</p>
                       {o.payment_method && <p className="text-[10px] text-gray-400">{PAYMENT_LABELS[o.payment_method] || o.payment_method}</p>}
                     </div>

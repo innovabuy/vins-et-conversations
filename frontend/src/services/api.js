@@ -223,6 +223,11 @@ export const usersAPI = {
   toggleStatus: (id) => api.post(`/admin/users/${id}/toggle-status`),
   importCSV: (data) => api.post('/admin/users/import-csv', data),
   anonymize: (id, reason) => api.post(`/admin/users/${id}/anonymize`, { reason }),
+  uploadAmbassadorPhoto: (id, file) => {
+    const fd = new FormData();
+    fd.append('photo', file);
+    return api.put(`/admin/users/${id}/ambassador-photo`, fd, { headers: { 'Content-Type': 'multipart/form-data' } });
+  },
 };
 
 // ─── Invitations ───────────────────────────────────
@@ -242,6 +247,14 @@ export const ambassadorAPI = {
   dashboard: (campaignId) => api.get('/dashboard/ambassador', { params: { campaign_id: campaignId } }),
   referralClick: (userId, source) => api.post('/ambassador/referral-click', { user_id: userId, source }),
   referralStats: () => api.get('/ambassador/referral-stats'),
+  profile: () => api.get('/ambassador/profile'),
+  updateProfile: (data) => api.put('/auth/profile', data),
+  uploadPhoto: (file) => {
+    const fd = new FormData();
+    fd.append('photo', file);
+    return api.put('/auth/profile/photo', fd, { headers: { 'Content-Type': 'multipart/form-data' } });
+  },
+  regions: () => api.get('/ambassador/regions'),
 };
 
 // ─── Margins ────────────────────────────────────────

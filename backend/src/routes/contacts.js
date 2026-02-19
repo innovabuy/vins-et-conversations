@@ -26,6 +26,7 @@ router.get('/', authenticate, requireRole('super_admin', 'commercial'), async (r
 
     const countQuery = db('contacts');
     if (req.query.type) countQuery.where('type', req.query.type);
+    if (req.query.source) countQuery.where('source', 'ilike', `%${req.query.source}%`);
     const total = await countQuery.count('id as count').first();
 
     const data = await query

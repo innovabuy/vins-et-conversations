@@ -221,7 +221,7 @@ export default function BoutiqueHome() {
             </button>
             {filters.categoryObjects.map(cat => (
               <button key={cat.id} onClick={() => setCategoryId(categoryId === cat.id ? '' : cat.id)} className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium transition-all ${categoryId === cat.id ? 'text-white shadow-sm' : 'bg-white border border-gray-200 text-gray-600 hover:border-gray-300'}`} style={categoryId === cat.id ? { backgroundColor: cat.color || '#7a1c3b' } : {}}>
-                <span>{cat.icon}</span> {cat.name}
+                <span>{cat.icon_emoji || cat.icon}</span> {cat.name}
               </button>
             ))}
           </div>

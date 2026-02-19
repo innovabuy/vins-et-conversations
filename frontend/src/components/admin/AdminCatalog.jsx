@@ -183,6 +183,8 @@ function ProductForm({ product, onSave, onCancel, allProducts = [], categoriesLi
   const wineType = resolveWineType(form.color, form.category);
   const criteria = TASTING_CRITERIA[wineType] || null;
   const isCoffret = wineType === 'coffret';
+  const selectedCategory = categoriesList.find(c => c.id === form.category_id);
+  const isWineProduct = !selectedCategory || ['wine', 'sparkling'].includes(selectedCategory.product_type);
 
   // Auto-enable tasting for new products when criteria exist
   useEffect(() => {
@@ -297,6 +299,7 @@ function ProductForm({ product, onSave, onCancel, allProducts = [], categoriesLi
             <label className="block text-xs font-medium text-gray-500 mb-1">Nom *</label>
             <input value={form.name} onChange={e => handleChange('name', e.target.value)} className="w-full border rounded-lg px-3 py-2 text-sm" required />
           </div>
+          {isWineProduct && (
           <div>
             <label className="block text-xs font-medium text-gray-500 mb-1">Couleur / Type</label>
             <select value={wineType} onChange={e => {
@@ -310,13 +313,15 @@ function ProductForm({ product, onSave, onCancel, allProducts = [], categoriesLi
               {WINE_TYPE_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
             </select>
           </div>
+          )}
           <div>
             <label className="block text-xs font-medium text-gray-500 mb-1">Catégorie</label>
             <select value={form.category_id || ''} onChange={e => { handleChange('category_id', e.target.value || null); const cat = categoriesList.find(c => c.id === e.target.value); if (cat) handleChange('category', cat.name); }} className="w-full border rounded-lg px-3 py-2 text-sm">
               <option value="">— Aucune —</option>
-              {categoriesList.filter(c => c.active).map(c => <option key={c.id} value={c.id}>{c.icon} {c.name}</option>)}
+              {categoriesList.filter(c => c.active).map(c => <option key={c.id} value={c.id}>{c.icon_emoji || c.icon} {c.name}{c.is_alcohol === false ? ' (sans alcool)' : ''}</option>)}
             </select>
           </div>
+          {isWineProduct && (<>
           <div>
             <label className="block text-xs font-medium text-gray-500 mb-1">Région</label>
             <input value={form.region || ''} onChange={e => handleChange('region', e.target.value)} className="w-full border rounded-lg px-3 py-2 text-sm" placeholder="Ex: Loire, Bordeaux" />
@@ -330,12 +335,13 @@ function ProductForm({ product, onSave, onCancel, allProducts = [], categoriesLi
             <input type="number" value={form.vintage || ''} onChange={e => handleChange('vintage', e.target.value)} className="w-full border rounded-lg px-3 py-2 text-sm" placeholder="2023" />
           </div>
           <div>
-            <label className="block text-xs font-medium text-gray-500 mb-1">Label</label>
-            <input value={form.label || ''} onChange={e => handleChange('label', e.target.value)} className="w-full border rounded-lg px-3 py-2 text-sm" placeholder="Bio, HVE, AOP..." />
-          </div>
-          <div className="md:col-span-2">
             <label className="block text-xs font-medium text-gray-500 mb-1">Cépages</label>
             <TagsInput value={form.grape_varieties} onChange={v => handleChange('grape_varieties', v)} placeholder="Ajouter un cépage..." />
+          </div>
+          </>)}
+          <div>
+            <label className="block text-xs font-medium text-gray-500 mb-1">Label</label>
+            <input value={form.label || ''} onChange={e => handleChange('label', e.target.value)} className="w-full border rounded-lg px-3 py-2 text-sm" placeholder="Bio, HVE, AOP..." />
           </div>
           <div className="md:col-span-2">
             <label className="block text-xs font-medium text-gray-500 mb-1">Description</label>

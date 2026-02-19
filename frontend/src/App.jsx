@@ -56,6 +56,7 @@ import CustomerDashboard from './components/customer/CustomerDashboard';
 import { AppSettingsProvider } from './contexts/AppSettingsContext';
 import { SiteImagesProvider } from './contexts/SiteImagesContext';
 import InviteRegisterPage from './pages/InviteRegisterPage';
+import AmbassadorsPage from './components/public/AmbassadorsPage';
 
 function ProtectedRoute({ children, roles }) {
   const { user, loading } = useAuth();
@@ -85,6 +86,7 @@ function AppRoutes() {
         <Route path="suivi" element={<OrderTrackingPage />} />
         <Route path="wizard" element={<TasteWizard />} />
         <Route path="selection" element={<SelectionPage />} />
+        <Route path="ambassadeurs" element={<AmbassadorsPage />} />
         <Route path="cgv" element={<CGVPage />} />
         <Route path="mentions-legales" element={<MentionsLegalesPage />} />
       </Route>

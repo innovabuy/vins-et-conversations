@@ -4,7 +4,7 @@ import { Outlet, NavLink, useNavigate } from 'react-router-dom';
 import {
   LayoutDashboard, ShoppingCart, Truck, Factory, Package, Users,
   CreditCard, BarChart3, BookOpen, Bell, Map, FileText, Settings,
-  Download, Wine, LogOut, Menu, X, ChevronRight, Shield, Tag, Building2, Image
+  Download, Wine, LogOut, Menu, X, ChevronRight, Shield, Tag, Building2, Image, ExternalLink
 } from 'lucide-react';
 import NotificationBell from '../shared/NotificationBell';
 import { useAppSettings } from '../../contexts/AppSettingsContext';
@@ -116,6 +116,16 @@ export default function AdminLayout() {
               {item.label}
             </NavLink>
           ))}
+          <hr className="my-2 border-gray-100" />
+          <a
+            href="/boutique"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-center gap-3 px-3 py-2 rounded-lg text-sm text-gray-600 hover:bg-gray-50 transition-colors"
+          >
+            <ExternalLink size={18} />
+            Voir le site
+          </a>
         </nav>
 
         <div className="absolute bottom-0 left-0 right-0 p-4 border-t border-gray-100">

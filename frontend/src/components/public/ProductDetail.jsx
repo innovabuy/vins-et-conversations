@@ -33,7 +33,7 @@ export default function ProductDetail() {
   if (!product) return <div className="text-center py-20 text-gray-400">Vin introuvable</div>;
 
   const radarData = buildRadarData(product.tasting_notes, product.color, product.category, product.category_tasting_axes);
-  const hasRadar = !!radarData && product.category_type !== 'bundle';
+  const hasRadar = !!radarData && product.category_type !== 'bundle' && product.category_product_type !== 'gift_set';
 
   const grapes = product.grape_varieties || [];
   const foodPairing = product.food_pairing || [];
@@ -58,9 +58,15 @@ export default function ProductDetail() {
         {/* Info */}
         <div className="space-y-6">
           <div>
-            <div className="flex items-center gap-2 mb-2">
-              {product.color && <span className="px-3 py-1 bg-wine-100 text-wine-700 rounded-full text-sm font-medium">{product.color}</span>}
+            <div className="flex items-center gap-2 mb-2 flex-wrap">
+              {product.category_name && (
+                <span className="px-3 py-1 rounded-full text-sm font-medium text-white" style={{ backgroundColor: product.category_color || '#7a1c3b' }}>
+                  {product.category_icon_emoji || product.category_icon || ''} {product.category_name}
+                </span>
+              )}
+              {product.color && !product.category_name && <span className="px-3 py-1 bg-wine-100 text-wine-700 rounded-full text-sm font-medium">{product.color}</span>}
               {product.vintage && <span className="text-sm text-gray-500">Millésime {product.vintage}</span>}
+              {product.category_is_alcohol === false && <span className="px-2 py-0.5 bg-green-100 text-green-700 rounded-full text-xs font-medium">Sans alcool</span>}
             </div>
             <h1 className="text-3xl font-bold text-gray-900">{product.name}</h1>
             {product.appellation && <p className="text-lg text-gray-500 mt-1">{product.appellation}</p>}

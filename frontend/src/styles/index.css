@@ -39,3 +39,7 @@
 
 .animate-float { animation: float 3s ease-in-out infinite; }
 .animate-slide-in { animation: slide-in 0.3s ease-out; }
+
+/* Hide scrollbar but keep scroll functionality */
+.scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
+.scrollbar-hide::-webkit-scrollbar { display: none; }

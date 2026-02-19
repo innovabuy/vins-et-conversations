@@ -61,6 +61,7 @@ const IDS = {
   cat_effervescents: uuidv4(),
   cat_coffrets: uuidv4(),
   cat_jus_softs: uuidv4(),
+  cat_terrines: uuidv4(),
   // Boutique Web
   org_boutique: uuidv4(),
   ct_boutique: uuidv4(),
@@ -100,6 +101,9 @@ exports.seed = async function (knex) {
   for (const table of tables) {
     await knex(table).del();
   }
+  // V4.2 tables — conditional cleanup
+  const hasRegions = await knex.schema.hasTable('regions');
+  if (hasRegions) await knex('regions').del();
 
   // App settings defaults
   await knex('app_settings').insert([
@@ -119,7 +123,33 @@ exports.seed = async function (knex) {
     { key: 'smtp_from_name', value: 'Vins & Conversations' },
     { key: 'smtp_from_email', value: '' },
     { key: 'smtp_mode', value: 'test' },
+    { key: 'pickup_enabled', value: 'true' },
+    { key: 'pickup_address', value: "Saint-Sylvain-d'Anjou — Maine-et-Loire (49)" },
+    { key: 'pickup_details', value: 'Retrait sur rendez-vous. Contactez-nous pour convenir d\'un créneau.' },
   ]);
+
+  // ═══════════════════════════════════════════════════════
+  // REGIONS (V4.2 — Référentiel régions administratives FR)
+  // ═══════════════════════════════════════════════════════
+  let regionPDL = null;
+  if (hasRegions) {
+    await knex('regions').insert([
+      { name: 'Auvergne-Rhône-Alpes', code: 'ARA', sort_order: 1 },
+      { name: 'Bourgogne-Franche-Comté', code: 'BFC', sort_order: 2 },
+      { name: 'Bretagne', code: 'BRE', sort_order: 3 },
+      { name: 'Centre-Val de Loire', code: 'CVL', sort_order: 4 },
+      { name: 'Corse', code: 'COR', sort_order: 5 },
+      { name: 'Grand Est', code: 'GES', sort_order: 6 },
+      { name: 'Hauts-de-France', code: 'HDF', sort_order: 7 },
+      { name: 'Île-de-France', code: 'IDF', sort_order: 8 },
+      { name: 'Normandie', code: 'NOR', sort_order: 9 },
+      { name: 'Nouvelle-Aquitaine', code: 'NAQ', sort_order: 10 },
+      { name: 'Occitanie', code: 'OCC', sort_order: 11 },
+      { name: 'Pays de la Loire', code: 'PDL', sort_order: 12 },
+      { name: 'Provence-Alpes-Côte d\'Azur', code: 'PAC', sort_order: 13 },
+    ]);
+    regionPDL = await knex('regions').where({ code: 'PDL' }).first();
+  }
 
   const hash = await bcrypt.hash('VinsConv2026!', 12);
 
@@ -188,6 +218,11 @@ exports.seed = async function (knex) {
       name: 'Jean-Pierre Martin',
       role: 'ambassadeur',
       status: 'active',
+      ...(hasRegions ? {
+        ambassador_bio: 'Passionné de vins de Loire depuis 10 ans, je parcours la région pour partager mes découvertes.',
+        region_id: regionPDL ? regionPDL.id : null,
+        show_on_public_page: true,
+      } : {}),
     },
     // Étudiants Sacré-Cœur
     ...[
@@ -239,6 +274,8 @@ exports.seed = async function (knex) {
         reward: 'free_bottle',
         choice: 'student_picks',
         from_catalog: true,
+        cost_method: 'cheapest_in_order',
+        applies_to_alcohol_only: true,
       }),
       tier_rules: JSON.stringify({ tiers: [] }),
       ui_config: JSON.stringify({
@@ -269,7 +306,10 @@ exports.seed = async function (knex) {
       name: 'ambassadeur',
       label: 'Réseau Ambassadeur',
       pricing_rules: JSON.stringify({ type: 'standard', value: 0, applies_to: 'all' }),
-      commission_rules: JSON.stringify({}),
+      commission_rules: JSON.stringify({
+        fund_collective: { type: 'percentage', value: 5, base: 'ca_ht_global', label: 'Commission association' },
+        fund_individual: { type: 'percentage', value: 3, base: 'ca_ht_student', label: 'Commission ambassadeur' },
+      }),
       free_bottle_rules: JSON.stringify({}),
       tier_rules: JSON.stringify({
         tiers: [
@@ -304,6 +344,8 @@ exports.seed = async function (knex) {
         reward: 'free_bottle',
         choice: 'student_picks',
         from_catalog: true,
+        cost_method: 'cheapest_in_order',
+        applies_to_alcohol_only: true,
       }),
       tier_rules: JSON.stringify({ tiers: [] }),
       ui_config: JSON.stringify({
@@ -433,17 +475,25 @@ exports.seed = async function (knex) {
   ]);
 
   // ═══════════════════════════════════════════════════════
-  // CATÉGORIES PRODUITS (CDC Avenant V4.1)
+  // CATÉGORIES PRODUITS (CDC V4.1 + V4.2)
   // ═══════════════════════════════════════════════════════
-  await knex('product_categories').insert([
-    { id: IDS.cat_rouges, name: 'Rouges', slug: 'rouges', description: 'Vins rouges de caractère', color: '#7a1c3b', icon: '🍷', sort_order: 1, type: 'wine', has_tasting_profile: true, tasting_axes: JSON.stringify([{ key: 'fruite', label: 'Fruité' }, { key: 'mineralite', label: 'Minéral' }, { key: 'rondeur', label: 'Rondeur' }, { key: 'acidite', label: 'Acidité' }, { key: 'tanins', label: 'Tanins' }, { key: 'boise', label: 'Boisé' }, { key: 'longueur', label: 'Longueur' }, { key: 'puissance', label: 'Puissance' }]) },
-    { id: IDS.cat_blancs_secs, name: 'Blancs Secs', slug: 'blancs-secs', description: 'Vins blancs secs et minéraux', color: '#C4A35A', icon: '🥂', sort_order: 2, type: 'wine', has_tasting_profile: true, tasting_axes: JSON.stringify([{ key: 'fruite', label: 'Fruité' }, { key: 'mineralite', label: 'Minéral' }, { key: 'rondeur', label: 'Rondeur' }, { key: 'acidite', label: 'Acidité' }, { key: 'boise', label: 'Boisé' }, { key: 'longueur', label: 'Longueur' }, { key: 'puissance', label: 'Puissance' }]) },
-    { id: IDS.cat_blancs_moelleux, name: 'Blancs Moelleux', slug: 'blancs-moelleux', description: 'Vins blancs moelleux et liquoreux', color: '#d4a017', icon: '🍯', sort_order: 3, type: 'wine', has_tasting_profile: true, tasting_axes: JSON.stringify([{ key: 'fruite', label: 'Fruité' }, { key: 'douceur', label: 'Douceur' }, { key: 'rondeur', label: 'Rondeur' }, { key: 'acidite', label: 'Acidité' }, { key: 'boise', label: 'Boisé' }, { key: 'longueur', label: 'Longueur' }, { key: 'puissance', label: 'Puissance' }]) },
-    { id: IDS.cat_roses, name: 'Rosés', slug: 'roses', description: 'Vins rosés frais et fruités', color: '#e88ca5', icon: '🌸', sort_order: 4, type: 'wine', has_tasting_profile: true, tasting_axes: JSON.stringify([{ key: 'fruite', label: 'Fruité' }, { key: 'mineralite', label: 'Minéral' }, { key: 'rondeur', label: 'Rondeur' }, { key: 'acidite', label: 'Acidité' }, { key: 'longueur', label: 'Longueur' }, { key: 'puissance', label: 'Puissance' }]) },
-    { id: IDS.cat_effervescents, name: 'Effervescents', slug: 'effervescents', description: 'Crémants et vins pétillants', color: '#59a9d4', icon: '🫧', sort_order: 5, type: 'wine', has_tasting_profile: true, tasting_axes: JSON.stringify([{ key: 'fruite', label: 'Fruité' }, { key: 'finesse_bulles', label: 'Bulles' }, { key: 'fraicheur', label: 'Fraîcheur' }, { key: 'rondeur', label: 'Rondeur' }, { key: 'longueur', label: 'Longueur' }, { key: 'puissance', label: 'Puissance' }]) },
-    { id: IDS.cat_coffrets, name: 'Coffrets', slug: 'coffrets', description: 'Coffrets découverte et cadeaux', color: '#9333ea', icon: '🎁', sort_order: 6, type: 'bundle', has_tasting_profile: false, tasting_axes: null },
-    { id: IDS.cat_jus_softs, name: 'Jus & Softs', slug: 'jus-softs', description: 'Jus de fruits et boissons sans alcool', color: '#059669', icon: '🍎', sort_order: 7, type: 'non_alcoholic', has_tasting_profile: false, tasting_axes: JSON.stringify([{ key: 'fruite', label: 'Fruité' }, { key: 'acidite', label: 'Acidité' }, { key: 'douceur', label: 'Douceur' }, { key: 'longueur', label: 'Longueur' }]) },
-  ]);
+  const hasProductType = await knex.schema.hasColumn('product_categories', 'product_type');
+  const v42Cat = (emoji, productType, isAlcohol) => hasProductType ? { icon_emoji: emoji, product_type: productType, is_alcohol: isAlcohol } : {};
+
+  const categories = [
+    { id: IDS.cat_rouges, name: 'Rouges', slug: 'rouges', description: 'Vins rouges de caractère', color: '#7a1c3b', icon: '🍷', sort_order: 1, type: 'wine', has_tasting_profile: true, tasting_axes: JSON.stringify([{ key: 'fruite', label: 'Fruité' }, { key: 'mineralite', label: 'Minéral' }, { key: 'rondeur', label: 'Rondeur' }, { key: 'acidite', label: 'Acidité' }, { key: 'tanins', label: 'Tanins' }, { key: 'boise', label: 'Boisé' }, { key: 'longueur', label: 'Longueur' }, { key: 'puissance', label: 'Puissance' }]), ...v42Cat('🍷', 'wine', true) },
+    { id: IDS.cat_blancs_secs, name: 'Blancs Secs', slug: 'blancs-secs', description: 'Vins blancs secs et minéraux', color: '#C4A35A', icon: '🍷', sort_order: 2, type: 'wine', has_tasting_profile: true, tasting_axes: JSON.stringify([{ key: 'fruite', label: 'Fruité' }, { key: 'mineralite', label: 'Minéral' }, { key: 'rondeur', label: 'Rondeur' }, { key: 'acidite', label: 'Acidité' }, { key: 'boise', label: 'Boisé' }, { key: 'longueur', label: 'Longueur' }, { key: 'puissance', label: 'Puissance' }]), ...v42Cat('🍷', 'wine', true) },
+    { id: IDS.cat_blancs_moelleux, name: 'Blancs Moelleux', slug: 'blancs-moelleux', description: 'Vins blancs moelleux et liquoreux', color: '#d4a017', icon: '🍯', sort_order: 3, type: 'wine', has_tasting_profile: true, tasting_axes: JSON.stringify([{ key: 'fruite', label: 'Fruité' }, { key: 'douceur', label: 'Douceur' }, { key: 'rondeur', label: 'Rondeur' }, { key: 'acidite', label: 'Acidité' }, { key: 'boise', label: 'Boisé' }, { key: 'longueur', label: 'Longueur' }, { key: 'puissance', label: 'Puissance' }]), ...v42Cat('🍯', 'wine', true) },
+    { id: IDS.cat_roses, name: 'Rosés', slug: 'roses', description: 'Vins rosés frais et fruités', color: '#e88ca5', icon: '🌸', sort_order: 4, type: 'wine', has_tasting_profile: true, tasting_axes: JSON.stringify([{ key: 'fruite', label: 'Fruité' }, { key: 'mineralite', label: 'Minéral' }, { key: 'rondeur', label: 'Rondeur' }, { key: 'acidite', label: 'Acidité' }, { key: 'longueur', label: 'Longueur' }, { key: 'puissance', label: 'Puissance' }]), ...v42Cat('🌸', 'wine', true) },
+    { id: IDS.cat_effervescents, name: 'Effervescents', slug: 'effervescents', description: 'Crémants et vins pétillants', color: '#59a9d4', icon: '🥂', sort_order: 5, type: 'wine', has_tasting_profile: true, tasting_axes: JSON.stringify([{ key: 'fruite', label: 'Fruité' }, { key: 'finesse_bulles', label: 'Bulles' }, { key: 'fraicheur', label: 'Fraîcheur' }, { key: 'rondeur', label: 'Rondeur' }, { key: 'longueur', label: 'Longueur' }, { key: 'puissance', label: 'Puissance' }]), ...v42Cat('🥂', 'sparkling', true) },
+    { id: IDS.cat_coffrets, name: 'Coffrets', slug: 'coffrets', description: 'Coffrets découverte et cadeaux', color: '#9333ea', icon: '🎁', sort_order: 6, type: 'bundle', has_tasting_profile: false, tasting_axes: null, ...v42Cat('🎁', 'gift_set', true) },
+    { id: IDS.cat_jus_softs, name: 'Jus & Softs', slug: 'jus-softs', description: 'Jus de fruits et boissons sans alcool', color: '#059669', icon: '🧃', sort_order: 7, type: 'non_alcoholic', has_tasting_profile: false, tasting_axes: JSON.stringify([{ key: 'fruite', label: 'Fruité' }, { key: 'acidite', label: 'Acidité' }, { key: 'douceur', label: 'Douceur' }, { key: 'longueur', label: 'Longueur' }]), ...v42Cat('🧃', 'beverage', false) },
+  ];
+  // V4.2: add Terrines category
+  if (hasProductType) {
+    categories.push({ id: IDS.cat_terrines, name: 'Terrines', slug: 'terrines', description: 'Terrines et produits du terroir', color: '#92400e', icon: '🫙', sort_order: 8, type: 'food', has_tasting_profile: false, tasting_axes: null, ...v42Cat('🫙', 'food', false) });
+  }
+  await knex('product_categories').insert(categories);
 
   // ═══════════════════════════════════════════════════════
   // PRODUITS (catalogue CDC §7.1)
@@ -682,6 +732,7 @@ exports.seed = async function (knex) {
       const orderId = uuidv4();
       const orderDate = new Date(2025, 8 + Math.floor(i / 3), 15 + (i * 3));
 
+      const totalItems = Math.ceil(orderAmount / 10);
       await knex('orders').insert({
         id: orderId,
         ref,
@@ -690,10 +741,18 @@ exports.seed = async function (knex) {
         status: 'delivered',
         total_ttc: parseFloat(orderAmount.toFixed(2)),
         total_ht: parseFloat((orderAmount / 1.20).toFixed(2)),
-        total_items: Math.ceil(orderAmount / 10),
+        total_items: totalItems,
         created_at: orderDate,
         updated_at: orderDate,
       });
+
+      // Order items — split between Oriolus (6.50) and Carillon (12.50)
+      const qtyCarillon = Math.floor(totalItems / 2);
+      const qtyOriolus = totalItems - qtyCarillon;
+      const items = [];
+      if (qtyOriolus > 0) items.push({ order_id: orderId, product_id: IDS.oriolus, qty: qtyOriolus, unit_price_ht: 5.42, unit_price_ttc: 6.50, type: 'product' });
+      if (qtyCarillon > 0) items.push({ order_id: orderId, product_id: IDS.carillon, qty: qtyCarillon, unit_price_ht: 10.42, unit_price_ttc: 12.50, type: 'product' });
+      if (items.length > 0) await knex('order_items').insert(items);
 
       // Financial event (append-only)
       await knex('financial_events').insert({

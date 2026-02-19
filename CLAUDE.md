@@ -1,40 +1,60 @@
-# Vins & Conversations — Plateforme de gestion des ventes de vin
-
-## Contexte projet
-
-Application web centralisée de gestion des ventes de vin multi-canaux (écoles, CSE, ambassadeurs).
-Fondée par Nicolas Froment. Remplace une gestion Excel par une plateforme complète.
-
-- **CDC de référence** : CDC V4.0 + Avenant V4.1 (13/02/2026)
-- **Stack** : Node.js/Express + React 18 + Tailwind CSS + PostgreSQL 16 + Redis
-- **Architecture** : Monorepo, API REST JSON, JWT auth, RBAC par module et campagne
-- **Hébergement** : Docker (docker-compose.yml), CI/CD GitHub Actions
+# Vins & Conversations — CLAUDE.md
+# Document de référence pour Claude Code
+# Version 4.2 — 18/02/2026
 
 ---
 
-## Structure du monorepo
+## 1. CONTEXTE PROJET
+
+**Vins & Conversations** est une plateforme de vente de vin multi-canaux fondée par Nicolas Froment (Loire Valley, 12 ans d'expérience). Elle remplace intégralement une gestion Excel par une application web centralisée.
+
+**Canaux de vente** : établissements scolaires (BTS, lycées), CSE d'entreprises, réseau d'ambassadeurs, événements privés.
+
+**Interlocuteurs** : Nicolas Froment (propriétaire, décisions métier), Mathéo (liaison client / stagiaire Sacré-Coeur).
+
+**CDC de référence** : V4.0 (07/02/2026) + Avenant V4.1 (13/02/2026) + Avenant V4.2 (18/02/2026)
+
+---
+
+## 2. STACK TECHNIQUE
+
+| Couche | Technologie |
+|--------|-------------|
+| Frontend | React 18 + Tailwind CSS (SPA, mobile-first) |
+| Backend | Node.js + Express (API REST JSON) |
+| Base de données | PostgreSQL 16 (JSONB pour règles métier) |
+| Auth | JWT — access token 15min + refresh token 7j (httpOnly cookie) |
+| Cache | Redis (invalider après TOUTE modification admin) |
+| Paiement | Stripe (webhooks) — seul Nicolas encaisse, jamais les étudiants |
+| Export comptable | Format Pennylane + CSV |
+| Hébergement | Docker (docker-compose.yml), CI/CD GitHub Actions |
+| ORM | Knex.js — migrations format `YYYYMMDDHHMMSS_description.js` |
+
+---
+
+## 3. STRUCTURE DU MONOREPO
 
 ```
 /
 ├── backend/
 │   └── src/
-│       ├── config/          # database.js, knexfile.js, redis.js, tastingCriteria.js
-│       ├── routes/          # 24 fichiers de routes (voir liste ci-dessous)
-│       ├── services/        # Logique métier (orderService, rulesEngine, stripeService, etc.)
-│       ├── middleware/       # auth.js, audit.js, cache.js, validate.js
-│       ├── migrations/      # 12 fichiers de migration Knex
-│       └── tests/           # api.integration.test.js, rulesEngine.test.js
+│       ├── config/       # database.js, knexfile.js, redis.js, tastingCriteria.js
+│       ├── routes/       # 34 fichiers de routes
+│       ├── services/     # Logique métier (10 services)
+│       ├── middleware/   # auth.js, audit.js, cache.js, validate.js
+│       ├── migrations/   # 27 fichiers Knex
+│       └── tests/        # 22 fichiers de tests (251+ tests)
 ├── frontend/
 │   └── src/
 │       ├── components/
-│       │   ├── admin/       # 20 composants (Cockpit, Campaigns, Orders, Catalog, Users, etc.)
+│       │   ├── admin/       # 20 composants (Cockpit, Campaigns, Orders, Catalog, Users...)
 │       │   ├── student/     # Dashboard étudiant
-│       │   ├── teacher/     # Dashboard enseignant
+│       │   ├── teacher/     # Dashboard enseignant (JAMAIS de montants)
 │       │   ├── bts/         # Dashboard BTS NDRC
-│       │   ├── cse/         # Dashboard CSE
+│       │   ├── cse/         # Dashboard CSE (e-commerce)
 │       │   ├── ambassador/  # Dashboard ambassadeur
-│       │   ├── boutique/    # BoutiqueHome, CartPage, CheckoutPage, ProductDetail, etc.
-│       │   └── shared/      # InstallGuide, PaymentModal, NotificationBell, Toast, SignaturePad
+│       │   ├── boutique/    # BoutiqueHome, CartPage, CheckoutPage, ProductDetail
+│       │   └── shared/      # Composants partagés tous profils
 │       └── layouts/         # Admin, Teacher, BTS, CSE, Ambassador, Public
 ├── docker-compose.yml
 ├── .github/workflows/ci.yml
@@ -43,196 +63,253 @@ Fondée par Nicolas Froment. Remplace une gestion Excel par une plateforme compl
 
 ---
 
-## Routes backend existantes (24)
+## 4. ROUTES BACKEND (34)
 
 auth, campaigns, orders, products, users, analytics, exports, margins, payments,
 stock, suppliers, contacts, deliveryNotes, deliveryRoutes, formation, invitations,
 notifications, categories, ambassador, auditLog, catalogPdf, boutiqueAPI,
-paymentIntents, publicCatalog, webhooks, pricingConditions, dashboard
+paymentIntents, publicCatalog, webhooks, pricingConditions, dashboard,
+appSettings, campaignResources, campaignTypes, clientTypes, organizationTypes,
+referral, shipping, siteImages
 
 ---
 
-## Services backend existants
+## 5. SERVICES BACKEND (10)
 
-- **orderService** : création/validation commandes
-- **dashboardService** : données agrégées par profil
-- **rulesEngine** : évaluation dynamique des règles métier JSONB (tarification, commissions, gratuités, paliers)
-- **stripeService** : intégration paiement Stripe
-- **emailService** : envoi emails
-- **badgeService** : gamification (badges, streaks)
-- **notificationService** : notifications temps réel
-- **boutiqueOrderService** : commandes boutique publique
-- **cartService** : gestion panier
-- **marginFilters** : calcul et filtrage marges
-
----
-
-## Middleware existant
-
-- **auth.js** : vérification JWT, extraction contexte utilisateur (userId, roles, permissions, campaign_ids)
-- **audit.js** : logging automatique des actions admin dans audit_log
-- **cache.js** : cache Redis pour les requêtes fréquentes
-- **validate.js** : validation des payloads API
+- **orderService** — création/validation commandes
+- **dashboardService** — données agrégées par profil
+- **rulesEngine** — évaluation dynamique règles JSONB (tarification, commissions, gratuités, paliers)
+- **stripeService** — paiement Stripe
+- **emailService** — envoi emails
+- **badgeService** — gamification (badges, streaks)
+- **notificationService** — notifications temps réel
+- **boutiqueOrderService** — commandes boutique publique
+- **cartService** — gestion panier
+- **marginFilters** — calcul et filtrage marges
 
 ---
 
-## Base de données PostgreSQL
+## 6. BASE DE DONNÉES POSTGRESQL
 
-### Tables existantes (20 tables CDC V4.0)
+### 6.1 Tables existantes
 
-**Utilisateurs** : users, participations, invitations
-**Organisations** : organizations, campaigns, client_types
-**Catalogue** : products, campaign_products, stock_movements
-**Commandes/Finance** : orders, order_items, financial_events, payments, delivery_notes, returns, contacts
-**Admin** : audit_log, notifications, delivery_routes, pricing_conditions
+**Utilisateurs** : `users`, `participations`, `invitations`, `refresh_tokens`
+**Organisations** : `organizations`, `campaigns`, `client_types`, `organization_types`, `campaign_types`, `organization_type_campaign_types`
+**Catalogue** : `products`, `product_categories`, `campaign_products`, `stock_movements`
+**Commandes/Finance** : `orders`, `order_items`, `financial_events`, `payments`, `delivery_notes`, `returns`, `contacts`
+**Admin** : `audit_log`, `notifications`, `delivery_routes`, `pricing_conditions`, `app_settings`, `site_images`
+**Transport** : `shipping_zones`, `shipping_rates`
+**Campagne** : `campaign_resources`
+**Référentiel** : `regions`
 
-### Nouvelles tables (Avenant V4.1 — À CRÉER)
+### 6.2 Tables V4.2
 
-- **product_categories** : catégories dynamiques (remplace le champ string `category` dans products)
-- **shipping_zones** : zones de livraison par département
-- **shipping_rates** : grille tarifaire transport historisée
-- **campaign_resources** : pièces jointes et liens par campagne
-- **app_settings** : paramètres globaux (logo, nom, couleurs)
+```sql
+-- Régions géographiques (référentiel)
+regions (
+  id SERIAL, name VARCHAR(100), code VARCHAR(10), sort_order INTEGER
+)
+```
 
-### Colonnes à ajouter sur tables existantes (Avenant V4.1)
+### 6.3 Colonnes clés
 
-- `products` : ajouter `category_id` (FK → product_categories), `is_featured` (BOOLEAN)
-- `organizations` : ajouter `logo_url` (VARCHAR 500)
-- `participations` : ajouter `referral_code` (VARCHAR 20 UNIQUE)
-- `orders` : ajouter `referred_by` (FK → users.id), `referral_code_used` (VARCHAR 20)
-- `order_items` : ajouter `type` ENUM('product', 'shipping')
+```sql
+-- product_categories (enrichies V4.2)
+product_type ENUM('wine','sparkling','food','beverage','gift_set','other')
+is_alcohol BOOLEAN DEFAULT true
+icon_emoji VARCHAR(10)   -- Fallback si pas d'icon_url
 
-### ORM / Query builder
+-- products
+category_id FK → product_categories, is_featured, is_visible, allow_backorder, visible_boutique
 
-Knex.js (migrations + queries). Fichier de config : `backend/src/config/knexfile.js`.
+-- campaigns
+logo_url VARCHAR(500)    -- Fallback sur app_settings.logo_url si null
 
----
+-- users (ambassadeurs)
+ambassador_photo_url, region_id FK → regions, ambassador_bio, show_on_public_page
 
-## Moteur de règles (rulesEngine)
+-- orders
+source, referral_code, referred_by FK → users
 
-Cœur de la plateforme. Les règles sont stockées en JSONB dans `client_types` et évaluées dynamiquement.
+-- order_items
+type VARCHAR(20) DEFAULT 'product'  -- 'product' | 'shipping'
 
-- **pricing_rules** : tarification par type de client (remises, min_order)
-- **commission_rules** : commissions association + étudiant (double cagnotte V4.1)
-- **free_bottle_rules** : bouteilles gratuites (every_n_sold)
-- **tier_rules** : paliers ambassadeurs (Bronze/Argent/Or/Platine)
-
-**Principe fondamental** : ZÉRO règle métier hardcodée dans le code. Tout est configurable via l'admin.
-
----
-
-## Authentification & RBAC
-
-- JWT : access token 15min + refresh token 7j (httpOnly cookie)
-- Payload JWT : `{ userId, roles[], permissions[], campaign_ids[] }`
-- 8 rôles : Super Admin, Commercial, Comptable, Enseignant, Étudiant, CSE, Ambassadeur, Lecture seule
-- Permissions vérifiées à 2 niveaux : accès module + scope campagne
-- Middleware auth vérifie signature + extrait contexte utilisateur
-
----
-
-## Principes de développement
-
-### Architecture
-
-- **Immutabilité financière** : les financial_events sont append-only. Jamais de modification, que des ajouts (corrections = nouvel événement type "correction")
-- **Scope campagne** : TOUTES les données sont segmentées par campagne. Un utilisateur ne voit QUE ses campagnes
-- **Configurabilité** : toute règle métier vient de la DB (client_types JSONB), jamais du code
-- **Audit total** : chaque action admin est loggée (audit_log) avec avant/après et justification
-
-### Code
-
-- **Backward compatibility** : quand on modifie une structure (ex: category string → category_id FK), l'API retourne les DEUX formats pendant la transition
-- **Invalidation cache** : quand l'admin modifie des règles (client_types, pricing_conditions), invalider le cache Redis immédiatement
-- **Pas de données financières pour les enseignants** : le dashboard/teacher ne retourne JAMAIS de montants en €
-- **Tests obligatoires** : chaque nouveau endpoint doit avoir des tests dans api.integration.test.js ou un fichier dédié
-
-### Conventions
-
-- API prefix : `/api/v1`
-- Nommage routes : camelCase pour les fichiers, kebab-case pour les URLs
-- Migrations Knex : format `YYYYMMDDHHMMSS_description.js`
-- Composants React : PascalCase, un composant par fichier
-- Styles : Tailwind CSS, mobile-first
-- Gestion erreurs API : `{ error: true, message: "...", code: "ERROR_CODE" }`
-
----
-
-## Modifications en cours (Avenant V4.1)
-
-### Priorité URGENTE
-1. **Bug min_order CSE** : le min_order=0 paramétré dans l'admin ne se répercute pas côté boutique (problème cache ou route)
-
-### Priorité HAUTE
-2. **Catégories produits dynamiques** : nouvelle table product_categories, migration category string → category_id FK, CRUD admin, adaptation wizard boutique
-3. **Logos paramétrables** : logo V&C dans app_settings, logo partenaire dans organizations.logo_url, propagation dans tous les templates (header, PDF, BL)
-4. **Double cagnotte étudiante** : commission_rules enrichies (fund_collective + fund_individual), composant React WinePiggyBank (cochon tirelire SVG animé avec vin qui ondule)
-
-### Priorité MOYENNE
-5. **Lien partage étudiant (referral)** : referral_code dans participations, referred_by dans orders, boutique partageable, CA attribué à l'étudiant
-6. **Grille tarifaire transport** : tables shipping_zones + shipping_rates, calcul auto à la commande par département × quantité bouteilles
-
-### Priorité BASSE
-7. **Toggle sélection du moment** : is_featured sur products, 1 featured par catégorie, section boutique
-8. **Espace ressources campagne** : table campaign_resources, onglet dans dashboard étudiant/BTS
-
----
-
-## Commandes utiles
-
-```bash
-# Dev
-npm run dev              # Lance front + back en dev
-npm run dev:backend      # Backend seul
-npm run dev:frontend     # Frontend seul
-
-# Base de données
-npx knex migrate:latest  # Appliquer les migrations
-npx knex migrate:rollback # Rollback dernière migration
-npx knex seed:run        # Charger les données de test
-
-# Tests
-npm test                 # Tous les tests
-npm run test:backend     # Tests backend uniquement
-
-# Docker
-docker-compose up -d     # Lance tout (DB + Redis + App)
-docker-compose down      # Arrête tout
-
-# Build
-npm run build            # Build production
+-- participations
+referral_code VARCHAR(20) UNIQUE
 ```
 
 ---
 
-## Données de test / Seeds
+## 7. MOTEUR DE RÈGLES (rulesEngine)
 
-### Produits catalogue
-Oriolus Blanc (6.50€), Cuvée Clémence (8.50€), Carillon (12.50€), Apertus (13.50€),
-Crémant de Loire (12.90€), Coffret Découverte 3bt (32.00€), Coteaux du Layon (11.00€),
-Jus de Pomme (3.50€)
+**Principe absolu : ZÉRO règle métier hardcodée dans le code. Tout vient de la DB.**
 
-### Catégories
-Blancs Secs, Blancs Moelleux, Rouges, Effervescents, Sans Alcool, Coffrets
+### 7.1 Règles de tarification (`pricing_rules`)
+```json
+{ "type": "percentage_discount", "value": 10, "applies_to": "all", "min_order": 200 }
+```
 
-### Campagnes actives
-- Sacré-Cœur 2025-2026 (Financement Projet, 18 063€ / 25 000€)
-- CSE Leroy Merlin (Offre CSE, 4 520€ / 8 000€)
-- Ambassadeurs Loire (Réseau Ambassadeur, 6 780€ / 15 000€)
-- ESPL Angers (Financement Projet, 8 920€ / 12 000€)
+### 7.2 Règles de commissions (`commission_rules`)
+```json
+{
+  "association_rate": 0.05,
+  "fund_collective": true,
+  "fund_individual": true,
+  "base": "gross_revenue_ht"
+}
+```
 
-### Étudiants test (Sacré-Cœur)
-ACKAVONG Mathéo (2 383.70€, GA), BOURCIER Lilian (2 231.90€, GB),
-LEBRETON Paul (1 802.60€, GA), FLIPEAU Lilian (1 677.90€, GA)
+### 7.3 Règles de bouteilles gratuites (`free_bottle_rules`)
+
+**Règle critique — gratuité toujours sur la bouteille la moins chère**
+
+```json
+{
+  "trigger": "every_n_sold",
+  "n": 12,
+  "reward": "free_bottle",
+  "choice": "student_picks",
+  "from_catalog": true,
+  "cost_method": "cheapest_in_order",
+  "applies_to_alcohol_only": true
+}
+```
+
+**Formule de marge corrigée (V4.2)** :
+```
+coût_gratuite       = prix_achat de la bouteille au plus bas prix_achat dans la commande
+marge_brute_ligne   = Σ(prix_vente_HT - prix_achat) pour chaque order_item
+marge_nette         = marge_brute_ligne - coût_gratuite
+commission_asso     = CA_HT_brut × 0.05
+```
+
+### 7.4 Règles de paliers ambassadeurs (`tier_rules`)
+```json
+{
+  "tiers": [
+    { "label": "Bronze", "threshold": 500,  "reward": "Carte cadeau 25€",      "color": "#CD7F32" },
+    { "label": "Argent", "threshold": 1500, "reward": "Carte cadeau 75€",      "color": "#C0C0C0" },
+    { "label": "Or",     "threshold": 3000, "reward": "Carte cadeau 200€",     "color": "#C4A35A" },
+    { "label": "Platine","threshold": 5000, "reward": "Week-end oenologique",  "color": "#E5E4E2" }
+  ],
+  "period": "cumulative",
+  "reset": "never"
+}
+```
 
 ---
 
-## Points d'attention critiques
+## 8. AUTHENTIFICATION & RBAC
 
-1. **L'enseignant ne voit JAMAIS de montants en €** — vérifier systématiquement l'API /dashboard/teacher
-2. **Les étudiants ne manipulent PAS Stripe** — c'est V&C (Nicolas) qui encaisse
-3. **Les espèces doivent être tracées** — dépôt obligatoire avec date, montant, déposant
-4. **Cache Redis** — invalider après TOUTE modification admin (client_types, pricing_conditions, products)
-5. **Facturation électronique** — obligatoire septembre 2026, exports Pennylane doivent anticiper
-6. **RGPD mineurs** — consentement parental obligatoire à l'onboarding
-7. **Append-only pour les financial_events** — JAMAIS de UPDATE ou DELETE sur cette table
+- JWT payload : `{ userId, roles[], permissions[], campaign_ids[] }`
+- 8 rôles : Super Admin, Commercial, Comptable, Enseignant, Étudiant, CSE, Ambassadeur, Lecture seule
+- Permissions vérifiées à 2 niveaux : accès module + scope campagne
+- **Permission `share_link`** : activée pour Étudiant et Ambassadeur (V4.2)
+
+---
+
+## 9. PRINCIPES DE DÉVELOPPEMENT
+
+### Architecture
+- **Immutabilité financière** : `financial_events` est append-only. JAMAIS de UPDATE/DELETE.
+- **Scope campagne** : toutes les données segmentées par campagne.
+- **Configurabilité** : toute règle métier vient de la DB (JSONB), jamais du code.
+- **Audit total** : chaque action admin loggée dans `audit_log`.
+
+### Code
+- **Backward compatibility** : quand on modifie une structure, l'API retourne les DEUX formats.
+- **Invalidation cache Redis** : après TOUTE modification admin.
+- **Enseignant** : `/dashboard/teacher` ne retourne JAMAIS de montants en euros.
+- **Tests obligatoires** : chaque nouvel endpoint doit avoir des tests.
+
+### Conventions
+- API prefix : `/api/v1`
+- Routes : camelCase pour les fichiers, kebab-case pour les URLs
+- Migrations Knex : `YYYYMMDDHHMMSS_description.js`
+- Composants React : PascalCase, un composant par fichier
+- Styles : Tailwind CSS, mobile-first
+- Erreurs API : `{ error: true, message: "...", code: "ERROR_CODE" }`
+
+---
+
+## 10. PLAN D'IMPLÉMENTATION V4.2
+
+### Ordre d'exécution
+
+```
+BLOC 0 (BDD) → BLOC 1 (bugs urgents) → BLOC 2 (catégories adaptatives) → BLOC 3 (calcul marge)
+→ BLOC 4 (exports) → BLOC 5 (referral) → BLOC 6 (photos extranets) → BLOC 7 (branding)
+→ BLOC 8 (catalogue) → BLOC 9 (transport) → BLOC 10 (modale produit) → BLOC 11 (ambassadeurs dynamiques)
+→ BLOC 12 (export ventes par contact)
+```
+
+### Gate de qualité avant chaque merge
+```bash
+docker exec vc-api npm test        # 251+ tests doivent passer
+docker exec vc-frontend npx vite build  # Build frontend sans erreur
+```
+
+---
+
+## 11. COMMANDES UTILES
+
+```bash
+# Tests
+docker exec vc-api npm test
+docker exec vc-frontend npx vite build
+
+# Base de données
+docker exec vc-api npx knex migrate:latest
+docker exec vc-api npx knex migrate:rollback
+docker exec vc-api npx knex seed:run
+
+# Docker
+docker-compose up -d
+docker-compose down
+docker-compose logs -f vc-api
+```
+
+---
+
+## 12. DONNÉES DE TEST / SEEDS
+
+### Produits catalogue
+| Produit | Prix TTC | Prix HT | Prix achat | Catégorie | Label |
+|---------|----------|---------|------------|-----------|-------|
+| Oriolus Blanc | 6,50 | 5,42 | 3,20 | Blancs Secs | HVE |
+| Cuvée Clémence | 8,50 | 7,08 | 4,10 | Blancs Moelleux | Bio |
+| Carillon | 12,50 | 10,42 | 5,80 | Rouges | Cru Bourgeois |
+| Apertus | 13,50 | 11,25 | 6,50 | Rouges | HVE |
+| Crémant de Loire | 12,90 | 10,75 | 5,90 | Effervescents | - |
+| Coffret Découverte 3bt | 32,00 | 26,67 | 14,00 | Coffrets | - |
+| Coteaux du Layon | 11,00 | 9,17 | 5,30 | Blancs Moelleux | HVE |
+| Jus de Pomme | 3,50 | 3,32 | 1,80 | Sans Alcool | Bio |
+
+### Catégories (V4.2)
+| name | product_type | is_alcohol | icon_emoji |
+|------|-------------|------------|------------|
+| Blancs Secs | wine | true | - |
+| Blancs Moelleux | wine | true | - |
+| Rouges | wine | true | - |
+| Rosés | wine | true | - |
+| Effervescents | sparkling | true | - |
+| Sans Alcool | beverage | false | - |
+| Coffrets | gift_set | true | - |
+| Terrines | food | false | - |
+
+---
+
+## 13. POINTS D'ATTENTION CRITIQUES
+
+1. **L'enseignant ne voit JAMAIS de montants en euros** — vérifier systématiquement
+2. **Les étudiants ne manipulent PAS Stripe** — Nicolas encaisse
+3. **Les espèces doivent être tracées** — dépôt obligatoire
+4. **Cache Redis** — invalider après TOUTE modification admin
+5. **Facturation électronique** — obligatoire septembre 2026
+6. **RGPD mineurs** — consentement parental obligatoire
+7. **Append-only financial_events** — JAMAIS de UPDATE ou DELETE
+8. **Règle 12+1 alcool uniquement** — ne s'applique PAS aux produits is_alcohol=false
+9. **Gratuite = la moins chère** — coût = prix_achat le plus bas du panier
+10. **API publique ambassadeurs** — ne jamais exposer données financières
+11. **Referral doublon** — rattacher sans recréer si email existe
+12. **ProductModal navigation** — rester dans le contexte du filtre actif

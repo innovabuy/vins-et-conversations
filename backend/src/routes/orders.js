@@ -6,6 +6,7 @@ const orderService = require('../services/orderService');
 const { authenticate, requireRole, requireCampaignAccess, antifraudCheck } = require('../middleware/auth');
 const { validate } = require('../middleware/validate');
 const { auditAction } = require('../middleware/audit');
+const { getAppBranding } = require('../utils/appBranding');
 
 const router = express.Router();
 
@@ -291,7 +292,8 @@ router.get('/:id/invoice', authenticate, async (req, res) => {
     doc.pipe(res);
 
     // Header
-    doc.fontSize(20).text('Vins & Conversations', { align: 'center' });
+    const brandingInv = await getAppBranding();
+    doc.fontSize(20).text(brandingInv.app_name, { align: 'center' });
     doc.fontSize(10).text('Nicolas Froment — Angers', { align: 'center' });
     doc.moveDown();
     doc.fontSize(14).text(`Facture ${order.ref}`, { align: 'left' });
@@ -483,7 +485,8 @@ router.get('/:id/pdf', authenticate, async (req, res) => {
     doc.pipe(res);
 
     // Header
-    doc.fontSize(22).fillColor('#7a1c3b').text('Vins & Conversations', { align: 'center' });
+    const brandingBon = await getAppBranding();
+    doc.fontSize(22).fillColor('#7a1c3b').text(brandingBon.app_name, { align: 'center' });
     doc.fontSize(9).fillColor('#666').text('Nicolas Froment — Angers — contact@vins-conversations.fr', { align: 'center' });
     doc.moveDown(1.5);
 
@@ -531,7 +534,7 @@ router.get('/:id/pdf', authenticate, async (req, res) => {
 
     doc.moveDown(2);
     doc.fontSize(8).fillColor('#999').font('Helvetica');
-    doc.text('Conditions : paiement à réception sauf accord préalable. Vins & Conversations — SIRET 000 000 000 00000', 50);
+    doc.text(`Conditions : paiement à réception sauf accord préalable. ${brandingBon.app_name} — SIRET 000 000 000 00000`, 50);
 
     doc.end();
   } catch (err) {

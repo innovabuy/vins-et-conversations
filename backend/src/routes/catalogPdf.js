@@ -5,6 +5,7 @@ const db = require('../config/database');
 const { authenticate, requireRole } = require('../middleware/auth');
 const { getCriteriaForProduct } = require('../config/tastingCriteria');
 const logger = require('../utils/logger');
+const { getAppBranding } = require('../utils/appBranding');
 
 const router = express.Router();
 
@@ -91,14 +92,14 @@ function parseNotes(val) {
 
 // ─── Premium multi-page PDF ─────────────────────────
 
-function generatePremiumPDF(doc, products, { segment = 'public', pricingRules = null, conditions = null } = {}) {
+function generatePremiumPDF(doc, products, { segment = 'public', pricingRules = null, conditions = null, branding = {} } = {}) {
+  const appName = branding.app_name || 'Vins & Conversations';
   const formatEur = (v) => parseFloat(v).toFixed(2).replace('.', ',') + ' €';
   const dateStr = new Date().toLocaleDateString('fr-FR', { day: '2-digit', month: 'long', year: 'numeric' });
 
   // ─── PAGE 1 — Cover ───────────────────────────────
   doc.moveDown(8);
-  doc.fontSize(36).fillColor('#7f1d1d').text('Vins &', { align: 'center' });
-  doc.fontSize(36).fillColor('#7f1d1d').text('Conversations', { align: 'center' });
+  doc.fontSize(36).fillColor('#7f1d1d').text(appName, { align: 'center' });
   doc.moveDown(1);
   doc.moveTo(200, doc.y).lineTo(395, doc.y).lineWidth(2).stroke('#7f1d1d');
   doc.moveDown(1);
@@ -110,7 +111,7 @@ function generatePremiumPDF(doc, products, { segment = 'public', pricingRules = 
   }
   doc.fontSize(10).fillColor('#9ca3af').text(dateStr, { align: 'center' });
   doc.moveDown(6);
-  doc.fontSize(9).fillColor('#9ca3af').text('Nicolas Froment — Vins & Conversations', { align: 'center' });
+  doc.fontSize(9).fillColor('#9ca3af').text(`Nicolas Froment — ${appName}`, { align: 'center' });
   doc.text('Loire Valley, France', { align: 'center' });
 
   // ─── PAGE 2 — Sommaire ────────────────────────────
@@ -229,7 +230,7 @@ function generatePremiumPDF(doc, products, { segment = 'public', pricingRules = 
     }
 
     // Footer
-    doc.fontSize(7).fillColor('#d1d5db').text('Vins & Conversations', 50, 780, { align: 'center', width: 495 });
+    doc.fontSize(7).fillColor('#d1d5db').text(appName, 50, 780, { align: 'center', width: 495 });
   }
 
   // ─── Conditions commerciales ──────────────────────
@@ -265,7 +266,7 @@ function generatePremiumPDF(doc, products, { segment = 'public', pricingRules = 
   doc.fontSize(24).fillColor('#7f1d1d').text('Contactez-nous', { align: 'center' });
   doc.moveDown(1.5);
   doc.fontSize(12).fillColor('#1f2937').text('Nicolas Froment', { align: 'center' });
-  doc.fontSize(10).fillColor('#6b7280').text('Vins & Conversations', { align: 'center' });
+  doc.fontSize(10).fillColor('#6b7280').text(appName, { align: 'center' });
   doc.moveDown(0.5);
   doc.text('06 XX XX XX XX', { align: 'center' });
   doc.text('nicolas@vins-conversations.fr', { align: 'center' });
@@ -311,7 +312,8 @@ router.get(
       res.setHeader('Content-Type', 'application/pdf');
       res.setHeader('Content-Disposition', `inline; filename=catalogue-${segment}.pdf`);
       doc.pipe(res);
-      generatePremiumPDF(doc, products, { segment, pricingRules, conditions });
+      const branding = await getAppBranding();
+      generatePremiumPDF(doc, products, { segment, pricingRules, conditions, branding });
       doc.end();
     } catch (err) {
       logger.error('Catalog PDF error:', err);
@@ -338,7 +340,8 @@ router.post(
       doc.on('data', (chunk) => chunks.push(chunk));
 
       const pdfReady = new Promise((resolve) => doc.on('end', () => resolve(Buffer.concat(chunks))));
-      generatePremiumPDF(doc, products, { segment: segment || 'public' });
+      const brandingEmail = await getAppBranding();
+      generatePremiumPDF(doc, products, { segment: segment || 'public', branding: brandingEmail });
       doc.end();
       const pdfBuffer = await pdfReady;
 
@@ -359,12 +362,12 @@ router.post(
       await transporter.sendMail({
         from: process.env.SMTP_FROM || 'catalogue@vins-conversations.fr',
         to: email,
-        subject: subject || 'Catalogue Vins & Conversations',
+        subject: subject || `Catalogue ${appName}`,
         html: `
           <div style="font-family: sans-serif; color: #1f2937;">
-            <h2 style="color: #7f1d1d;">Vins & Conversations</h2>
+            <h2 style="color: #7f1d1d;">${appName}</h2>
             <p>${message || 'Veuillez trouver ci-joint notre catalogue de vins.'}</p>
-            <p style="color: #6b7280; font-size: 12px;">Nicolas Froment — Vins & Conversations</p>
+            <p style="color: #6b7280; font-size: 12px;">Nicolas Froment — ${appName}</p>
           </div>
         `,
         attachments: [{
