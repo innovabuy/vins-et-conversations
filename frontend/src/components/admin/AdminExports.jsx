@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { exportsAPI, campaignsAPI } from '../../services/api';
-import { Download, FileText, FileSpreadsheet, Calendar } from 'lucide-react';
+import { Download, FileText, FileSpreadsheet, Calendar, Users } from 'lucide-react';
 
 function downloadBlob(res, filename) {
   const url = window.URL.createObjectURL(new Blob([res.data]));
@@ -15,6 +15,7 @@ export default function AdminExports() {
   const [start, setStart] = useState('');
   const [end, setEnd] = useState('');
   const [campaignId, setCampaignId] = useState('');
+  const [contactType, setContactType] = useState('');
   const [campaigns, setCampaigns] = useState([]);
   const [loading, setLoading] = useState({});
 
@@ -94,6 +95,16 @@ export default function AdminExports() {
       action: () => exportsAPI.activityReport(start, end),
       filename: 'rapport-activite.pdf',
     },
+    {
+      key: 'sales-by-contact',
+      title: 'Ventes par contact',
+      description: 'Récapitulatif et détail des ventes par contact (Excel)',
+      icon: Users,
+      type: 'xlsx',
+      needsDates: true,
+      action: () => exportsAPI.salesByContact(start, end, contactType),
+      filename: 'ventes-par-contact.xlsx',
+    },
   ];
 
   return (
@@ -124,6 +135,17 @@ export default function AdminExports() {
               ))}
             </select>
           </div>
+          <div className="flex items-center gap-2">
+            <label className="text-sm text-gray-600">Type contact</label>
+            <select value={contactType} onChange={(e) => setContactType(e.target.value)} className="input-field">
+              <option value="">Tous</option>
+              <option value="particulier">Particulier</option>
+              <option value="cse">CSE</option>
+              <option value="ambassadeur">Ambassadeur</option>
+              <option value="professionnel">Professionnel</option>
+              <option value="etudiant">Etudiant</option>
+            </select>
+          </div>
         </div>
       </div>
 
@@ -132,7 +154,7 @@ export default function AdminExports() {
         {exports.map((exp) => (
           <div key={exp.key} className="card flex flex-col">
             <div className="flex items-start gap-3 mb-3">
-              <div className={`p-2 rounded-lg ${exp.type === 'csv' ? 'bg-green-50 text-green-600' : 'bg-red-50 text-red-600'}`}>
+              <div className={`p-2 rounded-lg ${exp.type === 'csv' ? 'bg-green-50 text-green-600' : exp.type === 'xlsx' ? 'bg-blue-50 text-blue-600' : 'bg-red-50 text-red-600'}`}>
                 <exp.icon size={20} />
               </div>
               <div>

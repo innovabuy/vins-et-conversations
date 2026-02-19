@@ -588,4 +588,154 @@ router.get('/seller-detail', async (req, res) => {
   }
 });
 
+// 9. GET /api/v1/admin/exports/sales-by-contact?start&end&type — Ventes par contact Excel
+router.get('/sales-by-contact', async (req, res) => {
+  try {
+    const ExcelJS = require('exceljs');
+    const { start, end, type } = req.query;
+
+    let query = db('order_items')
+      .join('orders', 'order_items.order_id', 'orders.id')
+      .join('products', 'order_items.product_id', 'products.id')
+      .join('contacts', 'orders.customer_id', 'contacts.id')
+      .leftJoin('product_categories as pc', 'products.category_id', 'pc.id')
+      .whereIn('orders.status', ['validated', 'preparing', 'shipped', 'delivered'])
+      .where('order_items.type', 'product');
+
+    if (start) query = query.where('orders.created_at', '>=', start);
+    if (end) query = query.where('orders.created_at', '<=', end);
+    if (type) query = query.where('contacts.type', type);
+
+    const items = await query.select(
+      'contacts.name as contact_name',
+      'contacts.email as contact_email',
+      'contacts.type as contact_type',
+      'contacts.phone as contact_phone',
+      'contacts.address as contact_address',
+      'products.name as produit',
+      'pc.name as categorie',
+      'order_items.qty',
+      'order_items.unit_price_ht',
+      'order_items.unit_price_ttc',
+      'products.purchase_price',
+      'orders.ref',
+      'orders.created_at'
+    ).orderBy([{ column: 'contacts.name' }, { column: 'orders.created_at' }]);
+
+    // Group by contact
+    const contacts = {};
+    for (const item of items) {
+      const key = item.contact_name + '||' + (item.contact_email || '');
+      if (!contacts[key]) {
+        contacts[key] = {
+          name: item.contact_name,
+          email: item.contact_email || '',
+          type: item.contact_type || 'particulier',
+          phone: item.contact_phone || '',
+          address: item.contact_address || '',
+          items: [],
+        };
+      }
+      contacts[key].items.push(item);
+    }
+
+    const workbook = new ExcelJS.Workbook();
+    workbook.creator = 'Vins & Conversations';
+
+    // Summary sheet
+    const summary = workbook.addWorksheet('Récapitulatif');
+    summary.columns = [
+      { header: 'Contact', key: 'contact', width: 25 },
+      { header: 'Email', key: 'email', width: 28 },
+      { header: 'Type', key: 'type', width: 14 },
+      { header: 'Téléphone', key: 'phone', width: 16 },
+      { header: 'Adresse', key: 'address', width: 30 },
+      { header: 'Commandes', key: 'orders', width: 12 },
+      { header: 'Bouteilles', key: 'qty', width: 12 },
+      { header: 'CA HT', key: 'ca_ht', width: 14 },
+      { header: 'CA TTC', key: 'ca_ttc', width: 14 },
+      { header: 'Marge', key: 'marge', width: 14 },
+    ];
+    summary.getRow(1).font = { bold: true };
+    summary.getRow(1).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF722F37' } };
+    summary.getRow(1).font = { bold: true, color: { argb: 'FFFFFFFF' } };
+
+    let grandTotalQty = 0, grandTotalHT = 0, grandTotalTTC = 0, grandTotalMarge = 0;
+
+    for (const data of Object.values(contacts)) {
+      const uniqueOrders = new Set(data.items.map(i => i.ref)).size;
+      const totalQty = data.items.reduce((s, i) => s + i.qty, 0);
+      const totalHT = data.items.reduce((s, i) => s + parseFloat(i.unit_price_ht) * i.qty, 0);
+      const totalTTC = data.items.reduce((s, i) => s + parseFloat(i.unit_price_ttc) * i.qty, 0);
+      const totalMarge = data.items.reduce((s, i) => s + (parseFloat(i.unit_price_ht) - parseFloat(i.purchase_price)) * i.qty, 0);
+
+      summary.addRow({
+        contact: data.name, email: data.email, type: data.type,
+        phone: data.phone, address: data.address,
+        orders: uniqueOrders, qty: totalQty,
+        ca_ht: parseFloat(totalHT.toFixed(2)),
+        ca_ttc: parseFloat(totalTTC.toFixed(2)),
+        marge: parseFloat(totalMarge.toFixed(2)),
+      });
+
+      grandTotalQty += totalQty;
+      grandTotalHT += totalHT;
+      grandTotalTTC += totalTTC;
+      grandTotalMarge += totalMarge;
+    }
+
+    // Total row
+    const totalRow = summary.addRow({
+      contact: 'TOTAL', orders: Object.values(contacts).reduce((s, c) => s + new Set(c.items.map(i => i.ref)).size, 0),
+      qty: grandTotalQty, ca_ht: parseFloat(grandTotalHT.toFixed(2)),
+      ca_ttc: parseFloat(grandTotalTTC.toFixed(2)), marge: parseFloat(grandTotalMarge.toFixed(2)),
+    });
+    totalRow.font = { bold: true };
+
+    // Detail sheet
+    const detail = workbook.addWorksheet('Détail');
+    detail.columns = [
+      { header: 'Contact', key: 'contact', width: 25 },
+      { header: 'Type', key: 'type', width: 14 },
+      { header: 'Date', key: 'date', width: 12 },
+      { header: 'Réf commande', key: 'ref', width: 15 },
+      { header: 'Catégorie', key: 'categorie', width: 18 },
+      { header: 'Produit', key: 'produit', width: 30 },
+      { header: 'Qté', key: 'qty', width: 8 },
+      { header: 'PU HT', key: 'pu_ht', width: 12 },
+      { header: 'PU TTC', key: 'pu_ttc', width: 12 },
+      { header: 'CA HT', key: 'ca_ht', width: 14 },
+      { header: 'CA TTC', key: 'ca_ttc', width: 14 },
+      { header: 'Marge', key: 'marge', width: 14 },
+    ];
+    detail.getRow(1).font = { bold: true };
+    detail.getRow(1).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF722F37' } };
+    detail.getRow(1).font = { bold: true, color: { argb: 'FFFFFFFF' } };
+
+    for (const item of items) {
+      detail.addRow({
+        contact: item.contact_name,
+        type: item.contact_type || 'particulier',
+        date: new Date(item.created_at).toLocaleDateString('fr-FR'),
+        ref: item.ref,
+        categorie: item.categorie || '',
+        produit: item.produit,
+        qty: item.qty,
+        pu_ht: parseFloat(parseFloat(item.unit_price_ht).toFixed(2)),
+        pu_ttc: parseFloat(parseFloat(item.unit_price_ttc).toFixed(2)),
+        ca_ht: parseFloat((parseFloat(item.unit_price_ht) * item.qty).toFixed(2)),
+        ca_ttc: parseFloat((parseFloat(item.unit_price_ttc) * item.qty).toFixed(2)),
+        marge: parseFloat(((parseFloat(item.unit_price_ht) - parseFloat(item.purchase_price)) * item.qty).toFixed(2)),
+      });
+    }
+
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.setHeader('Content-Disposition', 'attachment; filename=ventes-par-contact.xlsx');
+    await workbook.xlsx.write(res);
+    res.end();
+  } catch (err) {
+    res.status(500).json({ error: 'SERVER_ERROR', message: err.message });
+  }
+});
+
 module.exports = router;

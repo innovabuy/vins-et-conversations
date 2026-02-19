@@ -24,6 +24,7 @@ const IDS = {
   bts_student1: uuidv4(),
   // Ambassadeur
   ambassadeur1: uuidv4(),
+  ambassadeur2: uuidv4(),
   // BTS campaign
   camp_bts_espl: uuidv4(),
   // Formation modules
@@ -132,6 +133,7 @@ exports.seed = async function (knex) {
   // REGIONS (V4.2 — Référentiel régions administratives FR)
   // ═══════════════════════════════════════════════════════
   let regionPDL = null;
+  let regionBretagne = null;
   if (hasRegions) {
     await knex('regions').insert([
       { name: 'Auvergne-Rhône-Alpes', code: 'ARA', sort_order: 1 },
@@ -149,6 +151,7 @@ exports.seed = async function (knex) {
       { name: 'Provence-Alpes-Côte d\'Azur', code: 'PAC', sort_order: 13 },
     ]);
     regionPDL = await knex('regions').where({ code: 'PDL' }).first();
+    regionBretagne = await knex('regions').where({ code: 'BRE' }).first();
   }
 
   const hash = await bcrypt.hash('VinsConv2026!', 12);
@@ -221,6 +224,19 @@ exports.seed = async function (knex) {
       ...(hasRegions ? {
         ambassador_bio: 'Passionné de vins de Loire depuis 10 ans, je parcours la région pour partager mes découvertes.',
         region_id: regionPDL ? regionPDL.id : null,
+        show_on_public_page: true,
+      } : {}),
+    },
+    {
+      id: IDS.ambassadeur2,
+      email: 'ambassadeur2@example.fr',
+      password_hash: hash,
+      name: 'Marie Durand',
+      role: 'ambassadeur',
+      status: 'active',
+      ...(hasRegions ? {
+        ambassador_bio: 'Sommelière de formation, je propose des dégustations privées en Bretagne et partage ma passion du terroir ligérien.',
+        region_id: regionBretagne ? regionBretagne.id : null,
         show_on_public_page: true,
       } : {}),
     },
@@ -672,13 +688,21 @@ exports.seed = async function (knex) {
     role_in_campaign: 'cse_manager',
   });
 
-  // Participation ambassadeur
-  await knex('participations').insert({
-    user_id: IDS.ambassadeur1,
-    campaign_id: IDS.camp_ambassadeurs,
-    organization_id: IDS.reseau_loire,
-    role_in_campaign: 'ambassador',
-  });
+  // Participation ambassadeurs
+  await knex('participations').insert([
+    {
+      user_id: IDS.ambassadeur1,
+      campaign_id: IDS.camp_ambassadeurs,
+      organization_id: IDS.reseau_loire,
+      role_in_campaign: 'ambassador',
+    },
+    {
+      user_id: IDS.ambassadeur2,
+      campaign_id: IDS.camp_ambassadeurs,
+      organization_id: IDS.reseau_loire,
+      role_in_campaign: 'ambassador',
+    },
+  ]);
 
   // Participation BTS student
   await knex('participations').insert({
@@ -800,6 +824,40 @@ exports.seed = async function (knex) {
       amount: ao.ca,
       description: `Vente ${aoRef} - Ambassadeur Martin`,
       created_at: aoDate,
+    });
+  }
+
+  // Commandes ambassadeur 2 (Marie Durand — CA ~800€ → Bronze)
+  const amb2Orders = [
+    { ca: 420, items: 32 },
+    { ca: 380, items: 28 },
+  ];
+  for (let i = 0; i < amb2Orders.length; i++) {
+    const a2o = amb2Orders[i];
+    const a2Ref = `VC-2026-${String(orderCounter++).padStart(4, '0')}`;
+    const a2Id = uuidv4();
+    const a2Date = new Date(2025, 11, 5 + i * 10);
+
+    await knex('orders').insert({
+      id: a2Id,
+      ref: a2Ref,
+      campaign_id: IDS.camp_ambassadeurs,
+      user_id: IDS.ambassadeur2,
+      status: 'delivered',
+      total_ttc: a2o.ca,
+      total_ht: parseFloat((a2o.ca / 1.20).toFixed(2)),
+      total_items: a2o.items,
+      created_at: a2Date,
+      updated_at: a2Date,
+    });
+
+    await knex('financial_events').insert({
+      order_id: a2Id,
+      campaign_id: IDS.camp_ambassadeurs,
+      type: 'sale',
+      amount: a2o.ca,
+      description: `Vente ${a2Ref} - Ambassadrice Durand`,
+      created_at: a2Date,
     });
   }
 

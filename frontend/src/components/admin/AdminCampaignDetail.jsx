@@ -5,7 +5,7 @@ import {
   ArrowLeft, Users, ShoppingCart, Wine, TrendingUp, Calendar,
   Target, Package, BarChart3, Mail, CreditCard, ExternalLink,
   Copy, Check, Store, FileText, BookOpen, Plus, Trash2, Upload,
-  FileDown, Video, Image, Link as LinkIcon,
+  FileDown, Video, Image, Link as LinkIcon, Download,
 } from 'lucide-react';
 import {
   ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip,
@@ -270,6 +270,26 @@ function OverviewTab({ data }) {
 
 function ParticipantsTab({ participants, campaignId }) {
   const navigate = useNavigate();
+  const [exporting, setExporting] = useState(null);
+
+  const handleExportExcel = async (e, participant) => {
+    e.stopPropagation();
+    setExporting(participant.id);
+    try {
+      const res = await campaignsAPI.participantExcel(campaignId, participant.id);
+      const url = window.URL.createObjectURL(new Blob([res.data]));
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `ventes-${participant.name.replace(/\s+/g, '-').toLowerCase()}.xlsx`;
+      link.click();
+      window.URL.revokeObjectURL(url);
+    } catch (err) {
+      alert('Erreur export: ' + (err.response?.data?.message || err.message));
+    } finally {
+      setExporting(null);
+    }
+  };
+
   return (
     <div className="space-y-4">
       <p className="text-sm text-gray-500">{participants.length} participant(s)</p>
@@ -283,7 +303,12 @@ function ParticipantsTab({ participants, campaignId }) {
                 <p className="font-semibold text-sm">{p.name}</p>
                 <p className="text-xs text-gray-500">{p.email}</p>
               </div>
-              <span className="text-xs px-2 py-0.5 rounded-full bg-gray-100">{p.role}</span>
+              <div className="flex items-center gap-2">
+                <span className="text-xs px-2 py-0.5 rounded-full bg-gray-100">{p.role}</span>
+                <button onClick={(e) => handleExportExcel(e, p)} disabled={exporting === p.id} className="p-1 text-gray-400 hover:text-wine-600 disabled:opacity-50" title="Export Excel">
+                  <Download size={14} />
+                </button>
+              </div>
             </div>
             <div className="flex gap-4 mt-2 text-sm">
               <span className="font-bold text-wine-700">{formatEur(parseFloat(p.ca))}</span>
@@ -305,6 +330,7 @@ function ParticipantsTab({ participants, campaignId }) {
               <th className="px-4 py-3 text-right">CA TTC</th>
               <th className="px-4 py-3 text-right">Commandes</th>
               <th className="px-4 py-3 text-left">Inscrit le</th>
+              <th className="px-4 py-3 text-center">Export</th>
             </tr>
           </thead>
           <tbody className="divide-y">
@@ -317,6 +343,11 @@ function ParticipantsTab({ participants, campaignId }) {
                 <td className="px-4 py-3 text-right font-bold text-wine-700">{formatEur(parseFloat(p.ca))}</td>
                 <td className="px-4 py-3 text-right">{p.orders_count}</td>
                 <td className="px-4 py-3 text-gray-500">{new Date(p.joined_at).toLocaleDateString('fr-FR')}</td>
+                <td className="px-4 py-3 text-center">
+                  <button onClick={(e) => handleExportExcel(e, p)} disabled={exporting === p.id} className="p-1.5 rounded hover:bg-gray-100 text-gray-400 hover:text-wine-600 disabled:opacity-50" title="Export Excel">
+                    <Download size={14} />
+                  </button>
+                </td>
               </tr>
             ))}
           </tbody>

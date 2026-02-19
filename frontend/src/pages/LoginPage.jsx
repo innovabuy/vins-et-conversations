@@ -183,12 +183,6 @@ export default function LoginPage() {
                   {loading ? 'Connexion...' : <>Se connecter <ArrowRight size={16} /></>}
                 </button>
               </form>
-              <div className="mt-4 p-3 bg-gray-50 rounded-lg text-xs text-gray-500">
-                <p className="font-medium mb-1">Comptes de démonstration :</p>
-                <p>Admin : nicolas@vins-conversations.fr</p>
-                <p>Élève : ackavong@eleve.sc.fr</p>
-                <p>Mot de passe : VinsConv2026!</p>
-              </div>
             </div>
           )}
 

@@ -228,7 +228,8 @@ router.get('/:id/report-pdf', authenticate, requireRole('super_admin', 'commerci
     if (!campaign) return res.status(404).json({ error: 'NOT_FOUND' });
 
     const validStatuses = ['submitted', 'validated', 'preparing', 'shipped', 'delivered'];
-    const formatEur = (v) => new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR' }).format(v || 0);
+    // Replace narrow no-break space (U+202F) and no-break space (U+00A0) with regular space for PDFKit compatibility
+    const formatEur = (v) => new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR' }).format(v || 0).replace(/[\u202F\u00A0]/g, ' ');
     const BURGUNDY = '#7a1c3b';
     const DARK = '#1f2937';
     const GRAY = '#6b7280';
@@ -278,8 +279,10 @@ router.get('/:id/report-pdf', authenticate, requireRole('super_admin', 'commerci
       .join('orders', 'order_items.order_id', 'orders.id')
       .where('orders.campaign_id', campaign.id)
       .whereIn('orders.status', validStatuses)
+      .where('order_items.type', 'product')
       .groupBy('products.id', 'products.name', 'products.purchase_price')
       .select(
+        'products.id as product_id',
         'products.name',
         'products.purchase_price',
         db.raw('SUM(order_items.qty) as qty'),
@@ -300,8 +303,9 @@ router.get('/:id/report-pdf', authenticate, requireRole('super_admin', 'commerci
         db.raw("COALESCE(SUM(CASE WHEN sm.type IN ('initial','entry','return') THEN sm.qty ELSE -sm.qty END), 0) as current_stock")
       );
 
+    // Index sold quantities by product ID for reliable matching
     const soldMap = {};
-    for (const ps of productSales) soldMap[ps.name] = parseInt(ps.qty) || 0;
+    for (const ps of productSales) soldMap[ps.product_id] = parseInt(ps.qty) || 0;
 
     // Generate PDF
     const doc = new PDFDocument({ size: 'A4', margin: 50, bufferPages: true });
@@ -411,41 +415,62 @@ router.get('/:id/report-pdf', authenticate, requireRole('super_admin', 'commerci
     if (stockData.length) {
       if (doc.y > 650) doc.addPage();
       drawSectionTitle('État du stock');
-      const sColX = [50, 300, 380, 460];
+      const sColX = [50, 280, 360, 440];
+      const sColW = [225, 75, 75, 80];
       let y = doc.y;
       doc.rect(50, y, 495, 16).fill('#f3f4f6');
       doc.fillColor(DARK).fontSize(8).font('Helvetica-Bold');
-      doc.text('Produit', sColX[0] + 4, y + 4, { width: 245 });
-      doc.text('Stock actuel', sColX[1] + 4, y + 4, { width: 75, align: 'right' });
-      doc.text('Vendu', sColX[2] + 4, y + 4, { width: 75, align: 'right' });
-      doc.text('Restant', sColX[3] + 4, y + 4, { width: 80, align: 'right' });
+      doc.text('Produit', sColX[0] + 4, y + 4, { width: sColW[0] });
+      doc.text('Stock actuel', sColX[1] + 4, y + 4, { width: sColW[1], align: 'right' });
+      doc.text('Vendu', sColX[2] + 4, y + 4, { width: sColW[2], align: 'right' });
+      doc.text('Restant', sColX[3] + 4, y + 4, { width: sColW[3], align: 'right' });
       y += 18;
       doc.font('Helvetica').fontSize(8);
       for (const s of stockData) {
         if (y > 750) { doc.addPage(); y = 50; }
-        const sold = soldMap[s.name] || 0;
+        const sold = soldMap[s.id] || 0;
         const stockQty = parseInt(s.current_stock) || 0;
-        doc.fillColor(DARK).text(s.name.substring(0, 50), sColX[0] + 4, y, { width: 245 });
-        doc.text(String(stockQty), sColX[1] + 4, y, { width: 75, align: 'right' });
-        doc.text(String(sold), sColX[2] + 4, y, { width: 75, align: 'right' });
+        const isNegativeStock = stockQty < 0;
+        // Highlight row if negative stock
+        if (isNegativeStock) {
+          doc.rect(50, y - 1, 495, 14).fill('#fef2f2');
+        }
+        doc.fillColor(isNegativeStock ? '#dc2626' : DARK).text(s.name.substring(0, 45), sColX[0] + 4, y, { width: sColW[0] });
+        doc.fillColor(isNegativeStock ? '#dc2626' : DARK).text(String(stockQty), sColX[1] + 4, y, { width: sColW[1], align: 'right' });
+        doc.fillColor(DARK).text(String(sold), sColX[2] + 4, y, { width: sColW[2], align: 'right' });
         const remaining = stockQty - sold;
-        doc.fillColor(remaining <= 0 ? '#dc2626' : DARK).text(String(remaining), sColX[3] + 4, y, { width: 80, align: 'right' });
+        doc.fillColor(remaining < 0 ? '#dc2626' : DARK).text(String(remaining), sColX[3] + 4, y, { width: sColW[3], align: 'right' });
         y += 14;
       }
       doc.y = y + 8;
       doc.moveDown(0.5);
     }
 
-    // ─── Top vendeurs ───
+    // ─── Top vendeurs (table layout to prevent overflow) ───
     if (topSellers.length) {
-      if (doc.y > 650) doc.addPage();
+      // Only add page if truly not enough room (at least ~200px needed for 10 sellers)
+      const neededHeight = topSellers.length * 15 + 40;
+      if (doc.y + neededHeight > 770) doc.addPage();
       drawSectionTitle('Top 10 Vendeurs');
-      doc.fontSize(9).font('Helvetica').fillColor(DARK);
+      const tColX = [50, 280, 420];
+      const tColW = [225, 135, 120];
+      let y = doc.y;
+      doc.rect(50, y, 495, 16).fill('#f3f4f6');
+      doc.fillColor(DARK).fontSize(8).font('Helvetica-Bold');
+      doc.text('#  Nom', tColX[0] + 4, y + 4, { width: tColW[0] });
+      doc.text('CA TTC', tColX[1] + 4, y + 4, { width: tColW[1], align: 'right' });
+      doc.text('Commandes', tColX[2] + 4, y + 4, { width: tColW[2], align: 'right' });
+      y += 18;
+      doc.font('Helvetica').fontSize(8);
       for (let i = 0; i < topSellers.length; i++) {
+        if (y > 760) { doc.addPage(); y = 50; }
         const s = topSellers[i];
-        doc.text(`${i + 1}. ${s.name} — ${formatEur(s.ca)} (${s.orders_count} commande${parseInt(s.orders_count) > 1 ? 's' : ''})`);
+        doc.fillColor(DARK).text(`${i + 1}. ${s.name.substring(0, 35)}`, tColX[0] + 4, y, { width: tColW[0] });
+        doc.text(formatEur(s.ca), tColX[1] + 4, y, { width: tColW[1], align: 'right' });
+        doc.text(`${s.orders_count}`, tColX[2] + 4, y, { width: tColW[2], align: 'right' });
+        y += 14;
       }
-      doc.moveDown(0.8);
+      doc.y = y + 8;
     }
 
     // ─── Footer on all pages ───
@@ -454,7 +479,7 @@ router.get('/:id/report-pdf', authenticate, requireRole('super_admin', 'commerci
     for (let i = range.start; i < range.start + range.count; i++) {
       doc.switchToPage(i);
       doc.fillColor(GRAY).fontSize(7).font('Helvetica');
-      doc.text(`Vins & Conversations — Rapport ${campaign.name} — ${now} — Page ${i + 1}/${range.count}`, 50, 800, { align: 'center', width: 495 });
+      doc.text(`Vins & Conversations — Rapport ${campaign.name} — ${now} — Page ${i + 1}/${range.count}`, 50, 780, { align: 'center', width: 495 });
     }
 
     doc.end();
@@ -925,6 +950,155 @@ router.delete('/:id', authenticate, requireRole('super_admin'), auditAction('cam
       message: 'Campagne supprimée définitivement',
     });
   } catch (err) {
+    res.status(500).json({ error: 'SERVER_ERROR', message: err.message });
+  }
+});
+
+// GET /api/v1/admin/campaigns/:campaignId/participants/:userId/export-excel
+router.get('/:campaignId/participants/:userId/export-excel', authenticate, requireRole('super_admin', 'commercial'), async (req, res) => {
+  try {
+    const ExcelJS = require('exceljs');
+    const { campaignId, userId } = req.params;
+
+    const campaign = await db('campaigns').where({ id: campaignId }).first();
+    if (!campaign) return res.status(404).json({ error: 'NOT_FOUND', message: 'Campagne introuvable' });
+
+    const user = await db('users').where({ id: userId }).first();
+    if (!user) return res.status(404).json({ error: 'NOT_FOUND', message: 'Participant introuvable' });
+
+    const validStatuses = ['submitted', 'validated', 'preparing', 'shipped', 'delivered'];
+
+    // Fetch all orders for this participant in this campaign with line items
+    const rows = await db('orders')
+      .join('order_items', 'orders.id', 'order_items.order_id')
+      .join('products', 'order_items.product_id', 'products.id')
+      .leftJoin('product_categories', 'products.category_id', 'product_categories.id')
+      .leftJoin('contacts', 'orders.customer_id', 'contacts.id')
+      .where('orders.campaign_id', campaignId)
+      .where('orders.user_id', userId)
+      .whereIn('orders.status', validStatuses)
+      .where('order_items.type', 'product')
+      .select(
+        'orders.ref as reference',
+        'orders.created_at as order_date',
+        'orders.status',
+        'orders.payment_method',
+        'contacts.name as contact_name',
+        'contacts.email as contact_email',
+        'contacts.phone as contact_phone',
+        'product_categories.name as category',
+        'products.name as product_name',
+        'order_items.qty',
+        'order_items.unit_price_ht',
+        'order_items.unit_price_ttc',
+        db.raw('order_items.qty * order_items.unit_price_ht as line_total_ht'),
+        'products.tva_rate'
+      )
+      .orderBy('orders.created_at', 'desc');
+
+    // Summary stats
+    const summary = await db('orders')
+      .where({ campaign_id: campaignId, user_id: userId })
+      .whereIn('status', validStatuses)
+      .select(
+        db.raw('COUNT(id) as orders_count'),
+        db.raw('COALESCE(SUM(total_ht), 0) as total_ht'),
+        db.raw('COALESCE(SUM(total_ttc), 0) as total_ttc')
+      ).first();
+
+    const totalBottles = await db('order_items')
+      .join('orders', 'order_items.order_id', 'orders.id')
+      .where('orders.campaign_id', campaignId)
+      .where('orders.user_id', userId)
+      .whereIn('orders.status', validStatuses)
+      .where('order_items.type', 'product')
+      .select(db.raw('COALESCE(SUM(order_items.qty), 0) as total')).first();
+
+    // Build workbook
+    const wb = new ExcelJS.Workbook();
+    wb.creator = 'Vins & Conversations';
+
+    // --- Sheet 1: Ventes (detail) ---
+    const ws1 = wb.addWorksheet('Ventes');
+    ws1.columns = [
+      { header: 'Référence', key: 'reference', width: 16 },
+      { header: 'Date', key: 'date', width: 14 },
+      { header: 'Statut', key: 'status', width: 12 },
+      { header: 'Contact', key: 'contact', width: 22 },
+      { header: 'Email contact', key: 'contact_email', width: 24 },
+      { header: 'Téléphone', key: 'phone', width: 14 },
+      { header: 'Catégorie', key: 'category', width: 16 },
+      { header: 'Produit', key: 'product', width: 28 },
+      { header: 'Qté', key: 'qty', width: 8 },
+      { header: 'PU HT', key: 'unit_price', width: 10 },
+      { header: 'Total HT', key: 'total_ht', width: 12 },
+      { header: 'TVA %', key: 'tva', width: 8 },
+      { header: 'Paiement', key: 'payment', width: 12 },
+    ];
+
+    // Style header
+    const headerRow1 = ws1.getRow(1);
+    headerRow1.font = { bold: true, color: { argb: 'FFFFFFFF' } };
+    headerRow1.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF722F37' } };
+    headerRow1.alignment = { vertical: 'middle' };
+    ws1.views = [{ state: 'frozen', ySplit: 1 }];
+
+    for (const r of rows) {
+      ws1.addRow({
+        reference: r.reference,
+        date: new Date(r.order_date).toLocaleDateString('fr-FR'),
+        status: r.status,
+        contact: r.contact_name || '',
+        contact_email: r.contact_email || '',
+        phone: r.contact_phone || '',
+        category: r.category || '',
+        product: r.product_name,
+        qty: parseInt(r.qty),
+        unit_price: parseFloat(r.unit_price_ht),
+        total_ht: parseFloat(r.line_total_ht),
+        tva: parseFloat(r.tva_rate || 20),
+        payment: r.payment_method || '',
+      });
+    }
+
+    // Format currency columns
+    ws1.getColumn('unit_price').numFmt = '#,##0.00 €';
+    ws1.getColumn('total_ht').numFmt = '#,##0.00 €';
+
+    // --- Sheet 2: Résumé ---
+    const ws2 = wb.addWorksheet('Résumé');
+    ws2.columns = [
+      { header: 'Indicateur', key: 'label', width: 30 },
+      { header: 'Valeur', key: 'value', width: 20 },
+    ];
+    const headerRow2 = ws2.getRow(1);
+    headerRow2.font = { bold: true, color: { argb: 'FFFFFFFF' } };
+    headerRow2.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF722F37' } };
+
+    ws2.addRow({ label: 'Participant', value: user.name });
+    ws2.addRow({ label: 'Email', value: user.email });
+    ws2.addRow({ label: 'Campagne', value: campaign.name });
+    ws2.addRow({ label: 'Nombre de commandes', value: parseInt(summary.orders_count) });
+    ws2.addRow({ label: 'Bouteilles vendues', value: parseInt(totalBottles.total) });
+    ws2.addRow({ label: 'CA HT', value: parseFloat(summary.total_ht) });
+    ws2.addRow({ label: 'CA TTC', value: parseFloat(summary.total_ttc) });
+
+    // Format currency cells in Résumé
+    ws2.getCell('B7').numFmt = '#,##0.00 €';
+    ws2.getCell('B8').numFmt = '#,##0.00 €';
+
+    // Generate filename
+    const safeName = user.name.replace(/[^a-zA-ZÀ-ÿ0-9 -]/g, '').replace(/\s+/g, '-').toLowerCase();
+    const safeCampaign = campaign.name.replace(/[^a-zA-ZÀ-ÿ0-9 -]/g, '').replace(/\s+/g, '-').toLowerCase();
+    const dateStr = new Date().toISOString().split('T')[0];
+    const filename = `ventes-${safeName}-${safeCampaign}-${dateStr}.xlsx`;
+
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    await wb.xlsx.write(res);
+    res.end();
+  } catch (err) {
+    logger.error(`Participant export-excel error: ${err.message}`);
     res.status(500).json({ error: 'SERVER_ERROR', message: err.message });
   }
 });

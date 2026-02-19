@@ -101,6 +101,7 @@ export const campaignsAPI = {
   resources: () => api.get('/admin/campaigns/resources'),
   listActive: () => api.get('/admin/campaigns', { params: { status: 'active' } }),
   reportPdf: (id) => `${api.defaults.baseURL}/admin/campaigns/${id}/report-pdf`,
+  participantExcel: (campaignId, userId) => api.get(`/admin/campaigns/${campaignId}/participants/${userId}/export-excel`, { responseType: 'blob' }),
 };
 
 // ─── Stock ────────────────────────────────────────────
@@ -213,6 +214,7 @@ export const exportsAPI = {
   stock: () => api.get('/admin/exports/stock', { responseType: 'blob' }),
   deliveryNotes: (start, end) => api.get('/admin/exports/delivery-notes', { params: { start, end }, responseType: 'blob' }),
   activityReport: (start, end) => api.get('/admin/exports/activity-report', { params: { start, end }, responseType: 'blob' }),
+  salesByContact: (start, end, type) => api.get('/admin/exports/sales-by-contact', { params: { start, end, type: type || undefined }, responseType: 'blob' }),
 };
 
 // ─── Users Admin ───────────────────────────────────
