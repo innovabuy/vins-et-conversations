@@ -10,6 +10,7 @@ const { authenticate } = require('../middleware/auth');
 const db = require('../config/database');
 const emailService = require('../services/emailService');
 const logger = require('../utils/logger');
+const { invalidateCache } = require('../middleware/cache');
 
 const BASE_URL = process.env.BASE_URL || process.env.FRONTEND_URL || '';
 
@@ -291,6 +292,7 @@ router.put(
 
       const ambassador_photo_url = `/uploads/ambassadors/${req.file.filename}`;
       await db('users').where({ id: req.user.userId }).update({ ambassador_photo_url, updated_at: new Date() });
+      await invalidateCache('vc:cache:*/ambassador/*');
       res.json({ ambassador_photo_url });
     } catch (err) {
       logger.error(`Photo upload error: ${err.message}`);
@@ -317,6 +319,7 @@ router.put('/profile', authenticate, async (req, res) => {
       return res.status(400).json({ error: 'NO_FIELDS' });
     }
     await db('users').where({ id: req.user.userId }).update(updates);
+    if (currentUser.role === 'ambassadeur') await invalidateCache('vc:cache:*/ambassador/*');
     const user = await db('users').where({ id: req.user.userId }).first();
     res.json({
       id: user.id, name: user.name, email: user.email, phone: user.phone, role: user.role,

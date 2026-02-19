@@ -9,6 +9,7 @@ const { auditAction } = require('../middleware/audit');
 const { validate } = require('../middleware/validate');
 const emailService = require('../services/emailService');
 const logger = require('../utils/logger');
+const { invalidateCache } = require('../middleware/cache');
 
 const router = express.Router();
 
@@ -55,7 +56,8 @@ router.get(
       const total = await applyFilters(db('users')).count('id as count').first();
       const offset = (parseInt(page, 10) - 1) * parseInt(limit, 10);
       const users = await applyFilters(db('users'))
-        .select('id', 'email', 'name', 'role', 'status', 'permissions', 'last_login_at', 'created_at')
+        .select('id', 'email', 'name', 'role', 'status', 'permissions', 'last_login_at', 'created_at',
+          'ambassador_photo_url', 'ambassador_bio', 'region_id', 'show_on_public_page')
         .orderBy('created_at', 'desc')
         .offset(offset)
         .limit(parseInt(limit, 10));
@@ -128,7 +130,7 @@ const updateSchema = Joi.object({
   role: Joi.string().valid('super_admin', 'commercial', 'comptable', 'enseignant', 'etudiant', 'cse', 'ambassadeur', 'lecture_seule'),
   status: Joi.string().valid('active', 'disabled', 'pending'),
   permissions: Joi.object(),
-  ambassador_photo_url: Joi.string().uri().allow('', null),
+  ambassador_photo_url: Joi.string().max(500).allow('', null),
   ambassador_bio: Joi.string().max(1000).allow('', null),
   region_id: Joi.number().integer().allow(null),
   show_on_public_page: Joi.boolean(),
@@ -147,10 +149,10 @@ router.put(
       if (!user) return res.status(404).json({ error: 'USER_NOT_FOUND' });
 
       const updates = {};
-      if (req.body.name) updates.name = req.body.name;
-      if (req.body.role) updates.role = req.body.role;
-      if (req.body.status) updates.status = req.body.status;
-      if (req.body.permissions) updates.permissions = JSON.stringify(req.body.permissions);
+      if (req.body.name !== undefined) updates.name = req.body.name;
+      if (req.body.role !== undefined) updates.role = req.body.role;
+      if (req.body.status !== undefined) updates.status = req.body.status;
+      if (req.body.permissions !== undefined) updates.permissions = JSON.stringify(req.body.permissions);
       // Ambassador-specific fields
       if (req.body.ambassador_photo_url !== undefined) updates.ambassador_photo_url = req.body.ambassador_photo_url || null;
       if (req.body.ambassador_bio !== undefined) updates.ambassador_bio = req.body.ambassador_bio || null;
@@ -159,7 +161,14 @@ router.put(
       updates.updated_at = new Date();
 
       const [updated] = await db('users').where({ id }).update(updates)
-        .returning(['id', 'email', 'name', 'role', 'status', 'permissions', 'updated_at']);
+        .returning(['id', 'email', 'name', 'role', 'status', 'permissions', 'updated_at',
+          'ambassador_photo_url', 'ambassador_bio', 'region_id', 'show_on_public_page']);
+
+      // Invalidate ambassador cache if relevant fields changed
+      if (updates.role || updates.show_on_public_page !== undefined || updates.ambassador_photo_url !== undefined
+          || updates.ambassador_bio !== undefined || updates.region_id !== undefined) {
+        await invalidateCache('vc:cache:*/ambassador/*');
+      }
 
       req.auditEntityId = id;
       req.auditAfter = updates;
@@ -285,6 +294,7 @@ router.put(
 
       const ambassador_photo_url = `/uploads/ambassadors/${req.file.filename}`;
       await db('users').where({ id }).update({ ambassador_photo_url, updated_at: new Date() });
+      await invalidateCache('vc:cache:*/ambassador/*');
       res.json({ ambassador_photo_url });
     } catch (err) {
       res.status(500).json({ error: 'SERVER_ERROR', message: err.message });

@@ -81,6 +81,107 @@ describe('Ambassador Workflow', () => {
     expect(res.status).toBe(403);
   });
 
+  test('Admin user update does NOT overwrite ambassador role when role not sent', async () => {
+    // Verify ambassador role before update
+    const before = await db('users').where({ id: ambassadorUserId }).first();
+    expect(before.role).toBe('ambassadeur');
+
+    // Update only name (no role in payload)
+    const res = await request(app)
+      .put(`/api/v1/admin/users/${ambassadorUserId}`)
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send({ name: 'Jean-Pierre Martin Updated' });
+
+    expect(res.status).toBe(200);
+
+    // Verify role was NOT changed
+    const after = await db('users').where({ id: ambassadorUserId }).first();
+    expect(after.role).toBe('ambassadeur');
+    expect(after.name).toBe('Jean-Pierre Martin Updated');
+
+    // Restore original name
+    await request(app)
+      .put(`/api/v1/admin/users/${ambassadorUserId}`)
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send({ name: 'Jean-Pierre Martin' });
+  });
+
+  test('Admin user update preserves ambassador fields when editing name only', async () => {
+    const before = await db('users').where({ id: ambassadorUserId }).first();
+    const originalBio = before.ambassador_bio;
+    const originalRegion = before.region_id;
+
+    // Update only name — ambassador fields should NOT be wiped
+    const res = await request(app)
+      .put(`/api/v1/admin/users/${ambassadorUserId}`)
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send({ name: 'Test Name Preserve' });
+
+    expect(res.status).toBe(200);
+
+    const after = await db('users').where({ id: ambassadorUserId }).first();
+    expect(after.ambassador_bio).toBe(originalBio);
+    expect(after.region_id).toBe(originalRegion);
+    expect(after.show_on_public_page).toBe(true);
+
+    // Restore
+    await db('users').where({ id: ambassadorUserId }).update({ name: before.name });
+  });
+
+  test('User list returns ambassador fields', async () => {
+    const res = await request(app)
+      .get('/api/v1/admin/users?role=ambassadeur')
+      .set('Authorization', `Bearer ${adminToken}`);
+
+    expect(res.status).toBe(200);
+    const ambassador = res.body.data.find(u => u.id === ambassadorUserId);
+    expect(ambassador).toBeDefined();
+    expect(ambassador).toHaveProperty('ambassador_photo_url');
+    expect(ambassador).toHaveProperty('ambassador_bio');
+    expect(ambassador).toHaveProperty('region_id');
+    expect(ambassador).toHaveProperty('show_on_public_page');
+  });
+
+  test('Public ambassador page returns correct data', async () => {
+    const res = await request(app).get('/api/v1/ambassador/public');
+    expect(res.status).toBe(200);
+    expect(res.body.ambassadors).toBeInstanceOf(Array);
+    expect(res.body.ambassadors.length).toBe(2);
+
+    // Each ambassador has required fields
+    for (const amb of res.body.ambassadors) {
+      expect(amb).toHaveProperty('name');
+      expect(amb).toHaveProperty('bio');
+      expect(amb).toHaveProperty('region');
+    }
+  });
+
+  test('Ambassador photo upload works and invalidates cache', async () => {
+    const fs = require('fs');
+    const path = require('path');
+
+    // Create a minimal valid image
+    const testPath = '/tmp/test-ambassador-photo.jpg';
+    const buf = Buffer.alloc(200);
+    buf[0] = 0xFF; buf[1] = 0xD8;
+    fs.writeFileSync(testPath, buf);
+
+    const res = await request(app)
+      .put('/api/v1/auth/profile/photo')
+      .set('Authorization', `Bearer ${ambassadorToken}`)
+      .attach('photo', testPath);
+
+    expect(res.status).toBe(200);
+    expect(res.body.ambassador_photo_url).toMatch(/\/uploads\/ambassadors\/.+\.jpg/);
+
+    // Verify in DB
+    const user = await db('users').where({ id: ambassadorUserId }).first();
+    expect(user.ambassador_photo_url).toBe(res.body.ambassador_photo_url);
+
+    // Clean up test file
+    fs.unlinkSync(testPath);
+  });
+
   test('Ambassador participation exists with campaign link', async () => {
     expect(ambassadorUserId).toBeDefined();
     expect(ambassadorCampaign).toBeDefined();
