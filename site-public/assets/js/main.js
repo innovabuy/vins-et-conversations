@@ -140,6 +140,7 @@ const CRITERIA_LABELS = {
 
 /* ─── Featured Wines + Add to Cart ─────────── */
 let allProducts = []; // cached products from API
+let featuredWines = []; // wines displayed in the selection grid
 
 async function loadFeaturedWines() {
   const grid = document.getElementById('wines-grid');
@@ -150,18 +151,26 @@ async function loadFeaturedWines() {
     const result = await res.json();
     const wines = result.data || result;
     if (wines && wines.length > 0) {
-      grid.innerHTML = wines.slice(0, 4).map(w => renderWineCard(w)).join('');
+      featuredWines = wines.slice(0, 4);
+      grid.innerHTML = featuredWines.map((w, i) => renderWineCard(w, i)).join('');
       grid.querySelectorAll('.btn-add-cart').forEach(btn => btn.addEventListener('click', onAddToCart));
+      grid.querySelectorAll('.wine-card').forEach(card => {
+        card.style.cursor = 'pointer';
+        card.addEventListener('click', (e) => {
+          if (e.target.closest('.btn-add-cart')) return;
+          const idx = parseInt(card.dataset.wineIndex);
+          openWineModal(idx);
+        });
+      });
     }
   } catch (err) {
     console.warn('Featured wines fallback to static', err);
-    // Add click handlers to static fallback cards
     grid.querySelectorAll('.btn-add-cart').forEach(btn => btn.addEventListener('click', onAddToCart));
   }
 }
 
-function renderWineCard(w) {
-  return `<div class="wine-card reveal visible">
+function renderWineCard(w, index) {
+  return `<div class="wine-card reveal visible" data-wine-index="${index}">
     <div class="wine-card-img"><img src="${getProductImage(w)}" alt="${escapeHtml(w.name)}" loading="lazy"></div>
     <div class="wine-card-body">
       <h3>${escapeHtml(w.name)}</h3>
@@ -177,6 +186,7 @@ function renderWineCard(w) {
 }
 
 function onAddToCart(e) {
+  e.stopPropagation();
   const btn = e.currentTarget;
   Cart.add({
     id: btn.dataset.id || 'static-' + btn.dataset.name,
@@ -185,6 +195,167 @@ function onAddToCart(e) {
     image_url: btn.dataset.img,
     appellation: btn.dataset.appellation,
   });
+}
+
+/* ─── Wine Detail Modal ───────────────────── */
+let wineModalIndex = -1;
+let wineModalOverlay = null;
+
+function createWineModalDOM() {
+  if (document.getElementById('wine-modal-overlay')) return;
+  const overlay = document.createElement('div');
+  overlay.id = 'wine-modal-overlay';
+  overlay.innerHTML = `
+    <button class="wine-modal-nav prev" aria-label="Vin précédent">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"/></svg>
+    </button>
+    <div class="wine-modal">
+      <button class="wine-modal-close" aria-label="Fermer">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>
+      <div class="wine-modal-content" id="wine-modal-body"></div>
+    </div>
+    <button class="wine-modal-nav next" aria-label="Vin suivant">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>
+    </button>
+  `;
+  document.body.appendChild(overlay);
+  wineModalOverlay = overlay;
+
+  // Close on X button
+  overlay.querySelector('.wine-modal-close').addEventListener('click', closeWineModal);
+
+  // Close on overlay click (not modal itself)
+  overlay.addEventListener('click', (e) => {
+    if (e.target === overlay) closeWineModal();
+  });
+
+  // Navigation arrows
+  overlay.querySelector('.wine-modal-nav.prev').addEventListener('click', () => navigateWineModal(-1));
+  overlay.querySelector('.wine-modal-nav.next').addEventListener('click', () => navigateWineModal(1));
+
+  // Keyboard
+  document.addEventListener('keydown', onWineModalKeydown);
+}
+
+function onWineModalKeydown(e) {
+  if (!wineModalOverlay || !wineModalOverlay.classList.contains('open')) return;
+  if (e.key === 'Escape') { closeWineModal(); e.preventDefault(); }
+  if (e.key === 'ArrowLeft') { navigateWineModal(-1); e.preventDefault(); }
+  if (e.key === 'ArrowRight') { navigateWineModal(1); e.preventDefault(); }
+}
+
+function openWineModal(index) {
+  if (!featuredWines.length) return;
+  createWineModalDOM();
+  wineModalIndex = index;
+  renderWineModal();
+  wineModalOverlay.classList.add('open');
+  document.body.style.overflow = 'hidden';
+}
+
+function closeWineModal() {
+  if (!wineModalOverlay) return;
+  wineModalOverlay.classList.remove('open');
+  document.body.style.overflow = '';
+  wineModalIndex = -1;
+}
+
+function navigateWineModal(dir) {
+  const newIdx = wineModalIndex + dir;
+  if (newIdx < 0 || newIdx >= featuredWines.length) return;
+  wineModalIndex = newIdx;
+  renderWineModal();
+}
+
+async function renderWineModal() {
+  const w = featuredWines[wineModalIndex];
+  if (!w) return;
+  const body = document.getElementById('wine-modal-body');
+
+  // Update nav arrows
+  const prevBtn = wineModalOverlay.querySelector('.wine-modal-nav.prev');
+  const nextBtn = wineModalOverlay.querySelector('.wine-modal-nav.next');
+  prevBtn.disabled = wineModalIndex <= 0;
+  nextBtn.disabled = wineModalIndex >= featuredWines.length - 1;
+
+  // Build meta tags
+  const tags = [];
+  if (w.vintage) tags.push(`<span class="wine-modal-tag">${escapeHtml(w.vintage)}</span>`);
+  if (w.region) tags.push(`<span class="wine-modal-tag">${escapeHtml(w.region)}</span>`);
+  if (w.color) tags.push(`<span class="wine-modal-tag">${escapeHtml(w.color.charAt(0).toUpperCase() + w.color.slice(1))}</span>`);
+  if (w.label) tags.push(`<span class="wine-modal-tag label-tag">${escapeHtml(w.label)}</span>`);
+
+  // Description
+  const desc = w.description || '';
+
+  body.innerHTML = `
+    <div class="wine-modal-img">
+      <img src="${getProductImage(w)}" alt="${escapeHtml(w.name)}">
+    </div>
+    <div class="wine-modal-details">
+      <h2>${escapeHtml(w.name)}</h2>
+      <p class="wine-modal-appellation">${escapeHtml(w.appellation || w.category || '')}</p>
+      ${tags.length ? `<div class="wine-modal-meta">${tags.join('')}</div>` : ''}
+      ${desc ? `<p class="wine-modal-desc">${escapeHtml(desc)}</p>` : ''}
+      <div id="wine-modal-extra"></div>
+      <div class="wine-modal-footer">
+        <div class="wine-modal-price">${parseFloat(w.price_ttc || w.price).toFixed(2)} €<small> TTC</small></div>
+        <button class="btn btn-wine btn-add-cart" data-id="${w.id}" data-name="${escapeHtml(w.name)}" data-price="${w.price_ttc||w.price}" data-img="${getProductImage(w)}" data-appellation="${escapeHtml(w.appellation||'')}">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 002 1.61h9.72a2 2 0 002-1.61L23 6H6"/></svg>
+          Ajouter au panier
+        </button>
+      </div>
+    </div>
+  `;
+
+  // Add cart handler on modal button
+  body.querySelector('.btn-add-cart').addEventListener('click', (e) => {
+    onAddToCart(e);
+  });
+
+  // Fetch full product details for tasting notes & extras
+  try {
+    const res = await fetch(`/api/v1/public/catalog/${w.id}`);
+    if (!res.ok) return;
+    const full = await res.json();
+    const product = full.data || full;
+    const extraEl = document.getElementById('wine-modal-extra');
+    if (!extraEl) return;
+    let extraHtml = '';
+
+    // Tasting radar chart
+    const wineType = resolveWineType(product.color, product.category);
+    const criteria = TASTING_CRITERIA[wineType];
+    if (criteria && product.tasting_notes) {
+      const notes = typeof product.tasting_notes === 'string' ? JSON.parse(product.tasting_notes) : product.tasting_notes;
+      const hasNotes = criteria.some(k => notes[k] !== undefined && notes[k] !== null);
+      if (hasNotes) {
+        extraHtml += `<div class="wine-modal-tasting"><h4>Profil de dégustation</h4><canvas id="wine-modal-radar" width="200" height="200"></canvas></div>`;
+      }
+    }
+
+    // Extra info
+    const extras = [];
+    if (product.grape_varieties) extras.push(`<strong>Cépages :</strong> ${escapeHtml(product.grape_varieties)}`);
+    if (product.food_pairing) extras.push(`<strong>Accords mets :</strong> ${escapeHtml(product.food_pairing)}`);
+    if (product.serving_temp) extras.push(`<strong>Température :</strong> ${escapeHtml(product.serving_temp)}`);
+    if (product.awards) extras.push(`<strong>Récompenses :</strong> ${escapeHtml(product.awards)}`);
+    if (extras.length) {
+      extraHtml += `<div class="wine-modal-extra">${extras.join('<br>')}</div>`;
+    }
+
+    extraEl.innerHTML = extraHtml;
+
+    // Draw radar chart if canvas present
+    const canvas = document.getElementById('wine-modal-radar');
+    if (canvas && product.tasting_notes) {
+      const notes = typeof product.tasting_notes === 'string' ? JSON.parse(product.tasting_notes) : product.tasting_notes;
+      const filteredNotes = {};
+      criteria.forEach(k => { if (notes[k] !== undefined) filteredNotes[k] = notes[k]; });
+      drawMiniRadar(canvas, filteredNotes);
+    }
+  } catch { /* extra details are optional */ }
 }
 
 /* ─── Full Wizard ──────────────────────────── */
