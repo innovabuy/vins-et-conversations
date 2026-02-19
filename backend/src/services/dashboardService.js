@@ -206,6 +206,7 @@ async function getStudentDashboard(userId, campaignId) {
     ui: rules.ui,
     campaign: {
       name: campaign?.name,
+      brand_name: campaign?.brand_name || null,
       goal: campaignGoal,
       alcohol_free: campaign?.alcohol_free || false,
       total_ca: totalCa,

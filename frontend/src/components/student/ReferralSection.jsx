@@ -4,7 +4,7 @@ import { referralAPI } from '../../services/api';
 
 const formatEur = (v) => new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR' }).format(v);
 
-export default function ReferralSection({ campaignId }) {
+export default function ReferralSection({ campaignId, brandName }) {
   const [linkData, setLinkData] = useState(null);
   const [stats, setStats] = useState(null);
   const [copied, setCopied] = useState(false);
@@ -46,7 +46,7 @@ export default function ReferralSection({ campaignId }) {
 
   const handleShare = async () => {
     const shareData = {
-      title: 'Vins & Conversations',
+      title: brandName || 'Vins & Conversations',
       text: 'Découvrez notre sélection de vins !',
       url: linkData.referral_link,
     };

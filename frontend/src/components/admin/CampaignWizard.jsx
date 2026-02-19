@@ -186,6 +186,7 @@ export default function CampaignWizard() {
     org_id: '',
     partner_logo_url: '',
     name: '',
+    brand_name: '',
     status: 'draft',
     goal: 0,
     start_date: '',
@@ -215,6 +216,7 @@ export default function CampaignWizard() {
             org_id: c.org_id || '',
             partner_logo_url: '',
             name: c.name || '',
+            brand_name: c.brand_name || '',
             status: c.status || 'draft',
             goal: c.goal || 0,
             start_date: c.start_date ? c.start_date.split('T')[0] : '',
@@ -512,6 +514,11 @@ export default function CampaignWizard() {
               <div className="sm:col-span-2">
                 <label className="block text-sm font-medium mb-1">Nom *</label>
                 <input type="text" value={form.name} onChange={(e) => updateForm('name', e.target.value)} className="w-full border rounded-lg px-3 py-2" placeholder="ex: Sacré-Coeur 2025-2026" />
+              </div>
+              <div className="sm:col-span-2">
+                <label className="block text-sm font-medium mb-1">Nom de marque extranet</label>
+                <input type="text" value={form.brand_name} onChange={(e) => updateForm('brand_name', e.target.value)} className="w-full border rounded-lg px-3 py-2" placeholder="Laisser vide pour afficher Vins & Conversations" />
+                <p className="text-xs text-gray-400 mt-1">Affiché sur les extranets étudiants et BTS uniquement</p>
               </div>
               <div>
                 <label className="block text-sm font-medium mb-1">Statut</label>

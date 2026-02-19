@@ -4,6 +4,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { Flame, Trophy, ShoppingCart, User, ChevronUp, Wine, Package, Clock, Award, Zap, Heart, Target, DollarSign, ArrowLeft, ArrowRight, Check, Phone, Mail, FileText, CreditCard, Banknote, Building, HelpCircle, Users, TrendingUp, TrendingDown, Minus, BarChart3, BookOpen, ExternalLink, Video, Image, FileDown, LogOut } from 'lucide-react';
 import WineBarrel from '../shared/WineBarrel';
 import ReferralSection from './ReferralSection';
+import useCampaignBrandName from '../../utils/useCampaignBrandName';
 
 const formatEur = (v) => new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR' }).format(v);
 const formatDate = (d) => new Date(d).toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit', year: 'numeric' });
@@ -442,6 +443,7 @@ export default function StudentDashboard() {
   ];
 
   const campaign = data?.campaign;
+  const brandName = useCampaignBrandName(campaign);
   const relative = data?.relative;
 
   return (
@@ -542,7 +544,7 @@ export default function StudentDashboard() {
             )}
 
             {/* Referral section — hidden for alcohol-free campaigns */}
-            {!campaign?.alcohol_free && <ReferralSection campaignId={campaignId} />}
+            {!campaign?.alcohol_free && <ReferralSection campaignId={campaignId} brandName={brandName} />}
 
             {/* Campaign collective stats */}
             {campaign && (
