@@ -1,6 +1,25 @@
 import { useState, useEffect } from 'react';
-import { MapPin, Filter, User } from 'lucide-react';
+import { MapPin, Filter } from 'lucide-react';
 import api from '../../services/api';
+
+const AVATAR_COLORS = [
+  '#7C3AED', '#2563EB', '#059669', '#D97706', '#DC2626',
+  '#8B5CF6', '#0891B2', '#65A30D', '#EA580C', '#DB2777',
+];
+
+function getInitials(name) {
+  if (!name) return '?';
+  const parts = name.trim().split(/\s+/);
+  if (parts.length >= 2) return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+  return parts[0][0].toUpperCase();
+}
+
+function getAvatarColor(name) {
+  if (!name) return AVATAR_COLORS[0];
+  let hash = 0;
+  for (let i = 0; i < name.length; i++) hash = name.charCodeAt(i) + ((hash << 5) - hash);
+  return AVATAR_COLORS[Math.abs(hash) % AVATAR_COLORS.length];
+}
 
 export default function AmbassadorsPage() {
   const [data, setData] = useState(null);
@@ -50,11 +69,16 @@ export default function AmbassadorsPage() {
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
           {data.ambassadors.map((a) => (
             <div key={a.id} className="bg-white rounded-2xl shadow-md overflow-hidden hover:shadow-lg transition-shadow">
-              <div className="h-48 bg-gradient-to-br from-wine-100 to-wine-50 flex items-center justify-center">
+              <div className="h-48 bg-gradient-to-br from-gray-100 to-gray-50 flex items-center justify-center">
                 {a.photo_url ? (
                   <img src={a.photo_url} alt={a.name} className="w-full h-full object-cover" />
                 ) : (
-                  <User size={64} className="text-wine-300" />
+                  <div
+                    className="w-24 h-24 rounded-full flex items-center justify-center text-white text-3xl font-bold shadow-md"
+                    style={{ backgroundColor: getAvatarColor(a.name) }}
+                  >
+                    {getInitials(a.name)}
+                  </div>
                 )}
               </div>
               <div className="p-4">

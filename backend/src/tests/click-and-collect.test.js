@@ -35,8 +35,8 @@ describe('Click & Collect', () => {
   });
 
   test('create cart for checkout', async () => {
-    // Pick a product with positive stock
-    const products = await db('products').where({ active: true }).select('id', 'name');
+    // Pick a product with positive stock and visible in boutique
+    const products = await db('products').where({ active: true, visible_boutique: true }).select('id', 'name');
     let product = products[0];
     for (const p of products) {
       const stock = await db('stock_movements')
@@ -108,7 +108,7 @@ describe('Click & Collect', () => {
 
   test('checkout with home_delivery requires address', async () => {
     // Create new cart - use a product with stock
-    const product = await db('products').where({ active: true }).first();
+    const product = await db('products').where({ active: true, visible_boutique: true }).first();
     const cartRes = await request(app)
       .post('/api/v1/public/cart')
       .send({ items: [{ product_id: product.id, qty: 1 }] });

@@ -2205,6 +2205,7 @@ describe('API Integration Tests', () => {
     const email = 'az.boutique@example.fr';
 
     afterAll(async () => {
+      await db('stock_movements').where({ reference: 'az-boutique-test-stock' }).delete().catch(() => {});
       if (orderId) {
         await db('notifications').where('link', 'like', `%${orderId}%`).delete();
         await db('payments').where({ order_id: orderId }).delete();
@@ -2223,6 +2224,14 @@ describe('API Integration Tests', () => {
         .whereIn('name', ['Oriolus Blanc', 'Cuvée Clémence'])
         .limit(2);
       expect(products.length).toBeGreaterThanOrEqual(1);
+
+      // Ensure stock is available (earlier tests may have depleted it)
+      for (const p of products) {
+        await db('stock_movements').insert({
+          product_id: p.id, type: 'entry', qty: 100,
+          reference: 'az-boutique-test-stock',
+        });
+      }
 
       // 2. Add to cart
       const cartRes = await request(app)
