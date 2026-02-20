@@ -3404,9 +3404,22 @@ describe('API Integration Tests', () => {
       });
     });
 
-    test('Commissions CSV export uses dynamic rates (not hardcoded 5%)', async () => {
+    test('Commissions export returns PDF by default', async () => {
       const res = await request(app)
         .get('/api/v1/admin/exports/commissions')
+        .set('Authorization', `Bearer ${adminToken}`)
+        .buffer(true);
+
+      expect(res.status).toBe(200);
+      expect(res.headers['content-type']).toContain('application/pdf');
+      expect(res.headers['content-disposition']).toContain('commissions.pdf');
+      // PDF magic bytes: %PDF
+      expect(res.body.slice(0, 5).toString()).toContain('%PDF');
+    });
+
+    test('Commissions CSV export uses dynamic rates (not hardcoded 5%)', async () => {
+      const res = await request(app)
+        .get('/api/v1/admin/exports/commissions?format=csv')
         .set('Authorization', `Bearer ${adminToken}`);
 
       expect(res.status).toBe(200);

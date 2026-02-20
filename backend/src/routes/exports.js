@@ -552,6 +552,313 @@ router.get('/campaign-pivot', authenticate, requireRole('super_admin', 'admin', 
 // Expose buildPivotData for unit testing
 router.buildPivotData = buildPivotData;
 
+// ═══════════════════════════════════════════════════════════════════
+// PARTICIPANT HISTORY — broader role access (before global middleware)
+// ═══════════════════════════════════════════════════════════════════
+
+/**
+ * GET /api/v1/admin/exports/participant-history
+ * Export historique des commandes par participant pour une campagne
+ * Query params: campaign_id (requis), user_id (optionnel)
+ */
+router.get('/participant-history', authenticate, requireRole('super_admin', 'admin', 'comptable', 'commercial'), async (req, res) => {
+  try {
+    const { campaign_id, user_id } = req.query;
+
+    if (!campaign_id) {
+      return res.status(400).json({ error: true, code: 'MISSING_CAMPAIGN_ID', message: 'campaign_id requis' });
+    }
+
+    const campaign = await db('campaigns').where('id', campaign_id).first();
+    if (!campaign) {
+      return res.status(404).json({ error: true, code: 'CAMPAIGN_NOT_FOUND', message: 'Campagne introuvable' });
+    }
+
+    // --- Fetch order lines with joins ---
+    let query = db('order_items as oi')
+      .join('orders as o', 'o.id', 'oi.order_id')
+      .join('products as p', 'p.id', 'oi.product_id')
+      .leftJoin('users as u', 'u.id', 'o.user_id')
+      .leftJoin('contacts as c', 'c.id', 'o.customer_id')
+      .where('o.campaign_id', campaign_id)
+      .whereNotIn('o.status', ['cancelled', 'draft'])
+      .where('oi.type', 'product')
+      .select(
+        'o.created_at',
+        'o.ref',
+        'o.status',
+        'o.user_id',
+        db.raw("COALESCE(u.name, 'Boutique Web') as vendeur"),
+        'u.email as vendeur_email',
+        db.raw("COALESCE(c.name, '') as client"),
+        'p.name as produit',
+        'oi.qty',
+        'oi.unit_price_ttc',
+        'oi.unit_price_ht'
+      )
+      .orderBy([{ column: 'vendeur' }, { column: 'o.created_at' }]);
+
+    if (user_id) {
+      query = query.where('o.user_id', user_id);
+    }
+
+    const rows = await query;
+
+    if (rows.length === 0) {
+      return res.status(404).json({ error: true, code: 'NO_DATA', message: 'Aucune commande pour cette campagne' });
+    }
+
+    // --- Build workbook ---
+    const ExcelJS = require('exceljs');
+    const workbook = new ExcelJS.Workbook();
+    workbook.creator = 'Vins & Conversations';
+    workbook.created = new Date();
+
+    const headerFill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF722F37' } };
+    const boldWhite = { bold: true, color: { argb: 'FFFFFFFF' } };
+    const border = { style: 'thin', color: { argb: 'FFD0D0D0' } };
+    const allBorders = { top: border, left: border, bottom: border, right: border };
+    const euroFmt = '#,##0.00 "€"';
+
+    // ──────────────────────────────────────────────────
+    // Sheet 1 — Historique
+    // ──────────────────────────────────────────────────
+    const sheetHist = workbook.addWorksheet('Historique');
+
+    // Title rows
+    sheetHist.mergeCells(1, 1, 1, 9);
+    const titleCell = sheetHist.getCell(1, 1);
+    titleCell.value = `Historique des commandes — ${campaign.name}`;
+    titleCell.font = { bold: true, size: 14, color: { argb: 'FF722F37' } };
+    titleCell.alignment = { horizontal: 'center' };
+
+    sheetHist.mergeCells(2, 1, 2, 9);
+    sheetHist.getCell(2, 1).value = `Export généré le ${new Date().toLocaleDateString('fr-FR', { day: '2-digit', month: 'long', year: 'numeric' })}`;
+    sheetHist.getCell(2, 1).font = { italic: true, color: { argb: 'FF666666' } };
+    sheetHist.getCell(2, 1).alignment = { horizontal: 'center' };
+    sheetHist.addRow([]);
+
+    // Header row (row 4)
+    const histHeaders = ['Date', 'Réf commande', 'Vendeur', 'Client', 'Produit', 'Qté', 'PU TTC', 'Total TTC', 'Statut'];
+    const histHeaderRow = sheetHist.getRow(4);
+    histHeaders.forEach((h, i) => {
+      const cell = histHeaderRow.getCell(i + 1);
+      cell.value = h;
+      cell.fill = headerFill;
+      cell.font = boldWhite;
+      cell.border = allBorders;
+      cell.alignment = { horizontal: 'center', wrapText: true };
+    });
+    histHeaderRow.height = 30;
+    histHeaderRow.commit();
+
+    // Status labels in French
+    const statusLabels = {
+      pending: 'En attente',
+      validated: 'Validée',
+      preparing: 'En préparation',
+      shipped: 'Expédiée',
+      delivered: 'Livrée',
+    };
+
+    // Data rows
+    let histRowIdx = 5;
+    for (const row of rows) {
+      const dataRow = sheetHist.getRow(histRowIdx);
+      dataRow.getCell(1).value = new Date(row.created_at).toLocaleDateString('fr-FR');
+      dataRow.getCell(2).value = row.ref;
+      dataRow.getCell(3).value = row.vendeur;
+      dataRow.getCell(4).value = row.client;
+      dataRow.getCell(5).value = row.produit;
+      dataRow.getCell(6).value = row.qty;
+      dataRow.getCell(6).alignment = { horizontal: 'center' };
+      dataRow.getCell(7).value = parseFloat(row.unit_price_ttc);
+      dataRow.getCell(7).numFmt = euroFmt;
+      dataRow.getCell(7).alignment = { horizontal: 'right' };
+      dataRow.getCell(8).value = parseFloat((row.qty * parseFloat(row.unit_price_ttc)).toFixed(2));
+      dataRow.getCell(8).numFmt = euroFmt;
+      dataRow.getCell(8).alignment = { horizontal: 'right' };
+      dataRow.getCell(9).value = statusLabels[row.status] || row.status;
+
+      // Zebra striping
+      if ((histRowIdx - 5) % 2 === 0) {
+        for (let c = 1; c <= 9; c++) {
+          dataRow.getCell(c).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF9F3EE' } };
+        }
+      }
+      for (let c = 1; c <= 9; c++) {
+        dataRow.getCell(c).border = allBorders;
+      }
+      dataRow.commit();
+      histRowIdx++;
+    }
+
+    // Footer credit
+    histRowIdx++;
+    sheetHist.mergeCells(histRowIdx, 1, histRowIdx, 9);
+    const footerCell1 = sheetHist.getCell(histRowIdx, 1);
+    footerCell1.value = 'Réalisation Cap-Numerik Angers — 07 60 40 39 66 — www.cap-numerik.fr';
+    footerCell1.font = { italic: true, size: 8, color: { argb: 'FFC0C0C0' } };
+    footerCell1.alignment = { horizontal: 'center' };
+
+    // Column widths
+    sheetHist.getColumn(1).width = 14;
+    sheetHist.getColumn(2).width = 18;
+    sheetHist.getColumn(3).width = 24;
+    sheetHist.getColumn(4).width = 24;
+    sheetHist.getColumn(5).width = 28;
+    sheetHist.getColumn(6).width = 8;
+    sheetHist.getColumn(7).width = 14;
+    sheetHist.getColumn(8).width = 14;
+    sheetHist.getColumn(9).width = 16;
+    sheetHist.views = [{ state: 'frozen', xSplit: 0, ySplit: 4 }];
+
+    // ──────────────────────────────────────────────────
+    // Sheet 2 — Récap par participant
+    // ──────────────────────────────────────────────────
+    const sheetRecap = workbook.addWorksheet('Récap par participant');
+
+    // Title rows
+    sheetRecap.mergeCells(1, 1, 1, 6);
+    const recapTitle = sheetRecap.getCell(1, 1);
+    recapTitle.value = `Récap par participant — ${campaign.name}`;
+    recapTitle.font = { bold: true, size: 14, color: { argb: 'FF722F37' } };
+    recapTitle.alignment = { horizontal: 'center' };
+
+    sheetRecap.mergeCells(2, 1, 2, 6);
+    sheetRecap.getCell(2, 1).value = `Export généré le ${new Date().toLocaleDateString('fr-FR', { day: '2-digit', month: 'long', year: 'numeric' })}`;
+    sheetRecap.getCell(2, 1).font = { italic: true, color: { argb: 'FF666666' } };
+    sheetRecap.getCell(2, 1).alignment = { horizontal: 'center' };
+    sheetRecap.addRow([]);
+
+    // Header row (row 4)
+    const recapHeaders = ['Participant', 'Email', 'Nb commandes', 'Bouteilles vendues', 'CA TTC', 'CA HT'];
+    const recapHeaderRow = sheetRecap.getRow(4);
+    recapHeaders.forEach((h, i) => {
+      const cell = recapHeaderRow.getCell(i + 1);
+      cell.value = h;
+      cell.fill = headerFill;
+      cell.font = boldWhite;
+      cell.border = allBorders;
+      cell.alignment = { horizontal: 'center', wrapText: true };
+    });
+    recapHeaderRow.height = 30;
+    recapHeaderRow.commit();
+
+    // Aggregate per participant
+    const participantMap = new Map();
+    for (const row of rows) {
+      const key = row.user_id || '__boutique__';
+      if (!participantMap.has(key)) {
+        participantMap.set(key, {
+          name: row.vendeur,
+          email: row.vendeur_email || '',
+          orderRefs: new Set(),
+          totalQty: 0,
+          totalTTC: 0,
+          totalHT: 0,
+        });
+      }
+      const p = participantMap.get(key);
+      p.orderRefs.add(row.ref);
+      p.totalQty += row.qty;
+      p.totalTTC += row.qty * parseFloat(row.unit_price_ttc);
+      p.totalHT += row.qty * parseFloat(row.unit_price_ht);
+    }
+
+    // Sort by CA TTC descending
+    const participants = Array.from(participantMap.values()).sort((a, b) => b.totalTTC - a.totalTTC);
+
+    let recapRowIdx = 5;
+    let grandQty = 0, grandTTC = 0, grandHT = 0, grandOrders = 0;
+
+    for (const p of participants) {
+      const dataRow = sheetRecap.getRow(recapRowIdx);
+      const nbOrders = p.orderRefs.size;
+
+      dataRow.getCell(1).value = p.name;
+      dataRow.getCell(2).value = p.email;
+      dataRow.getCell(3).value = nbOrders;
+      dataRow.getCell(3).alignment = { horizontal: 'center' };
+      dataRow.getCell(4).value = p.totalQty;
+      dataRow.getCell(4).alignment = { horizontal: 'center' };
+      dataRow.getCell(5).value = parseFloat(p.totalTTC.toFixed(2));
+      dataRow.getCell(5).numFmt = euroFmt;
+      dataRow.getCell(5).alignment = { horizontal: 'right' };
+      dataRow.getCell(6).value = parseFloat(p.totalHT.toFixed(2));
+      dataRow.getCell(6).numFmt = euroFmt;
+      dataRow.getCell(6).alignment = { horizontal: 'right' };
+
+      // Zebra striping
+      if ((recapRowIdx - 5) % 2 === 0) {
+        for (let c = 1; c <= 6; c++) {
+          dataRow.getCell(c).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF9F3EE' } };
+        }
+      }
+      for (let c = 1; c <= 6; c++) {
+        dataRow.getCell(c).border = allBorders;
+      }
+      dataRow.commit();
+
+      grandOrders += nbOrders;
+      grandQty += p.totalQty;
+      grandTTC += p.totalTTC;
+      grandHT += p.totalHT;
+      recapRowIdx++;
+    }
+
+    // Grand total row
+    const grandTotalFill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFCD7F32' } };
+    const grandRow = sheetRecap.getRow(recapRowIdx);
+    grandRow.getCell(1).value = 'TOTAL';
+    grandRow.getCell(2).value = '';
+    grandRow.getCell(3).value = grandOrders;
+    grandRow.getCell(3).alignment = { horizontal: 'center' };
+    grandRow.getCell(4).value = grandQty;
+    grandRow.getCell(4).alignment = { horizontal: 'center' };
+    grandRow.getCell(5).value = parseFloat(grandTTC.toFixed(2));
+    grandRow.getCell(5).numFmt = euroFmt;
+    grandRow.getCell(5).alignment = { horizontal: 'right' };
+    grandRow.getCell(6).value = parseFloat(grandHT.toFixed(2));
+    grandRow.getCell(6).numFmt = euroFmt;
+    grandRow.getCell(6).alignment = { horizontal: 'right' };
+    for (let c = 1; c <= 6; c++) {
+      grandRow.getCell(c).fill = grandTotalFill;
+      grandRow.getCell(c).font = { bold: true, color: { argb: 'FFFFFFFF' } };
+      grandRow.getCell(c).border = allBorders;
+    }
+    grandRow.commit();
+
+    // Footer credit
+    recapRowIdx += 2;
+    sheetRecap.mergeCells(recapRowIdx, 1, recapRowIdx, 6);
+    const footerCell2 = sheetRecap.getCell(recapRowIdx, 1);
+    footerCell2.value = 'Réalisation Cap-Numerik Angers — 07 60 40 39 66 — www.cap-numerik.fr';
+    footerCell2.font = { italic: true, size: 8, color: { argb: 'FFC0C0C0' } };
+    footerCell2.alignment = { horizontal: 'center' };
+
+    // Column widths
+    sheetRecap.getColumn(1).width = 28;
+    sheetRecap.getColumn(2).width = 30;
+    sheetRecap.getColumn(3).width = 16;
+    sheetRecap.getColumn(4).width = 20;
+    sheetRecap.getColumn(5).width = 16;
+    sheetRecap.getColumn(6).width = 16;
+    sheetRecap.views = [{ state: 'frozen', xSplit: 0, ySplit: 4 }];
+
+    // --- Send response ---
+    const safeName = campaign.name.normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9 ]/gi, '-').replace(/-+/g, '-').replace(/^-|-$/g, '');
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.setHeader('Content-Disposition', `attachment; filename="historique-participants-${safeName}-${Date.now()}.xlsx"`);
+
+    await workbook.xlsx.write(res);
+    res.end();
+  } catch (err) {
+    console.error('[exports/participant-history]', err);
+    res.status(500).json({ error: true, code: 'EXPORT_FAILED', message: err.message });
+  }
+});
+
 // All other exports require auth + super_admin/comptable
 router.use(authenticate, requireRole('super_admin', 'comptable'));
 
@@ -669,10 +976,10 @@ router.get('/sales-journal', async (req, res) => {
   }
 });
 
-// 3. GET /api/v1/admin/exports/commissions?campaign_id — Commissions CSV
+// 3. GET /api/v1/admin/exports/commissions?campaign_id&format — Commissions PDF (default) or CSV
 router.get('/commissions', async (req, res) => {
   try {
-    const { campaign_id } = req.query;
+    const { campaign_id, format } = req.query;
 
     let query = db('orders')
       .join('campaigns', 'orders.campaign_id', 'campaigns.id')
@@ -703,21 +1010,121 @@ router.get('/commissions', async (req, res) => {
       return {
         campaign: c.name,
         ca_ht: caHT.toFixed(2),
-        taux_collectif: `${collectivePct}%`,
+        taux_collectif: collectivePct,
         commission_collective: (caHT * collectivePct / 100).toFixed(2),
-        taux_individuel: `${individualPct}%`,
+        taux_individuel: individualPct,
         commission_individuelle: (caHT * individualPct / 100).toFixed(2),
       };
     });
 
-    const csv = '\uFEFF' + stringify(rows, {
-      header: true,
-      columns: ['campaign', 'ca_ht', 'taux_collectif', 'commission_collective', 'taux_individuel', 'commission_individuelle'],
-    });
+    // ── CSV format ──
+    if (format === 'csv') {
+      const csvRows = rows.map((r) => ({
+        ...r,
+        taux_collectif: `${r.taux_collectif}%`,
+        taux_individuel: `${r.taux_individuel}%`,
+      }));
 
-    res.setHeader('Content-Type', 'text/csv; charset=utf-8');
-    res.setHeader('Content-Disposition', 'attachment; filename=commissions.csv');
-    res.send(csv);
+      const csv = '\uFEFF' + stringify(csvRows, {
+        header: true,
+        columns: ['campaign', 'ca_ht', 'taux_collectif', 'commission_collective', 'taux_individuel', 'commission_individuelle'],
+      });
+
+      res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+      res.setHeader('Content-Disposition', 'attachment; filename=commissions.csv');
+      return res.send(csv);
+    }
+
+    // ── PDF format (default) ──
+    const branding = await getAppBranding();
+    const doc = new PDFDocument({ margin: 50, size: 'A4' });
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', 'attachment; filename=commissions.pdf');
+    doc.pipe(res);
+
+    // Title
+    doc.fontSize(20).text('Rapport des Commissions', { align: 'center' });
+    doc.fontSize(10).text(`${branding.app_name} — Export du ${new Date().toLocaleDateString('fr-FR')}`, { align: 'center' });
+    doc.moveDown(2);
+
+    // Table header
+    const tableLeft = 50;
+    const colWidths = [140, 65, 55, 75, 55, 75];  // campaign, ca_ht, taux_c, comm_c, taux_i, comm_i
+    const colHeaders = ['Campagne', 'CA HT', 'Taux coll.', 'Comm. coll.', 'Taux ind.', 'Comm. ind.'];
+
+    let cursorY = doc.y;
+    doc.font('Helvetica-Bold').fontSize(8);
+
+    // Draw header background
+    doc.rect(tableLeft, cursorY, colWidths.reduce((a, b) => a + b, 0), 18).fill('#722F37');
+    doc.fillColor('#FFFFFF');
+    let xPos = tableLeft;
+    for (let i = 0; i < colHeaders.length; i++) {
+      doc.text(colHeaders[i], xPos + 4, cursorY + 4, { width: colWidths[i] - 8, align: i === 0 ? 'left' : 'right' });
+      xPos += colWidths[i];
+    }
+    cursorY += 18;
+
+    // Table rows
+    doc.font('Helvetica').fontSize(8).fillColor('#000000');
+    let grandTotalCaHT = 0;
+    let grandTotalCommColl = 0;
+    let grandTotalCommInd = 0;
+
+    for (let idx = 0; idx < rows.length; idx++) {
+      const r = rows[idx];
+      grandTotalCaHT += parseFloat(r.ca_ht);
+      grandTotalCommColl += parseFloat(r.commission_collective);
+      grandTotalCommInd += parseFloat(r.commission_individuelle);
+
+      // Alternate row background
+      if (idx % 2 === 0) {
+        doc.rect(tableLeft, cursorY, colWidths.reduce((a, b) => a + b, 0), 16).fill('#F9F3EE');
+        doc.fillColor('#000000');
+      }
+
+      xPos = tableLeft;
+      const values = [
+        r.campaign,
+        `${r.ca_ht} EUR`,
+        `${r.taux_collectif}%`,
+        `${r.commission_collective} EUR`,
+        `${r.taux_individuel}%`,
+        `${r.commission_individuelle} EUR`,
+      ];
+      for (let i = 0; i < values.length; i++) {
+        doc.text(values[i], xPos + 4, cursorY + 3, { width: colWidths[i] - 8, align: i === 0 ? 'left' : 'right' });
+        xPos += colWidths[i];
+      }
+      cursorY += 16;
+
+      // Page break if near bottom
+      if (cursorY > 720) {
+        doc.addPage();
+        cursorY = 50;
+      }
+    }
+
+    // Grand totals row
+    doc.rect(tableLeft, cursorY, colWidths.reduce((a, b) => a + b, 0), 18).fill('#CD7F32');
+    doc.font('Helvetica-Bold').fontSize(8).fillColor('#FFFFFF');
+    xPos = tableLeft;
+    const totals = [
+      'TOTAL',
+      `${grandTotalCaHT.toFixed(2)} EUR`,
+      '',
+      `${grandTotalCommColl.toFixed(2)} EUR`,
+      '',
+      `${grandTotalCommInd.toFixed(2)} EUR`,
+    ];
+    for (let i = 0; i < totals.length; i++) {
+      doc.text(totals[i], xPos + 4, cursorY + 4, { width: colWidths[i] - 8, align: i === 0 ? 'left' : 'right' });
+      xPos += colWidths[i];
+    }
+
+    // Footer credit
+    doc.fillColor('#c0c0c0').fontSize(6).text('Réalisation Cap-Numerik Angers — 07 60 40 39 66 — www.cap-numerik.fr', 50, 780, { align: 'center', width: 495 });
+    doc.end();
   } catch (err) {
     res.status(500).json({ error: 'SERVER_ERROR', message: err.message });
   }

@@ -291,10 +291,24 @@ router.get(
         .limit(10)
         .select('id', 'ref', 'status', 'total_ttc', 'total_items', 'created_at');
 
+      // Referral code from participation
+      const referralCode = participation.referral_code || null;
+
       // Referral stats (entity_id = ambassador user_id)
       const referralClicks = await db('audit_log')
         .where({ entity: 'referral', action: 'REFERRAL_CLICK', entity_id: req.user.userId })
         .count('id as count')
+        .first();
+
+      // Referral conversions (orders generated via referral link)
+      const referralOrders = await db('orders')
+        .where({ referred_by: req.user.userId })
+        .whereIn('status', ['submitted', 'validated', 'preparing', 'shipped', 'delivered'])
+        .select(
+          db.raw('COUNT(id) as total_orders'),
+          db.raw('COALESCE(SUM(total_ttc), 0) as total_revenue'),
+          db.raw('COALESCE(SUM(total_items), 0) as total_bottles')
+        )
         .first();
 
       // Gains (rewards from tiers)
@@ -317,7 +331,13 @@ router.get(
         tiers: rules.tier?.tiers || [],
         sales: { caTTC, caHT, bottles, orderCount },
         recentOrders,
+        referralCode,
         referralClicks: parseInt(referralClicks?.count || 0, 10),
+        referralStats: {
+          orders: parseInt(referralOrders?.total_orders || 0, 10),
+          revenue: parseFloat(referralOrders?.total_revenue || 0),
+          bottles: parseInt(referralOrders?.total_bottles || 0, 10),
+        },
         gains,
         ui: rules.ui,
       });
@@ -334,7 +354,22 @@ router.get(
   requireRole('etudiant', 'super_admin'),
   async (req, res) => {
     try {
-      const campaignId = req.query.campaign_id || req.user.campaign_ids?.[0];
+      let campaignId = req.query.campaign_id;
+
+      // Auto-detect BTS campaign if not provided
+      if (!campaignId) {
+        const userCampaigns = req.user.campaign_ids || [];
+        if (userCampaigns.length > 0) {
+          const btsCampaign = await db('campaigns')
+            .join('client_types', 'campaigns.client_type_id', 'client_types.id')
+            .whereIn('campaigns.id', userCampaigns)
+            .whereNull('campaigns.deleted_at')
+            .whereRaw("client_types.ui_config::text LIKE '%show_formation%'")
+            .select('campaigns.id')
+            .first();
+          campaignId = btsCampaign?.id || userCampaigns[0];
+        }
+      }
       if (!campaignId) return res.status(400).json({ error: 'CAMPAIGN_REQUIRED' });
 
       // Check the campaign uses a BTS client_type (show_formation=true)

@@ -46,7 +46,7 @@
     "email": "contact@vinsetconversations.fr",
     "address": {
       "@type": "PostalAddress",
-      "streetAddress": "6 Square Léon Morice",
+      "streetAddress": "2 Rue de Saint-Sylvain",
       "addressLocality": "Verrières-en-Anjou",
       "postalCode": "49480",
       "addressRegion": "Pays de la Loire",
@@ -67,6 +67,20 @@
     }
   }
   </script>
+  <!-- Wine Detail Modal Styles -->
+  <style>
+    .wine-modal-overlay { display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.7); z-index:2000; align-items:center; justify-content:center; }
+    .wine-modal-overlay.active { display:flex; }
+    .wine-modal { background:#fff; border-radius:12px; max-width:700px; width:90%; max-height:85vh; overflow-y:auto; position:relative; }
+    .wine-modal-close { position:absolute; top:12px; right:16px; background:none; border:none; font-size:28px; cursor:pointer; color:#666; z-index:10; }
+    .wine-modal-content { display:flex; gap:24px; padding:32px; }
+    .wine-modal-img { flex:0 0 200px; }
+    .wine-modal-img img { width:100%; border-radius:8px; }
+    .wine-modal-info { flex:1; }
+    .wine-modal-info h2 { font-family:'Cormorant Garamond',serif; font-size:1.8rem; color:var(--wine-dark,#4a1c2b); margin-bottom:8px; }
+    .wine-modal-desc { color:#666; line-height:1.6; margin:16px 0; }
+    @media(max-width:600px) { .wine-modal-content { flex-direction:column; } .wine-modal-img { flex:none; text-align:center; } .wine-modal-img img { max-width:180px; } }
+  </style>
 </head>
 <body>
 
@@ -444,11 +458,87 @@
           <a href="https://www.cap-numerik.fr" target="_blank" rel="noopener"
              style="color: rgba(255,255,255,0.55); text-decoration: none; font-weight: 500;">Cap-Numerik Angers</a> ·
           <a href="tel:+33760403966"
-             style="color: rgba(255,255,255,0.55); text-decoration: none;">07 60 40 39 66</a>
+             style="color: rgba(255,255,255,0.55); text-decoration: none;">07 60 40 39 66</a> ·
+          <a href="https://www.cap-performances.fr" target="_blank" rel="noopener"
+             style="color: rgba(255,255,255,0.55); text-decoration: none;">cap-performances.fr</a> ·
+          <a href="https://www.vendmieux.fr" target="_blank" rel="noopener"
+             style="color: rgba(255,255,255,0.55); text-decoration: none;">vendmieux.fr</a>
         </p>
       </div>
     </div>
   </footer>
+
+  <!-- Wine Detail Modal -->
+  <div class="wine-modal-overlay" id="wine-modal-overlay">
+    <div class="wine-modal">
+      <button class="wine-modal-close" id="wine-modal-close">&times;</button>
+      <div class="wine-modal-content">
+        <div class="wine-modal-img">
+          <img id="wine-modal-img" src="" alt="">
+        </div>
+        <div class="wine-modal-info">
+          <h2 id="wine-modal-name"></h2>
+          <p class="appellation" id="wine-modal-appellation"></p>
+          <div id="wine-modal-badges"></div>
+          <div class="wine-price" id="wine-modal-price"></div>
+          <p id="wine-modal-description" class="wine-modal-desc"></p>
+          <button class="btn btn-wine" id="wine-modal-add-cart">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 002 1.61h9.72a2 2 0 002-1.61L23 6H6"/></svg>
+            Ajouter au panier
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Wine Modal Script -->
+  <script>
+  (function() {
+    const overlay = document.getElementById('wine-modal-overlay');
+    const closeBtn = document.getElementById('wine-modal-close');
+
+    // Make wine card images and names clickable to open modal
+    document.querySelectorAll('.wine-card').forEach(card => {
+      const img = card.querySelector('.wine-card-img');
+      const name = card.querySelector('h3');
+      const addBtn = card.querySelector('.btn-add-cart');
+
+      function openModal(e) {
+        e.preventDefault();
+        e.stopPropagation();
+        const cardImg = card.querySelector('.wine-card-img img');
+        const cardName = card.querySelector('h3').textContent;
+        const cardAppellation = card.querySelector('.appellation')?.textContent || '';
+        const cardPrice = card.querySelector('.wine-price')?.innerHTML || '';
+        const cardBadge = card.querySelector('.wine-badge')?.outerHTML || '';
+
+        document.getElementById('wine-modal-img').src = cardImg.src;
+        document.getElementById('wine-modal-img').alt = cardName;
+        document.getElementById('wine-modal-name').textContent = cardName;
+        document.getElementById('wine-modal-appellation').textContent = cardAppellation;
+        document.getElementById('wine-modal-badges').innerHTML = cardBadge;
+        document.getElementById('wine-modal-price').innerHTML = cardPrice;
+        document.getElementById('wine-modal-description').textContent = 'Vin sélectionné par Nicolas Froment, directement chez le vigneron.';
+
+        // Set up modal add-to-cart
+        const modalAddBtn = document.getElementById('wine-modal-add-cart');
+        modalAddBtn.onclick = function() { addBtn.click(); overlay.classList.remove('active'); };
+
+        overlay.classList.add('active');
+      }
+
+      if (img) img.style.cursor = 'pointer';
+      if (name) name.style.cursor = 'pointer';
+      if (img) img.addEventListener('click', openModal);
+      if (name) name.addEventListener('click', openModal);
+    });
+
+    // Close modal
+    if (closeBtn) closeBtn.addEventListener('click', () => overlay.classList.remove('active'));
+    if (overlay) overlay.addEventListener('click', (e) => { if (e.target === overlay) overlay.classList.remove('active'); });
+    document.addEventListener('keydown', (e) => { if (e.key === 'Escape') overlay.classList.remove('active'); });
+  })();
+  </script>
 
   <script src="assets/js/site-images.js?v=1"></script>
   <script src="assets/js/main.js?v=3"></script>
