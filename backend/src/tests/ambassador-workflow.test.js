@@ -187,6 +187,66 @@ describe('Ambassador Workflow', () => {
     expect(res.body.filters.regions.length).toBeGreaterThan(0);
   });
 
+  // ─── Tier data on public endpoint ────────────
+
+  test('Public page returns filters.tiers with 4 levels', async () => {
+    const res = await request(app).get('/api/v1/ambassador/public');
+    expect(res.status).toBe(200);
+    expect(res.body.filters.tiers).toBeInstanceOf(Array);
+    expect(res.body.filters.tiers.length).toBe(4);
+    const labels = res.body.filters.tiers.map(t => t.label);
+    expect(labels).toEqual(['Bronze', 'Argent', 'Or', 'Platine']);
+    // Each tier has label and color
+    for (const t of res.body.filters.tiers) {
+      expect(t).toHaveProperty('label');
+      expect(t).toHaveProperty('color');
+    }
+  });
+
+  test('Public page ambassadors have tier field based on CA', async () => {
+    await invalidateCache('vc:cache:*');
+    const res = await request(app).get('/api/v1/ambassador/public');
+    expect(res.status).toBe(200);
+
+    for (const amb of res.body.ambassadors) {
+      // tier should be present (object or null)
+      expect(amb).toHaveProperty('tier');
+    }
+
+    // Sophie is linked to ambassadeur1 (CA ~2800€ → Argent: ≥1500)
+    const sophie = res.body.ambassadors.find(a => a.name === 'Sophie Laurent');
+    expect(sophie).toBeDefined();
+    expect(sophie.tier).not.toBeNull();
+    expect(sophie.tier.label).toBe('Argent');
+
+    // Marc is linked to ambassadeur2 (CA ~800€ → Bronze: ≥500)
+    const marc = res.body.ambassadors.find(a => a.name === 'Marc Dupont');
+    expect(marc).toBeDefined();
+    expect(marc.tier).not.toBeNull();
+    expect(marc.tier.label).toBe('Bronze');
+  });
+
+  test('Ambassador with no linked user has null tier', async () => {
+    // Create a contact with no source_user_id and no matching email
+    const testId = require('crypto').randomUUID();
+    await db('contacts').insert({
+      id: testId,
+      name: 'Test NoTier',
+      type: 'ambassadeur',
+      show_on_public_page: true,
+      email: 'notier-unique@test.fr',
+    });
+    await invalidateCache('vc:cache:*');
+
+    const res = await request(app).get('/api/v1/ambassador/public');
+    const noTier = res.body.ambassadors.find(a => a.name === 'Test NoTier');
+    expect(noTier).toBeDefined();
+    expect(noTier.tier).toBeNull();
+
+    // Cleanup
+    await db('contacts').where({ id: testId }).del();
+  });
+
   test('Contact with show_on_public_page=false is NOT returned', async () => {
     // Set one ambassador contact to hidden
     const sophie = await db('contacts').where('name', 'Sophie Laurent').first();
