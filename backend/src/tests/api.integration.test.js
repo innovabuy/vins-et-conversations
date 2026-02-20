@@ -8,6 +8,7 @@ let adminToken;
 let studentToken;
 let campaignId;
 let orderId;
+let replenishMovementIds = [];
 
 beforeAll(async () => {
   // Wait for DB to be ready
@@ -17,9 +18,32 @@ beforeAll(async () => {
   const campaign = await db('campaigns').where('name', 'like', '%Sacr%').first()
     || await db('campaigns').first();
   campaignId = campaign?.id;
+
+  // Ensure sufficient stock for all active products (may be depleted by earlier suites or accumulated test runs)
+  const products = await db('products').where({ active: true });
+  for (const product of products) {
+    const stockResult = await db('stock_movements')
+      .where('product_id', product.id)
+      .select(
+        db.raw("COALESCE(SUM(CASE WHEN type IN ('initial', 'entry', 'return') THEN qty ELSE 0 END), 0) as total_in"),
+        db.raw("COALESCE(SUM(CASE WHEN type IN ('exit', 'correction', 'free', 'adjustment') THEN qty ELSE 0 END), 0) as total_out")
+      )
+      .first();
+    const currentStock = parseInt(stockResult.total_in) - parseInt(stockResult.total_out);
+    if (currentStock < 200) {
+      const needed = 200 - currentStock;
+      const [mv] = await db('stock_movements').insert({
+        product_id: product.id, type: 'entry', qty: needed, reference: 'TEST_REPLENISH_INTEGRATION',
+      }).returning('id');
+      replenishMovementIds.push(mv.id || mv);
+    }
+  }
 });
 
 afterAll(async () => {
+  for (const id of replenishMovementIds) {
+    await db('stock_movements').where({ id }).del().catch(() => {});
+  }
   await db.destroy();
 });
 

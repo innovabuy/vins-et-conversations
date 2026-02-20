@@ -11,6 +11,7 @@ const crypto = require('crypto');
 let sessionId; // will be set by first cart call (server-generated UUID)
 let testProduct;
 let orderId;
+let replenishMovementId;
 
 beforeAll(async () => {
   await db.raw('SELECT 1');
@@ -19,6 +20,25 @@ beforeAll(async () => {
   testProduct = await db('products')
     .where({ active: true, visible_boutique: true })
     .first();
+
+  // Ensure sufficient stock (may be depleted by earlier test suites in runInBand)
+  if (testProduct) {
+    const stockResult = await db('stock_movements')
+      .where('product_id', testProduct.id)
+      .select(
+        db.raw("COALESCE(SUM(CASE WHEN type IN ('initial', 'entry', 'return') THEN qty ELSE 0 END), 0) as total_in"),
+        db.raw("COALESCE(SUM(CASE WHEN type IN ('exit', 'correction', 'free') THEN qty ELSE 0 END), 0) as total_out")
+      )
+      .first();
+    const currentStock = parseInt(stockResult.total_in) - parseInt(stockResult.total_out);
+    if (currentStock < 200) {
+      const needed = 200 - currentStock;
+      const [mv] = await db('stock_movements').insert({
+        product_id: testProduct.id, type: 'entry', qty: needed, reference: 'TEST_REPLENISH_CHECKOUT',
+      }).returning('id');
+      replenishMovementId = mv.id || mv;
+    }
+  }
 }, 15000);
 
 afterAll(async () => {
@@ -31,6 +51,9 @@ afterAll(async () => {
     await db('financial_events').where({ order_id: orderId }).del().catch(() => {});
     await db('order_items').where({ order_id: orderId }).del().catch(() => {});
     await db('orders').where({ id: orderId }).del().catch(() => {});
+  }
+  if (replenishMovementId) {
+    await db('stock_movements').where({ id: replenishMovementId }).del().catch(() => {});
   }
   await db.destroy();
 });

@@ -8,6 +8,7 @@ const app = require('../index');
 const db = require('../config/database');
 
 let adminToken;
+let replenishMovementIds = [];
 
 beforeAll(async () => {
   await db.raw('SELECT 1');
@@ -16,6 +17,26 @@ beforeAll(async () => {
     .post('/api/v1/auth/login')
     .send({ email: 'nicolas@vins-conversations.fr', password: 'VinsConv2026!' });
   adminToken = adminRes.body.accessToken;
+
+  // Ensure sufficient stock for all active products (may be depleted by earlier suites in runInBand)
+  const products = await db('products').where({ active: true });
+  for (const product of products) {
+    const stockResult = await db('stock_movements')
+      .where('product_id', product.id)
+      .select(
+        db.raw("COALESCE(SUM(CASE WHEN type IN ('initial', 'entry', 'return') THEN qty ELSE 0 END), 0) as total_in"),
+        db.raw("COALESCE(SUM(CASE WHEN type IN ('exit', 'correction', 'free', 'adjustment') THEN qty ELSE 0 END), 0) as total_out")
+      )
+      .first();
+    const currentStock = parseInt(stockResult.total_in) - parseInt(stockResult.total_out);
+    if (currentStock < 200) {
+      const needed = 200 - currentStock;
+      const [mv] = await db('stock_movements').insert({
+        product_id: product.id, type: 'entry', qty: needed, reference: 'TEST_REPLENISH_SECURITY',
+      }).returning('id');
+      replenishMovementIds.push(mv.id || mv);
+    }
+  }
 }, 15000);
 
 afterAll(async () => {
@@ -25,6 +46,10 @@ afterAll(async () => {
     await db('refresh_tokens').where({ user_id: xssUser.id }).del();
     await db('contacts').where({ email: 'xss-test@test.fr' }).del();
     await db('users').where({ id: xssUser.id }).del();
+  }
+
+  for (const id of replenishMovementIds) {
+    await db('stock_movements').where({ id }).del().catch(() => {});
   }
 
   await db.destroy();

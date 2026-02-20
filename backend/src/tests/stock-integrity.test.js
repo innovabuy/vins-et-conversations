@@ -11,6 +11,7 @@ const db = require('../config/database');
 let adminToken;
 let products = [];
 let sacreCoeurCampaignId;
+let replenishMovementIds = [];
 
 beforeAll(async () => {
   await db.raw('SELECT 1');
@@ -26,9 +27,31 @@ beforeAll(async () => {
   // Get Sacre-Coeur campaign
   const scCamp = await db('campaigns').where('name', 'like', '%Sacr%').first();
   sacreCoeurCampaignId = scCamp?.id;
+
+  // Ensure sufficient stock for all products (may be depleted by earlier suites in runInBand)
+  for (const product of products) {
+    const stockResult = await db('stock_movements')
+      .where('product_id', product.id)
+      .select(
+        db.raw("COALESCE(SUM(CASE WHEN type IN ('initial', 'entry', 'return') THEN qty ELSE 0 END), 0) as total_in"),
+        db.raw("COALESCE(SUM(CASE WHEN type IN ('exit', 'correction', 'free') THEN qty ELSE 0 END), 0) as total_out")
+      )
+      .first();
+    const currentStock = parseInt(stockResult.total_in) - parseInt(stockResult.total_out);
+    if (currentStock < 200) {
+      const needed = 200 - currentStock;
+      const [mv] = await db('stock_movements').insert({
+        product_id: product.id, type: 'entry', qty: needed, reference: 'TEST_REPLENISH_STOCK',
+      }).returning('id');
+      replenishMovementIds.push(mv.id || mv);
+    }
+  }
 }, 15000);
 
 afterAll(async () => {
+  for (const id of replenishMovementIds) {
+    await db('stock_movements').where({ id }).del().catch(() => {});
+  }
   await db.destroy();
 });
 
@@ -180,12 +203,13 @@ describe('Stock Integrity', () => {
   });
 
   test('Insufficient stock returns 400 with INSUFFICIENT_STOCK error', async () => {
-    // Find a boutique-visible product
+    // Find a boutique-visible product and temporarily disable backorder for this test
     const product = await db('products')
       .where({ active: true })
       .whereNot('name', 'like', '%Coffret%')
       .first();
     expect(product).toBeDefined();
+    await db('products').where({ id: product.id }).update({ allow_backorder: false });
 
     // Calculate current stock for this product
     const stockResult = await db('stock_movements')
@@ -236,6 +260,8 @@ describe('Stock Integrity', () => {
       expect(checkoutRes.status).toBe(400);
       expect(checkoutRes.body.error).toBe('INSUFFICIENT_STOCK');
     } finally {
+      // Restore allow_backorder to true (default state)
+      await db('products').where({ id: product.id }).update({ allow_backorder: true });
       // Clean up: remove the drain movement to restore stock
       if (drainMovementId) {
         await db('stock_movements').where({ id: drainMovementId }).del();

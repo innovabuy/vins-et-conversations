@@ -38,11 +38,11 @@ describe('Backorder / Pré-commande', () => {
     expect(res.status).toBe(200);
     expect(res.body.allow_backorder).toBe(true);
 
-    // Reset
+    // Restore to true (default state)
     await request(app)
       .put(`/api/v1/admin/products/${product.id}`)
       .set('Authorization', `Bearer ${adminToken}`)
-      .send({ allow_backorder: false });
+      .send({ allow_backorder: true });
   });
 
   test('public catalog includes allow_backorder and in_stock fields', async () => {
@@ -116,11 +116,14 @@ describe('Backorder / Pré-commande', () => {
     await db('financial_events').where({ order_id: order.id }).del().catch(() => {});
     await db('orders').where({ id: order.id }).del().catch(() => {});
     await db('stock_movements').where('reference', 'backorder-test-drain').del().catch(() => {});
-    await db('products').where({ id: product.id }).update({ allow_backorder: false });
+    // Restore allow_backorder to true (default state)
+    await db('products').where({ id: product.id }).update({ allow_backorder: true });
   });
 
   test('product without allow_backorder still blocked when stock=0', async () => {
-    const product = await db('products').where({ active: true, visible_boutique: true, allow_backorder: false }).first();
+    // Temporarily disable backorder on one product to test the guard
+    const product = await db('products').where({ active: true, visible_boutique: true }).first();
+    await db('products').where({ id: product.id }).update({ allow_backorder: false });
 
     // Drain stock
     const stockRow = await db('stock_movements')
@@ -156,7 +159,8 @@ describe('Backorder / Pré-commande', () => {
     expect(checkoutRes.status).toBe(400);
     expect(checkoutRes.body.error).toBe('INSUFFICIENT_STOCK');
 
-    // Clean up
+    // Clean up: restore allow_backorder and remove drain
+    await db('products').where({ id: product.id }).update({ allow_backorder: true });
     await db('stock_movements').where('reference', 'backorder-test-drain-2').del().catch(() => {});
   });
 });
