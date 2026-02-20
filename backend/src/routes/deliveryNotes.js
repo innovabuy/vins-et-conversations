@@ -217,10 +217,17 @@ router.get('/:id/pdf', authenticate, requireRole('super_admin', 'commercial'), a
       .where('order_items.order_id', bl.order_id)
       .select('order_items.*', 'products.name as product_name');
 
+    // Buffer the PDF to avoid ERR_STREAM_WRITE_AFTER_END with compression middleware
     const doc = new PDFDocument({ margin: 50, size: 'A4' });
-    res.setHeader('Content-Type', 'application/pdf');
-    res.setHeader('Content-Disposition', `inline; filename=bl-${bl.ref}.pdf`);
-    doc.pipe(res);
+    const chunks = [];
+    doc.on('data', (chunk) => chunks.push(chunk));
+    doc.on('end', () => {
+      const pdfBuffer = Buffer.concat(chunks);
+      res.setHeader('Content-Type', 'application/pdf');
+      res.setHeader('Content-Disposition', `inline; filename=bl-${bl.ref}.pdf`);
+      res.setHeader('Content-Length', pdfBuffer.length);
+      res.end(pdfBuffer);
+    });
 
     // Header
     doc.fontSize(22).fillColor('#7a1c3b').text('Vins & Conversations', { align: 'center' });
@@ -260,12 +267,18 @@ router.get('/:id/pdf', authenticate, requireRole('super_admin', 'commercial'), a
     doc.fontSize(10).fillColor('#333').text('Signature du destinataire :', 50);
     doc.moveDown(0.5);
     if (bl.signature_url && bl.signature_url.startsWith('data:image/png;base64,')) {
-      const base64Data = bl.signature_url.replace('data:image/png;base64,', '');
-      const sigBuffer = Buffer.from(base64Data, 'base64');
-      doc.image(sigBuffer, 50, doc.y, { width: 200, height: 60 });
-      doc.moveDown(5);
-      if (bl.delivered_at) {
-        doc.fontSize(8).fillColor('#999').text(`Signé le ${new Date(bl.delivered_at).toLocaleDateString('fr-FR')}`, 50);
+      try {
+        const base64Data = bl.signature_url.replace('data:image/png;base64,', '');
+        const sigBuffer = Buffer.from(base64Data, 'base64');
+        doc.image(sigBuffer, 50, doc.y, { width: 200, height: 60 });
+        doc.moveDown(5);
+        if (bl.delivered_at) {
+          doc.fontSize(8).fillColor('#999').text(`Signé le ${new Date(bl.delivered_at).toLocaleDateString('fr-FR')}`, 50);
+        }
+      } catch (sigErr) {
+        logger.error(`Signature image error for BL ${bl.ref}: ${sigErr.message}`);
+        doc.fontSize(8).fillColor('#999').text('[Signature enregistrée — image non disponible]', 50);
+        doc.moveDown(5);
       }
     } else {
       doc.rect(50, doc.y, 200, 60).strokeColor('#ccc').stroke();
@@ -277,7 +290,9 @@ router.get('/:id/pdf', authenticate, requireRole('super_admin', 'commercial'), a
     doc.fillColor('#c0c0c0').fontSize(6).text('Réalisation Cap-Numerik Angers — 07 60 40 39 66 — www.cap-numerik.fr', 50, 780, { align: 'center', width: 495 });
     doc.end();
   } catch (err) {
-    res.status(500).json({ error: 'SERVER_ERROR', message: err.message });
+    if (!res.headersSent) {
+      res.status(500).json({ error: 'SERVER_ERROR', message: err.message });
+    }
   }
 });
 

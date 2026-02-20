@@ -198,6 +198,7 @@ async function getStudentDashboard(userId, campaignId) {
     position,
     totalParticipants,
     classGroup: participation.class_group,
+    referral_code: participation.referral_code || null,
     freeBottles,
     fund_collective: funds.fund_collective,
     fund_individual: funds.fund_individual,
