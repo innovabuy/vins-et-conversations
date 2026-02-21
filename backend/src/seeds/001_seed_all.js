@@ -388,7 +388,7 @@ exports.seed = async function (knex) {
       id: IDS.ct_entreprise,
       name: 'entreprise',
       label: 'Événement Entreprise',
-      pricing_rules: JSON.stringify({ type: 'volume_discount', value: 5, applies_to: 'all', min_order: 100 }),
+      pricing_rules: JSON.stringify({ type: 'percentage_discount', value: 5, applies_to: 'all', min_order: 100 }),
       commission_rules: JSON.stringify({}),
       free_bottle_rules: JSON.stringify({
         trigger: 'every_n_sold',

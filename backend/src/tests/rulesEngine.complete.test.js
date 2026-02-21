@@ -331,9 +331,32 @@ describe('Types client_types — entreprise et particulier', () => {
       .first();
   });
 
-  // TEST 1: Règle 12+1 entreprise — avec produits mixtes alcool/non-alcool
-  test('Entreprise : free_bottle_rules every_n_sold=12, alcohol_only, cost=cheapest', () => {
+  // TEST 1: Pricing entreprise — percentage_discount 5% avec min_order=100
+  test('Entreprise : pricing_rules percentage_discount 5% appliqué si total >= 100', () => {
     expect(entrepriseType).toBeDefined();
+    const pricing = entrepriseType.pricing_rules;
+
+    // Le type doit être percentage_discount (pas volume_discount)
+    expect(pricing.type).toBe('percentage_discount');
+    expect(pricing.value).toBe(5);
+    expect(pricing.min_order).toBe(100);
+
+    // Commande 150€ (>= min_order 100) → remise 5%
+    const product = { price_ht: 10.42, price_ttc: 12.50 };
+    const result = applyPricingRules(product, pricing, 150);
+    expect(result.discount_applied).toBe(5);
+    expect(result.price_ht).toBeCloseTo(9.90, 2);
+    expect(result.price_ttc).toBeCloseTo(11.88, 2);
+
+    // Commande 50€ (< min_order 100) → pas de remise
+    const resultLow = applyPricingRules(product, pricing, 50);
+    expect(resultLow.discount_applied).toBe(0);
+    expect(resultLow.price_ht).toBe(10.42);
+    expect(resultLow.warning).toContain('100');
+  });
+
+  // TEST 2: Règle 12+1 entreprise — alcool uniquement, coût = le moins cher
+  test('Entreprise : free_bottle_rules every_n_sold=12, alcohol_only, cost=cheapest', () => {
     const rules = entrepriseType.free_bottle_rules;
 
     expect(rules.trigger).toBe('every_n_sold');
