@@ -303,3 +303,131 @@ describe('loadRulesForCampaign', () => {
     ).rejects.toThrow('CAMPAIGN_NOT_FOUND');
   });
 });
+
+// ═══════════════════════════════════════════════════════
+// NOUVEAUX TYPES — Entreprise & Particulier (V4.3)
+// ═══════════════════════════════════════════════════════
+describe('Types client_types — entreprise et particulier', () => {
+  let entrepriseType, particulierType;
+  let wines, juice;
+
+  beforeAll(async () => {
+    entrepriseType = await db('client_types').where('name', 'entreprise').first();
+    particulierType = await db('client_types').where('name', 'particulier').first();
+
+    wines = await db('products')
+      .join('product_categories', 'products.category_id', 'product_categories.id')
+      .where('product_categories.is_alcohol', true)
+      .where('products.active', true)
+      .select('products.*')
+      .orderBy('products.purchase_price', 'asc')
+      .limit(3);
+
+    juice = await db('products')
+      .join('product_categories', 'products.category_id', 'product_categories.id')
+      .where('product_categories.is_alcohol', false)
+      .where('products.active', true)
+      .select('products.*')
+      .first();
+  });
+
+  // TEST 1: Règle 12+1 entreprise — avec produits mixtes alcool/non-alcool
+  test('Entreprise : free_bottle_rules every_n_sold=12, alcohol_only, cost=cheapest', () => {
+    expect(entrepriseType).toBeDefined();
+    const rules = entrepriseType.free_bottle_rules;
+
+    expect(rules.trigger).toBe('every_n_sold');
+    expect(rules.n).toBe(12);
+    expect(rules.applies_to_alcohol_only).toBe(true);
+    expect(rules.cost_method).toBe('cheapest_in_order');
+
+    // Simulation calcul: 12 alcoolisés vendus → 1 gratuite
+    const totalAlcoholSold = 12;
+    const earned = Math.floor(totalAlcoholSold / rules.n);
+    expect(earned).toBe(1);
+
+    // Coût = prix achat du vin le moins cher (pas le jus)
+    const cheapestWinePurchase = parseFloat(wines[0].purchase_price);
+    expect(cheapestWinePurchase).toBeGreaterThan(0);
+    // Le jus (1.80) ne doit PAS compter pour le coût gratuite
+    if (juice) {
+      expect(parseFloat(juice.purchase_price)).toBeLessThan(cheapestWinePurchase);
+    }
+  });
+
+  // TEST 2: Particulier — prix standard (pas de remise), 12+1 identique
+  test('Particulier : pricing standard, free_bottle 12+1 identique', () => {
+    expect(particulierType).toBeDefined();
+
+    // Pricing = standard → pas de remise
+    const pricing = particulierType.pricing_rules;
+    expect(pricing.type).toBe('standard');
+    expect(pricing.value).toBe(0);
+
+    const product = { price_ht: 10.42, price_ttc: 12.50 };
+    const result = applyPricingRules(product, pricing);
+    expect(result.price_ht).toBe(10.42);
+    expect(result.price_ttc).toBe(12.50);
+    expect(result.discount_applied).toBe(0);
+
+    // Free bottle identique à entreprise
+    const rules = particulierType.free_bottle_rules;
+    expect(rules.trigger).toBe('every_n_sold');
+    expect(rules.n).toBe(12);
+    expect(rules.applies_to_alcohol_only).toBe(true);
+
+    // 12 vins identiques → 1 gratuite, coût = prix achat du vin
+    const winePrice = parseFloat(wines[0].purchase_price);
+    const totalSold = 12;
+    const earned = Math.floor(totalSold / rules.n);
+    expect(earned).toBe(1);
+    expect(winePrice).toBeGreaterThan(0);
+  });
+
+  // TEST 3: Commission vide → pas de NaN, pas de crash
+  test('Entreprise : commission_rules={} → calculateFunds retourne null/null sans NaN', async () => {
+    const commRules = entrepriseType.commission_rules;
+    // commission_rules est {} — pas de fund_collective ni fund_individual
+    expect(commRules).toBeDefined();
+    expect(commRules.fund_collective).toBeUndefined();
+    expect(commRules.association).toBeUndefined();
+
+    // calculateFunds avec des rules vides
+    const result = await calculateFunds(campaignId, studentId, commRules);
+    expect(result.fund_collective).toBeNull();
+    expect(result.fund_individual).toBeNull();
+    // Aucune valeur NaN
+    expect(Number.isNaN(result.fund_collective)).toBe(false);
+    expect(Number.isNaN(result.fund_individual)).toBe(false);
+  });
+
+  // TEST 4: is_alcohol via jointure catégorie (colonne is_alcoholic supprimée)
+  test('is_alcohol passe par product_categories, colonne is_alcoholic supprimée', async () => {
+    // Vérifier que la colonne is_alcoholic n'existe plus
+    const columns = await db.raw(`
+      SELECT column_name FROM information_schema.columns
+      WHERE table_name = 'products' AND column_name = 'is_alcoholic'
+    `);
+    expect(columns.rows).toHaveLength(0);
+
+    // Vérifier que le Jus de Pomme est non-alcoolisé via la jointure catégorie
+    const juiceCheck = await db('products')
+      .join('product_categories', 'products.category_id', 'product_categories.id')
+      .where('products.name', 'ilike', '%jus%')
+      .select('products.name', 'product_categories.is_alcohol')
+      .first();
+
+    expect(juiceCheck).toBeDefined();
+    expect(juiceCheck.is_alcohol).toBe(false);
+
+    // Vérifier qu'un vin est bien alcoolisé via la même jointure
+    const wineCheck = await db('products')
+      .join('product_categories', 'products.category_id', 'product_categories.id')
+      .where('product_categories.is_alcohol', true)
+      .select('products.name', 'product_categories.is_alcohol')
+      .first();
+
+    expect(wineCheck).toBeDefined();
+    expect(wineCheck.is_alcohol).toBe(true);
+  });
+});
