@@ -152,12 +152,25 @@ router.get('/', ...adminAuth, async (req, res) => {
     // V4.2 BLOC 3: Free bottle cost by segment
     const fbcBySegment = await calculateFreeBottleCostsBySegment(filters);
 
-    // Apply 5% commission deduction + free bottle cost for scolaire/bts segments
+    // Read commission rates from DB (client_types.commission_rules) — NEVER hardcode
+    const commissionRates = await db('client_types')
+      .select('name', 'commission_rules')
+      .then(rows => {
+        const map = {};
+        for (const r of rows) {
+          const rules = typeof r.commission_rules === 'string'
+            ? JSON.parse(r.commission_rules) : (r.commission_rules || {});
+          const rate = (rules.fund_collective?.value ?? rules.association?.value ?? 0) / 100;
+          map[r.name] = rate;
+        }
+        return map;
+      });
+
     const segmentsWithCommission = bySegment.map((s) => {
       const caHT = parseFloat(s.ca_ht);
       const marginBrut = parseFloat(s.margin_brut);
-      const hasCommission = ['scolaire', 'bts_ndrc'].includes(s.segment);
-      const commission = hasCommission ? caHT * 0.05 : 0;
+      const commissionRate = commissionRates[s.segment] || 0;
+      const commission = parseFloat((caHT * commissionRate).toFixed(2));
       const freeBottleCost = parseFloat((fbcBySegment[s.segment] || 0).toFixed(2));
       return {
         segment: s.segment,
