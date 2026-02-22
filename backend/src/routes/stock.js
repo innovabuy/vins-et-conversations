@@ -66,12 +66,22 @@ router.get('/alerts', authenticate, requireRole('super_admin', 'commercial'), as
 router.post('/movements', authenticate, requireRole('super_admin', 'commercial'), async (req, res) => {
   try {
     const { product_id, campaign_id, type, qty, reference, reason } = req.body;
+
+    // Validation
+    if (!product_id || !type || qty == null) {
+      return res.status(400).json({ error: 'VALIDATION_ERROR', message: 'product_id, type et qty requis' });
+    }
+    const validTypes = ['initial', 'entry', 'exit', 'return', 'free', 'correction'];
+    if (!validTypes.includes(type)) {
+      return res.status(400).json({ error: 'VALIDATION_ERROR', message: `type invalide. Valeurs acceptées : ${validTypes.join(', ')}` });
+    }
+
     const [movement] = await db('stock_movements')
-      .insert({ product_id, campaign_id, type, qty, reference, reason })
+      .insert({ product_id, campaign_id, type, qty: parseInt(qty, 10), reference, reason })
       .returning('*');
     res.status(201).json(movement);
   } catch (err) {
-    res.status(500).json({ error: 'SERVER_ERROR' });
+    res.status(500).json({ error: 'SERVER_ERROR', message: err.message });
   }
 });
 
