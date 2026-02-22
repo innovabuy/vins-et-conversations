@@ -5,6 +5,7 @@ const { auditAction } = require('../middleware/audit');
 const emailService = require('../services/emailService');
 const notificationService = require('../services/notificationService');
 const logger = require('../utils/logger');
+const { addCapNumerikFooter } = require('../utils/pdfFooter');
 
 const router = express.Router();
 
@@ -288,6 +289,7 @@ router.get('/:id/pdf', authenticate, requireRole('super_admin', 'commercial'), a
 
     doc.moveDown(2);
     doc.fillColor('#c0c0c0').fontSize(6).text('Réalisation Cap-Numerik Angers — 07 60 40 39 66 — www.cap-numerik.fr', 50, 780, { align: 'center', width: 495 });
+    addCapNumerikFooter(doc);
     doc.end();
   } catch (err) {
     if (!res.headersSent) {

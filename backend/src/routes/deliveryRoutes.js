@@ -3,6 +3,7 @@ const Joi = require('joi');
 const db = require('../config/database');
 const { authenticate, requireRole } = require('../middleware/auth');
 const { auditAction } = require('../middleware/audit');
+const { addCapNumerikFooter } = require('../utils/pdfFooter');
 
 const router = express.Router();
 
@@ -552,6 +553,7 @@ router.get('/:id/pdf', ...adminAuth, async (req, res) => {
       doc.text('Réalisation Cap-Numerik Angers — 07 60 40 39 66 — www.cap-numerik.fr', 50, 812, { align: 'center', width: 495 });
     }
 
+    addCapNumerikFooter(doc);
     doc.end();
   } catch (err) {
     res.status(500).json({ error: 'SERVER_ERROR', message: err.message });

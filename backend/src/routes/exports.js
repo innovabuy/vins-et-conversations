@@ -4,6 +4,7 @@ const PDFDocument = require('pdfkit');
 const db = require('../config/database');
 const { authenticate, requireRole } = require('../middleware/auth');
 const { getAppBranding } = require('../utils/appBranding');
+const { addCapNumerikFooter } = require('../utils/pdfFooter');
 
 const router = express.Router();
 
@@ -1124,6 +1125,7 @@ router.get('/commissions', async (req, res) => {
 
     // Footer credit
     doc.fillColor('#c0c0c0').fontSize(6).text('Réalisation Cap-Numerik Angers — 07 60 40 39 66 — www.cap-numerik.fr', 50, 780, { align: 'center', width: 495 });
+    addCapNumerikFooter(doc);
     doc.end();
   } catch (err) {
     res.status(500).json({ error: 'SERVER_ERROR', message: err.message });
@@ -1218,6 +1220,7 @@ router.get('/delivery-notes', async (req, res) => {
     }
 
     doc.fillColor('#c0c0c0').fontSize(6).text('Réalisation Cap-Numerik Angers — 07 60 40 39 66 — www.cap-numerik.fr', 50, 780, { align: 'center', width: 495 });
+    addCapNumerikFooter(doc);
     doc.end();
   } catch (err) {
     res.status(500).json({ error: 'SERVER_ERROR', message: err.message });
@@ -1373,6 +1376,7 @@ router.get('/activity-report', async (req, res) => {
     }
 
     doc.fillColor('#c0c0c0').fontSize(6).text('Réalisation Cap-Numerik Angers — 07 60 40 39 66 — www.cap-numerik.fr', 50, 780, { align: 'center', width: 495 });
+    addCapNumerikFooter(doc);
     doc.end();
   } catch (err) {
     res.status(500).json({ error: 'SERVER_ERROR', message: err.message });

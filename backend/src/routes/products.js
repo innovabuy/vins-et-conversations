@@ -7,6 +7,7 @@ const { authenticate, requireRole, requireCampaignAccess } = require('../middlew
 const { validate } = require('../middleware/validate');
 const { auditAction } = require('../middleware/audit');
 const { cacheMiddleware } = require('../middleware/cache');
+const { addCapNumerikFooter } = require('../utils/pdfFooter');
 
 // Multer config for product images
 const storage = multer.diskStorage({
@@ -318,6 +319,7 @@ adminRouter.get(
         doc.text(`Page ${i + 1}/${range.count}`, 480, 800, { width: 65, align: 'right' });
       }
 
+      addCapNumerikFooter(doc);
       doc.end();
     } catch (err) {
       res.status(500).json({ error: 'SERVER_ERROR', message: err.message });

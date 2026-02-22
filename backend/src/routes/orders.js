@@ -7,6 +7,7 @@ const { authenticate, requireRole, requireCampaignAccess, antifraudCheck } = req
 const { validate } = require('../middleware/validate');
 const { auditAction } = require('../middleware/audit');
 const { getAppBranding } = require('../utils/appBranding');
+const { addCapNumerikFooter } = require('../utils/pdfFooter');
 
 const router = express.Router();
 
@@ -336,6 +337,7 @@ router.get('/:id/invoice', authenticate, async (req, res) => {
     doc.text(`Total TTC: ${parseFloat(order.total_ttc).toFixed(2)} EUR`, 350);
 
     doc.fillColor('#c0c0c0').fontSize(6).text('Réalisation Cap-Numerik Angers — 07 60 40 39 66 — www.cap-numerik.fr', 50, 780, { align: 'center', width: 495 });
+    addCapNumerikFooter(doc);
     doc.end();
   } catch (err) {
     res.status(500).json({ error: 'SERVER_ERROR', message: err.message });
@@ -538,6 +540,7 @@ router.get('/:id/pdf', authenticate, async (req, res) => {
     doc.text(`Conditions : paiement à réception sauf accord préalable. ${brandingBon.app_name} — SIRET 000 000 000 00000`, 50);
 
     doc.fillColor('#c0c0c0').fontSize(6).text('Réalisation Cap-Numerik Angers — 07 60 40 39 66 — www.cap-numerik.fr', 50, 780, { align: 'center', width: 495 });
+    addCapNumerikFooter(doc);
     doc.end();
   } catch (err) {
     res.status(500).json({ error: 'SERVER_ERROR', message: err.message });

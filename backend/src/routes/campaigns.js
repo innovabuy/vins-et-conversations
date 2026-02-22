@@ -9,6 +9,7 @@ const PDFDocument = require('pdfkit');
 const emailService = require('../services/emailService');
 const logger = require('../utils/logger');
 const { generateUniqueReferralCode } = require('../utils/referralCode');
+const { addCapNumerikFooter } = require('../utils/pdfFooter');
 
 const router = express.Router();
 
@@ -511,6 +512,7 @@ router.get('/:id/report-pdf', authenticate, requireRole('super_admin', 'commerci
       doc.text('Réalisation Cap-Numerik Angers — 07 60 40 39 66 — www.cap-numerik.fr', 50, 792, { align: 'center', width: 495 });
     }
 
+    addCapNumerikFooter(doc);
     doc.end();
   } catch (err) {
     logger.error(`Campaign report-pdf error: ${err.message}`);

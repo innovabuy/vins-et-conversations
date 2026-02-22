@@ -6,6 +6,7 @@ const { authenticate, requireRole } = require('../middleware/auth');
 const { getCriteriaForProduct } = require('../config/tastingCriteria');
 const logger = require('../utils/logger');
 const { getAppBranding } = require('../utils/appBranding');
+const { addCapNumerikFooter } = require('../utils/pdfFooter');
 
 const router = express.Router();
 
@@ -315,6 +316,7 @@ router.get(
       doc.pipe(res);
       const branding = await getAppBranding();
       generatePremiumPDF(doc, products, { segment, pricingRules, conditions, branding });
+      addCapNumerikFooter(doc);
       doc.end();
     } catch (err) {
       logger.error('Catalog PDF error:', err);
@@ -343,6 +345,7 @@ router.post(
       const pdfReady = new Promise((resolve) => doc.on('end', () => resolve(Buffer.concat(chunks))));
       const brandingEmail = await getAppBranding();
       generatePremiumPDF(doc, products, { segment: segment || 'public', branding: brandingEmail });
+      addCapNumerikFooter(doc);
       doc.end();
       const pdfBuffer = await pdfReady;
 

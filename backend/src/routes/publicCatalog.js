@@ -7,6 +7,7 @@ const notificationService = require('../services/notificationService');
 const logger = require('../utils/logger');
 const { drawRadarSimple } = require('./catalogPdf');
 const { getAppBranding } = require('../utils/appBranding');
+const { addCapNumerikFooter } = require('../utils/pdfFooter');
 
 const router = express.Router();
 
@@ -350,6 +351,7 @@ router.get('/catalog/:id/pdf', async (req, res) => {
     // Footer
     doc.fontSize(7).fillColor('#d1d5db').text(`${brandingPC.app_name} — nicolas@vins-conversations.fr`, 50, 780, { align: 'center', width: 495 });
 
+    addCapNumerikFooter(doc);
     doc.end();
   } catch (err) {
     logger.error('Single wine PDF error:', err);
