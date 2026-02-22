@@ -172,3 +172,45 @@ Note : la réponse utilise `totalTTC` (camelCase), la DB stocke `total_ttc` (sna
 **Réponse** : `{ "data": [{ "id", "name", "price_ht", "price_ttc", ... }] }`
 
 Note : pas `/admin/products` pour le listing.
+
+---
+
+## POST /api/v1/auth/login — Connexion
+
+**Body** : `{ "email": "string", "password": "string min 6" }`
+
+**Réponse 200** :
+```json
+{
+  "accessToken": "jwt...",
+  "user": { "id": "uuid", "email": "string", "name": "string", "role": "string" }
+}
+```
+
+Note : le refresh token est dans un cookie httpOnly `refreshToken`.
+
+---
+
+## POST /api/v1/admin/delivery-notes — Créer un BL
+
+**Body** :
+```json
+{
+  "order_id": "uuid (required — un seul order_id, pas un array)",
+  "recipient_name": "string (optional)",
+  "delivery_address": "string (optional)",
+  "planned_date": "date (optional)"
+}
+```
+
+**Prérequis** : la commande doit être en status `validated` ou `preparing`.
+
+**Réponse 201** : `{ "id", "ref", "status": "draft", "order_id", ... }`
+
+---
+
+## GET /api/v1/admin/invitations — Liste invitations
+
+**Query** : `campaign_id` (opt), `used=true|false` (opt)
+
+**Réponse** : `{ "data": [{ "code", "role", "campaign_id", "expires_at", "used_by", ... }] }`
