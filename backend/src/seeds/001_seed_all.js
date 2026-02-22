@@ -568,7 +568,7 @@ exports.seed = async function (knex) {
       awards: JSON.stringify([{ year: 2024, name: 'Médaille Argent Concours des Vins de Loire' }]),
     },
     {
-      id: IDS.clemence, name: 'Cuvée Clémence', description: 'Blanc moelleux Bio issu de vendanges tardives. Arômes de miel, coing et fruits confits pour un vin gourmand.', price_ht: 7.08, price_ttc: 8.50, purchase_price: 4.10, tva_rate: 20, visible_boutique: true,
+      id: IDS.clemence, name: 'Cuvée Clémence', description: 'Blanc moelleux Bio issu de vendanges tardives. Arômes de miel, coing et fruits confits pour un vin gourmand.', price_ht: 7.08, price_ttc: 8.50, purchase_price: 4.10, tva_rate: 20, visible_boutique: true, is_featured: true,
       image_url: '/uploads/products/cuvee-clemence.jpg',
       category: 'Blancs Moelleux', category_id: IDS.cat_blancs_moelleux, label: 'Bio', sort_order: 2,
       region: 'Loire', appellation: 'Anjou', color: 'blanc', vintage: 2022,

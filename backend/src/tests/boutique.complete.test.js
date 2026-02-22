@@ -185,7 +185,7 @@ describe('PARTIE 1 — Affichage catalogue', () => {
       const featured = await db('products').where({ active: true, is_featured: true });
       const byCat = {};
       for (const p of featured) {
-        if (byCat[p.category_id]) fail(`Doublon featured dans catégorie ${p.category_id}: ${p.name} et ${byCat[p.category_id]}`);
+        if (byCat[p.category_id]) throw new Error(`Doublon featured dans catégorie ${p.category_id}: ${p.name} et ${byCat[p.category_id]}`);
         byCat[p.category_id] = p.name;
       }
     });
