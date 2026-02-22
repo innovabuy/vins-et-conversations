@@ -529,6 +529,7 @@ async function getTeacherDashboard(userId, campaignId) {
   }
 
   return {
+    campaign_name: campaign.name,
     progress,
     totalStudents: allStudents.length,
     classGroups,
