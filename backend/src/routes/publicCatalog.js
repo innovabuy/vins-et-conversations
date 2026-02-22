@@ -412,4 +412,104 @@ router.post('/contact', async (req, res) => {
   }
 });
 
+// POST /api/v1/public/wine-wizard — Recommendation engine
+router.post('/wine-wizard', async (req, res) => {
+  try {
+    const { occasion, budget, taste, color, alcohol_free } = req.body;
+
+    // Load active visible products with category info
+    let query = db('products')
+      .leftJoin('product_categories', 'products.category_id', 'product_categories.id')
+      .where('products.active', true)
+      .where('products.visible_boutique', true)
+      .select(
+        'products.id', 'products.name', 'products.price_ttc', 'products.price_ht',
+        'products.color', 'products.category', 'products.description', 'products.image_url',
+        'products.region', 'products.appellation', 'products.grape_varieties',
+        'products.serving_temp', 'products.food_pairing', 'products.tasting_notes',
+        'products.label', 'products.vintage',
+        'product_categories.is_alcohol', 'product_categories.product_type'
+      );
+
+    // Filter alcohol-free if requested
+    if (alcohol_free === true) {
+      query = query.where('product_categories.is_alcohol', false);
+    } else if (alcohol_free === false) {
+      query = query.where('product_categories.is_alcohol', true);
+    }
+
+    // Filter by color preference
+    if (color) {
+      query = query.where('products.color', color);
+    }
+
+    // Budget filter
+    if (budget) {
+      if (budget === 'low') query = query.where('products.price_ttc', '<=', 8);
+      else if (budget === 'medium') query = query.whereBetween('products.price_ttc', [8, 15]);
+      else if (budget === 'high') query = query.where('products.price_ttc', '>', 15);
+    }
+
+    const products = await query.orderBy('products.sort_order');
+
+    // Score products based on taste preferences
+    const scored = products.map(p => {
+      let score = 50; // base score
+      const notes = typeof p.tasting_notes === 'string' ? JSON.parse(p.tasting_notes || '{}') : (p.tasting_notes || {});
+
+      // Taste preference matching
+      if (taste && typeof notes === 'object') {
+        if (taste === 'fruity' && notes.fruite) score += notes.fruite * 5;
+        if (taste === 'mineral' && notes.mineralite) score += notes.mineralite * 5;
+        if (taste === 'round' && notes.rondeur) score += notes.rondeur * 5;
+        if (taste === 'powerful' && notes.puissance) score += notes.puissance * 5;
+        if (taste === 'sweet' && notes.douceur) score += notes.douceur * 5;
+        if (taste === 'fresh' && (notes.acidite || notes.fraicheur)) score += (notes.acidite || notes.fraicheur) * 5;
+      }
+
+      // Occasion matching via food_pairing
+      if (occasion && p.food_pairing) {
+        const pairing = (typeof p.food_pairing === 'string' ? p.food_pairing : JSON.stringify(p.food_pairing)).toLowerCase();
+        if (occasion === 'aperitif' && (pairing.includes('apéritif') || pairing.includes('aperitif') || p.product_type === 'sparkling')) score += 20;
+        if (occasion === 'meat' && (pairing.includes('viande') || pairing.includes('bœuf') || pairing.includes('agneau'))) score += 20;
+        if (occasion === 'fish' && (pairing.includes('poisson') || pairing.includes('fruits de mer') || pairing.includes('crustac'))) score += 20;
+        if (occasion === 'cheese' && (pairing.includes('fromage') || pairing.includes('chèvre'))) score += 20;
+        if (occasion === 'dessert' && (pairing.includes('dessert') || pairing.includes('tarte') || p.product_type === 'food')) score += 20;
+        if (occasion === 'gift' && p.product_type === 'gift_set') score += 30;
+      }
+
+      // Featured boost
+      if (p.is_featured) score += 10;
+
+      return {
+        id: p.id,
+        name: p.name,
+        price_ttc: p.price_ttc,
+        image_url: p.image_url,
+        color: p.color,
+        category: p.category,
+        region: p.region,
+        appellation: p.appellation,
+        description: p.description,
+        label: p.label,
+        food_pairing: p.food_pairing,
+        tasting_notes: notes,
+        score,
+      };
+    });
+
+    // Sort by score descending, return top 3
+    scored.sort((a, b) => b.score - a.score);
+    const recommendations = scored.slice(0, 3);
+
+    res.json({
+      recommendations,
+      total_products: products.length,
+      filters_applied: { occasion, budget, taste, color, alcohol_free },
+    });
+  } catch (err) {
+    res.status(500).json({ error: 'SERVER_ERROR', message: err.message });
+  }
+});
+
 module.exports = router;
