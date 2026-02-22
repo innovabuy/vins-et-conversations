@@ -11,6 +11,14 @@ async function getStudentDashboard(userId, campaignId) {
 
   if (!participation) throw new Error('NOT_PARTICIPANT');
 
+  // Auto-generate referral code if missing
+  if (!participation.referral_code) {
+    const crypto = require('crypto');
+    const code = 'REF-' + crypto.randomBytes(4).toString('hex').toUpperCase();
+    await db('participations').where({ id: participation.id }).update({ referral_code: code });
+    participation.referral_code = code;
+  }
+
   // Combined user stats: direct CA/bottles/count + referred CA/bottles (3 queries → 1)
   const validStatuses = ['submitted', 'validated', 'preparing', 'shipped', 'delivered'];
   const userStats = await db('orders')

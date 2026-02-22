@@ -291,8 +291,15 @@ router.get(
         .limit(10)
         .select('id', 'ref', 'status', 'total_ttc', 'total_items', 'created_at');
 
-      // Referral code from participation
-      const referralCode = participation.referral_code || null;
+      // Referral code from participation — generate if missing
+      let referralCode = participation.referral_code;
+      if (!referralCode) {
+        const crypto = require('crypto');
+        referralCode = 'AMB-' + crypto.randomBytes(4).toString('hex').toUpperCase();
+        await db('participations')
+          .where({ id: participation.id })
+          .update({ referral_code: referralCode });
+      }
 
       // Referral stats (entity_id = ambassador user_id)
       const referralClicks = await db('audit_log')

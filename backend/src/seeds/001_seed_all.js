@@ -735,12 +735,14 @@ exports.seed = async function (knex) {
       campaign_id: IDS.camp_ambassadeurs,
       organization_id: IDS.reseau_loire,
       role_in_campaign: 'ambassador',
+      referral_code: 'AMB-JPMRT001',
     },
     {
       user_id: IDS.ambassadeur2,
       campaign_id: IDS.camp_ambassadeurs,
       organization_id: IDS.reseau_loire,
       role_in_campaign: 'ambassador',
+      referral_code: 'AMB-MDURA002',
     },
   ]);
 
