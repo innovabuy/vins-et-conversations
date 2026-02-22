@@ -73,6 +73,33 @@ router.get('/resources', authenticate, requireRole('super_admin', 'commercial'),
   }
 });
 
+// GET /api/v1/admin/campaigns/:id/qr-code — QR Code campagne (PNG)
+router.get('/:id/qr-code', authenticate, requireRole('super_admin', 'commercial'), async (req, res) => {
+  try {
+    const campaign = await db('campaigns').where({ id: req.params.id }).first();
+    if (!campaign) return res.status(404).json({ error: 'NOT_FOUND' });
+
+    const QRCode = require('qrcode');
+    const baseUrl = process.env.PUBLIC_URL || 'https://vins-conversations.fr';
+    const campaignUrl = `${baseUrl}/boutique?campaign_id=${campaign.id}${campaign.slug ? '&slug=' + campaign.slug : ''}`;
+
+    const format = req.query.format || 'png';
+
+    if (format === 'svg') {
+      const svg = await QRCode.toString(campaignUrl, { type: 'svg', width: 300, margin: 2 });
+      res.set('Content-Type', 'image/svg+xml');
+      res.send(svg);
+    } else {
+      const buffer = await QRCode.toBuffer(campaignUrl, { width: 300, margin: 2, type: 'png' });
+      res.set('Content-Type', 'image/png');
+      res.set('Content-Disposition', `inline; filename="qr-${campaign.slug || campaign.id}.png"`);
+      res.send(buffer);
+    }
+  } catch (err) {
+    res.status(500).json({ error: 'SERVER_ERROR', message: err.message });
+  }
+});
+
 // GET /api/v1/admin/campaigns/:id — Détail campagne + stats complètes
 router.get('/:id', authenticate, requireRole('super_admin', 'commercial'), async (req, res) => {
   try {
