@@ -108,9 +108,15 @@ router.post('/', authenticate, requireRole('super_admin', 'commercial'), auditAc
     const { name, email, phone, address, source, source_user_id, type, notes } = req.body;
     if (!name) return res.status(400).json({ error: 'NAME_REQUIRED' });
 
+    const validTypes = ['particulier', 'cse', 'ambassadeur', 'professionnel'];
+    const contactType = type || 'particulier';
+    if (!validTypes.includes(contactType)) {
+      return res.status(400).json({ error: 'VALIDATION_ERROR', message: `type invalide. Valeurs acceptées : ${validTypes.join(', ')}` });
+    }
+
     const insertData = {
       name, email, phone, address, source, source_user_id,
-      type: type || 'particulier',
+      type: contactType,
       notes: notes ? JSON.stringify(notes) : '{}',
     };
 
@@ -135,6 +141,10 @@ router.post('/', authenticate, requireRole('super_admin', 'commercial'), auditAc
 router.put('/:id', authenticate, requireRole('super_admin', 'commercial'), auditAction('contacts'), async (req, res) => {
   try {
     const { name, email, phone, address, source, type, notes } = req.body;
+    const validTypes = ['particulier', 'cse', 'ambassadeur', 'professionnel'];
+    if (type && !validTypes.includes(type)) {
+      return res.status(400).json({ error: 'VALIDATION_ERROR', message: `type invalide. Valeurs acceptées : ${validTypes.join(', ')}` });
+    }
     const updates = { name, email, phone, address, source, type, updated_at: new Date() };
     if (notes) updates.notes = JSON.stringify(notes);
 
