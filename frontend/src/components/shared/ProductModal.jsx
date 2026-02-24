@@ -127,6 +127,7 @@ export default function ProductModal({ product, onClose, onPrev, onNext, hasPrev
                   <div className="flex items-center gap-2 mb-1">
                     {p.color && <span className="px-2.5 py-0.5 bg-wine-100 text-wine-700 rounded-full text-xs font-medium capitalize">{p.color}</span>}
                     {p.vintage && <span className="text-xs text-gray-500">Millésime {p.vintage}</span>}
+                    {(p.category_is_alcohol !== false && p.cat_is_alcohol !== false) && <span className="px-2 py-0.5 bg-amber-100 text-amber-800 rounded-full text-[10px] font-bold">12+1</span>}
                     {product.matchScore !== undefined && (
                       <span className={`px-2 py-0.5 rounded-full text-xs font-bold ${
                         product.matchScore >= 80 ? 'bg-green-100 text-green-700' :

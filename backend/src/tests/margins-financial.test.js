@@ -19,16 +19,29 @@ beforeAll(async () => {
     .send({ email: 'nicolas@vins-conversations.fr', password: 'VinsConv2026!' });
   adminToken = adminRes.body.accessToken;
 
-  const studentUser = await db('users').where({ role: 'etudiant' }).whereNot('email', 'like', '%deleted%').first();
-  if (studentUser) {
-    const studentRes = await request(app)
-      .post('/api/v1/auth/login')
-      .send({ email: studentUser.email, password: 'VinsConv2026!' });
-    studentToken = studentRes.body.accessToken;
-  }
-
   const campaign = await db('campaigns').where('name', 'like', '%Sacr%').first();
   campaignId = campaign?.id;
+
+  // Find a student who participates in this campaign (deterministic ordering)
+  const participation = await db('participations')
+    .join('users', 'participations.user_id', 'users.id')
+    .where({ 'participations.campaign_id': campaignId, 'users.role': 'etudiant', 'users.status': 'active' })
+    .whereNot('users.email', 'like', '%deleted%')
+    .select('users.*')
+    .orderBy('users.email')
+    .first();
+  if (participation) {
+    const studentRes = await request(app)
+      .post('/api/v1/auth/login')
+      .send({ email: participation.email, password: 'VinsConv2026!' });
+    studentToken = studentRes.body.accessToken;
+
+    // Cancel ALL submitted/validated student orders (anti-fraud bypass for tests)
+    await db('orders')
+      .where({ user_id: participation.id })
+      .whereIn('status', ['submitted', 'validated'])
+      .update({ status: 'cancelled' });
+  }
 
   // Ensure sufficient stock
   const products = await db('products').where({ active: true });
@@ -63,18 +76,6 @@ afterAll(async () => {
 describe('Financial Events — Append-Only Integrity', () => {
   test('createOrder() creates exactly 1 financial_event type=sale', async () => {
     if (!studentToken) return;
-
-    // Cancel any unpaid student orders first
-    const studentUser = await db('users').where({ role: 'etudiant' }).whereNot('email', 'like', '%deleted%').first();
-    const unpaid = await db('orders')
-      .where({ user_id: studentUser.id })
-      .whereIn('status', ['submitted', 'validated'])
-      .whereNotIn('id', function () {
-        this.select('order_id').from('payments').where('status', 'completed');
-      });
-    for (const o of unpaid) {
-      await db('orders').where({ id: o.id }).update({ status: 'cancelled' });
-    }
 
     const cp = await db('campaign_products')
       .where({ campaign_id: campaignId, active: true })

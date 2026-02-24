@@ -67,6 +67,7 @@ export default function ProductDetail() {
               {product.color && !product.category_name && <span className="px-3 py-1 bg-wine-100 text-wine-700 rounded-full text-sm font-medium">{product.color}</span>}
               {product.vintage && <span className="text-sm text-gray-500">Millésime {product.vintage}</span>}
               {product.category_is_alcohol === false && <span className="px-2 py-0.5 bg-green-100 text-green-700 rounded-full text-xs font-medium">Sans alcool</span>}
+              {product.category_is_alcohol !== false && <span className="px-2 py-0.5 bg-amber-100 text-amber-800 rounded-full text-xs font-bold">12+1</span>}
             </div>
             <h1 className="text-3xl font-bold text-gray-900">{product.name}</h1>
             {product.appellation && <p className="text-lg text-gray-500 mt-1">{product.appellation}</p>}

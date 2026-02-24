@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
-import { dashboardAPI, productsAPI, ordersAPI, campaignResourcesAPI } from '../../services/api';
+import { dashboardAPI, productsAPI, ordersAPI, campaignResourcesAPI, invoicesAPI } from '../../services/api';
 import { useAuth } from '../../contexts/AuthContext';
 import { Flame, Trophy, ShoppingCart, User, ChevronUp, Wine, Package, Clock, Award, Zap, Heart, Target, DollarSign, ArrowLeft, ArrowRight, Check, Phone, Mail, FileText, CreditCard, Banknote, Building, HelpCircle, Users, TrendingUp, TrendingDown, Minus, BarChart3, BookOpen, ExternalLink, Video, Image, FileDown, LogOut } from 'lucide-react';
 import WineBarrel from '../shared/WineBarrel';
@@ -297,7 +297,10 @@ function OrderFlow({ campaignId, products, customers, onComplete }) {
           </div>
           <div className="flex-1">
             <p className="font-medium text-sm">{p.name}</p>
-            <p className="text-xs text-gray-500">{p.category}{p.label ? ` · ${p.label}` : ''}</p>
+            <p className="text-xs text-gray-500">
+              {p.category}{p.label ? ` · ${p.label}` : ''}
+              {p.category_is_alcohol !== false && <span className="ml-1 px-1.5 py-0.5 bg-amber-100 text-amber-800 rounded-full text-[10px] font-bold">12+1</span>}
+            </p>
             <p className="font-semibold text-wine-700">{formatEur(p.custom_price || p.price_ttc)}</p>
           </div>
           <div className="flex items-center gap-2">
@@ -833,6 +836,7 @@ export default function StudentDashboard() {
 function ProfileOrders({ campaignId }) {
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [downloading, setDownloading] = useState(null);
 
   useEffect(() => {
     if (!campaignId) return;
@@ -841,6 +845,25 @@ function ProfileOrders({ campaignId }) {
       .catch(console.error)
       .finally(() => setLoading(false));
   }, [campaignId]);
+
+  const handleDownloadInvoice = async (order) => {
+    setDownloading(order.id);
+    try {
+      const res = await invoicesAPI.download(order.id);
+      const url = window.URL.createObjectURL(new Blob([res.data], { type: 'application/pdf' }));
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `facture-${order.ref || order.id}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      window.URL.revokeObjectURL(url);
+    } catch {
+      alert('Erreur lors du telechargement de la facture');
+    } finally {
+      setDownloading(null);
+    }
+  };
 
   if (loading || !orders.length) return null;
 
@@ -859,6 +882,16 @@ function ProfileOrders({ campaignId }) {
               <p className="font-semibold">{formatEur(o.total_ttc)}</p>
               <p className="text-xs text-gray-400">{STATUS_LABELS[o.status] || o.status}</p>
               {o.payment_method && <p className="text-[10px] text-gray-300">{PAYMENT_LABELS[o.payment_method] || o.payment_method}</p>}
+              {['validated', 'delivered'].includes(o.status) && (
+                <button
+                  onClick={() => handleDownloadInvoice(o)}
+                  disabled={downloading === o.id}
+                  className="mt-1 inline-flex items-center gap-1 text-[10px] text-wine-700 hover:text-wine-900 font-medium"
+                >
+                  <FileDown size={12} />
+                  {downloading === o.id ? 'Telechargement...' : 'Facture'}
+                </button>
+              )}
             </div>
           </div>
         ))}

@@ -19,11 +19,21 @@ beforeAll(async () => {
     .send({ email: 'nicolas@vins-conversations.fr', password: 'VinsConv2026!' });
   adminToken = adminRes.body.accessToken;
 
-  const studentUser = await db('users').where({ role: 'etudiant' }).whereNot('email', 'like', '%deleted%').first();
-  if (studentUser) {
+  const campaign = await db('campaigns').where('name', 'like', '%Sacr%').first();
+  campaignId = campaign?.id;
+
+  // Find a student who participates in this campaign (deterministic ordering)
+  const participation = await db('participations')
+    .join('users', 'participations.user_id', 'users.id')
+    .where({ 'participations.campaign_id': campaignId, 'users.role': 'etudiant', 'users.status': 'active' })
+    .whereNot('users.email', 'like', '%deleted%')
+    .select('users.*')
+    .orderBy('users.email')
+    .first();
+  if (participation) {
     const studentRes = await request(app)
       .post('/api/v1/auth/login')
-      .send({ email: studentUser.email, password: 'VinsConv2026!' });
+      .send({ email: participation.email, password: 'VinsConv2026!' });
     studentToken = studentRes.body.accessToken;
   }
 
@@ -31,9 +41,6 @@ beforeAll(async () => {
     .post('/api/v1/auth/login')
     .send({ email: 'cse@leroymerlin.fr', password: 'VinsConv2026!' });
   cseToken = cseRes.body.accessToken;
-
-  const campaign = await db('campaigns').where('name', 'like', '%Sacr%').first();
-  campaignId = campaign?.id;
 
   const cseCamp = await db('campaigns').where('name', 'like', '%CSE%').first();
   cseCampaignId = cseCamp?.id;
@@ -56,14 +63,11 @@ beforeAll(async () => {
     }
   }
 
-  // Cancel unpaid student orders (anti-fraud)
-  if (studentUser) {
+  // Cancel ALL submitted/validated student orders (anti-fraud bypass for tests)
+  if (participation) {
     await db('orders')
-      .where({ user_id: studentUser.id })
+      .where({ user_id: participation.id })
       .whereIn('status', ['submitted', 'validated'])
-      .whereNotIn('id', function () {
-        this.select('order_id').from('payments').where('status', 'completed');
-      })
       .update({ status: 'cancelled' });
   }
 
@@ -125,10 +129,16 @@ describe('Auto-validate toggle ON', () => {
   test('createOrder with toggle ON → status validated', async () => {
     if (!studentToken || !campaignId) return;
 
-    // Cancel previous student order first
-    const studentUser = await db('users').where({ role: 'etudiant' }).whereNot('email', 'like', '%deleted%').first();
+    // Cancel previous student order first (find student via participation)
+    const participant = await db('participations')
+      .join('users', 'participations.user_id', 'users.id')
+      .where({ 'participations.campaign_id': campaignId, 'users.role': 'etudiant', 'users.status': 'active' })
+      .whereNot('users.email', 'like', '%deleted%')
+      .select('users.id')
+      .orderBy('users.email')
+      .first();
     await db('orders')
-      .where({ user_id: studentUser.id })
+      .where({ user_id: participant.id })
       .whereIn('status', ['submitted', 'validated'])
       .update({ status: 'cancelled' });
 

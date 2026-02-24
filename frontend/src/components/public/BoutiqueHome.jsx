@@ -164,6 +164,7 @@ export default function BoutiqueHome() {
                       <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${COLOR_MAP[p.color?.toLowerCase()] || 'bg-gray-100 text-gray-600'}`}>{p.color}</span>
                     ) : null}
                     {p.region && <span className="text-xs text-gray-400">{p.region}</span>}
+                    {(p.category_details?.is_alcohol !== false && p.cat_is_alcohol !== false) && <span className="px-1.5 py-0.5 bg-amber-100 text-amber-800 rounded-full text-[10px] font-bold">12+1</span>}
                   </div>
                   <h3 className="font-semibold text-gray-900 group-hover:text-wine-700 transition-colors">{p.name}</h3>
                   {p.description && <p className="text-xs text-gray-500 mt-1 line-clamp-2">{p.description}</p>}
@@ -286,6 +287,7 @@ export default function BoutiqueHome() {
                       <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${COLOR_MAP[p.color?.toLowerCase()] || 'bg-gray-100 text-gray-600'}`}>{p.color}</span>
                     ) : null}
                     {p.region && <span className="text-xs text-gray-400">{p.region}</span>}
+                    {(p.category_details?.is_alcohol !== false && p.cat_is_alcohol !== false) && <span className="px-1.5 py-0.5 bg-amber-100 text-amber-800 rounded-full text-[10px] font-bold">12+1</span>}
                   </div>
                   <h3 className="font-semibold text-gray-900 group-hover:text-wine-700 transition-colors">{p.name}</h3>
                   <p className="text-xs text-gray-500 mt-1">{p.appellation || '\u00A0'}</p>
