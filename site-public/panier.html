@@ -204,7 +204,7 @@
               <div class="cart-price">${item.price.toFixed(2)} &euro;</div>
               <div class="cart-qty">
                 <button class="qty-btn qty-minus" data-id="${item.id}">-</button>
-                <span class="qty-val">${item.qty}</span>
+                <input type="number" class="qty-input" data-id="${item.id}" value="${item.qty}" min="1" max="999" step="1" inputmode="numeric" style="width:3rem;text-align:center;border:1px solid #ddd;border-radius:4px;font-size:0.95rem;padding:2px 0;-moz-appearance:textfield;" />
                 <button class="qty-btn qty-plus" data-id="${item.id}">+</button>
               </div>
               <div class="cart-subtotal">${(item.price * item.qty).toFixed(2)} &euro;</div>
@@ -243,7 +243,20 @@
         btn.addEventListener('click', () => {
           const id = btn.dataset.id;
           const item = Cart.getItems().find(i => i.id === id);
-          if (item) { Cart.updateQty(id, item.qty + 1); }
+          if (item && item.qty < 999) { Cart.updateQty(id, item.qty + 1); }
+          renderCart();
+        });
+      });
+
+      content.querySelectorAll('.qty-input').forEach(input => {
+        input.addEventListener('change', () => {
+          const id = input.dataset.id;
+          const v = parseInt(input.value, 10);
+          if (!isNaN(v) && v >= 1 && v <= 999) {
+            Cart.updateQty(id, v);
+          } else if (!isNaN(v) && v < 1) {
+            Cart.remove(id);
+          }
           renderCart();
         });
       });

@@ -210,14 +210,21 @@ router.get(
         };
       });
 
-      // Orders with delivery tracking
+      // RBAC: CSE can only see their own campaign(s)
+      if (req.user.role === 'cse' && req.user.campaign_ids && !req.user.campaign_ids.includes(campaignId)) {
+        return res.status(403).json({ error: 'FORBIDDEN', message: 'Accès interdit à cette campagne' });
+      }
+
+      // All campaign orders (not just own) — CSE sees all orders in their campaign
       const orders = await db('orders')
         .leftJoin('delivery_notes', 'orders.id', 'delivery_notes.order_id')
-        .where('orders.user_id', req.user.userId)
+        .leftJoin('users', 'orders.user_id', 'users.id')
         .where('orders.campaign_id', campaignId)
         .select(
           'orders.id', 'orders.ref', 'orders.status', 'orders.total_ht',
           'orders.total_ttc', 'orders.total_items', 'orders.created_at',
+          'orders.source',
+          db.raw("COALESCE(users.name, 'Client direct') as user_name"),
           'delivery_notes.status as delivery_status',
           'delivery_notes.planned_date as delivery_date'
         )
@@ -226,6 +233,21 @@ router.get(
       const campConfig = typeof campaign.config === 'string' ? JSON.parse(campaign.config) : (campaign.config || {});
       const paymentTerms = campConfig.payment_terms || pricingRules?.payment_terms || null;
 
+      // Campaign CA and goal for gauge
+      const caStats = await db('orders')
+        .where({ campaign_id: campaignId })
+        .whereIn('status', ['submitted', 'validated', 'preparing', 'shipped', 'delivered'])
+        .select(
+          db.raw('COALESCE(SUM(total_ttc), 0) as ca_ttc'),
+          db.raw('COALESCE(SUM(total_ht), 0) as ca_ht')
+        )
+        .first();
+
+      const campaignCaTTC = parseFloat(caStats?.ca_ttc || 0);
+      const campaignGoal = parseFloat(campaign.goal || 0);
+      const campaignProgress = campaignGoal > 0 ? Math.round((campaignCaTTC / campaignGoal) * 100) : 0;
+      const deliveryFreeThreshold = parseFloat(campConfig.delivery_free_threshold || 0);
+
       res.json({
         products: productsWithCSE,
         orders,
@@ -233,6 +255,11 @@ router.get(
         discountPct,
         paymentTerms,
         alcohol_free: campaign.alcohol_free || false,
+        campaign_ca_ttc: campaignCaTTC,
+        campaign_ca_ht: parseFloat(caStats?.ca_ht || 0),
+        campaign_goal: campaignGoal,
+        campaign_progress: campaignProgress,
+        delivery_free_threshold: deliveryFreeThreshold,
       });
     } catch (err) {
       res.status(500).json({ error: 'SERVER_ERROR', message: err.message });

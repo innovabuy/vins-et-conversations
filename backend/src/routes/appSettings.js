@@ -86,6 +86,7 @@ router.put('/', authenticate, requireRole('super_admin'), auditAction('app_setti
       'stripe_live_publishable_key', 'stripe_live_secret_key', 'stripe_webhook_secret',
       'smtp_host', 'smtp_port', 'smtp_user', 'smtp_password', 'smtp_from_name', 'smtp_from_email', 'smtp_mode',
       'pickup_enabled', 'pickup_address', 'pickup_details',
+      'auto_validate_orders',
     ];
 
     for (const [key, value] of Object.entries(updates)) {

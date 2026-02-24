@@ -160,8 +160,20 @@ export default function ProductModal({ product, onClose, onPrev, onNext, hasPrev
                 <div className="flex items-center gap-3">
                   <div className="flex items-center border rounded-lg">
                     <button onClick={() => setQty(Math.max(1, qty - 1))} className="p-1.5 hover:bg-gray-50 text-gray-600"><Minus size={14} /></button>
-                    <span className="w-9 text-center font-semibold text-sm">{qty}</span>
-                    <button onClick={() => setQty(qty + 1)} className="p-1.5 hover:bg-gray-50 text-gray-600"><Plus size={14} /></button>
+                    <input
+                      type="number"
+                      min="1"
+                      max="999"
+                      step="1"
+                      inputMode="numeric"
+                      value={qty}
+                      onChange={e => {
+                        const v = parseInt(e.target.value, 10);
+                        if (!isNaN(v) && v >= 1 && v <= 999) setQty(v);
+                      }}
+                      className="w-12 text-center font-semibold text-sm border-0 focus:outline-none focus:ring-0 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                    />
+                    <button onClick={() => setQty(Math.min(999, qty + 1))} className="p-1.5 hover:bg-gray-50 text-gray-600"><Plus size={14} /></button>
                   </div>
                   <button
                     onClick={handleAdd}

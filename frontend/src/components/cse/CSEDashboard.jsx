@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import { cseDashboardAPI, ordersAPI, invoicesAPI } from '../../services/api';
-import { ShoppingCart, Package, FileText, Truck, AlertTriangle, RefreshCw, Wine } from 'lucide-react';
+import { ShoppingCart, Package, FileText, Truck, AlertTriangle, RefreshCw, Wine, TrendingUp, Target } from 'lucide-react';
 
 export default function CSEDashboard() {
   const { user } = useAuth();
@@ -133,6 +133,41 @@ export default function CSEDashboard() {
           </button>
         ))}
       </div>
+
+      {/* Campaign CA Gauge */}
+      {data.campaign_goal > 0 && (
+        <div className="card mb-4">
+          <div className="flex items-center gap-2 mb-3">
+            <Target size={18} className="text-wine-600" />
+            <h3 className="font-semibold text-gray-800">Objectif de la campagne</h3>
+          </div>
+          <div className="flex items-baseline gap-2 mb-2">
+            <span className="text-2xl font-bold text-wine-700">{data.campaign_ca_ttc?.toLocaleString('fr-FR', { minimumFractionDigits: 0 })} €</span>
+            <span className="text-gray-500">/ {data.campaign_goal?.toLocaleString('fr-FR', { minimumFractionDigits: 0 })} €</span>
+            <span className={`ml-auto text-sm font-semibold px-2 py-0.5 rounded-full ${
+              data.campaign_progress >= 100 ? 'bg-green-100 text-green-700' :
+              data.campaign_progress >= 75 ? 'bg-wine-100 text-wine-700' :
+              data.campaign_progress >= 50 ? 'bg-amber-100 text-amber-700' : 'bg-gray-100 text-gray-600'
+            }`}>{data.campaign_progress}%</span>
+          </div>
+          <div className="w-full bg-gray-100 rounded-full h-3 overflow-hidden">
+            <div
+              className={`h-3 rounded-full transition-all ${
+                data.campaign_progress >= 100 ? 'bg-green-500' :
+                data.campaign_progress >= 75 ? 'bg-wine-600' :
+                data.campaign_progress >= 50 ? 'bg-wine-500' : 'bg-wine-400'
+              }`}
+              style={{ width: `${Math.min(100, data.campaign_progress)}%` }}
+            />
+          </div>
+          {data.delivery_free_threshold > 0 && data.campaign_ca_ttc < data.delivery_free_threshold && (
+            <p className="mt-2 text-xs text-amber-600 flex items-center gap-1">
+              <AlertTriangle size={12} />
+              Livraison offerte à partir de {data.delivery_free_threshold?.toLocaleString('fr-FR')} € de CA
+            </p>
+          )}
+        </div>
+      )}
 
       {error && (
         <div className="bg-red-50 border border-red-200 rounded-lg p-3 mb-4 text-red-700 text-sm">

@@ -129,6 +129,7 @@ exports.seed = async function (knex) {
     { key: 'pickup_enabled', value: 'true' },
     { key: 'pickup_address', value: "Saint-Sylvain-d'Anjou — Maine-et-Loire (49)" },
     { key: 'pickup_details', value: 'Retrait sur rendez-vous. Contactez-nous pour convenir d\'un créneau.' },
+    { key: 'auto_validate_orders', value: 'false' },
   ]);
 
   // ═══════════════════════════════════════════════════════

@@ -244,13 +244,31 @@ async function createOrder({ userId, campaignId, items, customerId, notes, custo
     logger.error(`Order confirmation hook error: ${e.message}`);
   }
 
+  // Auto-validate if setting enabled
+  let finalStatus = 'submitted';
+  try {
+    const autoValidateSetting = await db('app_settings')
+      .where({ key: 'auto_validate_orders' })
+      .first();
+    if (autoValidateSetting?.value === 'true') {
+      await db('orders').where({ id: orderId }).update({
+        status: 'validated',
+        updated_at: new Date(),
+      });
+      finalStatus = 'validated';
+      logger.info(`Order ${ref} auto-validated (auto_validate_orders=true)`);
+    }
+  } catch (e) {
+    logger.error(`Auto-validate check failed: ${e.message}`);
+  }
+
   return {
     id: orderId,
     ref,
     totalHT: parseFloat(totalHT.toFixed(2)),
     totalTTC: parseFloat(totalTTC.toFixed(2)),
     totalItems,
-    status: 'submitted',
+    status: finalStatus,
     paymentMethod: paymentMethod || null,
     customerName: customerName || null,
   };
