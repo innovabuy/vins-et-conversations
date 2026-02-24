@@ -1313,6 +1313,44 @@ describe('API Integration Tests', () => {
         .send({ name: 'Test', email: 'test@test.fr', message: 'short' });
       expect(res.status).toBe(400);
     });
+
+    test('POST /public/contact with "subject" field (HTML form) returns 201', async () => {
+      const res = await request(app)
+        .post('/api/v1/public/contact')
+        .send({
+          name: 'Jean Test',
+          email: 'jean@test.fr',
+          subject: 'partenariat_ecole',
+          message: 'Bonjour, nous souhaitons un partenariat avec notre école.',
+        });
+      expect(res.status).toBe(201);
+      expect(res.body.message).toBe('Message envoyé');
+    });
+
+    test('POST /public/contact with "type" field (API compat) returns 201', async () => {
+      const res = await request(app)
+        .post('/api/v1/public/contact')
+        .send({
+          name: 'Paul Compat',
+          email: 'paul@test.fr',
+          type: 'devis',
+          message: 'Je souhaite un devis pour un événement professionnel.',
+        });
+      expect(res.status).toBe(201);
+      expect(res.body.message).toBe('Message envoyé');
+    });
+
+    test('POST /public/contact without subject nor type defaults to "question"', async () => {
+      const res = await request(app)
+        .post('/api/v1/public/contact')
+        .send({
+          name: 'Anne Default',
+          email: 'anne@test.fr',
+          message: 'Message sans sujet explicite, doit passer en question par défaut.',
+        });
+      expect(res.status).toBe(201);
+      expect(res.body.message).toBe('Message envoyé');
+    });
   });
 
   describe('Sprint C — Public Catalog', () => {

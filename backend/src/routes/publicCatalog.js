@@ -360,13 +360,24 @@ router.get('/catalog/:id/pdf', async (req, res) => {
 });
 
 // POST /api/v1/public/contact — Formulaire de contact public
+const CONTACT_TYPES = ['question', 'devis', 'partenariat', 'autre', 'partenariat_ecole', 'offre_cse', 'ambassadeur', 'evenement', 'commande'];
 const contactSchema = Joi.object({
   name: Joi.string().min(2).max(100).required(),
   email: Joi.string().email().required(),
   phone: Joi.string().allow('', null),
   company: Joi.string().allow('', null),
   message: Joi.string().min(10).max(2000).required(),
-  type: Joi.string().valid('question', 'devis', 'partenariat', 'autre').default('question'),
+  type: Joi.string().valid(...CONTACT_TYPES).optional(),
+  subject: Joi.string().valid(...CONTACT_TYPES).optional(),
+}).custom((value) => {
+  // Map subject → type for backward compatibility (HTML form sends "subject", API expects "type")
+  if (value.subject && !value.type) {
+    value.type = value.subject;
+  }
+  if (!value.type) {
+    value.type = 'question';
+  }
+  return value;
 });
 
 router.post('/contact', async (req, res) => {
