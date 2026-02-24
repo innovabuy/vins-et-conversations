@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Commande confirm&eacute;e — Vins & Conversations</title>
+  <link rel="stylesheet" href="css/style.css">
+  <link rel="icon" href="img/logo.svg" type="image/svg+xml">
+</head>
+<body data-page="confirmation">
+
+  <!-- Header -->
+  <header class="site-header">
+    <div class="header-inner">
+      <a href="index.html" class="header-logo">
+        <img src="img/logo.svg" alt="Logo" class="app-logo">
+        <span class="app-name">Vins & Conversations</span>
+      </a>
+      <button class="menu-toggle" id="menu-toggle" aria-label="Menu" aria-expanded="false">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12h18M3 6h18M3 18h18"/></svg>
+      </button>
+      <nav>
+        <ul class="nav-links" id="nav-menu">
+          <li><a href="boutique.html">Nos vins</a></li>
+          <li><a href="contact.html">Contact</a></li>
+          <li>
+            <a href="panier.html" class="nav-cart">
+              <svg class="cart-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 002 1.61h9.72a2 2 0 002-1.61L23 6H6"/></svg>
+              <span class="cart-badge">0</span>
+            </a>
+          </li>
+          <li><a href="http://localhost:5173" class="nav-member">Espace membre</a></li>
+        </ul>
+      </nav>
+    </div>
+  </header>
+
+  <!-- Confirmation -->
+  <section class="section">
+    <div class="container">
+      <div class="confirmation-card">
+        <div class="check-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="3"><path d="M20 6L9 17l-5-5"/></svg>
+        </div>
+        <h1>Commande confirm&eacute;e !</h1>
+        <p>Merci pour votre commande. Vous recevrez un email de confirmation.</p>
+        <div class="confirmation-ref">
+          R&eacute;f&eacute;rence : <span id="order-ref">—</span>
+        </div>
+        <p class="text-muted">Conservez cette r&eacute;f&eacute;rence pour suivre votre commande.</p>
+        <div class="confirmation-actions">
+          <a href="#" id="tracking-link" class="btn btn-primary">Suivre ma commande</a>
+          <a href="boutique.html" class="btn btn-secondary">Continuer mes achats</a>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Footer -->
+  <footer class="site-footer">
+    <div class="footer-inner">
+      <div class="footer-brand">
+        <h3>Vins & Conversations</h3>
+        <p>Vins de Loire d'exception, s&eacute;lectionn&eacute;s avec passion.</p>
+      </div>
+      <div class="footer-nav">
+        <h4>Navigation</h4>
+        <ul>
+          <li><a href="index.html">Accueil</a></li>
+          <li><a href="boutique.html">Nos vins</a></li>
+          <li><a href="contact.html">Contact</a></li>
+          <li><a href="cgv.html">CGV</a></li>
+          <li><a href="mentions.html">Mentions l&eacute;gales</a></li>
+        </ul>
+      </div>
+      <div class="footer-contact">
+        <h4>Contact</h4>
+        <p>contact@vinsetconversations.fr</p>
+      </div>
+    </div>
+    <div class="alcohol-warning">
+      L'abus d'alcool est dangereux pour la sant&eacute;. &Agrave; consommer avec mod&eacute;ration. La vente d'alcool est interdite aux mineurs.
+    </div>
+    <div class="footer-bottom">
+      <span>&copy; 2026 Vins & Conversations. Tous droits r&eacute;serv&eacute;s.</span>
+    </div>
+  </footer>
+
+  <script src="js/api.js"></script>
+  <script src="js/cart.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>
