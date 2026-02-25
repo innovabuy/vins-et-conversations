@@ -72,7 +72,7 @@ export default function NotificationBell() {
   };
 
   return (
-    <>
+    <div className="relative">
       <button onClick={() => setOpen(!open)} className="relative p-2 rounded-lg hover:bg-gray-100 transition-colors">
         <Bell size={18} className="text-gray-500" />
         {unread > 0 && (
@@ -85,7 +85,7 @@ export default function NotificationBell() {
       {open && (
         <>
           <div className="fixed inset-0 bg-black/30 z-[200]" onClick={() => setOpen(false)} />
-          <div className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-80 sm:w-96 bg-white rounded-xl shadow-2xl z-[201] max-h-[70vh] overflow-hidden flex flex-col">
+          <div className="absolute left-0 top-full mt-2 w-80 sm:w-96 bg-white rounded-xl shadow-2xl z-[201] max-h-[70vh] overflow-hidden flex flex-col">
             <div className="flex items-center justify-between px-4 py-3 border-b bg-gray-50">
               <h3 className="font-semibold text-sm">Notifications</h3>
               <div className="flex items-center gap-2">
@@ -139,6 +139,6 @@ export default function NotificationBell() {
           </div>
         </>
       )}
-    </>
+    </div>
   );
 }
