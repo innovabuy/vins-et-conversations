@@ -21,7 +21,7 @@ const ENTITY_ROUTES = {
   contact: () => '/admin/crm',
 };
 
-export default function NotificationBell() {
+export default function NotificationBell({ dropUp = false }) {
   const navigate = useNavigate();
   const [notifications, setNotifications] = useState([]);
   const [unread, setUnread] = useState(0);
@@ -44,14 +44,15 @@ export default function NotificationBell() {
     return () => clearInterval(interval);
   }, []);
 
-  // Close on click outside
+  // Close on click outside — use 'click' (not 'mousedown') to avoid race with button onClick
   useEffect(() => {
+    if (!open) return;
     const handler = (e) => {
       if (ref.current && !ref.current.contains(e.target)) setOpen(false);
     };
-    document.addEventListener('mousedown', handler);
-    return () => document.removeEventListener('mousedown', handler);
-  }, []);
+    document.addEventListener('click', handler);
+    return () => document.removeEventListener('click', handler);
+  }, [open]);
 
   const markRead = async (id) => {
     try {
@@ -85,7 +86,7 @@ export default function NotificationBell() {
       </button>
 
       {open && (
-        <div className="absolute right-0 top-full mt-2 w-80 sm:w-96 bg-white border rounded-xl shadow-xl z-50 max-h-[400px] overflow-hidden flex flex-col">
+        <div className={`absolute right-0 w-80 sm:w-96 bg-white border rounded-xl shadow-xl z-[100] max-h-[400px] overflow-hidden flex flex-col ${dropUp ? 'bottom-full mb-2' : 'top-full mt-2'}`}>
           <div className="flex items-center justify-between px-4 py-3 border-b bg-gray-50">
             <h3 className="font-semibold text-sm">Notifications</h3>
             {unread > 0 && (
