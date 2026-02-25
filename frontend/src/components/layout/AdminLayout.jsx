@@ -139,7 +139,7 @@ export default function AdminLayout() {
               <p className="text-sm font-medium truncate">{user?.name}</p>
               <p className="text-xs text-gray-500 truncate">{user?.role}</p>
             </div>
-            <div className="hidden lg:block"><NotificationBell dropUp /></div>
+            <div className="hidden lg:block"><NotificationBell /></div>
             <button onClick={handleLogout} className="text-gray-400 hover:text-red-500 transition-colors">
               <LogOut size={18} />
             </button>

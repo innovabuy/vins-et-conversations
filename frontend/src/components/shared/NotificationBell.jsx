@@ -21,7 +21,7 @@ const ENTITY_ROUTES = {
   contact: () => '/admin/crm',
 };
 
-export default function NotificationBell({ dropUp = false }) {
+export default function NotificationBell() {
   const navigate = useNavigate();
   const [notifications, setNotifications] = useState([]);
   const [unread, setUnread] = useState(0);
@@ -86,7 +86,7 @@ export default function NotificationBell({ dropUp = false }) {
       </button>
 
       {open && (
-        <div className={`absolute right-0 w-80 sm:w-96 bg-white border rounded-xl shadow-xl z-[100] max-h-[400px] overflow-hidden flex flex-col ${dropUp ? 'bottom-full mb-2' : 'top-full mt-2'}`}>
+        <div className="fixed right-4 mt-2 w-80 bg-white border rounded-xl shadow-xl z-[100] max-h-96 overflow-y-auto flex flex-col" style={{ top: ref.current?.getBoundingClientRect().bottom }}>
           <div className="flex items-center justify-between px-4 py-3 border-b bg-gray-50">
             <h3 className="font-semibold text-sm">Notifications</h3>
             {unread > 0 && (
