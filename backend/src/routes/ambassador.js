@@ -118,90 +118,20 @@ router.get('/public', cacheMiddleware(300), async (req, res) => {
 
     const ambassadors = await query.orderBy('contacts.name');
 
-    // Fetch tier_rules from ambassador client_type
-    const ambassadorCT = await db('client_types')
-      .where({ name: 'ambassadeur' })
-      .select('tier_rules')
-      .first();
-
-    let tiers = [];
-    if (ambassadorCT?.tier_rules) {
-      const parsed = typeof ambassadorCT.tier_rules === 'string'
-        ? JSON.parse(ambassadorCT.tier_rules)
-        : ambassadorCT.tier_rules;
-      tiers = parsed.tiers || [];
-    }
-
-    // Resolve linked user IDs (via source_user_id or email match)
-    const contactUserMap = {}; // contactId → userId
-    const directIds = [];
-    const emailsToMatch = [];
-
-    for (const a of ambassadors) {
-      if (a.source_user_id) {
-        contactUserMap[a.id] = a.source_user_id;
-        directIds.push(a.source_user_id);
-      } else if (a.email) {
-        emailsToMatch.push({ contactId: a.id, email: a.email });
-      }
-    }
-
-    // Match remaining contacts by email against ambassador users
-    if (emailsToMatch.length > 0) {
-      const matched = await db('users')
-        .whereIn('email', emailsToMatch.map(e => e.email))
-        .where('role', 'ambassadeur')
-        .select('id', 'email');
-      const emailMap = {};
-      for (const u of matched) emailMap[u.email] = u.id;
-      for (const { contactId, email } of emailsToMatch) {
-        if (emailMap[email]) contactUserMap[contactId] = emailMap[email];
-      }
-    }
-
-    // Compute CA for all linked users in one query
-    const allUserIds = [...new Set(Object.values(contactUserMap))];
-    const userCA = {}; // userId → CA
-    if (allUserIds.length > 0) {
-      const revenues = await db('orders')
-        .whereIn('user_id', allUserIds)
-        .whereIn('status', ['validated', 'preparing', 'shipped', 'delivered'])
-        .groupBy('user_id')
-        .select('user_id')
-        .sum('total_ttc as ca');
-      for (const r of revenues) userCA[r.user_id] = parseFloat(r.ca || 0);
-    }
-
-    // Determine tier from CA (highest matching threshold)
-    const sortedTiers = [...tiers].sort((a, b) => b.threshold - a.threshold);
-    function getTier(ca) {
-      if (!sortedTiers.length || !ca) return null;
-      for (const t of sortedTiers) {
-        if (ca >= t.threshold) return { label: t.label, color: t.color };
-      }
-      return null;
-    }
-
-    // Also return available filters
+    // Return available filters (region only — no tier/financial data on public page)
     const regions = await db('regions').orderBy('sort_order').select('id', 'name');
 
     res.json({
-      ambassadors: ambassadors.map((a) => {
-        const userId = contactUserMap[a.id];
-        const ca = userId ? (userCA[userId] || 0) : 0;
-        return {
-          id: a.id,
-          name: a.name,
-          photo_url: a.ambassador_photo_url,
-          bio: a.ambassador_bio,
-          region: a.region_name,
-          region_id: a.region_id,
-          tier: getTier(ca),
-        };
-      }),
+      ambassadors: ambassadors.map((a) => ({
+        id: a.id,
+        name: a.name,
+        photo_url: a.ambassador_photo_url,
+        bio: a.ambassador_bio,
+        region: a.region_name,
+        region_id: a.region_id,
+      })),
       filters: {
         regions,
-        tiers: tiers.map(t => ({ label: t.label, color: t.color })),
       },
     });
   } catch (err) {
