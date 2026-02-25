@@ -34,7 +34,7 @@ export default function NotificationBell() {
       setNotifications(data.data || []);
       setUnread(data.unread || 0);
     } catch (err) {
-      // Silently fail
+      console.error('NotificationBell fetch error:', err);
     }
   };
 
@@ -59,7 +59,7 @@ export default function NotificationBell() {
       setNotifications((prev) => prev.map((n) => n.id === id ? { ...n, read: true } : n));
       setUnread((u) => Math.max(0, u - 1));
     } catch (err) {
-      // Silently fail
+      console.error('NotificationBell markRead error:', err);
     }
   };
 
@@ -69,7 +69,7 @@ export default function NotificationBell() {
       setNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
       setUnread(0);
     } catch (err) {
-      // Silently fail
+      console.error('NotificationBell markAllRead error:', err);
     }
   };
 
@@ -107,9 +107,13 @@ export default function NotificationBell() {
                   className={`flex items-start gap-3 px-4 py-3 border-b last:border-b-0 cursor-pointer hover:bg-gray-50 transition-colors ${!n.read ? 'bg-wine-50/50' : ''}`}
                   onClick={() => {
                     if (!n.read) markRead(n.id);
-                    const routeFn = ENTITY_ROUTES[n.entity] || ENTITY_ROUTES[n.type];
-                    if (routeFn) {
-                      navigate(routeFn(n.entity_id));
+                    // Prefer n.link (always set by notificationService), fallback to entity routes
+                    const dest = n.link || (() => {
+                      const routeFn = ENTITY_ROUTES[n.entity] || ENTITY_ROUTES[n.type];
+                      return routeFn ? routeFn(n.entity_id) : null;
+                    })();
+                    if (dest) {
+                      navigate(dest);
                       setOpen(false);
                     }
                   }}
