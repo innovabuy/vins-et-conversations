@@ -59,7 +59,7 @@ export default function AdminLayout() {
         </button>
         <div className="flex items-center gap-2">
           {app_logo_url ? (
-            <img src={app_logo_url} alt={app_name} className="h-6 w-auto object-contain" />
+            <img src={app_logo_url} alt={app_name} className="h-8 w-auto object-contain" />
           ) : (
             <Wine size={20} className="text-wine-700" />
           )}
@@ -84,7 +84,7 @@ export default function AdminLayout() {
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
               {app_logo_url ? (
-                <img src={app_logo_url} alt={app_name} className="h-7 w-auto object-contain" />
+                <img src={app_logo_url} alt={app_name} className="h-10 w-auto object-contain" />
               ) : (
                 <Wine size={24} className="text-wine-700" />
               )}
