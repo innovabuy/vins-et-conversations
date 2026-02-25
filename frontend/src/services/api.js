@@ -225,6 +225,7 @@ export const exportsAPI = {
   activityReport: (start, end) => api.get('/admin/exports/activity-report', { params: { start, end }, responseType: 'blob' }),
   salesByContact: (start, end, type) => api.get('/admin/exports/sales-by-contact', { params: { start, end, type: type || undefined }, responseType: 'blob' }),
   campaignPivot: (campaignId, includeFree) => api.get('/admin/exports/campaign-pivot', { params: { campaign_id: campaignId, format: 'xlsx', include_free: includeFree ? 'true' : 'false' }, responseType: 'blob' }),
+  ambassadors: (start, end) => api.get('/admin/exports/ambassadors', { params: { start, end }, responseType: 'blob' }),
 };
 
 // ─── Users Admin ───────────────────────────────────

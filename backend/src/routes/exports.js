@@ -1696,4 +1696,212 @@ router.get('/sales-by-contact', async (req, res) => {
   }
 });
 
+// 10. GET /api/v1/admin/exports/ambassadors?start&end — Export ambassadeurs Excel
+router.get('/ambassadors', async (req, res) => {
+  try {
+    const ExcelJS = require('exceljs');
+    const { start, end } = req.query;
+
+    // 1. All ambassador users + region
+    const ambassadors = await db('users')
+      .leftJoin('regions', 'users.region_id', 'regions.id')
+      .where('users.role', 'ambassadeur')
+      .select(
+        'users.id', 'users.name', 'users.email',
+        'regions.name as region',
+        'users.ambassador_bio as bio',
+        'users.show_on_public_page'
+      )
+      .orderBy('users.name');
+
+    if (!ambassadors.length) {
+      return res.status(404).json({ error: 'NO_DATA', message: 'Aucun ambassadeur trouvé' });
+    }
+
+    const ambIds = ambassadors.map(a => a.id);
+
+    // 2. Referral codes from participations
+    const participations = await db('participations')
+      .whereIn('user_id', ambIds)
+      .whereNotNull('referral_code')
+      .select('user_id', 'referral_code');
+    const refCodeMap = {};
+    for (const p of participations) {
+      refCodeMap[p.user_id] = p.referral_code;
+    }
+
+    // 3. Referral clicks from audit_log
+    const clicks = await db('audit_log')
+      .where('entity', 'referral')
+      .where('action', 'REFERRAL_CLICK')
+      .whereIn('entity_id', ambIds)
+      .select('entity_id')
+      .count('* as cnt')
+      .groupBy('entity_id');
+    const clickMap = {};
+    for (const c of clicks) {
+      clickMap[c.entity_id] = parseInt(c.cnt);
+    }
+
+    // 4. Orders (own + referred) with items
+    let ordersQuery = db('order_items')
+      .join('orders', 'order_items.order_id', 'orders.id')
+      .join('products', 'order_items.product_id', 'products.id')
+      .whereIn('orders.status', ['validated', 'preparing', 'shipped', 'delivered'])
+      .where('order_items.type', 'product')
+      .where(function () {
+        this.whereIn('orders.user_id', ambIds).orWhereIn('orders.referred_by', ambIds);
+      });
+    if (start) ordersQuery = ordersQuery.where('orders.created_at', '>=', start);
+    if (end) ordersQuery = ordersQuery.where('orders.created_at', '<=', end);
+
+    const items = await ordersQuery.select(
+      'orders.user_id',
+      'orders.referred_by',
+      'orders.ref',
+      'orders.created_at',
+      'products.name as produit',
+      'order_items.qty',
+      'order_items.unit_price_ht',
+      'order_items.unit_price_ttc',
+      'products.purchase_price'
+    ).orderBy([{ column: 'orders.created_at' }]);
+
+    // 5. Aggregate per ambassador
+    const ambStats = {};
+    for (const a of ambassadors) {
+      ambStats[a.id] = { orders: new Set(), qty: 0, ca_ht: 0, ca_ttc: 0, items: [] };
+    }
+    for (const item of items) {
+      // Determine which ambassador gets credit
+      const ownerId = ambIds.includes(item.user_id) ? item.user_id : null;
+      const referrerId = item.referred_by && ambIds.includes(item.referred_by) ? item.referred_by : null;
+      const targets = [];
+      if (ownerId) targets.push({ id: ownerId, source: 'directe' });
+      if (referrerId && referrerId !== ownerId) targets.push({ id: referrerId, source: 'référé' });
+
+      const qty = item.qty;
+      const caHt = parseFloat(item.unit_price_ht) * qty;
+      const caTtc = parseFloat(item.unit_price_ttc) * qty;
+      const marge = (parseFloat(item.unit_price_ht) - parseFloat(item.purchase_price)) * qty;
+
+      for (const t of targets) {
+        if (!ambStats[t.id]) continue;
+        ambStats[t.id].orders.add(item.ref);
+        ambStats[t.id].qty += qty;
+        ambStats[t.id].ca_ht += caHt;
+        ambStats[t.id].ca_ttc += caTtc;
+        ambStats[t.id].items.push({
+          ambassadeur: ambassadors.find(a => a.id === t.id)?.name || '',
+          date: new Date(item.created_at).toLocaleDateString('fr-FR'),
+          ref: item.ref,
+          source: t.source,
+          produit: item.produit,
+          qty,
+          pu_ht: parseFloat(parseFloat(item.unit_price_ht).toFixed(2)),
+          pu_ttc: parseFloat(parseFloat(item.unit_price_ttc).toFixed(2)),
+          ca_ht: parseFloat(caHt.toFixed(2)),
+          marge: parseFloat(marge.toFixed(2)),
+        });
+      }
+    }
+
+    // 6. Tier calculation
+    const rulesEngine = require('../services/rulesEngine');
+    // Find ambassador campaign to get tier_rules
+    const ambCampaign = await db('campaigns')
+      .join('client_types', 'campaigns.client_type_id', 'client_types.id')
+      .where('client_types.name', 'like', '%ambassadeur%')
+      .whereNull('campaigns.deleted_at')
+      .select('campaigns.id', 'client_types.tier_rules')
+      .first();
+
+    let tierRules = null;
+    if (ambCampaign?.tier_rules) {
+      tierRules = typeof ambCampaign.tier_rules === 'string'
+        ? JSON.parse(ambCampaign.tier_rules) : ambCampaign.tier_rules;
+    }
+
+    const tierMap = {};
+    if (tierRules?.tiers?.length) {
+      for (const a of ambassadors) {
+        const tierResult = await rulesEngine.calculateTier(a.id, tierRules);
+        tierMap[a.id] = tierResult;
+      }
+    }
+
+    // 7. Build Excel workbook
+    const workbook = new ExcelJS.Workbook();
+    workbook.creator = 'Vins & Conversations';
+
+    // Sheet 1: Récapitulatif
+    const summary = workbook.addWorksheet('Récapitulatif');
+    summary.columns = [
+      { header: 'Nom', key: 'nom', width: 25 },
+      { header: 'Email', key: 'email', width: 30 },
+      { header: 'Région', key: 'region', width: 20 },
+      { header: 'Bio', key: 'bio', width: 35 },
+      { header: 'Visible page publique', key: 'visible', width: 18 },
+      { header: 'Code referral', key: 'referral_code', width: 18 },
+      { header: 'Clics referral', key: 'clics', width: 14 },
+      { header: 'Nb commandes', key: 'nb_orders', width: 14 },
+      { header: 'Nb bouteilles', key: 'nb_qty', width: 14 },
+      { header: 'CA HT', key: 'ca_ht', width: 14 },
+      { header: 'CA TTC', key: 'ca_ttc', width: 14 },
+      { header: 'Palier actuel', key: 'tier', width: 15 },
+      { header: 'Récompense', key: 'reward', width: 25 },
+    ];
+    summary.getRow(1).font = { bold: true };
+
+    for (const a of ambassadors) {
+      const stats = ambStats[a.id];
+      const tier = tierMap[a.id];
+      summary.addRow({
+        nom: a.name,
+        email: a.email,
+        region: a.region || '',
+        bio: a.bio || '',
+        visible: a.show_on_public_page ? 'Oui' : 'Non',
+        referral_code: refCodeMap[a.id] || '',
+        clics: clickMap[a.id] || 0,
+        nb_orders: stats.orders.size,
+        nb_qty: stats.qty,
+        ca_ht: parseFloat(stats.ca_ht.toFixed(2)),
+        ca_ttc: parseFloat(stats.ca_ttc.toFixed(2)),
+        tier: tier?.current?.label || 'Débutant',
+        reward: tier?.current?.reward || '—',
+      });
+    }
+
+    // Sheet 2: Détail ventes
+    const detail = workbook.addWorksheet('Détail ventes');
+    detail.columns = [
+      { header: 'Ambassadeur', key: 'ambassadeur', width: 25 },
+      { header: 'Date', key: 'date', width: 12 },
+      { header: 'Ref commande', key: 'ref', width: 18 },
+      { header: 'Source', key: 'source', width: 12 },
+      { header: 'Produit', key: 'produit', width: 30 },
+      { header: 'Qté', key: 'qty', width: 8 },
+      { header: 'PU HT', key: 'pu_ht', width: 12 },
+      { header: 'PU TTC', key: 'pu_ttc', width: 12 },
+      { header: 'CA HT', key: 'ca_ht', width: 14 },
+      { header: 'Marge', key: 'marge', width: 14 },
+    ];
+    detail.getRow(1).font = { bold: true };
+
+    for (const a of ambassadors) {
+      for (const row of ambStats[a.id].items) {
+        detail.addRow(row);
+      }
+    }
+
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.setHeader('Content-Disposition', 'attachment; filename=export-ambassadeurs.xlsx');
+    await workbook.xlsx.write(res);
+    res.end();
+  } catch (err) {
+    res.status(500).json({ error: 'SERVER_ERROR', message: err.message });
+  }
+});
+
 module.exports = router;

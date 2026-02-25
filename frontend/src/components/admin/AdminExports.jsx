@@ -107,6 +107,16 @@ export default function AdminExports() {
       filename: 'ventes-par-contact.xlsx',
     },
     {
+      key: 'ambassadors',
+      title: 'Export Ambassadeurs',
+      description: 'Profils, ventes, paliers et referral de chaque ambassadeur (Excel)',
+      icon: Users,
+      type: 'xlsx',
+      needsDates: true,
+      action: () => exportsAPI.ambassadors(start, end),
+      filename: 'export-ambassadeurs.xlsx',
+    },
+    {
       key: 'campaign-pivot',
       title: 'Récap Campagne — Tableau croisé',
       description: 'Tableau pivot Étudiants × Produits : quantités, montants TTC/HT, récap par étudiant et produit (5 onglets Excel)',
