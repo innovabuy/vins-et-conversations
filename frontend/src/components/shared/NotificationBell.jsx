@@ -86,7 +86,7 @@ export default function NotificationBell() {
       </button>
 
       {open && (
-        <div className="fixed right-4 mt-2 w-80 bg-white border rounded-xl shadow-xl z-[100] max-h-96 overflow-y-auto flex flex-col" style={{ top: ref.current?.getBoundingClientRect().bottom }}>
+        <div className="absolute right-0 top-full mt-2 w-80 bg-white border rounded-xl shadow-xl z-[100] max-h-96 overflow-y-auto flex flex-col">
           <div className="flex items-center justify-between px-4 py-3 border-b bg-gray-50">
             <h3 className="font-semibold text-sm">Notifications</h3>
             {unread > 0 && (
@@ -96,7 +96,7 @@ export default function NotificationBell() {
             )}
           </div>
 
-          <div className="overflow-y-auto flex-1">
+          <div className="flex-1">
             {notifications.length === 0 ? (
               <div className="text-center py-8 text-gray-400 text-sm">
                 Aucune notification
