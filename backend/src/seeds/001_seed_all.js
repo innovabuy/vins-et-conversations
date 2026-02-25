@@ -110,7 +110,7 @@ exports.seed = async function (knex) {
 
   // App settings defaults
   await knex('app_settings').insert([
-    { key: 'app_logo_url', value: '' },
+    { key: 'app_logo_url', value: '/images/logo-vins-conversations.png' },
     { key: 'app_name', value: 'Vins & Conversations' },
     { key: 'app_primary_color', value: '#722F37' },
     { key: 'stripe_mode', value: 'test' },
@@ -160,13 +160,16 @@ exports.seed = async function (knex) {
   const hash = await bcrypt.hash('VinsConv2026!', 12);
 
   // ═══════════════════════════════════════════════════════
-  // ORGANIZATION TYPES
+  // ORGANIZATION TYPES (sans default_client_type_id — sera mis à jour après insertion client_types)
   // ═══════════════════════════════════════════════════════
   await knex('organization_types').insert([
     { id: IDS.ot_school, code: 'school', label: 'Établissement scolaire', description: 'Lycées, collèges et écoles', default_config: JSON.stringify({ allowed_roles: ['etudiant', 'enseignant'], features: ['gamification', 'ranking'] }), active: true },
     { id: IDS.ot_company, code: 'company', label: 'Entreprise (CSE)', description: 'Comités sociaux et économiques', default_config: JSON.stringify({ allowed_roles: ['cse'], features: ['ecommerce_mode', 'discount'] }), active: true },
     { id: IDS.ot_network, code: 'network', label: 'Réseau ambassadeur', description: 'Réseaux de vente directe', default_config: JSON.stringify({ allowed_roles: ['ambassadeur'], features: ['tiers', 'referral'] }), active: true },
     { id: IDS.ot_boutique, code: 'boutique', label: 'Boutique en ligne', description: 'Vente directe boutique web', default_config: JSON.stringify({ allowed_roles: [], features: ['public_shop'] }), active: true },
+    { code: 'bts', label: 'BTS / Formation', description: 'BTS NDRC et formations commerciales', default_config: JSON.stringify({ allowed_roles: ['etudiant', 'enseignant'], features: ['gamification', 'ranking', 'formation'] }), active: true },
+    { code: 'entreprise', label: 'Entreprise (Événement)', description: 'Événements et dégustations entreprise', default_config: JSON.stringify({ allowed_roles: ['commercial'], features: ['event'] }), active: true },
+    { code: 'particulier', label: 'Particulier', description: 'Vente directe aux particuliers', default_config: JSON.stringify({ allowed_roles: [], features: ['direct_sale'] }), active: true },
   ]);
 
   // ═══════════════════════════════════════════════════════
@@ -422,6 +425,17 @@ exports.seed = async function (knex) {
       ui_config: JSON.stringify({ show_ranking: false, show_gamification: false }),
     },
   ]);
+
+  // ═══════════════════════════════════════════════════════
+  // ORGANIZATION TYPES — link default_client_type_id (now that client_types exist)
+  // ═══════════════════════════════════════════════════════
+  await knex('organization_types').where({ code: 'school' }).update({ default_client_type_id: IDS.ct_scolaire });
+  await knex('organization_types').where({ code: 'company' }).update({ default_client_type_id: IDS.ct_cse });
+  await knex('organization_types').where({ code: 'network' }).update({ default_client_type_id: IDS.ct_ambassadeur });
+  await knex('organization_types').where({ code: 'boutique' }).update({ default_client_type_id: IDS.ct_boutique });
+  await knex('organization_types').where({ code: 'bts' }).update({ default_client_type_id: IDS.ct_bts });
+  await knex('organization_types').where({ code: 'entreprise' }).update({ default_client_type_id: IDS.ct_entreprise });
+  await knex('organization_types').where({ code: 'particulier' }).update({ default_client_type_id: IDS.ct_particulier });
 
   // ═══════════════════════════════════════════════════════
   // CAMPAIGN TYPES

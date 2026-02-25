@@ -23,6 +23,9 @@ beforeAll(async () => {
 });
 
 afterAll(async () => {
+  // Cleanup test residues
+  await db('organization_types').where('code', 'like', 'test_ot_%').del();
+  await db('campaign_types').where('code', 'like', 'test_ct_%').del();
   await db.destroy();
 });
 

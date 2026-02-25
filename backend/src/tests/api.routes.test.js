@@ -55,6 +55,9 @@ beforeAll(async () => {
 });
 
 afterAll(async () => {
+  // Cleanup test residues: orphan products and categories created by tests
+  await db('products').where('name', 'like', 'Test Product%').del();
+  await db('product_categories').where('name', 'like', 'Test Cat %').del();
   await db.destroy();
 });
 
