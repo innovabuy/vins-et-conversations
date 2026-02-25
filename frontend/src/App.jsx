@@ -9,6 +9,7 @@ import AdminCampaigns from './components/admin/AdminCampaigns';
 import AdminCampaignDetail from './components/admin/AdminCampaignDetail';
 import CampaignWizard from './components/admin/CampaignWizard';
 import AdminStock from './components/admin/AdminStock';
+import AdminFreeBottles from './components/admin/AdminFreeBottles';
 import AdminDeliveryNotes from './components/admin/AdminDeliveryNotes';
 import AdminCRM from './components/admin/AdminCRM';
 import AdminSuppliers from './components/admin/AdminSuppliers';
@@ -106,6 +107,7 @@ function AppRoutes() {
         <Route path="delivery" element={<AdminDeliveryNotes />} />
         <Route path="suppliers" element={<AdminSuppliers />} />
         <Route path="stock" element={<AdminStock />} />
+        <Route path="free-bottles" element={<AdminFreeBottles />} />
         <Route path="crm" element={<AdminCRM />} />
         <Route path="finance" element={<AdminFinance />} />
         <Route path="payments" element={<AdminPayments />} />

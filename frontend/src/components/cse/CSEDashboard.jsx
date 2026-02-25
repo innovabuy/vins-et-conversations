@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import { cseDashboardAPI, ordersAPI, invoicesAPI } from '../../services/api';
-import { ShoppingCart, Package, FileText, Truck, AlertTriangle, RefreshCw, Wine, TrendingUp, Target } from 'lucide-react';
+import { ShoppingCart, Package, FileText, Truck, AlertTriangle, RefreshCw, Wine, TrendingUp, Target, Award } from 'lucide-react';
 
 export default function CSEDashboard() {
   const { user } = useAuth();
@@ -165,6 +165,52 @@ export default function CSEDashboard() {
               <AlertTriangle size={12} />
               Livraison offerte à partir de {data.delivery_free_threshold?.toLocaleString('fr-FR')} € de CA
             </p>
+          )}
+        </div>
+      )}
+
+      {/* Tier Progression */}
+      {data.current_tier !== undefined && (
+        <div className="card mb-4">
+          <div className="flex items-center gap-2 mb-3">
+            <Award size={18} className="text-wine-600" />
+            <h3 className="font-semibold text-gray-800">Palier fidélité</h3>
+          </div>
+          {data.current_tier ? (
+            <div className="flex items-center gap-3 mb-2">
+              <span
+                className="px-3 py-1 rounded-full text-sm font-semibold text-white"
+                style={{ backgroundColor: data.current_tier.color || '#722F37' }}
+              >
+                {data.current_tier.label}
+              </span>
+              <span className="text-sm text-gray-600">{data.current_tier.reward}</span>
+            </div>
+          ) : (
+            <p className="text-sm text-gray-500 mb-2">Aucun palier atteint pour le moment</p>
+          )}
+          {data.next_tier && (
+            <>
+              <div className="flex items-baseline justify-between text-xs text-gray-500 mb-1">
+                <span>Progression vers {data.next_tier.label}</span>
+                <span>{data.tier_progress_pct}%</span>
+              </div>
+              <div className="w-full bg-gray-100 rounded-full h-2 overflow-hidden">
+                <div
+                  className="h-2 rounded-full transition-all"
+                  style={{
+                    width: `${Math.min(100, data.tier_progress_pct || 0)}%`,
+                    backgroundColor: data.next_tier.color || '#722F37',
+                  }}
+                />
+              </div>
+              <p className="text-xs text-gray-400 mt-1">
+                Récompense : {data.next_tier.reward}
+              </p>
+            </>
+          )}
+          {!data.next_tier && data.current_tier && (
+            <p className="text-xs text-green-600 font-medium">Palier maximum atteint !</p>
           )}
         </div>
       )}

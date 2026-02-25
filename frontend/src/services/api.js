@@ -192,6 +192,13 @@ export const invoicesAPI = {
   download: (orderId) => api.get(`/orders/${orderId}/invoice`, { responseType: 'blob' }),
 };
 
+// ─── Free Bottles Admin ─────────────────────────────
+export const freeBottlesAPI = {
+  pending: (campaignId) => api.get('/admin/free-bottles/pending', { params: { campaign_id: campaignId } }),
+  toggle: (data) => api.patch('/admin/free-bottles/toggle', data),
+  record: (data) => api.post('/admin/free-bottles/record', data),
+};
+
 // ─── Pricing Conditions ─────────────────────────────
 export const pricingConditionsAPI = {
   list: () => api.get('/admin/pricing-conditions'),

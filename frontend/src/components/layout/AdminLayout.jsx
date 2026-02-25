@@ -4,7 +4,7 @@ import { Outlet, NavLink, useNavigate } from 'react-router-dom';
 import {
   LayoutDashboard, ShoppingCart, Truck, Factory, Package, Users,
   CreditCard, BarChart3, BookOpen, Bell, Map, FileText, Settings,
-  Download, Wine, LogOut, Menu, X, ChevronRight, Shield, Tag, Building2, Image, ExternalLink
+  Download, Wine, LogOut, Menu, X, ChevronRight, Shield, Tag, Building2, Image, ExternalLink, Gift
 } from 'lucide-react';
 import NotificationBell from '../shared/NotificationBell';
 import CapNumerikCredit from '../shared/CapNumerikCredit';
@@ -17,6 +17,7 @@ const allNavItems = [
   { to: '/admin/delivery', icon: Truck, label: 'Bons de livraison' },
   { to: '/admin/suppliers', icon: Factory, label: 'Fournisseurs' },
   { to: '/admin/stock', icon: Package, label: 'Stock' },
+  { to: '/admin/free-bottles', icon: Gift, label: '12+1 Gratuités' },
   { to: '/admin/crm', icon: Users, label: 'Contacts / CRM' },
   { to: '/admin/finance', icon: CreditCard, label: 'Finance & Marges', adminOnly: true },
   { to: '/admin/payments', icon: CreditCard, label: 'Paiements' },
