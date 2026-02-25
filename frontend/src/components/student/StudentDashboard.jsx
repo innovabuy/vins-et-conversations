@@ -502,7 +502,7 @@ export default function StudentDashboard() {
             {/* Free bottles */}
             <div className="card">
               <div className="flex items-center justify-between mb-2">
-                <h3 className="font-semibold text-sm">{'\uD83C\uDF81'} Bouteilles gratuites</h3>
+                <h3 className="font-semibold text-sm">{'\uD83C\uDF81'} Bouteilles gratuites (12+1)</h3>
                 <span className="badge bg-wine-100 text-wine-800">{data.freeBottles.available} disponible(s)</span>
               </div>
               <div className="w-full bg-gray-100 rounded-full h-3 mb-2">
@@ -511,9 +511,23 @@ export default function StudentDashboard() {
                   style={{ width: `${((data.freeBottles.totalSold % data.freeBottles.threshold) / data.freeBottles.threshold) * 100}%` }}
                 />
               </div>
-              <p className="text-xs text-gray-500">
+              <p className="text-xs text-gray-500 mb-2">
                 Encore {data.freeBottles.nextIn} bouteille(s) avant la prochaine gratuite
               </p>
+              {/* Per-reference detail */}
+              {data.freeBottles.details?.length > 0 && (
+                <div className="border-t pt-2 mt-2 space-y-1">
+                  <p className="text-xs font-medium text-gray-600 mb-1">Détail par référence :</p>
+                  {data.freeBottles.details.map((d) => (
+                    <div key={d.product_id} className="flex items-center justify-between text-xs">
+                      <span className="text-gray-700 truncate mr-2">{d.product_name}</span>
+                      <span className="text-gray-500 flex-shrink-0">
+                        {d.sold} vendues · {d.earned > 0 ? <span className="text-wine-700 font-semibold">{d.earned} gratuite(s)</span> : `${d.nextIn} restantes`}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
 
             {/* Barriques — Part des anges (V4.1) */}

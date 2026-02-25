@@ -178,27 +178,56 @@ async function calculateFreeBottles(userId, campaignId, freeBottleRules) {
 
   const n = freeBottleRules.n || 12;
   const alcoholOnly = freeBottleRules.applies_to_alcohol_only !== false;
+  const perReference = freeBottleRules.per_reference !== false; // V4.4: default per-reference
 
-  // Total bouteilles vendues par l'étudiant dans la campagne
-  // V4.2: filter by is_alcohol when applies_to_alcohol_only is set
+  // V4.4: Count per-reference (per product) instead of global total
   let soldQuery = db('order_items')
     .join('orders', 'order_items.order_id', 'orders.id')
+    .join('products', 'order_items.product_id', 'products.id')
     .where({ 'orders.user_id': userId, 'orders.campaign_id': campaignId })
     .whereIn('orders.status', ['validated', 'preparing', 'shipped', 'delivered'])
     .where('order_items.type', 'product');
 
   if (alcoholOnly) {
     soldQuery = soldQuery
-      .join('products', 'order_items.product_id', 'products.id')
       .leftJoin('product_categories', 'products.category_id', 'product_categories.id')
       .where(function () {
         this.where('product_categories.is_alcohol', true).orWhereNull('product_categories.is_alcohol');
       });
   }
 
-  const soldResult = await soldQuery.sum('order_items.qty as total').first();
-  const totalSold = parseInt(soldResult?.total || 0, 10);
-  const earned = Math.floor(totalSold / n);
+  let totalSold = 0;
+  let earned = 0;
+  let details = [];
+
+  if (perReference) {
+    // Per-reference: group by product_id, each product independently earns free bottles
+    const perProduct = await soldQuery
+      .select('order_items.product_id', 'products.name as product_name')
+      .sum('order_items.qty as qty')
+      .groupBy('order_items.product_id', 'products.name');
+
+    for (const row of perProduct) {
+      const qty = parseInt(row.qty || 0, 10);
+      const earnedForProduct = Math.floor(qty / n);
+      totalSold += qty;
+      earned += earnedForProduct;
+      if (qty > 0) {
+        details.push({
+          product_id: row.product_id,
+          product_name: row.product_name,
+          sold: qty,
+          earned: earnedForProduct,
+          nextIn: n - (qty % n),
+        });
+      }
+    }
+  } else {
+    // Legacy global counting
+    const soldResult = await soldQuery.sum('order_items.qty as total').first();
+    totalSold = parseInt(soldResult?.total || 0, 10);
+    earned = Math.floor(totalSold / n);
+  }
 
   // Bouteilles gratuites déjà utilisées
   const usedResult = await db('financial_events')
@@ -209,7 +238,10 @@ async function calculateFreeBottles(userId, campaignId, freeBottleRules) {
 
   const used = parseInt(usedResult?.count || 0, 10);
   const available = Math.max(0, earned - used);
-  const nextIn = n - (totalSold % n);
+  // nextIn: for per-reference, use the minimum nextIn across all products (closest to earning)
+  const nextIn = perReference && details.length > 0
+    ? Math.min(...details.map(d => d.nextIn))
+    : n - (totalSold % n);
 
   // V4.2: cost_per_bottle = cheapest purchase_price among alcohol items in student's orders
   let costQuery = db('order_items')
@@ -230,7 +262,7 @@ async function calculateFreeBottles(userId, campaignId, freeBottleRules) {
   const costResult = await costQuery.min('products.purchase_price as min_cost').first();
   const cost_per_bottle = parseFloat(costResult?.min_cost || 0);
 
-  return { earned, used, available, totalSold, threshold: n, nextIn, cost_per_bottle };
+  return { earned, used, available, totalSold, threshold: n, nextIn, cost_per_bottle, details };
 }
 
 // ─── §3.3b Coût gratuite par commande (V4.2 BLOC 3) ──
