@@ -248,6 +248,10 @@ router.get(
       const campaignProgress = campaignGoal > 0 ? Math.round((campaignCaTTC / campaignGoal) * 100) : 0;
       const deliveryFreeThreshold = parseFloat(campConfig.delivery_free_threshold || 0);
 
+      // V4.4: CSE sub_role (responsable vs collaborateur)
+      const cseSubRole = req.user.sub_role || 'responsable';
+      const canOrder = cseSubRole === 'responsable';
+
       // CSE tier progression
       const tierRules = typeof campaign.tier_rules === 'string'
         ? JSON.parse(campaign.tier_rules) : (campaign.tier_rules || {});
@@ -269,6 +273,8 @@ router.get(
         current_tier: tier.current,
         next_tier: tier.next,
         tier_progress_pct: tier.progress,
+        sub_role: cseSubRole,
+        can_order: canOrder,
       });
     } catch (err) {
       res.status(500).json({ error: 'SERVER_ERROR', message: err.message });

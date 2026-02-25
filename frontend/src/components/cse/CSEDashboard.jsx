@@ -52,8 +52,10 @@ export default function CSEDashboard() {
   const minOrder = data?.minOrder || 0;
   const isUnderMin = cartTotal > 0 && cartTotal < minOrder;
 
+  const canOrder = data?.can_order !== false;
+
   const handleOrder = async () => {
-    if (isUnderMin || cart.length === 0) return;
+    if (isUnderMin || cart.length === 0 || !canOrder) return;
     setOrdering(true);
     try {
       await ordersAPI.create({
@@ -118,6 +120,14 @@ export default function CSEDashboard() {
 
   return (
     <div>
+      {/* Collaborator info banner */}
+      {data?.sub_role === 'collaborateur' && (
+        <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-4 text-blue-700 text-sm flex items-center gap-2">
+          <AlertTriangle size={16} />
+          Compte collaborateur — consultation du catalogue uniquement. Contactez votre responsable CSE pour passer commande.
+        </div>
+      )}
+
       {/* Tab navigation */}
       <div className="flex gap-1 mb-6 bg-white rounded-lg p-1 shadow-sm">
         {tabs.map((tab) => (
@@ -300,7 +310,7 @@ export default function CSEDashboard() {
 
                 <button
                   onClick={handleOrder}
-                  disabled={isUnderMin || ordering}
+                  disabled={isUnderMin || ordering || !canOrder}
                   className="btn-primary w-full disabled:opacity-50"
                 >
                   {ordering ? 'Commande en cours...' : 'Commander'}

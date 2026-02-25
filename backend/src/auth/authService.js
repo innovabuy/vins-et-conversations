@@ -11,18 +11,18 @@ const REFRESH_EXPIRY = process.env.JWT_REFRESH_EXPIRY || '7d';
 
 function generateAccessToken(user, participations) {
   const campaignIds = participations.map((p) => p.campaign_id);
-  return jwt.sign(
-    {
-      userId: user.id,
-      email: user.email,
-      role: user.role,
-      name: user.name,
-      permissions: user.permissions || {},
-      campaign_ids: campaignIds,
-    },
-    JWT_SECRET,
-    { expiresIn: ACCESS_EXPIRY }
-  );
+  // V4.4: include sub_role for CSE collaborator differentiation
+  const subRole = participations.find((p) => p.sub_role)?.sub_role || null;
+  const payload = {
+    userId: user.id,
+    email: user.email,
+    role: user.role,
+    name: user.name,
+    permissions: user.permissions || {},
+    campaign_ids: campaignIds,
+  };
+  if (subRole) payload.sub_role = subRole;
+  return jwt.sign(payload, JWT_SECRET, { expiresIn: ACCESS_EXPIRY });
 }
 
 async function generateRefreshToken(userId) {

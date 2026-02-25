@@ -146,6 +146,7 @@ describe('CSE Workflow', () => {
     expect(typeof res.body.campaign_goal).toBe('number');
     expect(typeof res.body.campaign_progress).toBe('number');
     expect(typeof res.body.delivery_free_threshold).toBe('number');
+    expect(res.body.delivery_free_threshold).toBe(1000); // V4.4: seuil livraison gratuite = 1000€ TTC
 
     // Progress is a percentage (0-100+)
     expect(res.body.campaign_progress).toBeGreaterThanOrEqual(0);
@@ -164,5 +165,42 @@ describe('CSE Workflow', () => {
       .set('Authorization', `Bearer ${cseToken}`)
       .query({ campaign_id: otherCampaign.id });
     expect(res.status).toBe(403);
+  });
+
+  test('10. CSE dashboard returns sub_role and can_order', async () => {
+    const res = await request(app)
+      .get('/api/v1/dashboard/cse')
+      .set('Authorization', `Bearer ${cseToken}`)
+      .query({ campaign_id: cseCampaignId });
+    expect(res.status).toBe(200);
+    expect(res.body.sub_role).toBe('responsable');
+    expect(res.body.can_order).toBe(true);
+  });
+
+  test('11. Collaborateur sub_role restricts can_order', async () => {
+    const cseUser = await db('users').where({ email: 'cse@leroymerlin.fr' }).first();
+    // Temporarily set sub_role to collaborateur
+    await db('participations')
+      .where({ user_id: cseUser.id, campaign_id: cseCampaignId })
+      .update({ sub_role: 'collaborateur' });
+
+    // Re-login to get new JWT with sub_role
+    const loginRes = await request(app)
+      .post('/api/v1/auth/login')
+      .send({ email: 'cse@leroymerlin.fr', password: 'VinsConv2026!' });
+    const collabToken = loginRes.body.accessToken;
+
+    const res = await request(app)
+      .get('/api/v1/dashboard/cse')
+      .set('Authorization', `Bearer ${collabToken}`)
+      .query({ campaign_id: cseCampaignId });
+    expect(res.status).toBe(200);
+    expect(res.body.sub_role).toBe('collaborateur');
+    expect(res.body.can_order).toBe(false);
+
+    // Restore
+    await db('participations')
+      .where({ user_id: cseUser.id, campaign_id: cseCampaignId })
+      .update({ sub_role: 'responsable' });
   });
 });
