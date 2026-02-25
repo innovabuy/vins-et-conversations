@@ -5,7 +5,7 @@ const { v4: uuidv4 } = require('uuid');
 const db = require('../config/database');
 const cartService = require('../services/cartService');
 const boutiqueOrderService = require('../services/boutiqueOrderService');
-const { getStripe } = require('../services/stripeService');
+const paymentService = require('../services/paymentService');
 const logger = require('../utils/logger');
 
 const router = express.Router();
@@ -109,7 +109,7 @@ router.post('/checkout', async (req, res) => {
     // Skip Stripe for backorder (pending_stock) — payment will happen when stock arrives
     let clientSecret = null;
     if (!order.backorder) {
-      const stripe = await getStripe();
+      const stripe = await paymentService.getProvider();
       if (stripe) {
         const amountCents = Math.round(order.total_ttc * 100);
         const paymentIntent = await stripe.paymentIntents.create({

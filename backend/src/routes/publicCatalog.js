@@ -362,7 +362,7 @@ router.get('/catalog/:id/pdf', async (req, res) => {
 // POST /api/v1/public/contact — Formulaire de contact public
 const CONTACT_TYPES = ['question', 'devis', 'partenariat', 'autre', 'partenariat_ecole', 'offre_cse', 'ambassadeur', 'evenement', 'commande'];
 const contactSchema = Joi.object({
-  name: Joi.string().min(2).max(100).required(),
+  name: Joi.string().min(2).max(100).optional().default('Anonyme'),
   email: Joi.string().email().required(),
   phone: Joi.string().allow('', null),
   company: Joi.string().allow('', null),

@@ -128,6 +128,19 @@ describe('Delivery Notes PDF', () => {
   });
 });
 
+describe('Delivery Notes Export PDF', () => {
+  test('GET /admin/exports/delivery-notes returns valid PDF', async () => {
+    const res = await request(app)
+      .get('/api/v1/admin/exports/delivery-notes')
+      .set('Authorization', `Bearer ${adminToken}`);
+
+    expect(res.status).toBe(200);
+    expect(res.headers['content-type']).toMatch(/application\/pdf/);
+    expect(res.body.length).toBeGreaterThan(500);
+    expect(res.body.slice(0, 5).toString()).toMatch(/%PDF/);
+  });
+});
+
 describe('PDF Content Integrity', () => {
   test('Activity report PDF has no NaN or undefined values', async () => {
     const res = await request(app)
@@ -150,5 +163,79 @@ describe('PDF Content Integrity', () => {
     const pdfText = res.body.toString('latin1');
     expect(pdfText).not.toMatch(/NaN/);
     expect(pdfText).not.toMatch(/undefined/);
+  });
+
+  test('Invoice PDF has no NaN or undefined and amount > 0', async () => {
+    if (!testOrderId) return;
+
+    const res = await request(app)
+      .get(`/api/v1/orders/${testOrderId}/invoice`)
+      .set('Authorization', `Bearer ${adminToken}`);
+
+    expect(res.status).toBe(200);
+    const pdfText = res.body.toString('latin1');
+    expect(pdfText).not.toMatch(/NaN/);
+    expect(pdfText).not.toMatch(/undefined/);
+  });
+});
+
+describe('Cap-Numerik footer in PDFs', () => {
+  // PDFKit encodes text as hex in TJ operators inside compressed streams.
+  // We decompress all streams and search for the hex encoding of "Cap-Numerik".
+  const zlib = require('zlib');
+  const CAP_NUMERIK_HEX = Buffer.from('Cap-Numerik').toString('hex'); // 4361702d4e756d6572696b
+
+  function pdfContainsText(buf, needle) {
+    const raw = buf.toString('binary');
+    const streamRe = /stream\r?\n([\s\S]*?)endstream/g;
+    let streamMatch;
+    while ((streamMatch = streamRe.exec(raw)) !== null) {
+      const streamBuf = Buffer.from(streamMatch[1], 'binary');
+      let content;
+      try {
+        content = zlib.inflateSync(streamBuf).toString('utf8');
+      } catch (e) {
+        content = streamBuf.toString('utf8');
+      }
+      // PDFKit encodes text as hex strings in <...> within TJ operators.
+      // Extract all hex strings and decode them to check for the needle.
+      const hexRe = /<([0-9a-f]+)>/gi;
+      let hm;
+      let decoded = '';
+      while ((hm = hexRe.exec(content)) !== null) {
+        decoded += Buffer.from(hm[1], 'hex').toString('utf8');
+      }
+      if (decoded.includes(needle)) return true;
+    }
+    return false;
+  }
+
+  test('Activity report PDF contains Cap-Numerik mention', async () => {
+    const res = await request(app)
+      .get('/api/v1/admin/exports/activity-report')
+      .set('Authorization', `Bearer ${adminToken}`);
+
+    expect(res.status).toBe(200);
+    expect(pdfContainsText(res.body, 'Cap-Numerik')).toBe(true);
+  });
+
+  test('Commissions PDF contains Cap-Numerik mention', async () => {
+    const res = await request(app)
+      .get('/api/v1/admin/exports/commissions')
+      .set('Authorization', `Bearer ${adminToken}`);
+
+    expect(res.status).toBe(200);
+    expect(pdfContainsText(res.body, 'Cap-Numerik')).toBe(true);
+  });
+
+  test('Invoice PDF contains Cap-Numerik mention', async () => {
+    if (!testOrderId) return;
+
+    const res = await request(app)
+      .get(`/api/v1/orders/${testOrderId}/invoice`)
+      .set('Authorization', `Bearer ${adminToken}`);
+
+    expect(res.status).toBe(200);
+    expect(pdfContainsText(res.body, 'Cap-Numerik')).toBe(true);
   });
 });

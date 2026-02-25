@@ -1351,6 +1351,31 @@ describe('API Integration Tests', () => {
       expect(res.status).toBe(201);
       expect(res.body.message).toBe('Message envoyé');
     });
+
+    test('POST /public/contact without name returns 201 (name optional, defaults to Anonyme)', async () => {
+      const res = await request(app)
+        .post('/api/v1/public/contact')
+        .send({
+          subject: 'question',
+          email: 'sansnom@test.fr',
+          message: 'Message envoyé sans nom, doit fonctionner avec défaut Anonyme.',
+        });
+      expect(res.status).toBe(201);
+      expect(res.body.message).toBe('Message envoyé');
+    });
+
+    test('POST /public/contact with name and subject returns 201', async () => {
+      const res = await request(app)
+        .post('/api/v1/public/contact')
+        .send({
+          subject: 'question',
+          name: 'Jean Dupont',
+          email: 'jean@test.fr',
+          message: 'Message complet avec nom et sujet, doit fonctionner normalement.',
+        });
+      expect(res.status).toBe(201);
+      expect(res.body.message).toBe('Message envoyé');
+    });
   });
 
   describe('Sprint C — Public Catalog', () => {

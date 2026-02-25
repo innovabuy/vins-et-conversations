@@ -9,7 +9,8 @@ const app = require('../index');
 const db = require('../config/database');
 
 let adminToken, studentToken;
-let campaignId, orderId;
+let campaignId, orderId, orderIdToggleOff;
+let createdOrderIds = [];
 
 beforeAll(async () => {
   await db.raw('SELECT 1');
@@ -63,14 +64,15 @@ beforeAll(async () => {
 });
 
 afterAll(async () => {
-  // Cleanup test orders
-  if (orderId) {
-    await db('financial_events').where({ order_id: orderId }).del();
-    await db('order_items').where({ order_id: orderId }).del();
-    await db('stock_movements').where({ reference: 'TEST_REPLENISH_MARGINS' }).del();
-    await db('orders').where({ id: orderId }).del();
+  // Cleanup all test orders
+  for (const oid of createdOrderIds) {
+    await db('financial_events').where({ order_id: oid }).del();
+    await db('order_items').where({ order_id: oid }).del();
+    await db('orders').where({ id: oid }).del();
   }
   await db('stock_movements').where({ reference: 'TEST_REPLENISH_MARGINS' }).del();
+  // Restore auto_validate to false
+  await db('app_settings').where({ key: 'auto_validate_orders' }).update({ value: 'false' });
 });
 
 describe('Financial Events — Append-Only Integrity', () => {
@@ -97,6 +99,7 @@ describe('Financial Events — Append-Only Integrity', () => {
 
     expect(res.status).toBe(201);
     orderId = res.body.id;
+    createdOrderIds.push(orderId);
 
     const eventsAfter = await db('financial_events').where({ campaign_id: campaignId, type: 'sale' }).count('id as cnt').first();
     const countAfter = parseInt(eventsAfter.cnt);
@@ -151,6 +154,107 @@ describe('Margin Calculation', () => {
 
     // Margin must be positive (selling price > purchase price)
     expect(expectedMargin).toBeGreaterThan(0);
+  });
+});
+
+describe('Toggle OFF — financial_event still created at order creation', () => {
+  test('createOrder() with toggle OFF still creates 1 financial_event (CA recorded at order time)', async () => {
+    if (!studentToken || !campaignId) return;
+
+    // Ensure toggle is OFF
+    await db('app_settings').where({ key: 'auto_validate_orders' }).update({ value: 'false' });
+
+    // Cancel previous student orders
+    const participation = await db('participations')
+      .join('users', 'participations.user_id', 'users.id')
+      .where({ 'participations.campaign_id': campaignId, 'users.role': 'etudiant', 'users.status': 'active' })
+      .whereNot('users.email', 'like', '%deleted%')
+      .select('users.id')
+      .orderBy('users.email')
+      .first();
+    if (participation) {
+      await db('orders')
+        .where({ user_id: participation.id })
+        .whereIn('status', ['submitted', 'validated'])
+        .update({ status: 'cancelled' });
+    }
+
+    const cp = await db('campaign_products')
+      .where({ campaign_id: campaignId, active: true }).first();
+    if (!cp) return;
+
+    const eventsBefore = await db('financial_events').count('id as cnt').first();
+    const countBefore = parseInt(eventsBefore.cnt);
+
+    const res = await request(app)
+      .post('/api/v1/orders')
+      .set('Authorization', `Bearer ${studentToken}`)
+      .send({
+        campaign_id: campaignId,
+        customer_name: 'Client Toggle OFF',
+        payment_method: 'cash',
+        items: [{ productId: cp.product_id, qty: 1 }],
+      });
+
+    expect(res.status).toBe(201);
+    expect(res.body.status).toBe('submitted');
+    orderIdToggleOff = res.body.id;
+    createdOrderIds.push(orderIdToggleOff);
+
+    // financial_event is created even with toggle OFF (CA recorded at order creation)
+    const eventsAfter = await db('financial_events').count('id as cnt').first();
+    const countAfter = parseInt(eventsAfter.cnt);
+    expect(countAfter).toBe(countBefore + 1);
+
+    // Verify the event is type=sale linked to this order
+    const orderEvent = await db('financial_events')
+      .where({ order_id: orderIdToggleOff, type: 'sale' })
+      .first();
+    expect(orderEvent).toBeDefined();
+    expect(parseFloat(orderEvent.amount)).toBeGreaterThan(0);
+  });
+});
+
+describe('Margin with free bottle deduction', () => {
+  test('free bottle cost = purchase_price of cheapest alcohol product in order', async () => {
+    if (!orderId) return;
+
+    // Get order items with purchase prices
+    const items = await db('order_items')
+      .join('products', 'order_items.product_id', 'products.id')
+      .leftJoin('product_categories', 'products.category_id', 'product_categories.id')
+      .where({ 'order_items.order_id': orderId, 'order_items.type': 'product' })
+      .select(
+        'order_items.qty',
+        'order_items.unit_price_ht',
+        'products.purchase_price',
+        'products.name',
+        'product_categories.is_alcohol'
+      );
+
+    expect(items.length).toBeGreaterThan(0);
+
+    // Compute gross margin
+    let grossMargin = 0;
+    for (const item of items) {
+      grossMargin += item.qty * (parseFloat(item.unit_price_ht) - parseFloat(item.purchase_price));
+    }
+    grossMargin = parseFloat(grossMargin.toFixed(2));
+
+    // Find cheapest alcohol product purchase_price (same logic as rulesEngine.calculateFreeBottleCost)
+    const alcoholItems = items.filter(i => i.is_alcohol !== false);
+    if (alcoholItems.length === 0) return; // skip if no alcohol items
+
+    const cheapestCost = Math.min(...alcoholItems.map(i => parseFloat(i.purchase_price)));
+    expect(cheapestCost).toBeGreaterThan(0);
+
+    // Net margin with free bottle = gross margin - cheapest purchase_price
+    const netMargin = parseFloat((grossMargin - cheapestCost).toFixed(2));
+
+    // Net margin should be less than gross margin
+    expect(netMargin).toBeLessThan(grossMargin);
+    // Net margin should still be a reasonable number (not negative for normal orders)
+    expect(netMargin).toBeGreaterThanOrEqual(0);
   });
 });
 

@@ -104,8 +104,8 @@ router.put('/', authenticate, requireRole('super_admin'), auditAction('app_setti
     const stripeKeys = Object.keys(updates).filter((k) => k.startsWith('stripe_'));
     if (stripeKeys.length > 0) {
       try {
-        const { resetStripeCache } = require('../services/stripeService');
-        resetStripeCache();
+        const { resetProviderCache } = require('../services/paymentService');
+        resetProviderCache();
       } catch (e) { /* ignore if not yet available */ }
     }
 

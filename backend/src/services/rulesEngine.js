@@ -163,6 +163,15 @@ async function calculateFunds(campaignId, userId, commissionRules) {
  * @returns {Object} { earned, used, available, totalSold, threshold, nextIn }
  */
 async function calculateFreeBottles(userId, campaignId, freeBottleRules) {
+  // Check per-participant free_bottle_enabled flag first (V4.3)
+  const participation = await db('participations')
+    .where({ user_id: userId, campaign_id: campaignId })
+    .select('config')
+    .first();
+  if (participation?.config?.free_bottle_enabled === false) {
+    return { earned: 0, used: 0, available: 0, totalSold: 0, threshold: 0, nextIn: 0, cost_per_bottle: 0, disabled: true };
+  }
+
   if (!freeBottleRules?.trigger || freeBottleRules.trigger !== 'every_n_sold') {
     return { earned: 0, used: 0, available: 0, totalSold: 0, threshold: 0, nextIn: 0, cost_per_bottle: 0 };
   }
@@ -280,19 +289,25 @@ async function calculateFreeBottleCost(orderId, freeBottleRules) {
  * @param {Object} tierRules - Rules JSONB
  * @returns {Object} { current, next, ca, progress }
  */
-async function calculateTier(userId, tierRules) {
+async function calculateTier(userId, tierRules, options = {}) {
   if (!tierRules?.tiers?.length) {
     return { current: null, next: null, ca: 0, progress: 0 };
   }
 
-  // CA total de l'ambassadeur (ventes directes + ventes via lien de parrainage)
-  const caResult = await db('orders')
-    .where(function () {
+  // If campaignId provided (CSE mode), use all campaign orders CA
+  // Otherwise (ambassador mode), use user's direct + referral orders
+  let caQuery = db('orders')
+    .whereIn('status', ['validated', 'preparing', 'shipped', 'delivered']);
+
+  if (options.campaignId) {
+    caQuery = caQuery.where({ campaign_id: options.campaignId });
+  } else {
+    caQuery = caQuery.where(function () {
       this.where({ user_id: userId }).orWhere({ referred_by: userId });
-    })
-    .whereIn('status', ['validated', 'preparing', 'shipped', 'delivered'])
-    .sum('total_ttc as total')
-    .first();
+    });
+  }
+
+  const caResult = await caQuery.sum('total_ttc as total').first();
 
   const ca = parseFloat(caResult?.total || 0);
   const tiers = tierRules.tiers.sort((a, b) => a.threshold - b.threshold);

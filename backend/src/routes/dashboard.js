@@ -162,7 +162,7 @@ router.get(
         .join('client_types', 'campaigns.client_type_id', 'client_types.id')
         .where('campaigns.id', campaignId)
         .whereNull('campaigns.deleted_at')
-        .select('campaigns.*', 'client_types.pricing_rules')
+        .select('campaigns.*', 'client_types.pricing_rules', 'client_types.tier_rules')
         .first();
 
       if (!campaign) return res.status(404).json({ error: 'CAMPAIGN_NOT_FOUND' });
@@ -248,6 +248,12 @@ router.get(
       const campaignProgress = campaignGoal > 0 ? Math.round((campaignCaTTC / campaignGoal) * 100) : 0;
       const deliveryFreeThreshold = parseFloat(campConfig.delivery_free_threshold || 0);
 
+      // CSE tier progression
+      const tierRules = typeof campaign.tier_rules === 'string'
+        ? JSON.parse(campaign.tier_rules) : (campaign.tier_rules || {});
+      const rulesEngine = require('../services/rulesEngine');
+      const tier = await rulesEngine.calculateTier(req.user.userId, tierRules, { campaignId });
+
       res.json({
         products: productsWithCSE,
         orders,
@@ -260,6 +266,9 @@ router.get(
         campaign_goal: campaignGoal,
         campaign_progress: campaignProgress,
         delivery_free_threshold: deliveryFreeThreshold,
+        current_tier: tier.current,
+        next_tier: tier.next,
+        tier_progress_pct: tier.progress,
       });
     } catch (err) {
       res.status(500).json({ error: 'SERVER_ERROR', message: err.message });
@@ -358,6 +367,9 @@ router.get(
       // Alcohol-free flag
       const campaignData = await db('campaigns').where({ id: campaignId }).select('alcohol_free').first();
 
+      // Free bottles (12+1) — respects per-ambassador free_bottle_enabled flag
+      const freeBottles = await rulesEngine.calculateFreeBottles(req.user.userId, campaignId, rules.freeBottle);
+
       res.json({
         campaignId,
         alcohol_free: campaignData?.alcohol_free || false,
@@ -373,6 +385,7 @@ router.get(
           bottles: parseInt(referralOrders?.total_bottles || 0, 10),
         },
         gains,
+        free_bottles: freeBottles,
         ui: rules.ui,
       });
     } catch (err) {

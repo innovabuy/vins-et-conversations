@@ -1,5 +1,5 @@
 const express = require('express');
-const stripeService = require('../services/stripeService');
+const paymentService = require('../services/paymentService');
 const { authenticate, requireRole } = require('../middleware/auth');
 const { auditAction } = require('../middleware/audit');
 
@@ -17,7 +17,7 @@ router.post(
       if (!order_id) {
         return res.status(400).json({ error: 'VALIDATION_ERROR', message: 'order_id requis' });
       }
-      const result = await stripeService.createPaymentIntent(order_id);
+      const result = await paymentService.createPaymentIntent(order_id);
       res.json(result);
     } catch (err) {
       if (err.message === 'ORDER_NOT_FOUND') {

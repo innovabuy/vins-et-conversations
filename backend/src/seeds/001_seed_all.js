@@ -314,7 +314,17 @@ exports.seed = async function (knex) {
       pricing_rules: JSON.stringify({ type: 'percentage_discount', value: 10, applies_to: 'all', min_order: 200 }),
       commission_rules: JSON.stringify({}),
       free_bottle_rules: JSON.stringify({}),
-      tier_rules: JSON.stringify({ tiers: [] }),
+      tier_rules: JSON.stringify({
+        tiers: [
+          { label: 'Palier 1', threshold: 500,  reward: 'Bon cadeau 25€',      color: '#6B7280' },
+          { label: 'Palier 2', threshold: 1000, reward: 'Bon cadeau 50€',      color: '#3B82F6' },
+          { label: 'Palier 3', threshold: 2000, reward: 'Bon cadeau 100€',     color: '#10B981' },
+          { label: 'Palier 4', threshold: 3500, reward: 'Bon cadeau 200€',     color: '#F59E0B' },
+          { label: 'Palier 5', threshold: 5000, reward: 'Événement privatif',  color: '#8B5CF6' },
+        ],
+        period: 'cumulative',
+        reset: 'never',
+      }),
       ui_config: JSON.stringify({
         show_ranking: false,
         show_streak: false,
@@ -751,6 +761,7 @@ exports.seed = async function (knex) {
       organization_id: IDS.reseau_loire,
       role_in_campaign: 'ambassador',
       referral_code: 'AMB-JPMRT001',
+      config: JSON.stringify({ free_bottle_enabled: true }),
     },
     {
       user_id: IDS.ambassadeur2,
@@ -758,6 +769,7 @@ exports.seed = async function (knex) {
       organization_id: IDS.reseau_loire,
       role_in_campaign: 'ambassador',
       referral_code: 'AMB-MDURA002',
+      config: JSON.stringify({ free_bottle_enabled: true }),
     },
   ]);
 
@@ -1019,11 +1031,13 @@ exports.seed = async function (knex) {
   const referralContact2 = uuidv4();
   const ambassadorContact1 = uuidv4();
   const ambassadorContact2 = uuidv4();
+  const ambassadorContact3 = uuidv4();
   await knex('contacts').insert([
     { id: referralContact1, name: 'Marie Referral', email: 'marie.ref@example.fr', phone: '0612345678', source: 'referral:ACKAVONG Mathéo' },
     { id: referralContact2, name: 'Pierre Referral', email: 'pierre.ref@example.fr', phone: '0698765432', source: 'referral:ACKAVONG Mathéo' },
     { id: ambassadorContact1, name: 'Sophie Laurent', email: 'sophie.laurent@example.fr', phone: '0611223344', type: 'ambassadeur', show_on_public_page: true, ambassador_bio: 'Passionnée de vins de Loire depuis 15 ans, je partage ma passion avec mon réseau.', region_id: regionPDL?.id || null, source_user_id: IDS.ambassadeur1 },
     { id: ambassadorContact2, name: 'Marc Dupont', email: 'marc.dupont@example.fr', phone: '0655667788', type: 'ambassadeur', show_on_public_page: true, ambassador_bio: 'Amateur de vins et entrepreneur, je recommande les cuvées Vins & Conversations à mes partenaires.', region_id: regionBretagne?.id || null, source_user_id: IDS.ambassadeur2 },
+    { id: ambassadorContact3, name: 'Claire Moreau', email: 'claire.moreau@example.fr', phone: '0677889900', type: 'ambassadeur', show_on_public_page: true, ambassador_bio: 'Sommelière de formation, j\'organise des dégustations privées avec les vins de Nicolas.', region_id: regionPDL?.id || null },
   ]);
 
   const refOrder1Id = uuidv4();

@@ -132,4 +132,35 @@ router.get('/pending', authenticate, requireRole('super_admin', 'commercial'), a
   }
 });
 
+// PATCH /admin/free-bottles/toggle — Toggle free_bottle_enabled for a participant
+router.patch('/toggle', authenticate, requireRole('super_admin', 'commercial'), auditAction('free_bottles'), async (req, res) => {
+  try {
+    const { user_id, campaign_id, enabled } = req.body;
+
+    if (!user_id || !campaign_id || typeof enabled !== 'boolean') {
+      return res.status(400).json({ error: 'MISSING_FIELDS', message: 'user_id, campaign_id et enabled (boolean) requis' });
+    }
+
+    const participation = await db('participations')
+      .where({ user_id, campaign_id })
+      .first();
+    if (!participation) {
+      return res.status(404).json({ error: 'NOT_PARTICIPANT', message: 'Participation introuvable' });
+    }
+
+    const currentConfig = typeof participation.config === 'string'
+      ? JSON.parse(participation.config) : (participation.config || {});
+    currentConfig.free_bottle_enabled = enabled;
+
+    await db('participations')
+      .where({ user_id, campaign_id })
+      .update({ config: JSON.stringify(currentConfig) });
+
+    res.json({ success: true, free_bottle_enabled: enabled });
+  } catch (err) {
+    console.error('Free bottle toggle error:', err);
+    res.status(500).json({ error: 'SERVER_ERROR', message: err.message });
+  }
+});
+
 module.exports = router;

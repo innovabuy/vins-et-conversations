@@ -1,5 +1,5 @@
 const express = require('express');
-const stripeService = require('../services/stripeService');
+const paymentService = require('../services/paymentService');
 const logger = require('../utils/logger');
 
 const router = express.Router();
@@ -8,7 +8,7 @@ const router = express.Router();
 router.post('/stripe', express.raw({ type: 'application/json' }), async (req, res) => {
   try {
     const signature = req.headers['stripe-signature'];
-    const result = await stripeService.handleWebhook(req.body, signature);
+    const result = await paymentService.handleWebhook(req.body, signature);
     res.json(result);
   } catch (err) {
     if (err.message === 'INVALID_SIGNATURE') {
