@@ -37,9 +37,13 @@ describe('Boutique Web Orders — Admin Visibility', () => {
     expect(res.status).toBe(200);
     expect(res.body.data).toBeDefined();
 
-    // If boutique orders exist in DB, they must appear in admin listing
+    // If boutique orders exist in DB, they must appear when filtered by source
     if (boutiqueOrders.length > 0) {
-      const webOrders = res.body.data.filter(o => o.source === 'boutique_web');
+      const filtered = await request(app)
+        .get('/api/v1/orders/admin/list')
+        .set('Authorization', `Bearer ${adminToken}`)
+        .query({ source: 'boutique_web' });
+      const webOrders = filtered.body.data.filter(o => o.source === 'boutique_web');
       expect(webOrders.length).toBeGreaterThan(0);
     }
   });

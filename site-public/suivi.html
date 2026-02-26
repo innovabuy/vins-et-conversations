@@ -55,10 +55,13 @@
       font-weight: 600;
       margin-bottom: 20px;
     }
-    .status-pending { background: #fff3cd; color: #856404; }
-    .status-confirmed { background: #d1ecf1; color: #0c5460; }
+    .status-pending, .status-pending_payment { background: #fff3cd; color: #856404; }
+    .status-submitted { background: #d1ecf1; color: #0c5460; }
+    .status-confirmed, .status-validated { background: #d1ecf1; color: #0c5460; }
+    .status-preparing { background: #cce5ff; color: #004085; }
     .status-shipped { background: #d4edda; color: #155724; }
     .status-delivered { background: #d4edda; color: #155724; }
+    .status-cancelled { background: #f8d7da; color: #721c24; }
 
     .tracking-items {
       background: var(--cream);
@@ -282,11 +285,15 @@
 
         const order = await res.json();
         const statusLabels = {
-          pending: 'En attente',
-          confirmed: 'Confirmée',
-          shipped: 'Expédiée',
-          delivered: 'Livrée',
-          cancelled: 'Annulée',
+          submitted:       'Commande reçue',
+          pending_payment: 'En attente de paiement',
+          validated:       'Validée',
+          preparing:       'En préparation',
+          shipped:         'Expédiée',
+          delivered:       'Livrée',
+          cancelled:       'Annulée',
+          confirmed:       'Confirmée',
+          pending:         'En attente',
         };
         const statusClass = `status-${order.status || 'pending'}`;
 
@@ -297,13 +304,13 @@
             <div class="tracking-items">
               ${(order.items || []).map(item => `
                 <div class="tracking-item">
-                  <span>${escapeHtml(item.product_name || item.name)} x${item.quantity || item.qty}</span>
-                  <span>${parseFloat(item.total || item.price * item.quantity).toFixed(2)} &euro;</span>
+                  <span>${escapeHtml(item.name)} x${item.qty}</span>
+                  <span>${(parseFloat(item.unit_price_ttc) * item.qty).toFixed(2)} &euro;</span>
                 </div>
               `).join('')}
               <div class="tracking-total">
                 <span>Total</span>
-                <span>${parseFloat(order.total || 0).toFixed(2)} &euro; TTC</span>
+                <span>${parseFloat(order.total_ttc || 0).toFixed(2)} &euro; TTC</span>
               </div>
             </div>
           </div>

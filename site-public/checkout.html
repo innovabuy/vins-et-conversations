@@ -85,8 +85,22 @@
       <div class="checkout-layout" id="checkout-layout">
         <!-- Left: Form -->
         <div class="checkout-form">
-          <h2>Informations de livraison</h2>
+          <h2>Mode de livraison</h2>
           <form id="checkout-form" novalidate>
+            <div class="delivery-choice" style="display:flex;gap:12px;margin-bottom:24px;">
+              <label class="delivery-option" style="flex:1;padding:16px;border:2px solid var(--wine);border-radius:var(--radius);cursor:pointer;text-align:center;background:var(--cream);">
+                <input type="radio" name="delivery_type" value="home_delivery" checked style="margin-bottom:6px;">
+                <div style="font-weight:600;font-size:0.95rem;">Livraison à domicile</div>
+                <div style="font-size:0.8rem;color:var(--text-light);">Frais calculés selon le poids</div>
+              </label>
+              <label class="delivery-option" style="flex:1;padding:16px;border:2px solid var(--cream-dark);border-radius:var(--radius);cursor:pointer;text-align:center;">
+                <input type="radio" name="delivery_type" value="click_and_collect" style="margin-bottom:6px;">
+                <div style="font-weight:600;font-size:0.95rem;">Click & Collect</div>
+                <div style="font-size:0.8rem;color:var(--text-light);">Retrait sur place — gratuit</div>
+              </label>
+            </div>
+
+            <h2>Vos coordonnées</h2>
             <div class="form-row">
               <div class="form-group">
                 <label for="first_name">Prénom *</label>
@@ -105,18 +119,20 @@
               <label for="phone">Téléphone *</label>
               <input type="tel" id="phone" name="phone" required placeholder="06 12 34 56 78">
             </div>
-            <div class="form-group">
-              <label for="address">Adresse *</label>
-              <input type="text" id="address" name="address" required>
-            </div>
-            <div class="form-row">
+            <div id="address-fields">
               <div class="form-group">
-                <label for="postal_code">Code postal *</label>
-                <input type="text" id="postal_code" name="postal_code" required maxlength="5" pattern="[0-9]{5}" placeholder="49000">
+                <label for="address">Adresse *</label>
+                <input type="text" id="address" name="address" required>
               </div>
-              <div class="form-group">
-                <label for="city">Ville *</label>
-                <input type="text" id="city" name="city" required>
+              <div class="form-row">
+                <div class="form-group">
+                  <label for="postal_code">Code postal *</label>
+                  <input type="text" id="postal_code" name="postal_code" required maxlength="5" pattern="[0-9]{5}" placeholder="49000">
+                </div>
+                <div class="form-group">
+                  <label for="city">Ville *</label>
+                  <input type="text" id="city" name="city" required>
+                </div>
               </div>
             </div>
 
@@ -251,10 +267,59 @@
       }
 
       renderSummary(items);
+      setupDeliveryToggle();
       setupShippingCalc();
+      showReferralBadge();
       await initStripe();
       setupFormSubmit();
     });
+
+    function showReferralBadge() {
+      const ref = new URLSearchParams(window.location.search).get('ref');
+      if (!ref) return;
+      const summary = document.getElementById('checkout-summary');
+      if (!summary) return;
+      const badge = document.createElement('div');
+      badge.style.cssText = 'background:var(--cream);border:1px solid var(--gold);border-radius:var(--radius);padding:10px 16px;margin-bottom:16px;font-size:0.9rem;color:var(--wine);';
+      badge.innerHTML = 'Code parrainage actif : <strong>' + escapeHtml(ref) + '</strong>';
+      summary.prepend(badge);
+    }
+
+    function setupDeliveryToggle() {
+      const radios = document.querySelectorAll('input[name="delivery_type"]');
+      const addressFields = document.getElementById('address-fields');
+      const options = document.querySelectorAll('.delivery-option');
+
+      function updateState() {
+        const selected = document.querySelector('input[name="delivery_type"]:checked').value;
+        const isDelivery = selected === 'home_delivery';
+
+        // Toggle address fields visibility and required
+        addressFields.style.display = isDelivery ? 'block' : 'none';
+        addressFields.querySelectorAll('input').forEach(inp => {
+          inp.required = isDelivery;
+          if (!isDelivery) inp.value = '';
+        });
+
+        // Toggle border style
+        options.forEach(opt => {
+          const radio = opt.querySelector('input[type="radio"]');
+          opt.style.borderColor = radio.checked ? 'var(--wine)' : 'var(--cream-dark)';
+          opt.style.background = radio.checked ? 'var(--cream)' : 'transparent';
+        });
+
+        // Update shipping display
+        const shippingLine = document.getElementById('shipping-cost');
+        if (shippingLine && !isDelivery) {
+          shippingCost = 0;
+          shippingLine.textContent = 'Gratuit';
+          document.getElementById('total-price').textContent = Cart.getTotal().toFixed(2) + ' \u20ac';
+        }
+      }
+
+      radios.forEach(r => r.addEventListener('change', updateState));
+      updateState();
+    }
 
     async function initStripe() {
       try {
@@ -417,15 +482,20 @@
           const sessionId = cartData.session_id;
 
           // Step 2: Create order via checkout
+          const deliveryType = document.querySelector('input[name="delivery_type"]:checked').value;
+          const urlParams = new URLSearchParams(window.location.search);
+          const referralCode = urlParams.get('ref') || null;
           const orderPayload = {
             session_id: sessionId,
+            delivery_type: deliveryType,
+            referral_code: referralCode,
             customer: {
               name: `${firstName} ${lastName}`,
               email: email,
               phone: document.getElementById('phone').value.trim(),
-              address: document.getElementById('address').value.trim(),
-              city: document.getElementById('city').value.trim(),
-              postal_code: document.getElementById('postal_code').value.trim(),
+              address: document.getElementById('address').value.trim() || null,
+              city: document.getElementById('city').value.trim() || null,
+              postal_code: document.getElementById('postal_code').value.trim() || null,
             },
           };
 
