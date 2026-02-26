@@ -56,7 +56,7 @@ afterAll(async () => {
 });
 
 describe('Manual Free Bottle Recording', () => {
-  test('GET /admin/free-bottles/pending returns list', async () => {
+  test('GET /admin/free-bottles/pending returns students and products', async () => {
     if (!campaignId) return;
 
     const res = await request(app)
@@ -67,6 +67,14 @@ describe('Manual Free Bottle Recording', () => {
     expect(res.body).toHaveProperty('data');
     expect(Array.isArray(res.body.data)).toBe(true);
     expect(res.body).toHaveProperty('total');
+    // Products list must be present (alcohol products for this campaign)
+    expect(res.body).toHaveProperty('products');
+    expect(Array.isArray(res.body.products)).toBe(true);
+    if (res.body.products.length > 0) {
+      expect(res.body.products[0]).toHaveProperty('id');
+      expect(res.body.products[0]).toHaveProperty('name');
+      expect(res.body.products[0]).toHaveProperty('purchase_price');
+    }
   });
 
   test('GET /admin/free-bottles/pending without campaign_id returns 400', async () => {
@@ -93,6 +101,16 @@ describe('Manual Free Bottle Recording', () => {
       .post('/api/v1/admin/free-bottles/record')
       .set('Authorization', `Bearer ${adminToken}`)
       .send({ user_id: studentUserId });
+
+    expect(res.status).toBe(400);
+    expect(res.body.error).toBe('MISSING_FIELDS');
+  });
+
+  test('POST /admin/free-bottles/record with product_id null returns 400', async () => {
+    const res = await request(app)
+      .post('/api/v1/admin/free-bottles/record')
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send({ user_id: studentUserId, campaign_id: campaignId, product_id: null });
 
     expect(res.status).toBe(400);
     expect(res.body.error).toBe('MISSING_FIELDS');

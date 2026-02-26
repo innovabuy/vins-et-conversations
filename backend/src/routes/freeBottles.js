@@ -125,7 +125,16 @@ router.get('/pending', authenticate, requireRole('super_admin', 'commercial'), a
       }
     }
 
-    res.json({ data: results, total: results.length });
+    // Fetch alcohol products available in this campaign
+    const products = await db('campaign_products')
+      .join('products', 'campaign_products.product_id', 'products.id')
+      .join('product_categories', 'products.category_id', 'product_categories.id')
+      .where({ 'campaign_products.campaign_id': campaign_id, 'campaign_products.active': true, 'products.active': true })
+      .where('product_categories.is_alcohol', true)
+      .select('products.id', 'products.name', 'products.purchase_price')
+      .orderBy('products.purchase_price', 'asc');
+
+    res.json({ data: results, products, total: results.length });
   } catch (err) {
     console.error('Free bottles pending error:', err);
     res.status(500).json({ error: 'SERVER_ERROR', message: err.message });

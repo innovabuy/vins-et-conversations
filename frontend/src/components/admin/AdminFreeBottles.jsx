@@ -6,6 +6,8 @@ export default function AdminFreeBottles() {
   const [campaignId, setCampaignId] = useState('');
   const [campaigns, setCampaigns] = useState([]);
   const [pending, setPending] = useState([]);
+  const [products, setProducts] = useState([]);
+  const [selectedProduct, setSelectedProduct] = useState({});
   const [loading, setLoading] = useState(false);
   const [toggling, setToggling] = useState({});
   const [msg, setMsg] = useState(null);
@@ -23,9 +25,23 @@ export default function AdminFreeBottles() {
     setLoading(true);
     try {
       const res = await freeBottlesAPI.pending(cid);
-      setPending(res.data?.data || []);
+      const students = res.data?.data || [];
+      const prods = res.data?.products || [];
+      setPending(students);
+      setProducts(prods);
+      // Pre-select cheapest product (first in list, sorted by purchase_price asc)
+      if (prods.length > 0) {
+        const cheapest = prods[0].id;
+        const defaults = {};
+        students.forEach((s) => { defaults[s.user_id] = cheapest; });
+        setSelectedProduct(defaults);
+      } else {
+        setSelectedProduct({});
+      }
     } catch {
       setPending([]);
+      setProducts([]);
+      setSelectedProduct({});
     } finally {
       setLoading(false);
     }
@@ -49,7 +65,12 @@ export default function AdminFreeBottles() {
     }
   };
 
-  const handleRecord = async (userId, productId) => {
+  const handleRecord = async (userId) => {
+    const productId = selectedProduct[userId];
+    if (!productId) {
+      setMsg({ type: 'error', text: 'Sélectionnez un produit' });
+      return;
+    }
     try {
       await freeBottlesAPI.record({ user_id: userId, campaign_id: campaignId, product_id: productId });
       setMsg({ type: 'success', text: 'Bouteille gratuite enregistrée' });
@@ -103,18 +124,28 @@ export default function AdminFreeBottles() {
           ) : (
             <div className="space-y-3">
               {pending.map((p) => (
-                <div key={p.user_id} className="flex items-center justify-between border-b pb-3">
-                  <div>
+                <div key={p.user_id} className="flex items-center justify-between border-b pb-3 gap-3">
+                  <div className="min-w-0 flex-1">
                     <p className="font-medium text-sm">{p.user_name}</p>
                     <p className="text-xs text-gray-500">{p.user_email}</p>
                     <p className="text-xs text-gray-600 mt-1">
                       {p.totalSold} vendues · {p.earned} gagnées · {p.used} récupérées · <span className="font-semibold text-wine-700">{p.available} disponible(s)</span>
                     </p>
                   </div>
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2 flex-shrink-0">
+                    <select
+                      value={selectedProduct[p.user_id] || ''}
+                      onChange={(e) => setSelectedProduct((prev) => ({ ...prev, [p.user_id]: e.target.value }))}
+                      className="border rounded-lg px-2 py-1.5 text-xs max-w-[180px]"
+                    >
+                      <option value="">— Produit —</option>
+                      {products.map((prod) => (
+                        <option key={prod.id} value={prod.id}>{prod.name}</option>
+                      ))}
+                    </select>
                     <button
-                      onClick={() => handleRecord(p.user_id, null)}
-                      disabled={p.available <= 0}
+                      onClick={() => handleRecord(p.user_id)}
+                      disabled={p.available <= 0 || !selectedProduct[p.user_id]}
                       className="text-xs bg-wine-50 text-wine-700 px-3 py-1.5 rounded-lg hover:bg-wine-100 disabled:opacity-50"
                       title="Enregistrer comme récupérée"
                     >
