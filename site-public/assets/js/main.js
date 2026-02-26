@@ -154,19 +154,46 @@ async function loadFeaturedWines() {
       featuredWines = wines.slice(0, 4);
       grid.innerHTML = featuredWines.map((w, i) => renderWineCard(w, i)).join('');
       grid.querySelectorAll('.btn-add-cart').forEach(btn => btn.addEventListener('click', onAddToCart));
-      grid.querySelectorAll('.wine-card').forEach(card => {
-        card.style.cursor = 'pointer';
-        card.addEventListener('click', (e) => {
-          if (e.target.closest('.btn-add-cart')) return;
-          const idx = parseInt(card.dataset.wineIndex);
-          openWineModal(idx);
-        });
-      });
+      attachCardClickListeners(grid);
     }
   } catch (err) {
     console.warn('Featured wines fallback to static', err);
+    buildFeaturedFromStaticCards(grid);
     grid.querySelectorAll('.btn-add-cart').forEach(btn => btn.addEventListener('click', onAddToCart));
+    attachCardClickListeners(grid);
   }
+}
+
+function attachCardClickListeners(grid) {
+  grid.querySelectorAll('.wine-card').forEach(card => {
+    card.addEventListener('click', (e) => {
+      if (e.target.closest('.btn-add-cart')) return;
+      const idx = parseInt(card.dataset.wineIndex);
+      if (!isNaN(idx)) openWineModal(idx);
+    });
+  });
+}
+
+function buildFeaturedFromStaticCards(grid) {
+  const cards = grid.querySelectorAll('.wine-card');
+  featuredWines = [];
+  cards.forEach((card, i) => {
+    card.dataset.wineIndex = i;
+    const btn = card.querySelector('.btn-add-cart');
+    const h3 = card.querySelector('h3');
+    const appEl = card.querySelector('.appellation');
+    const img = card.querySelector('.wine-card-img img');
+    const badgeEl = card.querySelector('.wine-badge');
+    const priceEl = card.querySelector('.wine-price');
+    featuredWines.push({
+      id: btn ? btn.dataset.id : '',
+      name: h3 ? h3.textContent : '',
+      appellation: appEl ? appEl.textContent : '',
+      image_url: img ? img.src : '',
+      label: badgeEl ? badgeEl.textContent : '',
+      price_ttc: priceEl ? parseFloat(priceEl.textContent) || 0 : 0,
+    });
+  });
 }
 
 function renderWineCard(w, index) {

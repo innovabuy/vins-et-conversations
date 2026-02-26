@@ -469,6 +469,7 @@ h1, h2, h3, h4 {
   text-align: center;
   display: flex;
   flex-direction: column;
+  cursor: pointer;
 }
 
 .wine-card:hover {
@@ -1203,7 +1204,8 @@ h1, h2, h3, h4 {
 
 .btn-add-cart {
   margin-top: 12px;
-  width: 100%;
+  width: auto;
+  align-self: center;
   justify-content: center;
 }
 
