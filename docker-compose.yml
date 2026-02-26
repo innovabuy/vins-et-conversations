@@ -46,9 +46,9 @@ services:
       JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET:-vc_refresh_secret_dev_change_in_prod}
       STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY:-sk_test_placeholder}
       STRIPE_WEBHOOK_SECRET: ${STRIPE_WEBHOOK_SECRET:-whsec_placeholder}
-      SITE_PUBLIC_URL: ${SITE_PUBLIC_URL:-http://31.97.57.103:8082}
-      FRONTEND_URL: ${FRONTEND_URL:-http://31.97.57.103:5173}
-      BASE_URL: ${BASE_URL:-http://31.97.57.103:5173}
+      SITE_PUBLIC_URL: ${SITE_PUBLIC_URL:-http://76.13.44.13:8082}
+      FRONTEND_URL: ${FRONTEND_URL:-http://76.13.44.13:5173}
+      BASE_URL: ${BASE_URL:-http://76.13.44.13:5173}
     ports:
       - "3001:3001"
     volumes:
@@ -68,7 +68,7 @@ services:
     container_name: vc-frontend
     restart: always
     environment:
-      VITE_API_URL: ${API_URL:-http://31.97.57.103:3001/api/v1}
+      VITE_API_URL: ${API_URL:-http://76.13.44.13:3001/api/v1}
     ports:
       - "5173:5173"
     volumes:
