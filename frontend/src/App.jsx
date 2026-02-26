@@ -57,6 +57,7 @@ import CustomerDashboard from './components/customer/CustomerDashboard';
 import { AppSettingsProvider } from './contexts/AppSettingsContext';
 import { SiteImagesProvider } from './contexts/SiteImagesContext';
 import InviteRegisterPage from './pages/InviteRegisterPage';
+import InviteErrorPage from './pages/InviteErrorPage';
 import AmbassadorsPage from './components/public/AmbassadorsPage';
 
 function ProtectedRoute({ children, roles }) {
@@ -73,6 +74,7 @@ function AppRoutes() {
   return (
     <Routes>
       <Route path="/login" element={<LoginPage />} />
+      <Route path="/invite" element={<InviteErrorPage />} />
       <Route path="/invite/:code" element={<InviteRegisterPage />} />
       <Route path="/installer" element={<InstallGuide />} />
 
