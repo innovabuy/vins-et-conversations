@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { freeBottlesAPI, campaignsAPI } from '../../services/api';
-import { Gift, Check } from 'lucide-react';
+import { Gift, Check, Award } from 'lucide-react';
 
 export default function AdminFreeBottles() {
   const [campaignId, setCampaignId] = useState('');
@@ -8,6 +8,7 @@ export default function AdminFreeBottles() {
   const [pending, setPending] = useState([]);
   const [products, setProducts] = useState([]);
   const [selectedProduct, setSelectedProduct] = useState({});
+  const [ambassadors, setAmbassadors] = useState([]);
   const [loading, setLoading] = useState(false);
   const [toggling, setToggling] = useState({});
   const [msg, setMsg] = useState(null);
@@ -24,11 +25,15 @@ export default function AdminFreeBottles() {
     if (!cid) return;
     setLoading(true);
     try {
-      const res = await freeBottlesAPI.pending(cid);
-      const students = res.data?.data || [];
-      const prods = res.data?.products || [];
+      const [pendingRes, ambaRes] = await Promise.all([
+        freeBottlesAPI.pending(cid),
+        freeBottlesAPI.ambassadors(cid),
+      ]);
+      const students = pendingRes.data?.data || [];
+      const prods = pendingRes.data?.products || [];
       setPending(students);
       setProducts(prods);
+      setAmbassadors(ambaRes.data?.data || []);
       // Pre-select cheapest product (first in list, sorted by purchase_price asc)
       if (prods.length > 0) {
         const cheapest = prods[0].id;
@@ -42,6 +47,7 @@ export default function AdminFreeBottles() {
       setPending([]);
       setProducts([]);
       setSelectedProduct({});
+      setAmbassadors([]);
     } finally {
       setLoading(false);
     }
@@ -111,53 +117,89 @@ export default function AdminFreeBottles() {
         </select>
       </div>
 
-      {/* Pending list */}
       {campaignId && (
-        <div className="card">
-          <h2 className="font-semibold mb-3">Étudiants avec bouteilles gratuites disponibles</h2>
-          {loading ? (
-            <div className="flex justify-center py-8">
-              <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-wine-700" />
-            </div>
-          ) : pending.length === 0 ? (
-            <p className="text-gray-500 text-sm py-4">Aucun étudiant n'a de bouteilles gratuites en attente pour cette campagne.</p>
-          ) : (
-            <div className="space-y-3">
-              {pending.map((p) => (
-                <div key={p.user_id} className="flex items-center justify-between border-b pb-3 gap-3">
-                  <div className="min-w-0 flex-1">
-                    <p className="font-medium text-sm">{p.user_name}</p>
-                    <p className="text-xs text-gray-500">{p.user_email}</p>
-                    <p className="text-xs text-gray-600 mt-1">
-                      {p.totalSold} vendues · {p.earned} gagnées · {p.used} récupérées · <span className="font-semibold text-wine-700">{p.available} disponible(s)</span>
-                    </p>
-                  </div>
-                  <div className="flex items-center gap-2 flex-shrink-0">
-                    <select
-                      value={selectedProduct[p.user_id] || ''}
-                      onChange={(e) => setSelectedProduct((prev) => ({ ...prev, [p.user_id]: e.target.value }))}
-                      className="border rounded-lg px-2 py-1.5 text-xs max-w-[180px]"
-                    >
-                      <option value="">— Produit —</option>
-                      {products.map((prod) => (
-                        <option key={prod.id} value={prod.id}>{prod.name}</option>
-                      ))}
-                    </select>
+        <>
+          {/* Ambassadors toggle section */}
+          {ambassadors.length > 0 && (
+            <div className="card mb-4">
+              <div className="flex items-center gap-2 mb-3">
+                <Award size={18} className="text-purple-600" />
+                <h2 className="font-semibold">Ambassadeurs — Programme 12+1</h2>
+              </div>
+              <div className="space-y-2">
+                {ambassadors.map((a) => (
+                  <div key={a.user_id} className="flex items-center justify-between border-b pb-2">
+                    <div>
+                      <p className="font-medium text-sm">{a.user_name}</p>
+                      <p className="text-xs text-gray-500">{a.user_email}</p>
+                    </div>
                     <button
-                      onClick={() => handleRecord(p.user_id)}
-                      disabled={p.available <= 0 || !selectedProduct[p.user_id]}
-                      className="text-xs bg-wine-50 text-wine-700 px-3 py-1.5 rounded-lg hover:bg-wine-100 disabled:opacity-50"
-                      title="Enregistrer comme récupérée"
+                      onClick={() => handleToggle(a.user_id, !a.free_bottle_enabled)}
+                      disabled={toggling[a.user_id]}
+                      className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                        a.free_bottle_enabled ? 'bg-green-500' : 'bg-gray-300'
+                      } ${toggling[a.user_id] ? 'opacity-50' : ''}`}
+                      title={a.free_bottle_enabled ? 'Désactiver 12+1' : 'Activer 12+1'}
                     >
-                      <Check size={14} className="inline mr-1" />
-                      Enregistrer
+                      <span
+                        className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                          a.free_bottle_enabled ? 'translate-x-6' : 'translate-x-1'
+                        }`}
+                      />
                     </button>
                   </div>
-                </div>
-              ))}
+                ))}
+              </div>
             </div>
           )}
-        </div>
+
+          {/* Pending student list */}
+          <div className="card">
+            <h2 className="font-semibold mb-3">Étudiants avec bouteilles gratuites disponibles</h2>
+            {loading ? (
+              <div className="flex justify-center py-8">
+                <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-wine-700" />
+              </div>
+            ) : pending.length === 0 ? (
+              <p className="text-gray-500 text-sm py-4">Aucun étudiant n'a de bouteilles gratuites en attente pour cette campagne.</p>
+            ) : (
+              <div className="space-y-3">
+                {pending.map((p) => (
+                  <div key={p.user_id} className="flex items-center justify-between border-b pb-3 gap-3">
+                    <div className="min-w-0 flex-1">
+                      <p className="font-medium text-sm">{p.user_name}</p>
+                      <p className="text-xs text-gray-500">{p.user_email}</p>
+                      <p className="text-xs text-gray-600 mt-1">
+                        {p.totalSold} vendues · {p.earned} gagnées · {p.used} récupérées · <span className="font-semibold text-wine-700">{p.available} disponible(s)</span>
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-2 flex-shrink-0">
+                      <select
+                        value={selectedProduct[p.user_id] || ''}
+                        onChange={(e) => setSelectedProduct((prev) => ({ ...prev, [p.user_id]: e.target.value }))}
+                        className="border rounded-lg px-2 py-1.5 text-xs max-w-[180px]"
+                      >
+                        <option value="">— Produit —</option>
+                        {products.map((prod) => (
+                          <option key={prod.id} value={prod.id}>{prod.name}</option>
+                        ))}
+                      </select>
+                      <button
+                        onClick={() => handleRecord(p.user_id)}
+                        disabled={p.available <= 0 || !selectedProduct[p.user_id]}
+                        className="text-xs bg-wine-50 text-wine-700 px-3 py-1.5 rounded-lg hover:bg-wine-100 disabled:opacity-50"
+                        title="Enregistrer comme récupérée"
+                      >
+                        <Check size={14} className="inline mr-1" />
+                        Enregistrer
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </>
       )}
     </div>
   );

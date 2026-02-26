@@ -157,6 +157,60 @@ describe('Free Bottle Ambassador Flag', () => {
       .update({ config: JSON.stringify({ free_bottle_enabled: true }) });
   });
 
+  test('GET /admin/free-bottles/ambassadors returns list with status', async () => {
+    if (!ambassadorCampaignId) return;
+
+    const res = await request(app)
+      .get('/api/v1/admin/free-bottles/ambassadors')
+      .set('Authorization', `Bearer ${adminToken}`)
+      .query({ campaign_id: ambassadorCampaignId });
+
+    expect(res.status).toBe(200);
+    expect(res.body).toHaveProperty('data');
+    expect(Array.isArray(res.body.data)).toBe(true);
+    expect(res.body.data.length).toBeGreaterThan(0);
+
+    const amb = res.body.data[0];
+    expect(amb).toHaveProperty('user_id');
+    expect(amb).toHaveProperty('user_name');
+    expect(amb).toHaveProperty('user_email');
+    expect(amb).toHaveProperty('free_bottle_enabled');
+    expect(typeof amb.free_bottle_enabled).toBe('boolean');
+  });
+
+  test('GET /admin/free-bottles/ambassadors without campaign_id → 400', async () => {
+    const res = await request(app)
+      .get('/api/v1/admin/free-bottles/ambassadors')
+      .set('Authorization', `Bearer ${adminToken}`);
+
+    expect(res.status).toBe(400);
+    expect(res.body.error).toBe('MISSING_CAMPAIGN');
+  });
+
+  test('GET /admin/free-bottles/ambassadors reflects toggle state', async () => {
+    if (!ambassadorUserId || !ambassadorCampaignId) return;
+
+    // Disable
+    await request(app)
+      .patch('/api/v1/admin/free-bottles/toggle')
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send({ user_id: ambassadorUserId, campaign_id: ambassadorCampaignId, enabled: false });
+
+    const res = await request(app)
+      .get('/api/v1/admin/free-bottles/ambassadors')
+      .set('Authorization', `Bearer ${adminToken}`)
+      .query({ campaign_id: ambassadorCampaignId });
+
+    const amb = res.body.data.find((a) => a.user_id === ambassadorUserId);
+    expect(amb.free_bottle_enabled).toBe(false);
+
+    // Restore
+    await request(app)
+      .patch('/api/v1/admin/free-bottles/toggle')
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send({ user_id: ambassadorUserId, campaign_id: ambassadorCampaignId, enabled: true });
+  });
+
   test('Admin can toggle free_bottle_enabled via PATCH', async () => {
     if (!ambassadorUserId || !ambassadorCampaignId) return;
 

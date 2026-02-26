@@ -141,6 +141,36 @@ router.get('/pending', authenticate, requireRole('super_admin', 'commercial'), a
   }
 });
 
+// GET /admin/free-bottles/ambassadors — List ambassadors with 12+1 status
+router.get('/ambassadors', authenticate, requireRole('super_admin', 'commercial'), async (req, res) => {
+  try {
+    const { campaign_id } = req.query;
+    if (!campaign_id) {
+      return res.status(400).json({ error: 'MISSING_CAMPAIGN', message: 'campaign_id requis' });
+    }
+
+    const ambassadors = await db('participations')
+      .join('users', 'participations.user_id', 'users.id')
+      .where({ 'participations.campaign_id': campaign_id, 'users.role': 'ambassadeur', 'users.status': 'active' })
+      .select('users.id', 'users.name', 'users.email', 'participations.config');
+
+    const data = ambassadors.map((a) => {
+      const config = typeof a.config === 'string' ? JSON.parse(a.config) : (a.config || {});
+      return {
+        user_id: a.id,
+        user_name: a.name,
+        user_email: a.email,
+        free_bottle_enabled: config.free_bottle_enabled !== false,
+      };
+    });
+
+    res.json({ data });
+  } catch (err) {
+    console.error('Free bottles ambassadors error:', err);
+    res.status(500).json({ error: 'SERVER_ERROR', message: err.message });
+  }
+});
+
 // PATCH /admin/free-bottles/toggle — Toggle free_bottle_enabled for a participant
 router.patch('/toggle', authenticate, requireRole('super_admin', 'commercial'), auditAction('free_bottles'), async (req, res) => {
   try {
