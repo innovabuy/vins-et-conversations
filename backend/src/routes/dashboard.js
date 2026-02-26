@@ -215,20 +215,32 @@ router.get(
         return res.status(403).json({ error: 'FORBIDDEN', message: 'Accès interdit à cette campagne' });
       }
 
-      // All campaign orders (not just own) — CSE sees all orders in their campaign
-      const orders = await db('orders')
+      // V4.4: CSE sub_role (responsable vs collaborateur)
+      // Collaborateur: peut commander, voit ses propres commandes
+      // Responsable: peut commander, voit toutes les commandes de la campagne
+      const cseSubRole = req.user.sub_role || 'responsable';
+      const canOrder = true; // Both roles can order
+
+      // Collaborateur: own orders only. Responsable: all campaign orders.
+      const ordersQuery = db('orders')
         .leftJoin('delivery_notes', 'orders.id', 'delivery_notes.order_id')
         .leftJoin('users', 'orders.user_id', 'users.id')
         .where('orders.campaign_id', campaignId)
         .select(
           'orders.id', 'orders.ref', 'orders.status', 'orders.total_ht',
           'orders.total_ttc', 'orders.total_items', 'orders.created_at',
-          'orders.source',
+          'orders.source', 'orders.user_id',
           db.raw("COALESCE(users.name, 'Client direct') as user_name"),
           'delivery_notes.status as delivery_status',
           'delivery_notes.planned_date as delivery_date'
         )
         .orderBy('orders.created_at', 'desc');
+
+      if (cseSubRole === 'collaborateur') {
+        ordersQuery.where('orders.user_id', req.user.userId);
+      }
+
+      const orders = await ordersQuery;
 
       const campConfig = typeof campaign.config === 'string' ? JSON.parse(campaign.config) : (campaign.config || {});
       const paymentTerms = campConfig.payment_terms || pricingRules?.payment_terms || null;
@@ -247,10 +259,6 @@ router.get(
       const campaignGoal = parseFloat(campaign.goal || 0);
       const campaignProgress = campaignGoal > 0 ? Math.round((campaignCaTTC / campaignGoal) * 100) : 0;
       const deliveryFreeThreshold = parseFloat(campConfig.delivery_free_threshold || 0);
-
-      // V4.4: CSE sub_role (responsable vs collaborateur)
-      const cseSubRole = req.user.sub_role || 'responsable';
-      const canOrder = cseSubRole === 'responsable';
 
       // CSE tier progression
       const tierRules = typeof campaign.tier_rules === 'string'

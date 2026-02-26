@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import { cseDashboardAPI, ordersAPI, invoicesAPI } from '../../services/api';
-import { ShoppingCart, Package, FileText, Truck, AlertTriangle, RefreshCw, Wine, TrendingUp, Target, Award } from 'lucide-react';
+import { ShoppingCart, Package, FileText, Truck, AlertTriangle, RefreshCw, Wine, TrendingUp, Target, Award, Users } from 'lucide-react';
 
 export default function CSEDashboard() {
   const { user } = useAuth();
@@ -120,11 +120,11 @@ export default function CSEDashboard() {
 
   return (
     <div>
-      {/* Collaborator info banner */}
-      {data?.sub_role === 'collaborateur' && (
-        <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-4 text-blue-700 text-sm flex items-center gap-2">
-          <AlertTriangle size={16} />
-          Compte collaborateur — consultation du catalogue uniquement. Contactez votre responsable CSE pour passer commande.
+      {/* Responsable info banner */}
+      {data?.sub_role === 'responsable' && (
+        <div className="bg-green-50 border border-green-200 rounded-lg p-3 mb-4 text-green-700 text-sm flex items-center gap-2">
+          <Users size={16} />
+          Responsable CSE — vous voyez toutes les commandes de l'équipe.
         </div>
       )}
 
@@ -325,7 +325,7 @@ export default function CSEDashboard() {
       {/* Order history */}
       {activeTab === 'orders' && (
         <div className="card">
-          <h3 className="font-semibold mb-3">Historique des commandes</h3>
+          <h3 className="font-semibold mb-3">{data?.sub_role === 'responsable' ? 'Commandes de l\'équipe' : 'Mes commandes'}</h3>
           {data.orders.length === 0 ? (
             <p className="text-gray-500 text-sm">Aucune commande</p>
           ) : (
@@ -333,7 +333,7 @@ export default function CSEDashboard() {
               {data.orders.map((order) => (
                 <div key={order.id} className="flex items-center justify-between border-b pb-2 text-sm">
                   <div>
-                    <p className="font-medium">{order.ref}</p>
+                    <p className="font-medium">{order.ref}{data?.sub_role === 'responsable' && order.user_name ? ` — ${order.user_name}` : ''}</p>
                     <p className="text-xs text-gray-500">{new Date(order.created_at).toLocaleDateString('fr-FR')}</p>
                   </div>
                   <div className="flex items-center gap-3">

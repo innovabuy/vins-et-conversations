@@ -177,7 +177,7 @@ describe('CSE Workflow', () => {
     expect(res.body.can_order).toBe(true);
   });
 
-  test('11. Collaborateur sub_role restricts can_order', async () => {
+  test('11. Collaborateur sub_role can order and sees only own orders', async () => {
     const cseUser = await db('users').where({ email: 'cse@leroymerlin.fr' }).first();
     // Temporarily set sub_role to collaborateur
     await db('participations')
@@ -196,7 +196,12 @@ describe('CSE Workflow', () => {
       .query({ campaign_id: cseCampaignId });
     expect(res.status).toBe(200);
     expect(res.body.sub_role).toBe('collaborateur');
-    expect(res.body.can_order).toBe(false);
+    expect(res.body.can_order).toBe(true);
+
+    // Collaborateur sees only own orders
+    for (const order of res.body.orders) {
+      expect(order.user_id).toBe(cseUser.id);
+    }
 
     // Restore
     await db('participations')
