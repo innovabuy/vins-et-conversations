@@ -793,12 +793,23 @@ exports.seed = async function (knex) {
   // ═══════════════════════════════════════════════════════
   // STOCK INITIAL
   // ═══════════════════════════════════════════════════════
+  // Stock initial par campagne — suffisant pour couvrir toutes les commandes seed
+  const stockPerProduct = {
+    [IDS.oriolus]:  10000,
+    [IDS.carillon]:  3000,
+    [IDS.coffret]:   1500,
+    [IDS.clemence]:  2000,
+    [IDS.coteaux]:   1500,
+    [IDS.cremant]:   1500,
+    [IDS.apertus]:   1500,
+    [IDS.jus]:       1000,
+  };
   await knex('stock_movements').insert(
     allProductIds.map((pid) => ({
       product_id: pid,
       campaign_id: IDS.camp_sacre_coeur,
       type: 'initial',
-      qty: 200,
+      qty: stockPerProduct[pid] || 500,
       reference: 'Stock initial campagne',
     }))
   );
