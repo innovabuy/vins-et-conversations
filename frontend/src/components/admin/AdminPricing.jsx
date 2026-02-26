@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
-import { pricingConditionsAPI } from '../../services/api';
-import { FileText, Plus, Save, X } from 'lucide-react';
+import { pricingConditionsAPI, clientTypesAPI } from '../../services/api';
+import { FileText, Plus, Save, X, Trash2, Award } from 'lucide-react';
 
 export default function AdminPricing() {
   const [conditions, setConditions] = useState([]);
@@ -12,7 +12,14 @@ export default function AdminPricing() {
     commission_student: '', min_order: 0, payment_terms: '', active: true,
   });
 
-  useEffect(() => { loadConditions(); }, []);
+  // Tier editor state
+  const [clientTypes, setClientTypes] = useState([]);
+  const [editingTiers, setEditingTiers] = useState(null); // client_type id
+  const [tiers, setTiers] = useState([]);
+  const [tierSaving, setTierSaving] = useState(false);
+  const [tierMsg, setTierMsg] = useState(null);
+
+  useEffect(() => { loadConditions(); loadClientTypes(); }, []);
 
   const loadConditions = async () => {
     try {
@@ -22,6 +29,19 @@ export default function AdminPricing() {
       console.error(err);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const loadClientTypes = async () => {
+    try {
+      const res = await clientTypesAPI.list();
+      const all = res.data?.data || res.data || [];
+      setClientTypes(all.filter((ct) => {
+        const tr = typeof ct.tier_rules === 'string' ? JSON.parse(ct.tier_rules) : (ct.tier_rules || {});
+        return tr.tiers && tr.tiers.length > 0 || ct.name === 'cse' || ct.name === 'ambassadeur';
+      }));
+    } catch (err) {
+      console.error(err);
     }
   };
 
@@ -54,6 +74,50 @@ export default function AdminPricing() {
       active: c.active,
     });
     setShowCreate(true);
+  };
+
+  // Tier editor
+  const startEditTiers = (ct) => {
+    const tr = typeof ct.tier_rules === 'string' ? JSON.parse(ct.tier_rules) : (ct.tier_rules || {});
+    setEditingTiers(ct.id);
+    setTiers((tr.tiers || []).map((t) => ({ ...t })));
+    setTierMsg(null);
+  };
+
+  const addTier = () => {
+    setTiers([...tiers, { threshold: 0, label: '', reward: '', color: '#6B7280' }]);
+  };
+
+  const removeTier = (idx) => {
+    setTiers(tiers.filter((_, i) => i !== idx));
+  };
+
+  const updateTier = (idx, field, value) => {
+    setTiers(tiers.map((t, i) => i === idx ? { ...t, [field]: field === 'threshold' ? parseFloat(value) || 0 : value } : t));
+  };
+
+  const saveTiers = async () => {
+    // Validate
+    for (const t of tiers) {
+      if (!t.label || t.threshold <= 0 || !t.reward) {
+        setTierMsg({ type: 'error', text: 'Chaque palier doit avoir un seuil > 0, un label et une récompense.' });
+        return;
+      }
+    }
+    setTierSaving(true);
+    try {
+      const ct = clientTypes.find((c) => c.id === editingTiers);
+      const existingRules = typeof ct.tier_rules === 'string' ? JSON.parse(ct.tier_rules) : (ct.tier_rules || {});
+      const newRules = { ...existingRules, tiers: tiers.sort((a, b) => a.threshold - b.threshold) };
+      await clientTypesAPI.update(editingTiers, { tier_rules: newRules });
+      setTierMsg({ type: 'success', text: 'Paliers enregistrés' });
+      setEditingTiers(null);
+      loadClientTypes();
+    } catch (err) {
+      setTierMsg({ type: 'error', text: err.response?.data?.message || 'Erreur' });
+    } finally {
+      setTierSaving(false);
+    }
   };
 
   if (loading) {
@@ -122,7 +186,7 @@ export default function AdminPricing() {
       )}
 
       {/* Table */}
-      <div className="card overflow-x-auto">
+      <div className="card overflow-x-auto mb-6">
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b text-left text-gray-500">
@@ -158,6 +222,96 @@ export default function AdminPricing() {
           </tbody>
         </table>
       </div>
+
+      {/* Tier editor section */}
+      {clientTypes.length > 0 && (
+        <div className="card">
+          <div className="flex items-center gap-2 mb-4">
+            <Award size={20} className="text-wine-600" />
+            <h2 className="text-lg font-bold text-gray-900">Paliers de fidélité</h2>
+          </div>
+
+          {tierMsg && (
+            <div className={`mb-3 p-2 rounded text-sm ${tierMsg.type === 'success' ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'}`}>
+              {tierMsg.text}
+            </div>
+          )}
+
+          {clientTypes.map((ct) => {
+            const tr = typeof ct.tier_rules === 'string' ? JSON.parse(ct.tier_rules) : (ct.tier_rules || {});
+            const ctTiers = tr.tiers || [];
+            const isEditing = editingTiers === ct.id;
+
+            return (
+              <div key={ct.id} className="border rounded-lg p-4 mb-3">
+                <div className="flex items-center justify-between mb-2">
+                  <h3 className="font-semibold text-sm">{ct.label || ct.name} <span className="text-gray-400 font-normal">({ct.name})</span></h3>
+                  {!isEditing ? (
+                    <button onClick={() => startEditTiers(ct)} className="text-wine-600 hover:text-wine-800 text-xs">Modifier</button>
+                  ) : (
+                    <button onClick={() => setEditingTiers(null)} className="text-gray-400 hover:text-gray-600"><X size={16} /></button>
+                  )}
+                </div>
+
+                {!isEditing ? (
+                  ctTiers.length === 0 ? (
+                    <p className="text-xs text-gray-400">Aucun palier défini</p>
+                  ) : (
+                    <div className="flex flex-wrap gap-2">
+                      {ctTiers.map((t, i) => (
+                        <div key={i} className="flex items-center gap-2 text-xs bg-gray-50 rounded-lg px-3 py-1.5">
+                          <span className="w-3 h-3 rounded-full flex-shrink-0" style={{ background: t.color || '#6B7280' }} />
+                          <span className="font-medium">{t.label}</span>
+                          <span className="text-gray-500">{t.threshold} €</span>
+                          <span className="text-gray-400">→ {t.reward}</span>
+                        </div>
+                      ))}
+                    </div>
+                  )
+                ) : (
+                  <div>
+                    <div className="space-y-2 mb-3">
+                      {tiers.map((t, i) => (
+                        <div key={i} className="grid grid-cols-[80px_1fr_1fr_50px_auto] gap-2 items-center">
+                          <input
+                            type="number" min="0" step="100"
+                            value={t.threshold} onChange={(e) => updateTier(i, 'threshold', e.target.value)}
+                            className="input-field text-xs" placeholder="Seuil €"
+                          />
+                          <input
+                            value={t.label} onChange={(e) => updateTier(i, 'label', e.target.value)}
+                            className="input-field text-xs" placeholder="Label"
+                          />
+                          <input
+                            value={t.reward} onChange={(e) => updateTier(i, 'reward', e.target.value)}
+                            className="input-field text-xs" placeholder="Récompense"
+                          />
+                          <input
+                            type="color" value={t.color || '#6B7280'}
+                            onChange={(e) => updateTier(i, 'color', e.target.value)}
+                            className="w-8 h-8 rounded cursor-pointer border-0 p-0"
+                          />
+                          <button onClick={() => removeTier(i)} className="text-red-400 hover:text-red-600" title="Supprimer">
+                            <Trash2 size={14} />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <button onClick={addTier} className="text-xs text-wine-600 hover:text-wine-800 flex items-center gap-1">
+                        <Plus size={14} /> Ajouter un palier
+                      </button>
+                      <button onClick={saveTiers} disabled={tierSaving} className="btn-primary text-xs flex items-center gap-1">
+                        <Save size={14} /> {tierSaving ? 'Enregistrement...' : 'Enregistrer'}
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 }
