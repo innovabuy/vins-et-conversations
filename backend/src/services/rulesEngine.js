@@ -178,7 +178,7 @@ async function calculateFreeBottles(userId, campaignId, freeBottleRules) {
 
   const n = freeBottleRules.n || 12;
   const alcoholOnly = freeBottleRules.applies_to_alcohol_only !== false;
-  const perReference = freeBottleRules.per_reference !== false; // V4.4: default per-reference
+  const perReference = freeBottleRules.per_reference === true; // Panachage global par défaut
 
   // V4.4: Count per-reference (per product) instead of global total
   let soldQuery = db('order_items')

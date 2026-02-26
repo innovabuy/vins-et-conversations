@@ -186,16 +186,9 @@ describe('Free Bottle Rules', () => {
     // ACKAVONG has 12 orders with total_items > 12 → should have earned free bottles
     expect(result.threshold).toBe(12);
     expect(result.totalSold).toBeGreaterThan(0);
-    // V4.4: per-reference counting — earned = sum of floor(soldPerProduct / 12)
-    // earned <= floor(totalSold / 12) since remainders are per-product
+    // Global panachage: earned = floor(totalSold / 12)
     expect(result.earned).toBeGreaterThan(0);
-    expect(result.earned).toBeLessThanOrEqual(Math.floor(result.totalSold / 12));
-    // Details array should be populated
-    expect(result.details).toBeInstanceOf(Array);
-    expect(result.details.length).toBeGreaterThan(0);
-    // Sum of details.earned should equal result.earned
-    const detailsEarned = result.details.reduce((s, d) => s + d.earned, 0);
-    expect(detailsEarned).toBe(result.earned);
+    expect(result.earned).toBe(Math.floor(result.totalSold / 12));
   });
 
   test('Trigger every_n_sold=12: 24 vendues → 2 gratuites', async () => {
