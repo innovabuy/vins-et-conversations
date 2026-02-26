@@ -6,7 +6,7 @@ const request = require('supertest');
 const app = require('../index');
 const db = require('../config/database');
 
-const SERVER_IP = '31.97.57.103';
+const SERVER_IP = '76.13.44.13';
 const PASSWORD = 'VinsConv2026!';
 
 // Tokens per role
