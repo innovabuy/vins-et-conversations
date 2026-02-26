@@ -1,9 +1,9 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate, useSearchParams, Link } from 'react-router-dom';
-import { ordersAPI, campaignsAPI, contactsAPI, productsAPI, deliveryNotesAPI } from '../../services/api';
+import { ordersAPI, campaignsAPI, contactsAPI, productsAPI, deliveryNotesAPI, usersAPI } from '../../services/api';
 import {
   ShoppingCart, Search, Plus, Check, Eye, EyeOff, FileText, Printer, Mail,
-  ChevronLeft, ChevronRight, X, Trash2, Save, Truck, ExternalLink, AlertTriangle
+  ChevronLeft, ChevronRight, X, Trash2, Save, Truck, ExternalLink, AlertTriangle, UserPlus
 } from 'lucide-react';
 
 const formatEur = (v) => new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR' }).format(v);
@@ -23,6 +23,7 @@ const STATUS_LABELS = {
 const SOURCE_LABELS = {
   campaign: { label: 'Campagne', color: 'bg-blue-50 text-blue-700' },
   boutique_web: { label: 'Boutique Web', color: 'bg-purple-50 text-purple-700' },
+  student_referral: { label: 'Parrainage étudiant', color: 'bg-amber-50 text-amber-700' },
   ambassador_referral: { label: 'Ambassadeur', color: 'bg-green-50 text-green-700' },
   phone: { label: 'Téléphone', color: 'bg-gray-50 text-gray-700' },
   email: { label: 'Email', color: 'bg-sky-50 text-sky-700' },
@@ -294,6 +295,94 @@ function OrderDetail({ orderId, onClose, onUpdated }) {
   );
 }
 
+// ─── Assign Modal ──────────────────────────────────
+function AssignModal({ orderId, orderRef, onClose, onAssigned }) {
+  const [query, setQuery] = useState('');
+  const [results, setResults] = useState([]);
+  const [searching, setSearching] = useState(false);
+  const [selected, setSelected] = useState(null);
+  const [assigning, setAssigning] = useState(false);
+  const debounceRef = useRef(null);
+
+  const handleSearch = (q) => {
+    setQuery(q);
+    setSelected(null);
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    if (q.length < 2) { setResults([]); return; }
+    debounceRef.current = setTimeout(async () => {
+      setSearching(true);
+      try {
+        const { data } = await usersAPI.list({ search: q, role: 'etudiant', limit: 10 });
+        const students = (data.data || data || []).filter(u => u.role === 'etudiant');
+        // Also search ambassadors
+        const { data: ambData } = await usersAPI.list({ search: q, role: 'ambassadeur', limit: 10 });
+        const ambassadors = (ambData.data || ambData || []).filter(u => u.role === 'ambassadeur');
+        setResults([...students, ...ambassadors]);
+      } catch { setResults([]); }
+      finally { setSearching(false); }
+    }, 300);
+  };
+
+  const handleAssign = async () => {
+    if (!selected) return;
+    setAssigning(true);
+    try {
+      await ordersAPI.assign(orderId, { user_id: selected.id });
+      onAssigned();
+    } catch (err) {
+      alert(err.response?.data?.message || 'Erreur lors du rattachement');
+    } finally { setAssigning(false); }
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4" onClick={onClose}>
+      <div className="bg-white rounded-xl shadow-xl w-full max-w-md p-6 space-y-4" onClick={e => e.stopPropagation()}>
+        <div className="flex items-center justify-between">
+          <h3 className="font-bold text-lg">Rattacher {orderRef}</h3>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600"><X size={20} /></button>
+        </div>
+        <div className="relative">
+          <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+          <input
+            type="text" value={query} onChange={e => handleSearch(e.target.value)}
+            placeholder="Rechercher un étudiant ou ambassadeur..."
+            className="w-full pl-10 pr-4 py-2.5 border rounded-lg text-sm focus:ring-2 focus:ring-wine-500 focus:border-wine-500"
+            autoFocus
+          />
+        </div>
+        {searching && <p className="text-sm text-gray-400 text-center">Recherche...</p>}
+        {results.length > 0 && (
+          <div className="max-h-48 overflow-y-auto border rounded-lg divide-y">
+            {results.map(u => (
+              <button key={u.id} onClick={() => setSelected(u)}
+                className={`w-full text-left p-3 text-sm hover:bg-gray-50 ${selected?.id === u.id ? 'bg-wine-50 border-l-2 border-wine-600' : ''}`}>
+                <p className="font-medium">{u.name}</p>
+                <p className="text-xs text-gray-500">{u.email} · {u.role === 'etudiant' ? 'Étudiant' : 'Ambassadeur'}</p>
+              </button>
+            ))}
+          </div>
+        )}
+        {query.length >= 2 && !searching && results.length === 0 && (
+          <p className="text-sm text-gray-400 text-center py-2">Aucun résultat</p>
+        )}
+        {selected && (
+          <div className="bg-green-50 border border-green-200 rounded-lg p-3 text-sm">
+            <p className="font-medium text-green-800">Rattacher à : {selected.name}</p>
+            <p className="text-xs text-green-600">{selected.email}</p>
+          </div>
+        )}
+        <div className="flex justify-end gap-2 pt-2">
+          <button onClick={onClose} className="px-4 py-2 text-sm rounded-lg border hover:bg-gray-50">Annuler</button>
+          <button onClick={handleAssign} disabled={!selected || assigning}
+            className="px-4 py-2 text-sm rounded-lg bg-wine-600 text-white hover:bg-wine-700 disabled:opacity-40">
+            {assigning ? 'Rattachement...' : 'Confirmer'}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ─── Main Component ─────────────────────────────────
 export default function AdminOrders() {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -312,6 +401,7 @@ export default function AdminOrders() {
   const [showFlaggedOnly, setShowFlaggedOnly] = useState(false);
   const [selectedOrder, setSelectedOrder] = useState(searchParams.get('selected') || null);
   const [showNewForm, setShowNewForm] = useState(false);
+  const [assignOrder, setAssignOrder] = useState(null);
 
   const fetchOrders = useCallback(async () => {
     setLoading(true);
@@ -476,6 +566,9 @@ export default function AdminOrders() {
                     <td className="py-3 text-right" onClick={e => e.stopPropagation()}>
                       <div className="flex items-center justify-end gap-1">
                         <button onClick={() => setSelectedOrder(o.id)} className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-500" title="Voir détail"><Eye size={16} /></button>
+                        {o.source === 'boutique_web' && !o.referred_by && (
+                          <button onClick={() => setAssignOrder(o)} className="p-1.5 rounded-lg hover:bg-amber-50 text-amber-600" title="Rattacher à un étudiant"><UserPlus size={16} /></button>
+                        )}
                         {o.status === 'submitted' && (
                           <button onClick={() => handleValidate(o.id)} className="p-1.5 rounded-lg hover:bg-green-50 text-green-600" title="Valider"><Check size={16} /></button>
                         )}
@@ -501,6 +594,7 @@ export default function AdminOrders() {
       )}
 
       {showNewForm && <NewOrderForm onClose={() => setShowNewForm(false)} onCreated={handleCreated} />}
+      {assignOrder && <AssignModal orderId={assignOrder.id} orderRef={assignOrder.ref} onClose={() => setAssignOrder(null)} onAssigned={() => { setAssignOrder(null); fetchOrders(); }} />}
     </div>
   );
 }

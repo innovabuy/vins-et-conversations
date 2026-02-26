@@ -82,6 +82,7 @@ export const ordersAPI = {
   validate: (id) => api.post(`/orders/admin/${id}/validate`),
   update: (id, data) => api.put(`/orders/admin/${id}`, data),
   cancel: (id) => api.delete(`/orders/admin/${id}`),
+  assign: (id, data) => api.patch(`/orders/admin/${id}/assign`, data),
   pdf: (id) => `${api.defaults.baseURL}/orders/${id}/pdf`,
   sendEmail: (id) => api.post(`/orders/${id}/send-email`),
   myCustomers: () => api.get('/orders/my-customers'),

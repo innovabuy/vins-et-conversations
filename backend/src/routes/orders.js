@@ -461,6 +461,58 @@ router.delete(
   }
 );
 
+// PATCH /api/v1/orders/admin/:id/assign — Rattacher commande boutique à un étudiant
+router.patch(
+  '/admin/:id/assign',
+  authenticate,
+  requireRole('super_admin', 'commercial'),
+  auditAction('orders'),
+  async (req, res) => {
+    try {
+      const { user_id } = req.body;
+      if (!user_id) return res.status(400).json({ error: true, code: 'MISSING_USER_ID', message: 'user_id requis' });
+
+      const order = await db('orders').where({ id: req.params.id }).first();
+      if (!order) return res.status(404).json({ error: true, code: 'NOT_FOUND', message: 'Commande introuvable' });
+
+      if (order.referred_by) {
+        return res.status(409).json({ error: true, code: 'ALREADY_ASSIGNED', message: `Commande déjà rattachée` });
+      }
+
+      // Verify user exists and get referral code
+      const user = await db('users').where({ id: user_id }).first();
+      if (!user) return res.status(400).json({ error: true, code: 'USER_NOT_FOUND', message: 'Utilisateur introuvable' });
+      if (!['etudiant', 'ambassadeur'].includes(user.role)) {
+        return res.status(400).json({ error: true, code: 'INVALID_ROLE', message: 'L\'utilisateur doit être étudiant ou ambassadeur' });
+      }
+
+      const participation = await db('participations').where({ user_id }).select('referral_code').first();
+      const referralCode = participation?.referral_code || null;
+      const source = user.role === 'etudiant' ? 'student_referral' : 'ambassador_referral';
+
+      await db('orders').where({ id: req.params.id }).update({
+        referred_by: user_id,
+        referral_code: referralCode,
+        source,
+        updated_at: new Date(),
+      });
+
+      // Append-only financial event for traceability
+      await db('financial_events').insert({
+        order_id: req.params.id,
+        campaign_id: order.campaign_id,
+        type: 'correction',
+        amount: 0,
+        description: `Rattachement commande ${order.ref} à ${user.name} (${user.role})`,
+      });
+
+      res.json({ message: 'Commande rattachée', ref: order.ref, assigned_to: user.name, referral_code: referralCode });
+    } catch (err) {
+      res.status(500).json({ error: true, code: 'SERVER_ERROR', message: err.message });
+    }
+  }
+);
+
 // GET /api/v1/orders/:id/pdf — Générer PDF commande
 router.get('/:id/pdf', authenticate, async (req, res) => {
   try {
