@@ -5,8 +5,8 @@ import { Elements, CardElement, useStripe, useElements } from '@stripe/react-str
 import { useCart } from '../../contexts/CartContext';
 import { useAuth } from '../../contexts/AuthContext';
 import { useAppSettings } from '../../contexts/AppSettingsContext';
-import { boutiqueAPI, shippingAPI, authAPI, appSettingsAPI } from '../../services/api';
-import { ArrowLeft, Lock, ShoppingCart, Truck, Loader2, User, MapPin, CreditCard, Check, LogIn, UserPlus, UserX, Store } from 'lucide-react';
+import { boutiqueAPI, shippingAPI, authAPI, appSettingsAPI, paypalAPI } from '../../services/api';
+import { ArrowLeft, Lock, ShoppingCart, Truck, Loader2, User, MapPin, CreditCard, Check, LogIn, UserPlus, UserX, Store, Wallet, Building2 } from 'lucide-react';
 
 const formatEur = (v) => new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR' }).format(v);
 
@@ -103,6 +103,7 @@ export default function CheckoutPage() {
   const [shippingError, setShippingError] = useState('');
   const [orderData, setOrderData] = useState(null); // { order_id, ref, total_ttc, client_secret }
   const [stripeObj, setStripeObj] = useState(null);
+  const [paymentMethod, setPaymentMethod] = useState('stripe');
 
   // Load Stripe
   useEffect(() => {
@@ -281,6 +282,24 @@ export default function CheckoutPage() {
       navigate(`/boutique/confirmation/${orderData.ref}`);
     } catch (err) {
       setOrderError(err.response?.data?.message || 'Erreur de confirmation');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  // PayPal flow: create order on backend, redirect to PayPal approval URL
+  const handlePayPalPayment = async () => {
+    setSubmitting(true);
+    setOrderError('');
+    try {
+      const { data } = await paypalAPI.createOrder({ order_id: orderData.order_id });
+      if (data.approval_url) {
+        window.location.href = data.approval_url;
+      } else {
+        setOrderError('URL d\'approbation PayPal introuvable');
+      }
+    } catch (err) {
+      setOrderError(err.response?.data?.message || 'Erreur PayPal');
     } finally {
       setSubmitting(false);
     }
@@ -534,7 +553,56 @@ export default function CheckoutPage() {
 
               {orderError && <div className="bg-red-50 text-red-700 text-sm p-3 rounded-lg">{orderError}</div>}
 
-              {stripeObj && orderData.client_secret ? (
+              {/* Payment method selector */}
+              <div className="space-y-2">
+                <p className="text-sm font-medium text-gray-700">Mode de paiement</p>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  <button
+                    onClick={() => setPaymentMethod('stripe')}
+                    disabled={!stripeObj || !orderData.client_secret}
+                    className={`flex items-center gap-3 p-4 rounded-xl border-2 transition-all text-left ${
+                      paymentMethod === 'stripe' ? 'border-wine-600 bg-wine-50' : 'border-gray-200 hover:border-gray-300'
+                    } ${!stripeObj || !orderData.client_secret ? 'opacity-40 cursor-not-allowed' : ''}`}
+                  >
+                    <CreditCard size={20} className={paymentMethod === 'stripe' ? 'text-wine-700' : 'text-gray-400'} />
+                    <div>
+                      <p className="font-medium text-sm">Carte bancaire</p>
+                      <p className="text-xs text-gray-500">Via Stripe</p>
+                    </div>
+                  </button>
+
+                  <button
+                    onClick={() => setPaymentMethod('paypal')}
+                    className={`flex items-center gap-3 p-4 rounded-xl border-2 transition-all text-left ${
+                      paymentMethod === 'paypal' ? 'border-blue-600 bg-blue-50' : 'border-gray-200 hover:border-gray-300'
+                    }`}
+                  >
+                    <Wallet size={20} className={paymentMethod === 'paypal' ? 'text-blue-600' : 'text-gray-400'} />
+                    <div>
+                      <p className="font-medium text-sm">PayPal</p>
+                      <p className="text-xs text-gray-500">Paiement securise</p>
+                    </div>
+                  </button>
+
+                  {user?.role === 'cse' && (
+                    <button
+                      onClick={() => setPaymentMethod('transfer')}
+                      className={`flex items-center gap-3 p-4 rounded-xl border-2 transition-all text-left ${
+                        paymentMethod === 'transfer' ? 'border-green-600 bg-green-50' : 'border-gray-200 hover:border-gray-300'
+                      }`}
+                    >
+                      <Building2 size={20} className={paymentMethod === 'transfer' ? 'text-green-600' : 'text-gray-400'} />
+                      <div>
+                        <p className="font-medium text-sm">Virement 30 jours</p>
+                        <p className="text-xs text-gray-500">Reservé CSE</p>
+                      </div>
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              {/* Stripe payment form */}
+              {paymentMethod === 'stripe' && stripeObj && orderData.client_secret && (
                 <Elements stripe={stripeObj} options={{ clientSecret: orderData.client_secret }}>
                   <InlinePaymentForm
                     clientSecret={orderData.client_secret}
@@ -543,22 +611,51 @@ export default function CheckoutPage() {
                     onError={(msg) => setOrderError(msg)}
                   />
                 </Elements>
-              ) : (
+              )}
+
+              {/* PayPal payment */}
+              {paymentMethod === 'paypal' && (
                 <div className="space-y-3">
-                  <p className="text-sm text-gray-500">Stripe non configure. Paiement en mode demo.</p>
+                  <button
+                    onClick={handlePayPalPayment}
+                    disabled={submitting}
+                    className="w-full flex items-center justify-center gap-2 py-3 rounded-lg font-medium text-white bg-[#0070ba] hover:bg-[#005ea6] disabled:opacity-50 transition-colors"
+                  >
+                    <Wallet size={16} />
+                    {submitting ? 'Redirection vers PayPal...' : `Payer ${formatEur(orderData.total_ttc)} avec PayPal`}
+                  </button>
+                  <p className="text-xs text-gray-400 text-center">
+                    Vous serez redirigé vers PayPal pour finaliser le paiement.
+                  </p>
+                </div>
+              )}
+
+              {/* CSE transfer */}
+              {paymentMethod === 'transfer' && (
+                <div className="space-y-3">
+                  <div className="bg-green-50 border border-green-200 rounded-lg p-4 text-sm text-green-800">
+                    Votre commande sera validée avec un delai de paiement de 30 jours par virement.
+                  </div>
                   <button
                     onClick={handleDemoPayment}
                     disabled={submitting}
                     className="btn-primary w-full flex items-center justify-center gap-2 py-3 disabled:opacity-50"
                   >
-                    <Lock size={16} />
+                    <Building2 size={16} />
                     {submitting ? 'Confirmation...' : `Confirmer ${formatEur(orderData.total_ttc)}`}
                   </button>
                 </div>
               )}
 
+              {/* Fallback when no stripe and no payment method selected */}
+              {paymentMethod === 'stripe' && (!stripeObj || !orderData.client_secret) && (
+                <div className="space-y-3">
+                  <p className="text-sm text-gray-500">Stripe non configure. Selectionnez PayPal ou un autre mode de paiement.</p>
+                </div>
+              )}
+
               <p className="text-xs text-gray-400 text-center">
-                Paiement securise. Carte de test : 4242 4242 4242 4242
+                Paiement securise. {paymentMethod === 'stripe' && 'Carte de test : 4242 4242 4242 4242'}
               </p>
             </div>
           )}

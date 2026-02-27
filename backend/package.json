@@ -16,6 +16,7 @@
     "swagger": "node src/docs/generate-swagger.js"
   },
   "dependencies": {
+    "@paypal/checkout-server-sdk": "^1.0.3",
     "bcryptjs": "^2.4.3",
     "compression": "^1.8.1",
     "cookie-parser": "^1.4.6",

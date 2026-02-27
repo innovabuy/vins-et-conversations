@@ -46,6 +46,9 @@ services:
       JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET:-vc_refresh_secret_dev_change_in_prod}
       STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY:-sk_test_placeholder}
       STRIPE_WEBHOOK_SECRET: ${STRIPE_WEBHOOK_SECRET:-whsec_placeholder}
+      PAYPAL_CLIENT_ID: ${PAYPAL_CLIENT_ID:-AZ_E-ZvSOo4A0fSMJBoZj-JPJf-Wyp_s09XDDM1hoQQFeEvMOcQF8kvNtodxsBq-j57iKEwGgXxrO1TJ}
+      PAYPAL_SECRET: ${PAYPAL_SECRET:-EGkCKiJalmy8mxDnMcwWCDqxtszWGEb-9hK_T3KwfCTcqFPzAowyzljbTg8-_iR5-NWx0hAvFL_ZkKgb}
+      PAYPAL_MODE: ${PAYPAL_MODE:-sandbox}
       SITE_PUBLIC_URL: ${SITE_PUBLIC_URL:-http://76.13.44.13:8082}
       FRONTEND_URL: ${FRONTEND_URL:-http://76.13.44.13:5173}
       BASE_URL: ${BASE_URL:-http://76.13.44.13:5173}

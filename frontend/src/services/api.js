@@ -369,6 +369,12 @@ export const boutiqueAPI = {
   register: (data) => api.post('/public/register', data),
 };
 
+// ─── PayPal ─────────────────────────────────────
+export const paypalAPI = {
+  createOrder: (data) => api.post('/paypal/create-order', data),
+  captureOrder: (data) => api.post('/paypal/capture-order', data),
+};
+
 // ─── Referral (Student) ─────────────────────────
 export const referralAPI = {
   myLink: (campaignId) => api.get('/referral/my-link', { params: { campaign_id: campaignId } }),

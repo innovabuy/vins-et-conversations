@@ -137,6 +137,7 @@ app.use('/api/v1/admin/client-types', require('./routes/clientTypes'));
 app.use('/api/v1/admin/site-images', require('./routes/siteImages'));
 app.use('/api/v1/public/site-images', require('./routes/siteImages').publicRouter);
 app.use('/api/v1/admin/free-bottles', require('./routes/freeBottles'));
+app.use('/api/v1/paypal', require('./routes/paypal'));
 
 // ─── Health check ─────────────────────────────────────
 app.get('/api/health', async (req, res) => {
