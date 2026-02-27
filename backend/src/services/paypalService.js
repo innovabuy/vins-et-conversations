@@ -51,8 +51,28 @@ async function getAccessToken() {
  * @param {string} orderId - Internal order UUID (stored as custom_id)
  * @returns {{ paypal_order_id: string, approval_url: string }}
  */
-async function createOrder(amount, currency = 'EUR', orderId) {
+async function createOrder(amount, currency = 'EUR', orderId, { returnUrl, cancelUrl } = {}) {
   const accessToken = await getAccessToken();
+
+  const payload = {
+    intent: 'CAPTURE',
+    purchase_units: [{
+      amount: {
+        currency_code: currency,
+        value: parseFloat(amount).toFixed(2),
+      },
+      custom_id: orderId,
+    }],
+  };
+
+  if (returnUrl || cancelUrl) {
+    payload.application_context = {
+      brand_name: 'Vins & Conversations',
+      user_action: 'PAY_NOW',
+      ...(returnUrl && { return_url: returnUrl }),
+      ...(cancelUrl && { cancel_url: cancelUrl }),
+    };
+  }
 
   const res = await fetch(`${PAYPAL_BASE_URL}/v2/checkout/orders`, {
     method: 'POST',
@@ -60,16 +80,7 @@ async function createOrder(amount, currency = 'EUR', orderId) {
       'Authorization': `Bearer ${accessToken}`,
       'Content-Type': 'application/json',
     },
-    body: JSON.stringify({
-      intent: 'CAPTURE',
-      purchase_units: [{
-        amount: {
-          currency_code: currency,
-          value: parseFloat(amount).toFixed(2),
-        },
-        custom_id: orderId,
-      }],
-    }),
+    body: JSON.stringify(payload),
   });
 
   if (!res.ok) {

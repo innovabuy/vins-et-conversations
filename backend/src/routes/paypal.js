@@ -29,10 +29,15 @@ router.post('/create-order', async (req, res) => {
       return res.status(404).json({ error: 'NOT_FOUND', message: 'Commande introuvable' });
     }
 
+    const siteUrl = process.env.SITE_PUBLIC_URL || 'http://localhost:8082';
+    const returnUrl = `${siteUrl}/confirmation.html?order_id=${order_id}`;
+    const cancelUrl = `${siteUrl}/boutique.html?paypal_cancelled=true`;
+
     const result = await paypalService.createOrder(
       parseFloat(order.total_ttc),
       'EUR',
-      order_id
+      order_id,
+      { returnUrl, cancelUrl }
     );
 
     res.json(result);

@@ -51,7 +51,7 @@ describe('PayPal Routes', () => {
 
   // ─── POST /paypal/create-order ─────────────────────
 
-  test('POST /paypal/create-order with valid order → 200 + paypal_order_id', async () => {
+  test('POST /paypal/create-order with valid order → 200 + paypal_order_id + return_url', async () => {
     expect(testOrder).toBeDefined();
 
     paypalService.createOrder.mockResolvedValue({
@@ -68,11 +68,15 @@ describe('PayPal Routes', () => {
     expect(res.body).toHaveProperty('approval_url');
     expect(res.body.approval_url).toContain('sandbox.paypal.com');
 
-    // Verify the service was called with correct args
+    // Verify the service was called with return_url and cancel_url
     expect(paypalService.createOrder).toHaveBeenCalledWith(
       parseFloat(testOrder.total_ttc),
       'EUR',
-      testOrder.id
+      testOrder.id,
+      expect.objectContaining({
+        returnUrl: expect.stringContaining(`/confirmation.html?order_id=${testOrder.id}`),
+        cancelUrl: expect.stringContaining('/boutique.html?paypal_cancelled=true'),
+      })
     );
 
     createdOrderId = testOrder.id;
