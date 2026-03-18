@@ -87,6 +87,12 @@ const IDS = {
 };
 
 exports.seed = async function (knex) {
+  const existingUsers = await knex('users').count('id as count').first();
+  if (parseInt(existingUsers.count) > 0) {
+    console.log('⚠️ Seed ignoré — données existantes en base');
+    return;
+  }
+
   // Clean en ordre inverse des FK
   const tables = [
     'campaign_resources',
