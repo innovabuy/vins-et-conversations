@@ -186,6 +186,34 @@ export default function LoginPage() {
             </div>
           )}
 
+          {/* Demo accounts block */}
+          {import.meta.env.VITE_DEMO_MODE === 'true' && (
+            <div className="mt-4">
+              <p className="text-center text-white/80 text-sm font-medium mb-3">🎯 Accès démo rapide</p>
+              <div className="grid grid-cols-2 gap-2">
+                {[
+                  { icon: '👑', label: 'Admin', email: 'admin@domaine-collines.fr', password: 'Demo2026!' },
+                  { icon: '🎓', label: 'Étudiant', email: 'etudiant@domaine-collines.fr', password: 'Demo2026!' },
+                  { icon: '🏢', label: 'CSE', email: 'cse@domaine-collines.fr', password: 'Demo2026!' },
+                  { icon: '⭐', label: 'Ambassadeur', email: 'ambassadeur@domaine-collines.fr', password: 'Demo2026!' },
+                ].map((account) => (
+                  <button
+                    key={account.email}
+                    type="button"
+                    onClick={() => { setEmail(account.email); setPassword(account.password); }}
+                    className="flex items-center gap-2 bg-white/10 hover:bg-white/20 backdrop-blur-sm rounded-xl px-3 py-2.5 text-left transition-colors"
+                  >
+                    <span className="text-lg">{account.icon}</span>
+                    <div className="min-w-0">
+                      <div className="text-white text-sm font-medium">{account.label}</div>
+                      <div className="text-white/60 text-[10px] truncate">{account.email}</div>
+                    </div>
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
           <p className="text-center mt-5">
             <Link to="/boutique" className="text-wine-300 hover:text-white text-sm transition-colors">
               Découvrir nos vins →
