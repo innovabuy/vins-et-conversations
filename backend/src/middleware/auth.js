@@ -124,4 +124,22 @@ async function antifraudCheck(req, res, next) {
   }
 }
 
-module.exports = { authenticate, requireRole, requireCampaignAccess, antifraudCheck };
+/**
+ * CSE role check — restricts access based on cse_role (manager/member)
+ * @param  {...string} cseRoles - Allowed CSE roles ('manager', 'member')
+ */
+function requireCseRole(...cseRoles) {
+  return (req, res, next) => {
+    if (!req.user) return res.status(401).json({ error: 'AUTH_REQUIRED' });
+    // Non-CSE roles pass through (admin, etc.)
+    if (req.user.role !== 'cse') return next();
+    const userCseRole = req.user.cse_role || 'manager';
+    if (!cseRoles.includes(userCseRole)) {
+      logger.warn(`CSE access denied: ${req.user.email} [${userCseRole}] needs [${cseRoles.join(',')}]`);
+      return res.status(403).json({ error: 'CSE_ROLE_FORBIDDEN', message: 'Accès réservé aux responsables CSE' });
+    }
+    next();
+  };
+}
+
+module.exports = { authenticate, requireRole, requireCampaignAccess, antifraudCheck, requireCseRole };

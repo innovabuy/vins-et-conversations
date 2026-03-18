@@ -14,10 +14,15 @@ const rulesEngine = require('../services/rulesEngine');
 // POST /admin/free-bottles/record
 router.post('/record', authenticate, requireRole('super_admin', 'commercial'), auditAction('free_bottles'), async (req, res) => {
   try {
-    const { user_id, campaign_id, product_id, reason } = req.body;
+    const { user_id, campaign_id, product_id, reason, quantity } = req.body;
 
     if (!user_id || !campaign_id || !product_id) {
       return res.status(400).json({ error: 'MISSING_FIELDS', message: 'user_id, campaign_id et product_id requis' });
+    }
+
+    const qty = quantity != null ? parseInt(quantity, 10) : 1;
+    if (!Number.isInteger(qty) || qty < 1) {
+      return res.status(400).json({ error: 'INVALID_QUANTITY', message: 'quantity doit être un entier positif' });
     }
 
     // Validate student exists and participates
@@ -56,12 +61,20 @@ router.post('/record', authenticate, requireRole('super_admin', 'commercial'), a
       });
     }
 
-    // Record in financial_events (append-only)
-    const [event] = await db('financial_events').insert({
+    if (qty > balance.available) {
+      return res.status(400).json({
+        error: 'INSUFFICIENT_FREE_BOTTLES',
+        message: `Seulement ${balance.available} bouteille(s) disponible(s), ${qty} demandée(s)`,
+        balance,
+      });
+    }
+
+    // Record in financial_events (append-only) — one row per bottle for auditability
+    const rows = Array.from({ length: qty }, () => ({
       campaign_id,
       type: 'free_bottle',
       amount: product.purchase_price || 0,
-      description: reason || 'Enregistrement manuel 12+1',
+      description: reason || `Enregistrement manuel 12+1${qty > 1 ? ` (lot de ${qty})` : ''}`,
       metadata: JSON.stringify({
         user_id,
         product_id,
@@ -69,17 +82,19 @@ router.post('/record', authenticate, requireRole('super_admin', 'commercial'), a
         recorded_by: req.user.userId,
         manual_recording: true,
       }),
-    }).returning('*');
+    }));
+    const events = await db('financial_events').insert(rows).returning('*');
 
     // Recalculate balance
     const newBalance = await rulesEngine.calculateFreeBottles(user_id, campaign_id, freeBottleRules);
 
     res.status(201).json({
       success: true,
+      recorded: events.length,
       event: {
-        id: event.id,
-        type: event.type,
-        amount: parseFloat(event.amount),
+        id: events[0].id,
+        type: events[0].type,
+        amount: parseFloat(events[0].amount),
         product_name: product.name,
       },
       balance: newBalance,
@@ -198,6 +213,146 @@ router.patch('/toggle', authenticate, requireRole('super_admin', 'commercial'), 
     res.json({ success: true, free_bottle_enabled: enabled });
   } catch (err) {
     console.error('Free bottle toggle error:', err);
+    res.status(500).json({ error: 'SERVER_ERROR', message: err.message });
+  }
+});
+
+// GET /admin/free-bottles/history — Full history of all free bottle redemptions
+router.get('/history', authenticate, requireRole('super_admin', 'commercial', 'comptable'), async (req, res) => {
+  try {
+    const { campaign_id, student_id, page = 1, limit = 50 } = req.query;
+    const pageNum = Math.max(1, parseInt(page, 10) || 1);
+    const limitNum = Math.min(200, Math.max(1, parseInt(limit, 10) || 50));
+    const offset = (pageNum - 1) * limitNum;
+
+    let query = db('financial_events')
+      .join('campaigns', 'financial_events.campaign_id', 'campaigns.id')
+      .where('financial_events.type', 'free_bottle');
+
+    let countQuery = db('financial_events')
+      .where('type', 'free_bottle');
+
+    if (campaign_id) {
+      query = query.where('financial_events.campaign_id', campaign_id);
+      countQuery = countQuery.where('campaign_id', campaign_id);
+    }
+    if (student_id) {
+      query = query.whereRaw("financial_events.metadata->>'user_id' = ?", [student_id]);
+      countQuery = countQuery.whereRaw("metadata->>'user_id' = ?", [student_id]);
+    }
+
+    const totalResult = await countQuery.count('id as c').first();
+    const total = parseInt(totalResult?.c || 0, 10);
+
+    const rows = await query
+      .orderBy('financial_events.created_at', 'desc')
+      .offset(offset)
+      .limit(limitNum)
+      .select(
+        'financial_events.id',
+        'financial_events.created_at',
+        'financial_events.amount',
+        'financial_events.metadata',
+        'campaigns.name as campaign_name'
+      );
+
+    // Resolve user names in batch
+    const userIds = new Set();
+    const recorderIds = new Set();
+    rows.forEach((r) => {
+      const meta = typeof r.metadata === 'string' ? JSON.parse(r.metadata) : (r.metadata || {});
+      if (meta.user_id) userIds.add(meta.user_id);
+      if (meta.recorded_by) recorderIds.add(meta.recorded_by);
+    });
+    const allIds = [...new Set([...userIds, ...recorderIds])];
+    const users = allIds.length > 0
+      ? await db('users').whereIn('id', allIds).select('id', 'name', 'email')
+      : [];
+    const userMap = {};
+    users.forEach((u) => { userMap[u.id] = u; });
+
+    const data = rows.map((r) => {
+      const meta = typeof r.metadata === 'string' ? JSON.parse(r.metadata) : (r.metadata || {});
+      return {
+        id: r.id,
+        date: r.created_at,
+        student_name: userMap[meta.user_id]?.name || 'Inconnu',
+        student_id: meta.user_id || null,
+        campaign_name: r.campaign_name,
+        product_name: meta.product_name || 'Produit inconnu',
+        quantity: 1,
+        amount: parseFloat(r.amount),
+        recorded_by: userMap[meta.recorded_by]?.email || 'système',
+      };
+    });
+
+    res.json({ data, total, page: pageNum, limit: limitNum });
+  } catch (err) {
+    console.error('Free bottles history error:', err);
+    res.status(500).json({ error: 'SERVER_ERROR', message: err.message });
+  }
+});
+
+// GET /admin/free-bottles/history/export — Export history as CSV
+router.get('/history/export', authenticate, requireRole('super_admin', 'commercial', 'comptable'), async (req, res) => {
+  try {
+    const { campaign_id, student_id } = req.query;
+
+    let query = db('financial_events')
+      .join('campaigns', 'financial_events.campaign_id', 'campaigns.id')
+      .where('financial_events.type', 'free_bottle');
+
+    if (campaign_id) query = query.where('financial_events.campaign_id', campaign_id);
+    if (student_id) query = query.whereRaw("financial_events.metadata->>'user_id' = ?", [student_id]);
+
+    const rows = await query
+      .orderBy('financial_events.created_at', 'desc')
+      .select(
+        'financial_events.created_at',
+        'financial_events.amount',
+        'financial_events.metadata',
+        'campaigns.name as campaign_name'
+      );
+
+    // Resolve user names
+    const allIds = new Set();
+    rows.forEach((r) => {
+      const meta = typeof r.metadata === 'string' ? JSON.parse(r.metadata) : (r.metadata || {});
+      if (meta.user_id) allIds.add(meta.user_id);
+      if (meta.recorded_by) allIds.add(meta.recorded_by);
+    });
+    const users = allIds.size > 0
+      ? await db('users').whereIn('id', [...allIds]).select('id', 'name', 'email')
+      : [];
+    const userMap = {};
+    users.forEach((u) => { userMap[u.id] = u; });
+
+    const csvEscape = (v) => `"${String(v || '').replace(/"/g, '""')}"`;
+    const headers = ['Date', 'Étudiant', 'Campagne', 'Produit', 'Quantité', 'Coût achat (EUR)', 'Enregistré par'];
+    const csvRows = [headers.join(';')];
+
+    rows.forEach((r) => {
+      const meta = typeof r.metadata === 'string' ? JSON.parse(r.metadata) : (r.metadata || {});
+      csvRows.push([
+        csvEscape(new Date(r.created_at).toLocaleDateString('fr-FR')),
+        csvEscape(userMap[meta.user_id]?.name || 'Inconnu'),
+        csvEscape(r.campaign_name),
+        csvEscape(meta.product_name || 'Produit inconnu'),
+        1,
+        parseFloat(r.amount).toFixed(2),
+        csvEscape(userMap[meta.recorded_by]?.email || 'système'),
+      ].join(';'));
+    });
+
+    // Total row
+    const totalAmount = rows.reduce((s, r) => s + parseFloat(r.amount), 0);
+    csvRows.push(['', '', '', csvEscape('TOTAL'), rows.length, totalAmount.toFixed(2), ''].join(';'));
+
+    res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+    res.setHeader('Content-Disposition', `attachment; filename="gratuites-12+1-${Date.now()}.csv"`);
+    res.send('\uFEFF' + csvRows.join('\n'));
+  } catch (err) {
+    console.error('Free bottles history export error:', err);
     res.status(500).json({ error: 'SERVER_ERROR', message: err.message });
   }
 });

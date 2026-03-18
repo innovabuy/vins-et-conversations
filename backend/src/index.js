@@ -102,6 +102,8 @@ app.use('/api/v1/orders', require('./routes/orders'));
 app.use('/api/v1/dashboard', require('./routes/dashboard'));
 app.use('/api/v1/admin/campaigns', require('./routes/campaigns'));
 app.use('/api/v1/admin/stock', require('./routes/stock'));
+app.use('/api/v1/admin/delivery-notes', require('./routes/signatureBL'));
+app.use('/api/v1/admin/delivery-notes', require('./routes/groupedBL'));
 app.use('/api/v1/admin/delivery-notes', require('./routes/deliveryNotes'));
 app.use('/api/v1/admin/contacts', require('./routes/contacts'));
 app.use('/api/v1/admin/suppliers', require('./routes/suppliers'));
@@ -120,6 +122,7 @@ app.use('/api/v1/referral', require('./routes/referral'));
 app.use('/api/v1/formation', require('./routes/formation'));
 app.use('/api/v1/admin/users', require('./routes/users'));
 app.use('/api/v1/admin/invitations', require('./routes/invitations'));
+app.use('/api/v1/public', require('./routes/signatureBL').publicRouter);
 app.use('/api/v1/public', require('./routes/publicCatalog'));
 app.use('/api/v1/public', require('./routes/boutiqueAPI'));
 app.use('/api/v1/admin/catalog', require('./routes/catalogPdf'));
@@ -138,6 +141,8 @@ app.use('/api/v1/admin/site-images', require('./routes/siteImages'));
 app.use('/api/v1/public/site-images', require('./routes/siteImages').publicRouter);
 app.use('/api/v1/admin/free-bottles', require('./routes/freeBottles'));
 app.use('/api/v1/paypal', require('./routes/paypal'));
+app.use('/api/v1/admin/promo-codes', require('./routes/promoCodes'));
+app.use('/api/v1/promo-codes', require('./routes/promoCodes').publicRouter);
 
 // ─── Health check ─────────────────────────────────────
 app.get('/api/health', async (req, res) => {

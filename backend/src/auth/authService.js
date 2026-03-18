@@ -22,6 +22,8 @@ function generateAccessToken(user, participations) {
     campaign_ids: campaignIds,
   };
   if (subRole) payload.sub_role = subRole;
+  // V4.5: include cse_role (manager/member) from users table
+  if (user.cse_role) payload.cse_role = user.cse_role;
   return jwt.sign(payload, JWT_SECRET, { expiresIn: ACCESS_EXPIRY });
 }
 
@@ -62,6 +64,7 @@ async function login(email, password) {
       role: user.role,
       avatar: user.avatar,
       permissions: user.permissions,
+      cse_role: user.cse_role || null,
       campaigns: participations.map((p) => ({
         campaign_id: p.campaign_id,
         role: p.role_in_campaign,
@@ -94,6 +97,13 @@ async function register(code, name, email, password, parentalConsent) {
       throw new Error('PARENTAL_CONSENT_REQUIRED');
     }
 
+    // V4.5: map invitation sub_role to users.cse_role (manager/member)
+    let cseRole = null;
+    if (invitation.role === 'cse') {
+      const sr = invitation.sub_role || 'responsable';
+      cseRole = sr === 'collaborateur' ? 'member' : 'manager';
+    }
+
     await trx('users').insert({
       id: userId,
       email: email.toLowerCase().trim(),
@@ -103,12 +113,14 @@ async function register(code, name, email, password, parentalConsent) {
       status: 'active',
       parental_consent: invitation.role === 'etudiant' ? true : false,
       parental_consent_date: invitation.role === 'etudiant' ? new Date() : null,
+      cse_role: cseRole,
     });
 
     await trx('participations').insert({
       user_id: userId,
       campaign_id: invitation.campaign_id,
       role_in_campaign: invitation.role,
+      sub_role: invitation.sub_role || (invitation.role === 'cse' ? 'responsable' : null),
     });
 
     await trx('invitations').where({ id: invitation.id }).update({

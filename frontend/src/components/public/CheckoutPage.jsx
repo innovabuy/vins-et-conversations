@@ -5,8 +5,8 @@ import { Elements, CardElement, useStripe, useElements } from '@stripe/react-str
 import { useCart } from '../../contexts/CartContext';
 import { useAuth } from '../../contexts/AuthContext';
 import { useAppSettings } from '../../contexts/AppSettingsContext';
-import { boutiqueAPI, shippingAPI, authAPI, appSettingsAPI, paypalAPI } from '../../services/api';
-import { ArrowLeft, Lock, ShoppingCart, Truck, Loader2, User, MapPin, CreditCard, Check, LogIn, UserPlus, UserX, Store, Wallet, Building2 } from 'lucide-react';
+import { boutiqueAPI, shippingAPI, authAPI, appSettingsAPI, paypalAPI, promoCodesAPI } from '../../services/api';
+import { ArrowLeft, Lock, ShoppingCart, Truck, Loader2, User, MapPin, CreditCard, Check, LogIn, UserPlus, UserX, Store, Wallet, Building2, Tag, X } from 'lucide-react';
 
 const formatEur = (v) => new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR' }).format(v);
 
@@ -104,6 +104,10 @@ export default function CheckoutPage() {
   const [orderData, setOrderData] = useState(null); // { order_id, ref, total_ttc, client_secret }
   const [stripeObj, setStripeObj] = useState(null);
   const [paymentMethod, setPaymentMethod] = useState('stripe');
+  const [promoInput, setPromoInput] = useState('');
+  const [promoResult, setPromoResult] = useState(null); // { valid, promo_code_id, discount_amount, ... }
+  const [promoError, setPromoError] = useState('');
+  const [promoLoading, setPromoLoading] = useState(false);
 
   // Load Stripe
   useEffect(() => {
@@ -150,7 +154,33 @@ export default function CheckoutPage() {
       .finally(() => setShippingLoading(false));
   }, [form.postal_code, cart.total_items, deliveryType]);
 
-  const grandTotalTTC = cart.total_ttc + (deliveryType === 'click_and_collect' ? 0 : (shipping?.price_ttc || 0));
+  const grandTotalTTC = cart.total_ttc + (deliveryType === 'click_and_collect' ? 0 : (shipping?.price_ttc || 0)) - (promoResult?.discount_amount || 0);
+
+  const handleApplyPromo = async () => {
+    if (!promoInput.trim()) return;
+    setPromoLoading(true);
+    setPromoError('');
+    setPromoResult(null);
+    try {
+      const orderTotal = cart.total_ttc + (deliveryType === 'click_and_collect' ? 0 : (shipping?.price_ttc || 0));
+      const { data } = await promoCodesAPI.validate({ code: promoInput.trim(), order_total_ttc: orderTotal });
+      if (data.valid) {
+        setPromoResult(data);
+      } else {
+        setPromoError(data.message || 'Code promo invalide');
+      }
+    } catch {
+      setPromoError('Erreur lors de la validation du code');
+    } finally {
+      setPromoLoading(false);
+    }
+  };
+
+  const handleRemovePromo = () => {
+    setPromoResult(null);
+    setPromoError('');
+    setPromoInput('');
+  };
 
   if (cart.items.length === 0 && !orderData) {
     return (
@@ -240,6 +270,7 @@ export default function CheckoutPage() {
         delivery_type: deliveryType,
         customer: deliveryType === 'click_and_collect' ? { name: form.name, email: form.email, phone: form.phone } : form,
         referral_code: getReferralCode() || undefined,
+        promo_code: promoResult?.valid ? promoInput.trim() : undefined,
       });
       setOrderData(res.data);
       // Backorder: skip payment, go to confirmation directly
@@ -698,6 +729,49 @@ export default function CheckoutPage() {
                 <span className="text-gray-400 text-xs">Renseignez le code postal</span>
               )}
             </div>
+
+            {/* Promo code input */}
+            {step < 3 && (
+              <div className="border-t pt-3 space-y-2">
+                <p className="text-sm font-medium text-gray-700 flex items-center gap-1"><Tag size={14} /> Code promo</p>
+                {promoResult ? (
+                  <div className="flex items-center justify-between bg-green-50 rounded-lg px-3 py-2">
+                    <div>
+                      <span className="text-sm font-medium text-green-700">{promoInput.toUpperCase()}</span>
+                      <span className="text-sm text-green-600 ml-2">-{formatEur(promoResult.discount_amount)}</span>
+                    </div>
+                    <button onClick={handleRemovePromo} className="text-green-600 hover:text-red-500">
+                      <X size={14} />
+                    </button>
+                  </div>
+                ) : (
+                  <div className="flex gap-2">
+                    <input
+                      value={promoInput}
+                      onChange={(e) => setPromoInput(e.target.value.toUpperCase())}
+                      placeholder="BIENVENUE10"
+                      className="flex-1 border rounded-lg px-3 py-1.5 text-sm uppercase outline-none focus:ring-2 focus:ring-wine-200 focus:border-wine-500"
+                      onKeyDown={(e) => e.key === 'Enter' && handleApplyPromo()}
+                    />
+                    <button
+                      onClick={handleApplyPromo}
+                      disabled={promoLoading || !promoInput.trim()}
+                      className="px-3 py-1.5 bg-wine-700 text-white text-sm rounded-lg hover:bg-wine-800 disabled:opacity-50"
+                    >
+                      {promoLoading ? <Loader2 size={14} className="animate-spin" /> : 'OK'}
+                    </button>
+                  </div>
+                )}
+                {promoError && <p className="text-xs text-red-500">{promoError}</p>}
+              </div>
+            )}
+
+            {promoResult && (
+              <div className="flex justify-between text-sm text-green-600">
+                <span>Remise ({promoResult.type === 'percentage' ? `${promoResult.value}%` : 'fixe'})</span>
+                <span className="font-medium">-{formatEur(promoResult.discount_amount)}</span>
+              </div>
+            )}
 
             {shipping && shipping.surcharges && (
               <div className="bg-white rounded-lg p-3 text-xs text-gray-500 space-y-1">

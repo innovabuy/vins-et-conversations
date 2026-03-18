@@ -57,7 +57,7 @@ function MovementForm({ products, onSubmit, onCancel }) {
     setSaving(true);
     try {
       await onSubmit({
-        product_id: parseInt(form.product_id, 10),
+        product_id: form.product_id,
         type: form.type,
         qty: parseInt(form.qty, 10),
         reference: form.reference || undefined,

@@ -136,6 +136,17 @@
               </div>
             </div>
 
+            <!-- Promo code -->
+            <div class="form-group" id="promo-section" style="margin-top:20px;margin-bottom:20px;">
+              <label style="margin-bottom:6px;display:block;font-weight:600;font-size:0.95rem;">Vous avez un code promo ?</label>
+              <div style="display:flex;gap:8px;">
+                <input type="text" id="promo-input" placeholder="Ex : BIENVENUE10" style="flex:1;text-transform:uppercase;" autocomplete="off">
+                <button type="button" id="promo-apply-btn" class="btn btn-wine" style="padding:10px 20px;white-space:nowrap;">Appliquer</button>
+              </div>
+              <div id="promo-error" style="display:none;color:#991b1b;font-size:0.85rem;margin-top:6px;"></div>
+              <div id="promo-success" style="display:none;background:var(--cream);border:1px solid var(--gold);border-radius:var(--radius);padding:10px 16px;margin-top:8px;font-size:0.9rem;color:var(--wine);"></div>
+            </div>
+
             <div class="form-group">
               <label>
                 <input type="checkbox" id="accept-cgv" required>
@@ -251,6 +262,8 @@
   <script src="assets/js/main.js?v=3"></script>
   <script>
     let shippingCost = 0;
+    let promoDiscount = 0;
+    let promoCode = null; // validated code string
     let stripeInstance = null;
     let cardElement = null;
     let stripeEnabled = false;
@@ -269,6 +282,7 @@
       renderSummary(items);
       setupDeliveryToggle();
       setupShippingCalc();
+      setupPromoCode();
       showReferralBadge();
       await initStripe();
       setupFormSubmit();
@@ -313,7 +327,7 @@
         if (shippingLine && !isDelivery) {
           shippingCost = 0;
           shippingLine.textContent = 'Gratuit';
-          document.getElementById('total-price').textContent = Cart.getTotal().toFixed(2) + ' \u20ac';
+          updateTotalDisplay();
         }
       }
 
@@ -390,6 +404,10 @@
           <span>Livraison</span>
           <span id="shipping-cost">À calculer</span>
         </div>
+        <div class="summary-line" id="promo-line" style="display:none;color:#166534;">
+          <span>Code promo</span>
+          <span id="promo-discount-amount">-0,00 &euro;</span>
+        </div>
         <div class="summary-line summary-total">
           <span>Total TTC</span>
           <span id="total-price">${subtotal.toFixed(2)} &euro;</span>
@@ -419,7 +437,7 @@
             const data = await res.json();
             shippingCost = parseFloat(data.price_ttc || data.shipping_cost || 0);
             document.getElementById('shipping-cost').textContent = shippingCost > 0 ? shippingCost.toFixed(2) + ' \u20ac' : 'Offerte';
-            document.getElementById('total-price').textContent = (Cart.getTotal() + shippingCost).toFixed(2) + ' \u20ac';
+            updateTotalDisplay();
           } else {
             document.getElementById('shipping-cost').textContent = 'Non disponible';
           }
@@ -427,6 +445,88 @@
           console.warn('Shipping calc error', err);
         }
       });
+    }
+
+    function updateTotalDisplay() {
+      const totalEl = document.getElementById('total-price');
+      const promoLine = document.getElementById('promo-line');
+      if (totalEl) {
+        totalEl.textContent = Math.max(0, Cart.getTotal() + shippingCost - promoDiscount).toFixed(2) + ' \u20ac';
+      }
+      if (promoLine) {
+        promoLine.style.display = promoDiscount > 0 ? 'flex' : 'none';
+        const amountEl = document.getElementById('promo-discount-amount');
+        if (amountEl) amountEl.textContent = '-' + promoDiscount.toFixed(2) + ' \u20ac';
+      }
+    }
+
+    function setupPromoCode() {
+      const input = document.getElementById('promo-input');
+      const applyBtn = document.getElementById('promo-apply-btn');
+      const errorDiv = document.getElementById('promo-error');
+      const successDiv = document.getElementById('promo-success');
+      if (!applyBtn) return;
+
+      async function applyPromo() {
+        const code = input.value.trim().toUpperCase();
+        if (!code) return;
+
+        errorDiv.style.display = 'none';
+        successDiv.style.display = 'none';
+        applyBtn.disabled = true;
+        applyBtn.textContent = '...';
+
+        try {
+          const deliveryType = document.querySelector('input[name="delivery_type"]:checked').value;
+          const orderTotal = Cart.getTotal() + (deliveryType === 'click_and_collect' ? 0 : shippingCost);
+
+          const res = await fetch('/api/v1/promo-codes/validate', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ code: code, order_total_ttc: orderTotal }),
+          });
+
+          const data = await res.json();
+
+          if (data.valid) {
+            promoDiscount = parseFloat(data.discount_amount) || 0;
+            promoCode = code;
+            const label = data.type === 'percentage' ? '(' + data.value + '%)' : '(fixe)';
+            successDiv.innerHTML = 'Code <strong>' + escapeHtml(code) + '</strong> ' + label + ' : <strong style="color:#166534;">-' + promoDiscount.toFixed(2) + ' &euro;</strong>'
+              + ' <button type="button" id="promo-remove-btn" style="margin-left:12px;background:none;border:none;color:#991b1b;cursor:pointer;font-size:0.85rem;text-decoration:underline;">Retirer</button>';
+            successDiv.style.display = 'block';
+            input.disabled = true;
+            applyBtn.style.display = 'none';
+
+            document.getElementById('promo-remove-btn').addEventListener('click', () => {
+              promoDiscount = 0;
+              promoCode = null;
+              input.value = '';
+              input.disabled = false;
+              applyBtn.style.display = 'inline-block';
+              successDiv.style.display = 'none';
+              updateTotalDisplay();
+            });
+
+            updateTotalDisplay();
+          } else {
+            promoDiscount = 0;
+            promoCode = null;
+            errorDiv.textContent = data.message || 'Code invalide ou expiré';
+            errorDiv.style.display = 'block';
+            updateTotalDisplay();
+          }
+        } catch (err) {
+          errorDiv.textContent = 'Erreur lors de la validation du code';
+          errorDiv.style.display = 'block';
+        } finally {
+          applyBtn.disabled = false;
+          applyBtn.textContent = 'Appliquer';
+        }
+      }
+
+      applyBtn.addEventListener('click', applyPromo);
+      input.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); applyPromo(); } });
     }
 
     function setupFormSubmit() {
@@ -489,6 +589,7 @@
             session_id: sessionId,
             delivery_type: deliveryType,
             referral_code: referralCode,
+            promo_code: promoCode || undefined,
             customer: {
               name: `${firstName} ${lastName}`,
               email: email,

@@ -30,7 +30,7 @@ router.get('/my-link', authenticate, requireRole('etudiant'), async (req, res) =
       await db('participations').where({ id: participation.id }).update({ referral_code: referralCode });
     }
 
-    const siteUrl = process.env.SITE_PUBLIC_URL || process.env.FRONTEND_URL || '';
+    const siteUrl = process.env.FRONTEND_URL || process.env.SITE_PUBLIC_URL || '';
     const referralLink = `${siteUrl}/boutique?ref=${referralCode}`;
 
     res.json({ referral_code: referralCode, referral_link: referralLink });
@@ -55,7 +55,7 @@ router.get('/stats', authenticate, requireRole('etudiant'), async (req, res) => 
 
     if (!participation) return res.status(404).json({ error: 'NOT_PARTICIPANT', message: 'Vous ne participez pas à cette campagne' });
 
-    const validStatuses = ['submitted', 'validated', 'preparing', 'shipped', 'delivered'];
+    const validStatuses = ['submitted', 'pending_payment', 'pending_stock', 'validated', 'preparing', 'shipped', 'delivered'];
 
     const stats = await db('orders')
       .where({ referred_by: req.user.userId })

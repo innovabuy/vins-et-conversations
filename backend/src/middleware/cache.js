@@ -3,7 +3,7 @@ const logger = require('../utils/logger');
 let redis = null;
 
 // Only connect to Redis when not in test environment
-if (process.env.NODE_ENV !== 'test') {
+if (process.env.NODE_ENV !== 'test' && !process.env.JEST_WORKER_ID) {
   try {
     const Redis = require('ioredis');
     const redisUrl = process.env.REDIS_URL || 'redis://localhost:6379';

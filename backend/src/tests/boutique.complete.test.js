@@ -56,6 +56,22 @@ afterAll(async () => {
 
 // ─── Helpers ────────────────────────────────────────
 function getProduct(name) {
+  // Prefer exact seed product names to avoid ambiguity with variant products
+  const SEED_NAMES = {
+    'Oriolus': 'Oriolus Blanc',
+    'Clémence': 'Cuvée Clémence',
+    'Carillon': 'Carillon',
+    'Apertus': 'Apertus',
+    'Crémant': 'Crémant de Loire',
+    'Jus de Pomme': 'Jus de Pomme',
+    'Coffret': 'Coffret Découverte 3bt',
+    'Coteaux': 'Coteaux du Layon',
+  };
+  const exactName = SEED_NAMES[name];
+  if (exactName) {
+    const exact = products.find(p => p.name === exactName);
+    if (exact) return exact;
+  }
   return products.find(p => p.name.includes(name));
 }
 

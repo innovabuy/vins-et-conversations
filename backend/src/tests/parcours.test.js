@@ -485,6 +485,20 @@ describe('Parcours 7 — Referral étudiant', () => {
     expect(parseFloat(res.body.total_revenue)).toBeGreaterThan(0);
     expect(res.body.unique_clients).toBeGreaterThan(0);
   });
+
+  test('6. ca_referred cohérent entre dashboard et referral stats', async () => {
+    const dashRes = await request(app)
+      .get('/api/v1/dashboard/student')
+      .set('Authorization', `Bearer ${studentToken}`)
+      .query({ campaign_id: campaignId });
+    const statsRes = await request(app)
+      .get('/api/v1/referral/stats')
+      .set('Authorization', `Bearer ${studentToken}`)
+      .query({ campaign_id: campaignId });
+    expect(dashRes.status).toBe(200);
+    expect(statsRes.status).toBe(200);
+    expect(parseFloat(dashRes.body.ca_referred)).toBe(parseFloat(statsRes.body.total_revenue));
+  });
 });
 
 // ═══════════════════════════════════════════════════════

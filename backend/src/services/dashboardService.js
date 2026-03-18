@@ -1,5 +1,10 @@
 const db = require('../config/database');
 const rulesEngine = require('./rulesEngine');
+const { calculateFreeBottleCosts } = require('./marginFilters');
+
+// All order statuses that count as "active" for CA/stats calculations
+const ACTIVE_STATUSES = ['submitted', 'pending_payment', 'pending_stock', 'validated', 'preparing', 'shipped', 'delivered'];
+const ACTIVE_STATUSES_SQL = "('submitted','pending_payment','pending_stock','validated','preparing','shipped','delivered')";
 
 /**
  * Dashboard Étudiant (CDC §4.2)
@@ -20,7 +25,7 @@ async function getStudentDashboard(userId, campaignId) {
   }
 
   // Combined user stats: direct CA/bottles/count + referred CA/bottles (3 queries → 1)
-  const validStatuses = ['submitted', 'validated', 'preparing', 'shipped', 'delivered'];
+  const validStatuses = ACTIVE_STATUSES;
   const userStats = await db('orders')
     .whereIn('status', validStatuses)
     .where(function () {
@@ -46,14 +51,13 @@ async function getStudentDashboard(userId, campaignId) {
   const bottlesSold = parseInt(userStats?.direct_bottles || 0, 10) + bottlesReferred;
 
   // Classement (UNION ALL: direct orders + referred orders)
-  const validStatusList = "('submitted','validated','preparing','shipped','delivered')";
   const ranking = await db.raw(`
     SELECT user_id, SUM(total_ttc) as ca FROM (
       SELECT user_id, total_ttc FROM orders
-        WHERE campaign_id = ? AND status IN ${validStatusList} AND user_id IS NOT NULL
+        WHERE campaign_id = ? AND status IN ${ACTIVE_STATUSES_SQL} AND user_id IS NOT NULL
       UNION ALL
       SELECT referred_by as user_id, total_ttc FROM orders
-        WHERE referred_by IS NOT NULL AND source = 'student_referral' AND status IN ${validStatusList}
+        WHERE referred_by IS NOT NULL AND source = 'student_referral' AND status IN ${ACTIVE_STATUSES_SQL}
     ) combined GROUP BY user_id ORDER BY ca DESC
   `, [campaignId]);
   const rankingRows = ranking.rows || ranking;
@@ -66,10 +70,27 @@ async function getStudentDashboard(userId, campaignId) {
   const freeBottles = await rulesEngine.calculateFreeBottles(userId, campaignId, rules.freeBottle);
   const funds = await rulesEngine.calculateFunds(campaignId, userId, rules.commission);
 
+  // Historique des gratuités déjà remises (financial_events type='free_bottle')
+  // Historique des gratuités déjà remises (financial_events type='free_bottle')
+  const freeBottlesHistory = await db('financial_events')
+    .where({ campaign_id: campaignId, type: 'free_bottle' })
+    .whereRaw("metadata->>'user_id' = ?", [userId])
+    .orderBy('created_at', 'desc')
+    .select('created_at', 'metadata');
+
+  freeBottles.history = freeBottlesHistory.map((fe) => {
+    const meta = typeof fe.metadata === 'string' ? JSON.parse(fe.metadata) : (fe.metadata || {});
+    return {
+      date: fe.created_at,
+      product_name: meta.product_name || 'Produit inconnu',
+      quantity: 1,
+    };
+  });
+
   // Streak (simplifié — calculé depuis les dates de commandes)
   const recentOrders = await db('orders')
     .where({ user_id: userId, campaign_id: campaignId })
-    .whereIn('status', ['submitted', 'validated', 'preparing', 'shipped', 'delivered'])
+    .whereIn('status', ACTIVE_STATUSES)
     .orderBy('created_at', 'desc')
     .select('created_at')
     .limit(30);
@@ -192,7 +213,7 @@ async function getStudentDashboard(userId, campaignId) {
       this.where({ 'orders.user_id': userId, 'orders.campaign_id': campaignId })
         .orWhere({ 'orders.referred_by': userId, 'orders.source': 'student_referral' });
     })
-    .whereIn('orders.status', ['submitted', 'validated', 'preparing', 'shipped', 'delivered'])
+    .whereIn('orders.status', ACTIVE_STATUSES)
     .orderBy('orders.created_at', 'desc')
     .limit(5)
     .select('orders.id', 'orders.ref', 'orders.total_ttc', 'orders.total_items', 'orders.created_at', 'orders.payment_method', 'contacts.name as customer_name', 'orders.referred_by', 'orders.source');
@@ -268,7 +289,7 @@ async function getStudentRanking(userId, campaignId) {
     .first();
   if (!participation) throw new Error('NOT_PARTICIPANT');
 
-  const validStatusList = "('submitted','validated','preparing','shipped','delivered')";
+  const validStatusList = ACTIVE_STATUSES_SQL;
   const rankingResult = await db.raw(`
     SELECT combined.user_id, u.name, p.class_group,
            SUM(combined.total_ttc) as ca,
@@ -316,7 +337,7 @@ async function getAdminCockpit(campaignIds) {
 
   // KPIs principaux
   const ordersStats = await campaignFilter(db('orders')
-    .whereIn('status', ['submitted', 'validated', 'preparing', 'shipped', 'delivered']))
+    .whereIn('status', ACTIVE_STATUSES))
     .sum('total_ttc as ca_ttc')
     .sum('total_ht as ca_ht')
     .count('id as total_orders')
@@ -326,7 +347,7 @@ async function getAdminCockpit(campaignIds) {
   const caHT = parseFloat(ordersStats?.ca_ht || 0);
   const totalOrders = parseInt(ordersStats?.total_orders || 0, 10);
 
-  // Marge globale
+  // Marge globale (brute - coût 12+1 = nette)
   const marginResult = await db.raw(`
     SELECT COALESCE(SUM(oi.qty * (oi.unit_price_ht - p.purchase_price)), 0) as marge
     FROM order_items oi
@@ -335,7 +356,10 @@ async function getAdminCockpit(campaignIds) {
     WHERE o.status IN ('validated', 'preparing', 'shipped', 'delivered')
     ${campaignIds?.length ? `AND o.campaign_id IN (${campaignIds.map(() => '?').join(',')})` : ''}
   `, campaignIds?.length ? campaignIds : []);
-  const marge = parseFloat(marginResult.rows?.[0]?.marge || 0);
+  const margeBrute = parseFloat(marginResult.rows?.[0]?.marge || 0);
+  const fbcFilters = campaignIds?.length === 1 ? { campaign_id: campaignIds[0] } : {};
+  const fbcData = await calculateFreeBottleCosts(fbcFilters);
+  const marge = parseFloat((margeBrute - fbcData.total).toFixed(2));
 
   // Cartes d'action
   const pendingOrders = await campaignFilter(db('orders').where({ status: 'submitted' })).count('id as c').first();
@@ -361,7 +385,7 @@ async function getAdminCockpit(campaignIds) {
         .andOn('participations.campaign_id', 'orders.campaign_id');
     })
     .where('users.role', 'etudiant')
-    .whereIn('orders.status', ['submitted', 'validated', 'preparing', 'shipped', 'delivered'])
+    .whereIn('orders.status', ACTIVE_STATUSES)
     .groupBy('orders.user_id', 'users.name', 'participations.class_group')
     .select(
       'orders.user_id',
@@ -377,7 +401,7 @@ async function getAdminCockpit(campaignIds) {
   const topProducts = await db('order_items')
     .join('products', 'order_items.product_id', 'products.id')
     .join('orders', 'order_items.order_id', 'orders.id')
-    .whereIn('orders.status', ['submitted', 'validated', 'preparing', 'shipped', 'delivered'])
+    .whereIn('orders.status', ACTIVE_STATUSES)
     .groupBy('products.id', 'products.name')
     .select(
       'products.id',
@@ -391,7 +415,7 @@ async function getAdminCockpit(campaignIds) {
   // CA par campagne
   const caByCampaign = await db('orders')
     .join('campaigns', 'orders.campaign_id', 'campaigns.id')
-    .whereIn('orders.status', ['submitted', 'validated', 'preparing', 'shipped', 'delivered'])
+    .whereIn('orders.status', ACTIVE_STATUSES)
     .groupBy('campaigns.id', 'campaigns.name', 'campaigns.goal')
     .select(
       'campaigns.id',
@@ -403,7 +427,7 @@ async function getAdminCockpit(campaignIds) {
   // Boutique Web KPI
   const boutiqueStats = await db('orders')
     .whereIn('source', ['boutique_web', 'ambassador_referral', 'student_referral'])
-    .whereIn('status', ['submitted', 'validated', 'preparing', 'shipped', 'delivered'])
+    .whereIn('status', ACTIVE_STATUSES)
     .sum('total_ttc as ca_ttc')
     .count('id as count')
     .first();
@@ -452,7 +476,7 @@ async function getTeacherDashboard(userId, campaignId) {
   // Progression classe (objectif global en %)
   const caResult = await db('orders')
     .where({ campaign_id: campaignId })
-    .whereIn('status', ['submitted', 'validated', 'preparing', 'shipped', 'delivered'])
+    .whereIn('status', ACTIVE_STATUSES)
     .sum('total_ttc as ca')
     .first();
   const ca = parseFloat(caResult?.ca || 0);
@@ -467,7 +491,7 @@ async function getTeacherDashboard(userId, campaignId) {
     })
     .where('orders.campaign_id', campaignId)
     .where('users.role', 'etudiant')
-    .whereIn('orders.status', ['submitted', 'validated', 'preparing', 'shipped', 'delivered'])
+    .whereIn('orders.status', ACTIVE_STATUSES)
     .groupBy('orders.user_id', 'users.name', 'participations.class_group')
     .select(
       'users.name',
@@ -525,7 +549,7 @@ async function getTeacherDashboard(userId, campaignId) {
     const result = await db('orders')
       .where({ campaign_id: campaignId })
       .whereIn('user_id', studentIds)
-      .whereIn('status', ['submitted', 'validated', 'preparing', 'shipped', 'delivered'])
+      .whereIn('status', ACTIVE_STATUSES)
       .sum('total_items as bottles')
       .count('id as sales_count')
       .first();
@@ -598,7 +622,7 @@ async function getStudentLeaderboard(userId, campaignId, { period = 'all', class
     .first();
   if (!participation) throw new Error('NOT_PARTICIPANT');
 
-  const validStatusList = "('submitted','validated','preparing','shipped','delivered')";
+  const validStatusList = ACTIVE_STATUSES_SQL;
 
   // Build period filter SQL
   let periodFilter = '';
@@ -654,7 +678,7 @@ async function getStudentLeaderboard(userId, campaignId, { period = 'all', class
   const campaign = await db('campaigns').where({ id: campaignId }).first();
   const totalCaResult = await db('orders')
     .where({ campaign_id: campaignId })
-    .whereIn('status', ['submitted', 'validated', 'preparing', 'shipped', 'delivered'])
+    .whereIn('status', ACTIVE_STATUSES)
     .sum('total_ttc as total')
     .first();
   const totalCa = parseFloat(totalCaResult?.total || 0);

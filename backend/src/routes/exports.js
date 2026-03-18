@@ -79,6 +79,7 @@ function buildQuantiteSheet(workbook, pivotData, campaign) {
   const sheet = workbook.addWorksheet('Quantités vendues');
 
   const headerFill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF722F37' } };
+  const gratuiteFill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF8B5E3C' } };
   const totalFill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFE4B5' } };
   const grandTotalFill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFCD7F32' } };
   const boldWhite = { bold: true, color: { argb: 'FFFFFFFF' } };
@@ -86,13 +87,16 @@ function buildQuantiteSheet(workbook, pivotData, campaign) {
   const border = { style: 'thin', color: { argb: 'FFD0D0D0' } };
   const allBorders = { top: border, left: border, bottom: border, right: border };
 
-  sheet.mergeCells(1, 1, 1, products.length + 2);
+  // Each product occupies 2 columns: Qty + Offertes, then 2 total columns at the end
+  const totalCols = 1 + products.length * 2 + 2;
+
+  sheet.mergeCells(1, 1, 1, totalCols);
   const titleCell = sheet.getCell(1, 1);
   titleCell.value = `Récapitulatif des ventes — ${campaign.name} — Quantités vendues`;
   titleCell.font = { bold: true, size: 14, color: { argb: 'FF722F37' } };
   titleCell.alignment = { horizontal: 'center' };
 
-  sheet.mergeCells(2, 1, 2, products.length + 2);
+  sheet.mergeCells(2, 1, 2, totalCols);
   sheet.getCell(2, 1).value = `Export généré le ${new Date().toLocaleDateString('fr-FR', { day: '2-digit', month: 'long', year: 'numeric' })}`;
   sheet.getCell(2, 1).font = { italic: true, color: { argb: 'FF666666' } };
   sheet.getCell(2, 1).alignment = { horizontal: 'center' };
@@ -105,20 +109,41 @@ function buildQuantiteSheet(workbook, pivotData, campaign) {
   headerRow.getCell(1).border = allBorders;
 
   for (let i = 0; i < products.length; i++) {
-    const cell = headerRow.getCell(i + 2);
-    cell.value = products[i].name;
-    cell.fill = headerFill;
-    cell.font = boldWhite;
-    cell.alignment = { horizontal: 'center', wrapText: true };
-    cell.border = allBorders;
+    const colQty = 2 + i * 2;
+    const colGrat = colQty + 1;
+
+    const cellQty = headerRow.getCell(colQty);
+    cellQty.value = products[i].name;
+    cellQty.fill = headerFill;
+    cellQty.font = boldWhite;
+    cellQty.alignment = { horizontal: 'center', wrapText: true };
+    cellQty.border = allBorders;
+
+    const cellGrat = headerRow.getCell(colGrat);
+    cellGrat.value = 'Offertes (12+1)';
+    cellGrat.fill = gratuiteFill;
+    cellGrat.font = boldWhite;
+    cellGrat.alignment = { horizontal: 'center', wrapText: true };
+    cellGrat.border = allBorders;
   }
 
-  const totalHeaderCell = headerRow.getCell(products.length + 2);
+  const totalQtyCol = 2 + products.length * 2;
+  const totalGratCol = totalQtyCol + 1;
+
+  const totalHeaderCell = headerRow.getCell(totalQtyCol);
   totalHeaderCell.value = 'TOTAL Btl';
   totalHeaderCell.fill = totalFill;
   totalHeaderCell.font = bold;
   totalHeaderCell.alignment = { horizontal: 'center' };
   totalHeaderCell.border = allBorders;
+
+  const totalGratHeaderCell = headerRow.getCell(totalGratCol);
+  totalGratHeaderCell.value = 'Total Offertes';
+  totalGratHeaderCell.fill = totalFill;
+  totalGratHeaderCell.font = bold;
+  totalGratHeaderCell.alignment = { horizontal: 'center' };
+  totalGratHeaderCell.border = allBorders;
+
   headerRow.height = 45;
   headerRow.commit();
 
@@ -128,9 +153,13 @@ function buildQuantiteSheet(workbook, pivotData, campaign) {
     row.getCell(1).value = student.name;
     row.getCell(1).border = allBorders;
 
+    let totalGratuite = 0;
     for (let i = 0; i < products.length; i++) {
       const cell = cells.get(`${student.id}__${products[i].id}`);
-      const qtyCell = row.getCell(i + 2);
+      const colQty = 2 + i * 2;
+      const colGrat = colQty + 1;
+
+      const qtyCell = row.getCell(colQty);
       qtyCell.value = cell ? cell.qty : 0;
       qtyCell.alignment = { horizontal: 'center' };
       qtyCell.border = allBorders;
@@ -138,15 +167,34 @@ function buildQuantiteSheet(workbook, pivotData, campaign) {
         qtyCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE8F5E9' } };
         qtyCell.font = { bold: true, color: { argb: 'FF2E7D32' } };
       }
+
+      const gratCell = row.getCell(colGrat);
+      const qg = cell ? cell.qty_gratuite : 0;
+      gratCell.value = qg;
+      gratCell.alignment = { horizontal: 'center' };
+      gratCell.border = allBorders;
+      if (qg > 0) {
+        gratCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFF3E0' } };
+        gratCell.font = { bold: true, color: { argb: 'FFE65100' } };
+      }
+      totalGratuite += qg;
     }
 
     const studentTotal = totalsByStudent.get(student.id);
-    const totalCell = row.getCell(products.length + 2);
+    const totalCell = row.getCell(totalQtyCol);
     totalCell.value = studentTotal ? studentTotal.total_qty : 0;
     totalCell.fill = totalFill;
     totalCell.font = bold;
     totalCell.alignment = { horizontal: 'center' };
     totalCell.border = allBorders;
+
+    const totalGratCell = row.getCell(totalGratCol);
+    totalGratCell.value = totalGratuite;
+    totalGratCell.fill = totalFill;
+    totalGratCell.font = bold;
+    totalGratCell.alignment = { horizontal: 'center' };
+    totalGratCell.border = allBorders;
+
     row.commit();
     dataRowIndex++;
   }
@@ -157,29 +205,57 @@ function buildQuantiteSheet(workbook, pivotData, campaign) {
   totalRow.getCell(1).font = { bold: true, color: { argb: 'FFFFFFFF' } };
   totalRow.getCell(1).border = allBorders;
 
+  let grandTotalGratuite = 0;
   for (let i = 0; i < products.length; i++) {
     const productTotal = totalsByProduct.get(products[i].id);
-    const cell = totalRow.getCell(i + 2);
+    const colQty = 2 + i * 2;
+    const colGrat = colQty + 1;
+
+    const cell = totalRow.getCell(colQty);
     cell.value = productTotal ? productTotal.total_qty : 0;
     cell.fill = grandTotalFill;
     cell.font = { bold: true, color: { argb: 'FFFFFFFF' } };
     cell.alignment = { horizontal: 'center' };
     cell.border = allBorders;
+
+    // Sum gratuite for this product across all students
+    let prodGratuite = 0;
+    for (const s of students) {
+      const c = cells.get(`${s.id}__${products[i].id}`);
+      if (c) prodGratuite += c.qty_gratuite;
+    }
+    const gratCell = totalRow.getCell(colGrat);
+    gratCell.value = prodGratuite;
+    gratCell.fill = grandTotalFill;
+    gratCell.font = { bold: true, color: { argb: 'FFFFFFFF' } };
+    gratCell.alignment = { horizontal: 'center' };
+    gratCell.border = allBorders;
+    grandTotalGratuite += prodGratuite;
   }
 
-  const grandTotalCell = totalRow.getCell(products.length + 2);
+  const grandTotalCell = totalRow.getCell(totalQtyCol);
   grandTotalCell.value = grandTotal.qty;
   grandTotalCell.fill = grandTotalFill;
   grandTotalCell.font = { bold: true, size: 12, color: { argb: 'FFFFFFFF' } };
   grandTotalCell.alignment = { horizontal: 'center' };
   grandTotalCell.border = allBorders;
+
+  const grandTotalGratCell = totalRow.getCell(totalGratCol);
+  grandTotalGratCell.value = grandTotalGratuite;
+  grandTotalGratCell.fill = grandTotalFill;
+  grandTotalGratCell.font = { bold: true, size: 12, color: { argb: 'FFFFFFFF' } };
+  grandTotalGratCell.alignment = { horizontal: 'center' };
+  grandTotalGratCell.border = allBorders;
+
   totalRow.commit();
 
   sheet.getColumn(1).width = 25;
-  for (let i = 2; i <= products.length + 1; i++) {
-    sheet.getColumn(i).width = Math.max(12, (products[i - 2]?.name?.length || 10) * 0.8);
+  for (let i = 0; i < products.length; i++) {
+    sheet.getColumn(2 + i * 2).width = Math.max(12, (products[i]?.name?.length || 10) * 0.8);
+    sheet.getColumn(3 + i * 2).width = 14;
   }
-  sheet.getColumn(products.length + 2).width = 14;
+  sheet.getColumn(totalQtyCol).width = 14;
+  sheet.getColumn(totalGratCol).width = 14;
   sheet.views = [{ state: 'frozen', xSplit: 1, ySplit: 4 }];
 }
 
@@ -447,23 +523,42 @@ function buildRecapProduitSheet(workbook, pivotData, campaign) {
   sheet.getColumn(6).width = 16;
 }
 
-/** Export CSV basique (quantités uniquement) */
+/** Export CSV détail (une ligne par étudiant × produit) */
 function buildCsvPivot(pivotData) {
   const { students, products, cells, totalsByStudent } = pivotData;
   const lines = [];
 
-  const header = ['Étudiant', ...products.map((p) => p.name), 'TOTAL'];
-  lines.push(header.join(';'));
+  lines.push(['Étudiant', 'Produit', 'Quantité commandée', 'Bouteilles offertes (12+1)', 'Total TTC', 'Total HT'].join(';'));
 
   for (const student of students) {
-    const values = [student.name];
     for (const product of products) {
       const cell = cells.get(`${student.id}__${product.id}`);
-      values.push(cell ? cell.qty : 0);
+      if (!cell || cell.qty_commerciale === 0) continue;
+      lines.push([
+        student.name,
+        product.name,
+        cell.qty_commerciale,
+        cell.qty_gratuite,
+        cell.montant_ttc.toFixed(2),
+        cell.montant_ht.toFixed(2),
+      ].join(';'));
     }
+    // Sous-total étudiant
     const total = totalsByStudent.get(student.id);
-    values.push(total ? total.total_qty : 0);
-    lines.push(values.join(';'));
+    if (total) {
+      const totalGratuite = products.reduce((sum, p) => {
+        const c = cells.get(`${student.id}__${p.id}`);
+        return sum + (c ? c.qty_gratuite : 0);
+      }, 0);
+      lines.push([
+        `${student.name} — TOTAL`,
+        '',
+        total.total_qty,
+        totalGratuite,
+        total.total_ttc.toFixed(2),
+        total.total_ht.toFixed(2),
+      ].join(';'));
+    }
   }
 
   return lines.join('\r\n');
@@ -507,7 +602,6 @@ router.get('/campaign-pivot', authenticate, requireRole('super_admin', 'admin', 
         'p.price_ttc',
         'p.price_ht',
         db.raw('SUM(oi.qty) as qty_vendue'),
-        db.raw('COALESCE(SUM(oi.free_qty), 0) as qty_gratuite'),
         db.raw('SUM(oi.qty * oi.unit_price_ttc) as montant_ttc'),
         db.raw('SUM(oi.qty * oi.unit_price_ht) as montant_ht')
       )
@@ -516,6 +610,25 @@ router.get('/campaign-pivot', authenticate, requireRole('super_admin', 'admin', 
 
     if (rows.length === 0) {
       return res.status(404).json({ error: true, code: 'NO_DATA', message: 'Aucune commande pour cette campagne' });
+    }
+
+    // Build free bottle map from financial_events (source of truth, append-only)
+    const freeBottleRows = await db('financial_events')
+      .where({ campaign_id, type: 'free_bottle' })
+      .select(
+        db.raw("metadata->>'user_id' as user_id"),
+        db.raw("metadata->>'product_id' as product_id"),
+        db.raw('COUNT(*) as qty_gratuite')
+      )
+      .groupByRaw("metadata->>'user_id', metadata->>'product_id'");
+    const freeBottleMap = new Map();
+    for (const fb of freeBottleRows) {
+      freeBottleMap.set(`${fb.user_id}__${fb.product_id}`, parseInt(fb.qty_gratuite, 10));
+    }
+
+    // Inject qty_gratuite from financial_events into rows
+    for (const row of rows) {
+      row.qty_gratuite = freeBottleMap.get(`${row.user_id}__${row.product_id}`) || 0;
     }
 
     const pivotData = buildPivotData(rows, include_free === 'true');
@@ -1260,25 +1373,14 @@ router.get('/activity-report', async (req, res) => {
       .select(db.raw('COALESCE(SUM(oi.qty * (oi.unit_price_ht - p.purchase_price)), 0) as marge_brute'));
     const margeBrute = parseFloat(marginResult[0]?.marge_brute || 0);
 
-    // Free bottle cost deduction (V4.2)
-    let freeBottleQuery = db('order_items as oi')
-      .join('orders as o', 'oi.order_id', 'o.id')
-      .join('products as p', 'oi.product_id', 'p.id')
-      .leftJoin('product_categories as pc', 'p.category_id', 'pc.id')
-      .join('campaigns as camp', 'o.campaign_id', 'camp.id')
-      .join('client_types as ct', 'camp.client_type_id', 'ct.id')
-      .whereIn('o.status', ['validated', 'preparing', 'shipped', 'delivered'])
-      .where('oi.type', 'product')
-      .whereRaw("COALESCE(pc.is_alcohol, true) = true")
-      .whereRaw("ct.free_bottle_rules IS NOT NULL AND ct.free_bottle_rules::text != '{}'");
-    if (start) freeBottleQuery = freeBottleQuery.where('o.created_at', '>=', start);
-    if (end) freeBottleQuery = freeBottleQuery.where('o.created_at', '<=', end);
+    // Free bottle cost deduction — source of truth: financial_events
+    let freeBottleQuery = db('financial_events')
+      .where('type', 'free_bottle');
+    if (start) freeBottleQuery = freeBottleQuery.where('created_at', '>=', start);
+    if (end) freeBottleQuery = freeBottleQuery.where('created_at', '<=', end);
 
     const freeBottleResult = await freeBottleQuery.select(
-      db.raw(`COALESCE(SUM(
-        FLOOR(oi.qty::numeric / COALESCE((ct.free_bottle_rules->>'n')::numeric, 12))
-        * p.purchase_price
-      ), 0) as free_bottle_cost`)
+      db.raw('COALESCE(SUM(amount), 0) as free_bottle_cost')
     );
     const freeBottleCost = parseFloat(freeBottleResult[0]?.free_bottle_cost || 0);
 

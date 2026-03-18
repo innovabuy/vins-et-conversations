@@ -156,7 +156,7 @@ function OverviewTab({ data }) {
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         <KPIGradient label="Ventes TTC" value={formatEur(data.sales.total_ttc)} icon={TrendingUp} gradient="from-wine-700 to-wine-900" />
         <KPIGradient label="Achats (cout)" value={formatEur(data.purchases.total_cost)} icon={DollarSign} gradient="from-blue-500 to-blue-700" />
-        <KPIGradient label="Marge nette" value={formatEur(data.margin - (data.free_bottle_cost || 0) - (data.commission || 0))} icon={BarChart3} gradient="from-emerald-500 to-emerald-700" />
+        <KPIGradient label="Marge nette" value={formatEur(data.margin)} icon={BarChart3} gradient="from-emerald-500 to-emerald-700" />
         <KPIGradient label="Taux de marge" value={`${data.margin_pct}%`} icon={TrendingUp} gradient="from-purple-500 to-purple-700" />
       </div>
 
@@ -164,13 +164,13 @@ function OverviewTab({ data }) {
       <div className="card">
         <h3 className="font-semibold mb-3">Decomposition de la marge</h3>
         <div className="space-y-2 text-sm">
-          <div className="flex justify-between py-1"><span className="text-gray-600">Marge brute</span><span className="font-semibold text-emerald-600">{formatEur(data.margin)}</span></div>
+          <div className="flex justify-between py-1"><span className="text-gray-600">Marge brute</span><span className="font-semibold text-emerald-600">{formatEur(data.margin_brut)}</span></div>
           {(data.free_bottle_cost > 0 || data.commission > 0) && <div className="border-t" />}
           {data.free_bottle_cost > 0 && <div className="flex justify-between py-1"><span className="text-gray-600">Cout gratuites (12+1)</span><span className="font-semibold text-red-500">-{formatEur(data.free_bottle_cost)}</span></div>}
           {data.commission > 0 && <div className="flex justify-between py-1"><span className="text-gray-600">Commission association</span><span className="font-semibold text-red-500">-{formatEur(data.commission)}</span></div>}
           {(data.free_bottle_cost > 0 || data.commission > 0) && <>
             <div className="border-t border-gray-300" />
-            <div className="flex justify-between py-1"><span className="font-semibold text-gray-900">Marge nette</span><span className="font-bold text-emerald-700">{formatEur(data.margin - (data.free_bottle_cost || 0) - (data.commission || 0))}</span></div>
+            <div className="flex justify-between py-1"><span className="font-semibold text-gray-900">Marge nette</span><span className="font-bold text-emerald-700">{formatEur(data.margin)}</span></div>
           </>}
         </div>
       </div>

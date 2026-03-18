@@ -39,7 +39,18 @@ export default function CartPage() {
               >
                 <Minus size={14} />
               </button>
-              <span className="w-8 text-center font-medium">{item.qty}</span>
+              <input
+                type="number"
+                min="1"
+                max="999"
+                value={item.qty}
+                onChange={(e) => {
+                  const val = parseInt(e.target.value, 10);
+                  if (!isNaN(val) && val >= 1) updateQty(item.product_id, val);
+                }}
+                disabled={loading}
+                className="w-14 text-center font-medium border rounded-lg py-1 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+              />
               <button
                 onClick={() => updateQty(item.product_id, item.qty + 1)}
                 disabled={loading}

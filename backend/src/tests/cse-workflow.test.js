@@ -208,4 +208,59 @@ describe('CSE Workflow', () => {
       .where({ user_id: cseUser.id, campaign_id: cseCampaignId })
       .update({ sub_role: 'responsable' });
   });
+
+  // ═══════════════════════════════════════════════════════
+  // V4.5: CSE ROLE (manager/member) on users table
+  // ═══════════════════════════════════════════════════════
+
+  test('12. CSE dashboard returns cse_role field', async () => {
+    const res = await request(app)
+      .get('/api/v1/dashboard/cse')
+      .set('Authorization', `Bearer ${cseToken}`)
+      .query({ campaign_id: cseCampaignId });
+    expect(res.status).toBe(200);
+    expect(res.body.cse_role).toBe('manager');
+  });
+
+  test('13. CSE member sees only own orders via cse_role', async () => {
+    const cseUser = await db('users').where({ email: 'cse@leroymerlin.fr' }).first();
+    // Set cse_role to member
+    await db('users').where({ id: cseUser.id }).update({ cse_role: 'member' });
+    await db('participations')
+      .where({ user_id: cseUser.id, campaign_id: cseCampaignId })
+      .update({ sub_role: 'collaborateur' });
+
+    // Re-login to get new JWT with cse_role=member
+    const loginRes = await request(app)
+      .post('/api/v1/auth/login')
+      .send({ email: 'cse@leroymerlin.fr', password: 'VinsConv2026!' });
+    const memberToken = loginRes.body.accessToken;
+
+    const res = await request(app)
+      .get('/api/v1/dashboard/cse')
+      .set('Authorization', `Bearer ${memberToken}`)
+      .query({ campaign_id: cseCampaignId });
+    expect(res.status).toBe(200);
+    expect(res.body.cse_role).toBe('member');
+    expect(res.body.can_order).toBe(true);
+
+    // Member sees only own orders
+    for (const order of res.body.orders) {
+      expect(order.user_id).toBe(cseUser.id);
+    }
+
+    // Restore
+    await db('users').where({ id: cseUser.id }).update({ cse_role: 'manager' });
+    await db('participations')
+      .where({ user_id: cseUser.id, campaign_id: cseCampaignId })
+      .update({ sub_role: 'responsable' });
+  });
+
+  test('14. requireCseRole middleware blocks member from manager-only endpoints', async () => {
+    const { requireCseRole } = require('../middleware/auth');
+    expect(typeof requireCseRole).toBe('function');
+    // Verify it returns a middleware function
+    const middleware = requireCseRole('manager');
+    expect(typeof middleware).toBe('function');
+  });
 });

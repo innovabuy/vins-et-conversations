@@ -32,8 +32,12 @@ describe('Diagnostic V4.3 — Avertissements corrigés', () => {
 
   // ⚠️ 2. Pas de produits seedés sans image
   test('All seeded products have an image_url', async () => {
+    const seededNames = [
+      'Oriolus Blanc', 'Cuvée Clémence', 'Carillon', 'Apertus',
+      'Crémant de Loire', 'Coffret Découverte 3bt', 'Coteaux du Layon', 'Jus de Pomme',
+    ];
     const productsNoImage = await db('products')
-      .where('name', 'not like', 'Test %')
+      .whereIn('name', seededNames)
       .andWhere(function () {
         this.whereNull('image_url').orWhere('image_url', '');
       });

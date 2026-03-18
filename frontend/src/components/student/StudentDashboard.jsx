@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { dashboardAPI, productsAPI, ordersAPI, campaignResourcesAPI, invoicesAPI } from '../../services/api';
 import { useAuth } from '../../contexts/AuthContext';
-import { Flame, Trophy, ShoppingCart, User, ChevronUp, Wine, Package, Clock, Award, Zap, Heart, Target, DollarSign, ArrowLeft, ArrowRight, Check, Phone, Mail, FileText, CreditCard, Banknote, Building, HelpCircle, Users, TrendingUp, TrendingDown, Minus, BarChart3, BookOpen, ExternalLink, Video, Image, FileDown, LogOut } from 'lucide-react';
+import { Flame, Trophy, ShoppingCart, User, ChevronUp, ChevronDown, Wine, Package, Clock, Award, Zap, Heart, Target, DollarSign, ArrowLeft, ArrowRight, Check, Phone, Mail, FileText, CreditCard, Banknote, Building, HelpCircle, Users, TrendingUp, TrendingDown, Minus, BarChart3, BookOpen, ExternalLink, Video, Image, FileDown, LogOut } from 'lucide-react';
 import WineBarrel from '../shared/WineBarrel';
 import CapNumerikCredit from '../shared/CapNumerikCredit';
 import ReferralSection from './ReferralSection';
@@ -157,6 +157,14 @@ function OrderFlow({ campaignId, products, customers, onComplete }) {
     });
   };
 
+  const setCartQty = (productId, value) => {
+    const qty = Math.max(0, parseInt(value) || 0);
+    setCart((prev) => {
+      if (qty === 0) { const next = { ...prev }; delete next[productId]; return next; }
+      return { ...prev, [productId]: qty };
+    });
+  };
+
   const cartTotal = useMemo(() => Object.entries(cart).reduce((sum, [pid, qty]) => {
     const p = products.find((x) => x.id === pid);
     return sum + (p ? (p.custom_price || p.price_ttc) * qty : 0);
@@ -305,7 +313,14 @@ function OrderFlow({ campaignId, products, customers, onComplete }) {
           </div>
           <div className="flex items-center gap-2">
             <button onClick={() => updateCart(p.id, -1)} className="w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center font-bold text-lg">&minus;</button>
-            <span className="w-6 text-center font-medium">{cart[p.id] || 0}</span>
+            <input
+              type="number"
+              min="0"
+              value={cart[p.id] || 0}
+              onChange={e => setCartQty(p.id, e.target.value)}
+              onBlur={e => setCartQty(p.id, e.target.value)}
+              className="w-12 text-center font-medium border rounded px-1 py-0.5 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+            />
             <button onClick={() => updateCart(p.id, 1)} className="w-10 h-10 rounded-full bg-wine-100 text-wine-700 flex items-center justify-center font-bold text-lg">+</button>
           </div>
         </div>
@@ -406,6 +421,7 @@ export default function StudentDashboard() {
   const [resources, setResources] = useState([]);
   const [loading, setLoading] = useState(true);
   const [orderSuccess, setOrderSuccess] = useState(false);
+  const [showFreeHistory, setShowFreeHistory] = useState(false);
 
   const campaignId = user?.campaigns?.[0]?.campaign_id;
 
@@ -528,6 +544,29 @@ export default function StudentDashboard() {
                   ))}
                 </div>
               )}
+              {/* Free bottles history */}
+              {data.freeBottles.history?.length > 0 && (
+                <div className="border-t pt-2 mt-2">
+                  <button
+                    onClick={() => setShowFreeHistory((v) => !v)}
+                    className="flex items-center justify-between w-full text-xs font-medium text-gray-600 hover:text-gray-800"
+                  >
+                    <span>Gratuités déjà remises ({data.freeBottles.history.length})</span>
+                    {showFreeHistory ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+                  </button>
+                  {showFreeHistory && (
+                    <div className="mt-2 space-y-1">
+                      {data.freeBottles.history.map((h, i) => (
+                        <div key={i} className="flex items-center justify-between text-xs">
+                          <span className="text-gray-500 w-20 flex-shrink-0">{formatDate(h.date)}</span>
+                          <span className="text-gray-700 truncate mx-2 flex-1">{h.product_name}</span>
+                          <span className="text-wine-700 font-semibold flex-shrink-0">{h.quantity}</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
 
             {/* Barriques — Part des anges (V4.1) */}
@@ -562,7 +601,7 @@ export default function StudentDashboard() {
             )}
 
             {/* Referral section — hidden for alcohol-free campaigns */}
-            {!campaign?.alcohol_free && <ReferralSection campaignId={campaignId} brandName={brandName} />}
+            {!campaign?.alcohol_free && <ReferralSection campaignId={campaignId} brandName={brandName} caReferred={data.ca_referred || 0} />}
 
             {/* Campaign collective stats */}
             {campaign && (

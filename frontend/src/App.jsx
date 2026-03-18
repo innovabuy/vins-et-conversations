@@ -28,6 +28,7 @@ import AppSettings from './components/admin/AppSettings';
 import AdminOrganizationTypes from './components/admin/AdminOrganizationTypes';
 import AdminCampaignTypes from './components/admin/AdminCampaignTypes';
 import SiteImages from './components/admin/SiteImages';
+import AdminPromoCodes from './components/admin/AdminPromoCodes';
 import StudentDashboard from './components/student/StudentDashboard';
 import CSELayout from './components/layout/CSELayout';
 import CSEDashboard from './components/cse/CSEDashboard';
@@ -59,6 +60,8 @@ import { SiteImagesProvider } from './contexts/SiteImagesContext';
 import InviteRegisterPage from './pages/InviteRegisterPage';
 import InviteErrorPage from './pages/InviteErrorPage';
 import AmbassadorsPage from './components/public/AmbassadorsPage';
+import SignaturePage from './pages/SignaturePage';
+import JoinCampaignPage from './pages/JoinCampaignPage';
 
 function ProtectedRoute({ children, roles }) {
   const { user, loading } = useAuth();
@@ -77,6 +80,8 @@ function AppRoutes() {
       <Route path="/invite" element={<InviteErrorPage />} />
       <Route path="/invite/:code" element={<InviteRegisterPage />} />
       <Route path="/installer" element={<InstallGuide />} />
+      <Route path="/sign/:token" element={<SignaturePage />} />
+      <Route path="/join-campaign/:campaignId" element={<JoinCampaignPage />} />
 
       {/* Public boutique */}
       <Route path="/boutique" element={<CartProvider><PublicLayout /></CartProvider>}>
@@ -125,6 +130,7 @@ function AppRoutes() {
         <Route path="users" element={<AdminUsers />} />
         <Route path="organization-types" element={<AdminOrganizationTypes />} />
         <Route path="campaign-types" element={<AdminCampaignTypes />} />
+        <Route path="promo-codes" element={<AdminPromoCodes />} />
         <Route path="site-images" element={<SiteImages />} />
         <Route path="settings" element={<AppSettings />} />
       </Route>

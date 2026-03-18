@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate, useSearchParams, Link } from 'react-router-dom';
-import { ordersAPI, campaignsAPI, contactsAPI, productsAPI, deliveryNotesAPI, usersAPI } from '../../services/api';
+import { ordersAPI, campaignsAPI, contactsAPI, productsAPI, deliveryNotesAPI, usersAPI, promoCodesAPI } from '../../services/api';
 import {
   ShoppingCart, Search, Plus, Check, Eye, EyeOff, FileText, Printer, Mail,
   ChevronLeft, ChevronRight, X, Trash2, Save, Truck, ExternalLink, AlertTriangle, UserPlus
@@ -37,6 +37,10 @@ function NewOrderForm({ onClose, onCreated }) {
   const [contacts, setContacts] = useState([]);
   const [form, setForm] = useState({ campaign_id: '', customer_id: null, items: [], notes: '' });
   const [saving, setSaving] = useState(false);
+  const [promoInput, setPromoInput] = useState('');
+  const [promoResult, setPromoResult] = useState(null);
+  const [promoError, setPromoError] = useState('');
+  const [promoLoading, setPromoLoading] = useState(false);
   const debounceRef = useRef(null);
 
   useEffect(() => {
@@ -73,6 +77,31 @@ function NewOrderForm({ onClose, onCreated }) {
     setForm(f => ({ ...f, items: f.items.filter(i => i.productId !== productId) }));
   };
 
+  const handleApplyPromo = async () => {
+    if (!promoInput.trim()) return;
+    setPromoLoading(true);
+    setPromoError('');
+    setPromoResult(null);
+    try {
+      const res = await promoCodesAPI.validate({ code: promoInput.trim(), order_total_ttc: total });
+      if (res.data.valid) {
+        setPromoResult(res.data);
+      } else {
+        setPromoError(res.data.message || 'Code invalide ou expiré');
+      }
+    } catch {
+      setPromoError('Erreur de validation du code');
+    } finally {
+      setPromoLoading(false);
+    }
+  };
+
+  const handleRemovePromo = () => {
+    setPromoResult(null);
+    setPromoError('');
+    setPromoInput('');
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!form.campaign_id || form.items.length === 0) { alert('Sélectionnez une campagne et au moins un produit'); return; }
@@ -83,6 +112,7 @@ function NewOrderForm({ onClose, onCreated }) {
         customer_id: form.customer_id,
         items: form.items.map(i => ({ productId: i.productId, qty: i.qty })),
         notes: form.notes,
+        promo_code: promoResult ? promoInput.trim() : undefined,
       });
       onCreated();
     } catch (err) {
@@ -155,7 +185,13 @@ function NewOrderForm({ onClose, onCreated }) {
                     </div>
                   </div>
                 ))}
-                <div className="flex justify-end p-2 font-semibold text-sm">Total : {formatEur(total)}</div>
+                <div className="flex justify-end p-2 font-semibold text-sm">
+                  {promoResult ? (
+                    <span>Total : <span className="line-through text-gray-400 mr-2">{formatEur(total)}</span>{formatEur(total - promoResult.discount_amount)}</span>
+                  ) : (
+                    <span>Total : {formatEur(total)}</span>
+                  )}
+                </div>
               </div>
             </div>
           )}
@@ -163,6 +199,37 @@ function NewOrderForm({ onClose, onCreated }) {
           <div>
             <label className="block text-xs font-medium text-gray-500 mb-1">Notes</label>
             <textarea value={form.notes} onChange={e => setForm(f => ({ ...f, notes: e.target.value }))} className="w-full border rounded-lg px-3 py-2 text-sm" rows={2} />
+          </div>
+
+          <div>
+            <label className="block text-xs font-medium text-gray-500 mb-1">Code promo (optionnel)</label>
+            {promoResult ? (
+              <div className="flex items-center gap-2 p-2 bg-green-50 border border-green-200 rounded-lg text-sm">
+                <Check size={16} className="text-green-600 shrink-0" />
+                <span className="text-green-800 font-medium">{promoInput.toUpperCase()}</span>
+                <span className="text-green-600">-{formatEur(promoResult.discount_amount)}</span>
+                <button type="button" onClick={handleRemovePromo} className="ml-auto text-gray-400 hover:text-red-500"><X size={14} /></button>
+              </div>
+            ) : (
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  value={promoInput}
+                  onChange={e => { setPromoInput(e.target.value); setPromoError(''); }}
+                  placeholder="Entrez un code promo"
+                  className="flex-1 border rounded-lg px-3 py-2 text-sm"
+                />
+                <button
+                  type="button"
+                  onClick={handleApplyPromo}
+                  disabled={promoLoading || !promoInput.trim() || form.items.length === 0}
+                  className="px-3 py-2 text-sm bg-gray-100 hover:bg-gray-200 rounded-lg disabled:opacity-50"
+                >
+                  {promoLoading ? '...' : 'Appliquer'}
+                </button>
+              </div>
+            )}
+            {promoError && <p className="text-xs text-red-500 mt-1">{promoError}</p>}
           </div>
 
           <div className="flex justify-end gap-3 pt-2">

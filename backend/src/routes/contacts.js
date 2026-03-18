@@ -140,21 +140,30 @@ router.post('/', authenticate, requireRole('super_admin', 'commercial'), auditAc
 // PUT /api/v1/admin/contacts/:id — Modifier contact
 router.put('/:id', authenticate, requireRole('super_admin', 'commercial'), auditAction('contacts'), async (req, res) => {
   try {
-    const { name, email, phone, address, source, type, notes } = req.body;
     const validTypes = ['particulier', 'cse', 'ambassadeur', 'professionnel'];
-    if (type && !validTypes.includes(type)) {
+    if (req.body.type && !validTypes.includes(req.body.type)) {
       return res.status(400).json({ error: 'VALIDATION_ERROR', message: `type invalide. Valeurs acceptées : ${validTypes.join(', ')}` });
     }
-    const updates = { name, email, phone, address, source, type, updated_at: new Date() };
-    if (notes) updates.notes = JSON.stringify(notes);
 
-    // Ambassador-specific fields
-    if (type === 'ambassadeur') {
+    // Only include fields explicitly provided in the body
+    const updates = { updated_at: new Date() };
+    if (req.body.name !== undefined) updates.name = req.body.name;
+    if (req.body.email !== undefined) updates.email = req.body.email;
+    if (req.body.phone !== undefined) updates.phone = req.body.phone;
+    if (req.body.address !== undefined) updates.address = req.body.address;
+    if (req.body.source !== undefined) updates.source = req.body.source;
+    if (req.body.type !== undefined) updates.type = req.body.type;
+    if (req.body.notes !== undefined) updates.notes = JSON.stringify(req.body.notes);
+
+    // Ambassador-specific fields: only update if provided
+    if (req.body.type === 'ambassadeur' || req.body.type === undefined) {
+      // type is ambassador or not changing — allow ambassador field updates if provided
       if (req.body.show_on_public_page !== undefined) updates.show_on_public_page = req.body.show_on_public_page;
       if (req.body.ambassador_bio !== undefined) updates.ambassador_bio = req.body.ambassador_bio || null;
       if (req.body.region_id !== undefined) updates.region_id = req.body.region_id || null;
-    } else {
-      // If type changed away from ambassadeur, reset ambassador fields
+    }
+    // Reset ambassador fields only when type is explicitly changed away from ambassadeur
+    if (req.body.type !== undefined && req.body.type !== 'ambassadeur') {
       updates.show_on_public_page = false;
       updates.ambassador_photo_url = null;
       updates.ambassador_bio = null;

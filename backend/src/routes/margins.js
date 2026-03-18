@@ -1,76 +1,28 @@
 const express = require('express');
 const db = require('../config/database');
 const { authenticate, requireRole } = require('../middleware/auth');
-const { parseMarginFilters, applyMarginFilters, applyOrderOnlyFilters } = require('../services/marginFilters');
+const { parseMarginFilters, applyMarginFilters, applyOrderOnlyFilters, calculateFreeBottleCosts } = require('../services/marginFilters');
 
 const router = express.Router();
 
 const VALID_STATUSES = ['validated', 'preparing', 'shipped', 'delivered'];
 const adminAuth = [authenticate, requireRole('super_admin', 'commercial', 'comptable')];
 
-// ─── V4.2 BLOC 3: Free bottle cost calculation ─────────────────
-// coût_gratuite = floor(alcohol_qty / n) × min(purchase_price) per order
-// Only for campaigns with free_bottle_rules.trigger = 'every_n_sold'
-
-async function calculateFreeBottleCosts(filters) {
-  const query = db('order_items')
-    .join('orders', 'order_items.order_id', 'orders.id')
-    .join('products', 'order_items.product_id', 'products.id')
-    .leftJoin('product_categories as pc', 'products.category_id', 'pc.id')
-    .join('campaigns', 'orders.campaign_id', 'campaigns.id')
-    .join('client_types', 'campaigns.client_type_id', 'client_types.id')
-    .whereIn('orders.status', VALID_STATUSES)
-    .where('order_items.type', 'product')
-    .whereRaw("client_types.free_bottle_rules->>'trigger' = 'every_n_sold'")
-    .groupBy('orders.id', 'client_types.free_bottle_rules')
-    .select(
-      'orders.id as order_id',
-      db.raw(`
-        FLOOR(
-          SUM(CASE WHEN COALESCE(pc.is_alcohol, true) THEN order_items.qty ELSE 0 END)::numeric /
-          GREATEST(COALESCE((client_types.free_bottle_rules->>'n')::int, 12), 1)
-        ) * MIN(CASE WHEN COALESCE(pc.is_alcohol, true) THEN products.purchase_price END)
-        as free_bottle_cost
-      `)
-    );
-
-  // Apply date/campaign filters to the subquery
-  if (filters.campaign_id) query.where('orders.campaign_id', filters.campaign_id);
-  if (filters.date_from) query.where('orders.created_at', '>=', filters.date_from);
-  if (filters.date_to) query.where('orders.created_at', '<=', filters.date_to);
-
-  const rows = await query;
-  const total = rows.reduce((sum, r) => sum + parseFloat(r.free_bottle_cost || 0), 0);
-  return { total: parseFloat(total.toFixed(2)), byOrder: rows };
-}
-
-// Same but grouped by segment (client_type)
+// Same but grouped by segment (client_type) — reads actual financial_events
 async function calculateFreeBottleCostsBySegment(filters) {
-  const query = db('order_items')
-    .join('orders', 'order_items.order_id', 'orders.id')
-    .join('products', 'order_items.product_id', 'products.id')
-    .leftJoin('product_categories as pc', 'products.category_id', 'pc.id')
-    .join('campaigns', 'orders.campaign_id', 'campaigns.id')
+  const query = db('financial_events')
+    .join('campaigns', 'financial_events.campaign_id', 'campaigns.id')
     .join('client_types', 'campaigns.client_type_id', 'client_types.id')
-    .whereIn('orders.status', VALID_STATUSES)
-    .where('order_items.type', 'product')
-    .whereRaw("client_types.free_bottle_rules->>'trigger' = 'every_n_sold'")
-    .groupBy('orders.id', 'client_types.name', 'client_types.free_bottle_rules')
+    .where('financial_events.type', 'free_bottle')
+    .groupBy('client_types.name')
     .select(
-      'orders.id as order_id',
       'client_types.name as segment',
-      db.raw(`
-        FLOOR(
-          SUM(CASE WHEN COALESCE(pc.is_alcohol, true) THEN order_items.qty ELSE 0 END)::numeric /
-          GREATEST(COALESCE((client_types.free_bottle_rules->>'n')::int, 12), 1)
-        ) * MIN(CASE WHEN COALESCE(pc.is_alcohol, true) THEN products.purchase_price END)
-        as free_bottle_cost
-      `)
+      db.raw('SUM(financial_events.amount) as free_bottle_cost')
     );
 
-  if (filters.campaign_id) query.where('orders.campaign_id', filters.campaign_id);
-  if (filters.date_from) query.where('orders.created_at', '>=', filters.date_from);
-  if (filters.date_to) query.where('orders.created_at', '<=', filters.date_to);
+  if (filters.campaign_id) query.where('financial_events.campaign_id', filters.campaign_id);
+  if (filters.date_from) query.where('financial_events.created_at', '>=', filters.date_from);
+  if (filters.date_to) query.where('financial_events.created_at', '<=', `${filters.date_to}T23:59:59.999Z`);
 
   const rows = await query;
   const bySegment = {};
@@ -472,12 +424,28 @@ router.get('/overview', ...adminAuth, async (req, res) => {
     const costByMonth = {};
     monthlyCost.forEach(r => { costByMonth[r.month] = parseFloat(r.cost); });
 
+    // V4.5: Monthly free bottle costs for P&L chart
+    const monthlyFbcQ = db('financial_events')
+      .where('type', 'free_bottle')
+      .select(
+        db.raw("TO_CHAR(financial_events.created_at, 'YYYY-MM') as month"),
+        db.raw('COALESCE(SUM(financial_events.amount), 0) as fbc')
+      )
+      .groupBy('month');
+    if (filters.campaign_id) monthlyFbcQ.where('financial_events.campaign_id', filters.campaign_id);
+    if (filters.date_from) monthlyFbcQ.where('financial_events.created_at', '>=', filters.date_from);
+    if (filters.date_to) monthlyFbcQ.where('financial_events.created_at', '<=', `${filters.date_to}T23:59:59.999Z`);
+    const monthlyFbc = await monthlyFbcQ;
+    const fbcByMonth = {};
+    monthlyFbc.forEach(r => { fbcByMonth[r.month] = parseFloat(r.fbc); });
+
     const pl = monthly.map(m => ({
       month: m.month,
       ca_ttc: parseFloat(m.ca_ttc),
       ca_ht: parseFloat(m.ca_ht),
       cost: costByMonth[m.month] || 0,
-      margin: parseFloat(m.ca_ht) - (costByMonth[m.month] || 0),
+      free_bottle_cost: fbcByMonth[m.month] || 0,
+      margin: parseFloat(m.ca_ht) - (costByMonth[m.month] || 0) - (fbcByMonth[m.month] || 0),
       orders: parseInt(m.orders_count, 10),
     }));
 

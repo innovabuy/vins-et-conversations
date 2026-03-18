@@ -106,11 +106,11 @@ export default function LoginPage() {
         >
           {/* Logo + title */}
           <div className="text-center mb-6">
-            <div className="inline-flex items-center justify-center w-14 h-14 bg-white/10 backdrop-blur-sm rounded-2xl mb-3">
+            <div className="inline-flex items-center justify-center w-28 h-28 sm:w-36 sm:h-36 bg-white/10 backdrop-blur-sm rounded-3xl mb-4">
               {app_logo_url ? (
-                <img src={app_logo_url} alt={app_name} className="w-10 h-10 object-contain" />
+                <img src={app_logo_url} alt={app_name} className="w-24 h-24 sm:w-32 sm:h-32 object-contain" />
               ) : (
-                <Wine className="w-7 h-7 text-white" />
+                <Wine className="w-12 h-12 text-white" />
               )}
             </div>
             <h1 className="text-2xl sm:text-3xl font-bold text-white">{app_name}</h1>

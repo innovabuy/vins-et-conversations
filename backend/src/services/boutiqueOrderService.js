@@ -64,7 +64,7 @@ async function upsertContact({ name, email, phone, address, city, postal_code, r
 /**
  * Create a boutique order (status: pending_payment)
  */
-async function createBoutiqueOrder({ cartItems, customer, referralCode, delivery_type }) {
+async function createBoutiqueOrder({ cartItems, customer, referralCode, delivery_type, promoCode }) {
   const campaignId = await getBoutiqueWebCampaignId();
   const orderId = uuidv4();
   // ref generated inside transaction below for concurrency safety
@@ -206,6 +206,34 @@ async function createBoutiqueOrder({ cartItems, customer, referralCode, delivery
   totalHT += shippingHT;
   totalTTC += shippingTTC;
 
+  // ─── Promo code validation & discount ─────────────
+  let promoCodeId = null;
+  let promoDiscount = 0;
+  let promoCodeValue = null;
+  if (promoCode) {
+    const code = promoCode.toUpperCase().trim();
+    const promo = await db('promo_codes').where({ code, active: true }).first();
+    if (promo) {
+      const now = new Date();
+      const validFrom = promo.valid_from ? new Date(promo.valid_from) <= now : true;
+      const validUntil = promo.valid_until ? new Date(promo.valid_until) >= now : true;
+      const usesOk = promo.max_uses === null || promo.current_uses < promo.max_uses;
+      const minOk = totalTTC >= parseFloat(promo.min_order_ttc || 0);
+
+      if (validFrom && validUntil && usesOk && minOk) {
+        promoCodeId = promo.id;
+        promoCodeValue = code;
+        if (promo.type === 'percentage') {
+          promoDiscount = Math.round(totalTTC * (parseFloat(promo.value) / 100) * 100) / 100;
+        } else {
+          promoDiscount = Math.min(parseFloat(promo.value), totalTTC);
+        }
+        totalTTC = Math.round((totalTTC - promoDiscount) * 100) / 100;
+        totalHT = Math.round((totalHT - promoDiscount / 1.20) * 100) / 100;
+      }
+    }
+  }
+
   const orderStatus = hasBackorderItems ? 'pending_stock' : 'pending_payment';
 
   let ref;
@@ -224,11 +252,14 @@ async function createBoutiqueOrder({ cartItems, customer, referralCode, delivery
       status: orderStatus,
       source,
       referral_code: referralCode || null,
+      referral_code_used: referralCode || null,
       referred_by: referredBy,
       items: JSON.stringify(cartItems),
       total_ht: parseFloat(totalHT.toFixed(2)),
       total_ttc: parseFloat(totalTTC.toFixed(2)),
       total_items: totalItems,
+      promo_code_id: promoCodeId,
+      promo_discount: promoDiscount,
       flags: JSON.stringify(orderFlags),
     });
 
@@ -255,6 +286,20 @@ async function createBoutiqueOrder({ cartItems, customer, referralCode, delivery
       amount: parseFloat(totalTTC.toFixed(2)),
       description: `Commande boutique ${ref}`,
     });
+
+    // Promo code: increment usage + financial event
+    if (promoCodeId) {
+      await trx('promo_codes')
+        .where({ id: promoCodeId })
+        .increment('current_uses', 1);
+      await trx('financial_events').insert({
+        order_id: orderId,
+        campaign_id: campaignId,
+        type: 'correction',
+        amount: -promoDiscount,
+        description: `Code promo ${promoCodeValue} appliqué`,
+      });
+    }
   });
 
   logger.info(`Boutique order created: ${ref} for ${customer.email} (${source})`);
@@ -272,6 +317,8 @@ async function createBoutiqueOrder({ cartItems, customer, referralCode, delivery
     backorder: hasBackorderItems,
     source,
     customer_email: contact.email,
+    promo_code_id: promoCodeId,
+    promo_discount: promoDiscount,
   };
 }
 

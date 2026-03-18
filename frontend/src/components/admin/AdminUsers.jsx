@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { usersAPI, invitationsAPI, campaignsAPI, ambassadorAPI } from '../../services/api';
 import { Users, Shield, Mail, Copy, Check, Plus, Upload, Link, QrCode, X, Download, Pencil } from 'lucide-react';
+import { copyToClipboard } from '../../utils/copyToClipboard';
 
 const ROLES = [
   { value: 'super_admin', label: 'Super Admin', color: 'bg-red-100 text-red-700' },
@@ -73,10 +74,14 @@ export default function AdminUsers() {
     }
   };
 
-  const copyLink = (link, id) => {
-    navigator.clipboard.writeText(link);
-    setCopiedId(id);
-    setTimeout(() => setCopiedId(null), 2000);
+  const copyLink = async (link, id) => {
+    try {
+      await copyToClipboard(link);
+      setCopiedId(id);
+      setTimeout(() => setCopiedId(null), 2000);
+    } catch (err) {
+      console.error('Copie échouée:', err);
+    }
   };
 
   const filteredUsers = users.filter((u) => {
@@ -281,6 +286,7 @@ export default function AdminUsers() {
                       <td className="py-2 px-2">{inv.campaign_name || '-'}</td>
                       <td className="py-2 px-2">
                         <span className="text-xs bg-gray-100 px-2 py-0.5 rounded">{inv.role}</span>
+                        {inv.sub_role && <span className="text-xs bg-teal-50 text-teal-700 px-1.5 py-0.5 rounded ml-1">{inv.sub_role === 'collaborateur' ? 'membre' : inv.sub_role === 'responsable' ? 'manager' : inv.sub_role}</span>}
                       </td>
                       <td className="py-2 px-2">
                         {inv.method === 'link' && <Link size={14} className="text-blue-500" />}
@@ -522,7 +528,7 @@ function EditUserModal({ user, onClose, onSaved }) {
 
 // ─── Create Invitation Modal ─────────────────────────
 function CreateInvitationModal({ campaigns, onClose, onCreated }) {
-  const [form, setForm] = useState({ campaign_id: '', role: 'etudiant', method: 'link', count: 1 });
+  const [form, setForm] = useState({ campaign_id: '', role: 'etudiant', method: 'link', count: 1, sub_role: 'responsable' });
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
 
@@ -553,6 +559,12 @@ function CreateInvitationModal({ campaigns, onClose, onCreated }) {
           <select value={form.role} onChange={(e) => setForm({ ...form, role: e.target.value })} className="input-field">
             {ROLES.map((r) => <option key={r.value} value={r.value}>{r.label}</option>)}
           </select>
+          {form.role === 'cse' && (
+            <select value={form.sub_role} onChange={(e) => setForm({ ...form, sub_role: e.target.value })} className="input-field">
+              <option value="responsable">Manager / Responsable (accès complet)</option>
+              <option value="collaborateur">Membre / Collaborateur (catalogue + commande)</option>
+            </select>
+          )}
           <select value={form.method} onChange={(e) => setForm({ ...form, method: e.target.value })} className="input-field">
             <option value="link">Lien</option>
             <option value="qr">QR Code</option>
@@ -623,7 +635,7 @@ function QRModal({ link, code, campaign, onClose }) {
 
         <div className="flex gap-2 justify-center">
           <button
-            onClick={() => { navigator.clipboard.writeText(link); setCopied(true); setTimeout(() => setCopied(false), 2000); }}
+            onClick={() => { copyToClipboard(link).then(() => { setCopied(true); setTimeout(() => setCopied(false), 2000); }).catch(() => {}); }}
             className="flex items-center gap-1 px-4 py-2 text-sm rounded-lg border hover:bg-gray-50"
           >
             {copied ? <Check size={14} /> : <Copy size={14} />}

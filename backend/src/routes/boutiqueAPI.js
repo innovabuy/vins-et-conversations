@@ -34,6 +34,7 @@ const checkoutSchema = Joi.object({
     postal_code: Joi.string().pattern(/^\d{5}$/).allow('', null).optional(),
   }).required(),
   referral_code: Joi.string().allow('', null).optional(),
+  promo_code: Joi.string().allow('', null).optional(),
 }).custom((value, helpers) => {
   // Address required for home delivery
   if (value.delivery_type === 'home_delivery') {
@@ -104,6 +105,7 @@ router.post('/checkout', async (req, res) => {
       customer: value.customer,
       referralCode: value.referral_code || null,
       delivery_type: value.delivery_type || 'home_delivery',
+      promoCode: value.promo_code || null,
     });
 
     // Skip Stripe for backorder (pending_stock) — payment will happen when stock arrives
@@ -134,6 +136,7 @@ router.post('/checkout', async (req, res) => {
       total_ttc: order.total_ttc,
       shipping_ht: order.shipping_ht,
       shipping_ttc: order.shipping_ttc,
+      promo_discount: order.promo_discount || 0,
       backorder: order.backorder || false,
       client_secret: clientSecret,
     });
@@ -287,6 +290,147 @@ router.post('/register', async (req, res) => {
     res.status(201).json({ id: contact.id, name: contact.name, email: contact.email, registered: true });
   } catch (err) {
     logger.error(`Register error: ${err.message}`);
+    res.status(500).json({ error: 'SERVER_ERROR', message: err.message });
+  }
+});
+
+// ─── GET /campaigns/:id/info — Public campaign info for join page ───
+
+router.get('/campaigns/:id/info', async (req, res) => {
+  try {
+    const campaign = await db('campaigns')
+      .leftJoin('organizations', 'campaigns.org_id', 'organizations.id')
+      .where('campaigns.id', req.params.id)
+      .whereIn('campaigns.status', ['active', 'draft'])
+      .select(
+        'campaigns.id', 'campaigns.name', 'campaigns.brand_name',
+        'campaigns.goal', 'campaigns.start_date', 'campaigns.end_date',
+        'organizations.name as org_name'
+      )
+      .first();
+
+    if (!campaign) return res.status(404).json({ error: 'CAMPAIGN_NOT_FOUND', message: 'Campagne introuvable' });
+
+    res.json({
+      id: campaign.id,
+      name: campaign.name,
+      brand_name: campaign.brand_name,
+      org_name: campaign.org_name,
+      goal: campaign.goal ? parseFloat(campaign.goal) : null,
+      start_date: campaign.start_date,
+      end_date: campaign.end_date,
+    });
+  } catch (err) {
+    logger.error(`Campaign info error: ${err.message}`);
+    res.status(500).json({ error: 'SERVER_ERROR', message: err.message });
+  }
+});
+
+// ─── POST /campaigns/:id/join — Public self-registration into a campaign ───
+
+const joinCampaignSchema = Joi.object({
+  first_name: Joi.string().min(1).max(50).required(),
+  last_name: Joi.string().min(1).max(50).required(),
+  email: Joi.string().email().required(),
+  password: Joi.string().min(6).max(100).required(),
+  class_group: Joi.string().allow('', null).optional(),
+});
+
+router.post('/campaigns/:id/join', async (req, res) => {
+  try {
+    const { error, value } = joinCampaignSchema.validate(req.body);
+    if (error) return res.status(400).json({ error: 'VALIDATION_ERROR', message: error.details[0].message });
+
+    const campaign = await db('campaigns')
+      .where({ id: req.params.id })
+      .whereIn('status', ['active', 'draft'])
+      .first();
+
+    if (!campaign) return res.status(404).json({ error: 'CAMPAIGN_NOT_FOUND', message: 'Campagne introuvable' });
+
+    const email = value.email.toLowerCase().trim();
+    const fullName = `${value.first_name.trim()} ${value.last_name.trim()}`;
+    const bcrypt = require('bcryptjs');
+
+    let user = await db('users').where({ email }).first();
+    let isNew = false;
+
+    if (user) {
+      // User exists — check if already in this campaign
+      const existing = await db('participations')
+        .where({ user_id: user.id, campaign_id: campaign.id })
+        .first();
+      if (existing) {
+        // Already registered — log them in
+        const authService = require('../auth/authService');
+        const loginData = await authService.login(email, value.password);
+        return res.json({ success: true, already_registered: true, ...loginData });
+      }
+    } else {
+      // Create new account
+      const passwordHash = await bcrypt.hash(value.password, 10);
+      const userId = uuidv4();
+      await db('users').insert({
+        id: userId,
+        name: fullName,
+        email,
+        password_hash: passwordHash,
+        role: 'etudiant',
+        status: 'active',
+      });
+      user = { id: userId };
+      isNew = true;
+    }
+
+    // Create participation
+    const { generateUniqueReferralCode } = require('../utils/referralCode');
+    const referralCode = await generateUniqueReferralCode(campaign.name, fullName);
+
+    await db('participations').insert({
+      user_id: user.id,
+      campaign_id: campaign.id,
+      role_in_campaign: 'participant',
+      class_group: value.class_group || null,
+      referral_code: referralCode,
+      config: JSON.stringify({}),
+    });
+
+    // Auto-login: generate tokens
+    const authService = require('../auth/authService');
+    let loginData;
+    if (isNew) {
+      // For new users, generate tokens directly (we know the password)
+      loginData = await authService.login(email, value.password);
+    } else {
+      // Existing user — they must provide the correct password
+      try {
+        loginData = await authService.login(email, value.password);
+      } catch {
+        // Wrong password but participation was created — still success, just no auto-login
+        return res.status(201).json({
+          success: true,
+          new_account: false,
+          campaign_name: campaign.name,
+          message: 'Inscription réussie. Connectez-vous avec votre mot de passe habituel.',
+        });
+      }
+    }
+
+    res.status(201).json({
+      success: true,
+      new_account: isNew,
+      campaign_name: campaign.name,
+      referral_code: referralCode,
+      ...loginData,
+    });
+  } catch (err) {
+    if (err.code === '23505') {
+      return res.status(409).json({ error: 'DUPLICATE', message: 'Vous êtes déjà inscrit(e) à cette campagne' });
+    }
+    if (err.message === 'INVALID_CREDENTIALS') {
+      return res.status(401).json({ error: 'INVALID_CREDENTIALS', message: 'Mot de passe incorrect pour ce compte existant' });
+    }
+    logger.error(`Join campaign error: ${err.message}`);
     res.status(500).json({ error: 'SERVER_ERROR', message: err.message });
   }
 });

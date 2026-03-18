@@ -2,6 +2,7 @@
  * Shared filter helpers for margin endpoints.
  * All queries are expected to have orders + order_items + products joined.
  */
+const db = require('../config/database');
 
 function parseMarginFilters(query) {
   return {
@@ -125,4 +126,26 @@ function applyOrderOnlyFilters(qb, filters, opts = {}) {
   }
 }
 
-module.exports = { parseMarginFilters, applyMarginFilters, applyOrderOnlyFilters };
+// ─── Free bottle cost calculation (V4.2 BLOC 3) ─────────────────
+// Source of truth: financial_events with type='free_bottle' (append-only)
+// These events are created both by manual recording and automatic triggers.
+
+async function calculateFreeBottleCosts(filters = {}) {
+  const query = db('financial_events')
+    .where('financial_events.type', 'free_bottle')
+    .select(
+      'financial_events.order_id',
+      db.raw('SUM(financial_events.amount) as free_bottle_cost')
+    )
+    .groupBy('financial_events.order_id');
+
+  if (filters.campaign_id) query.where('financial_events.campaign_id', filters.campaign_id);
+  if (filters.date_from) query.where('financial_events.created_at', '>=', filters.date_from);
+  if (filters.date_to) query.where('financial_events.created_at', '<=', `${filters.date_to}T23:59:59.999Z`);
+
+  const rows = await query;
+  const total = rows.reduce((sum, r) => sum + parseFloat(r.free_bottle_cost || 0), 0);
+  return { total: parseFloat(total.toFixed(2)), byOrder: rows };
+}
+
+module.exports = { parseMarginFilters, applyMarginFilters, applyOrderOnlyFilters, calculateFreeBottleCosts };

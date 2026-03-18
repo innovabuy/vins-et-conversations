@@ -1,8 +1,9 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { deliveryNotesAPI, ordersAPI } from '../../services/api';
-import { Truck, FileText, Check, Eye, EyeOff, X, ChevronRight, Printer, Mail, Trash2, Pencil, Save, ExternalLink, PenTool } from 'lucide-react';
+import { Truck, FileText, Check, Eye, EyeOff, X, ChevronRight, Printer, Mail, Trash2, Pencil, Save, ExternalLink, PenTool, Link2, Copy, MessageCircle, Send } from 'lucide-react';
 import SignaturePad from '../shared/SignaturePad';
+import { copyToClipboard } from '../../utils/copyToClipboard';
 
 const formatEur = (v) => new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR' }).format(v);
 const formatDate = (d) => d ? new Date(d).toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit', year: 'numeric' }) : '—';
@@ -99,6 +100,13 @@ function DeliveryNoteDetail({ noteId, onClose, onUpdated }) {
   const [editing, setEditing] = useState(false);
   const [editForm, setEditForm] = useState({});
   const [showSignaturePad, setShowSignaturePad] = useState(false);
+  const [showSignatureLink, setShowSignatureLink] = useState(false);
+  const [sigLinkForm, setSigLinkForm] = useState({ signer_type: 'client', expires_in_hours: 48 });
+  const [generatedLink, setGeneratedLink] = useState(null);
+  const [generatingLink, setGeneratingLink] = useState(false);
+  const [linkCopied, setLinkCopied] = useState(false);
+  const [showViewSignature, setShowViewSignature] = useState(false);
+  const [signatureData, setSignatureData] = useState(null);
 
   const fetchNote = useCallback(async () => {
     setLoading(true);
@@ -160,6 +168,33 @@ function DeliveryNoteDetail({ noteId, onClose, onUpdated }) {
     try { await deliveryNotesAPI.update(note.id, editForm); setEditing(false); await fetchNote(); if (onUpdated) onUpdated(); } catch (err) { alert(err.response?.data?.message || 'Erreur'); }
   };
 
+  const handleGenerateLink = async () => {
+    setGeneratingLink(true);
+    try {
+      const res = await deliveryNotesAPI.generateSignatureLink(noteId, sigLinkForm);
+      setGeneratedLink(res.data.signature_url);
+    } catch (err) {
+      alert(err.response?.data?.message || 'Erreur');
+    } finally { setGeneratingLink(false); }
+  };
+
+  const handleCopyLink = async () => {
+    if (!generatedLink) return;
+    await copyToClipboard(generatedLink);
+    setLinkCopied(true);
+    setTimeout(() => setLinkCopied(false), 2000);
+  };
+
+  const handleViewSignature = async () => {
+    try {
+      const res = await deliveryNotesAPI.getSignature(noteId);
+      setSignatureData(res.data);
+      setShowViewSignature(true);
+    } catch (err) {
+      alert(err.response?.data?.message || 'Aucune signature');
+    }
+  };
+
   if (loading) return <div className="flex justify-center py-12"><div className="animate-spin rounded-full h-6 w-6 border-b-2 border-wine-700" /></div>;
   if (!note) return <p className="text-center text-gray-500 py-8">BL introuvable</p>;
 
@@ -204,6 +239,8 @@ function DeliveryNoteDetail({ noteId, onClose, onUpdated }) {
         {canEdit && <button onClick={startEdit} className="flex items-center gap-1.5 px-3 py-1.5 text-sm rounded-lg border border-gray-300 hover:bg-gray-50"><Pencil size={14} /> Modifier</button>}
         <button onClick={handlePrint} className="flex items-center gap-1.5 px-3 py-1.5 text-sm rounded-lg border border-gray-300 hover:bg-gray-50"><Printer size={14} /> Imprimer PDF</button>
         <button onClick={handleEmail} className="flex items-center gap-1.5 px-3 py-1.5 text-sm rounded-lg border border-gray-300 hover:bg-gray-50"><Mail size={14} /> Envoyer par email</button>
+        {note.status !== 'signed' && <button onClick={() => { setGeneratedLink(null); setShowSignatureLink(true); }} className="flex items-center gap-1.5 px-3 py-1.5 text-sm rounded-lg border border-wine-300 text-wine-700 hover:bg-wine-50"><Link2 size={14} /> Lien de signature</button>}
+        {note.status === 'signed' && <button onClick={handleViewSignature} className="flex items-center gap-1.5 px-3 py-1.5 text-sm rounded-lg border border-green-300 text-green-700 hover:bg-green-50"><Eye size={14} /> Voir signature</button>}
         {note.status === 'draft' && <button onClick={handleDelete} className="flex items-center gap-1.5 px-3 py-1.5 text-sm rounded-lg bg-red-600 text-white hover:bg-red-700"><Trash2 size={14} /> Supprimer</button>}
       </div>
 
@@ -232,13 +269,18 @@ function DeliveryNoteDetail({ noteId, onClose, onUpdated }) {
       {/* Signature zone for delivered/signed */}
       {(note.status === 'delivered' || note.status === 'signed') && (
         <div className="border-2 border-dashed border-green-300 rounded-lg p-4 bg-green-50">
-          {note.status === 'signed' && note.signature_url && note.signature_url.startsWith('data:') ? (
+          {note.status === 'signed' ? (
             <div>
-              <p className="text-sm font-medium text-green-800 mb-2">Signature</p>
-              <img src={note.signature_url} alt="Signature" className="max-w-[200px] h-auto border rounded bg-white" />
+              <p className="text-sm font-medium text-green-800 mb-1">Signe{note.signed_by ? ` par ${note.signed_by}` : ''}</p>
+              {note.signed_at && <p className="text-xs text-green-600">le {formatDate(note.signed_at)}</p>}
+              {note.signer_type && <p className="text-xs text-gray-500 mt-0.5">Type : {note.signer_type === 'client' ? 'Client' : 'Etudiant'}</p>}
+              {note.signature_image_url && (
+                <img src={note.signature_image_url.startsWith('data:') ? note.signature_image_url : note.signature_image_url} alt="Signature" className="max-w-[200px] h-auto border rounded bg-white mt-2" />
+              )}
+              {note.signature_url && note.signature_url.startsWith('data:') && !note.signature_image_url && (
+                <img src={note.signature_url} alt="Signature" className="max-w-[200px] h-auto border rounded bg-white mt-2" />
+              )}
             </div>
-          ) : note.status === 'signed' ? (
-            <p className="text-sm font-medium text-green-800">Signé</p>
           ) : (
             <div className="flex items-center justify-between">
               <p className="text-sm font-medium text-amber-700">En attente de signature</p>
@@ -247,7 +289,7 @@ function DeliveryNoteDetail({ noteId, onClose, onUpdated }) {
               </button>
             </div>
           )}
-          {note.delivered_at && <p className="text-xs text-green-600 mt-1">Livré le {formatDate(note.delivered_at)}</p>}
+          {note.delivered_at && <p className="text-xs text-green-600 mt-1">Livre le {formatDate(note.delivered_at)}</p>}
         </div>
       )}
 
@@ -257,6 +299,87 @@ function DeliveryNoteDetail({ noteId, onClose, onUpdated }) {
           onConfirm={handleSignatureConfirm}
           onClose={() => setShowSignaturePad(false)}
         />
+      )}
+
+      {/* Signature Link Modal */}
+      {showSignatureLink && (
+        <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-xl shadow-xl max-w-md w-full">
+            <div className="flex items-center justify-between p-4 border-b">
+              <h2 className="text-lg font-bold flex items-center gap-2"><Link2 size={18} /> Lien de signature</h2>
+              <button onClick={() => setShowSignatureLink(false)} className="text-gray-400 hover:text-gray-600"><X size={20} /></button>
+            </div>
+            <div className="p-4 space-y-4">
+              {!generatedLink ? (
+                <>
+                  <div>
+                    <label className="block text-xs font-medium text-gray-500 mb-1">Type de signataire</label>
+                    <div className="flex gap-2">
+                      {['client', 'student'].map(t => (
+                        <button key={t} onClick={() => setSigLinkForm(f => ({ ...f, signer_type: t }))} className={`flex-1 px-3 py-2 rounded-lg text-sm font-medium border ${sigLinkForm.signer_type === t ? 'bg-wine-50 border-wine-300 text-wine-700' : 'border-gray-200 text-gray-600 hover:bg-gray-50'}`}>
+                          {t === 'client' ? 'Client' : 'Etudiant'}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-gray-500 mb-1">Expiration</label>
+                    <select value={sigLinkForm.expires_in_hours} onChange={e => setSigLinkForm(f => ({ ...f, expires_in_hours: Number(e.target.value) }))} className="w-full border rounded-lg px-3 py-2 text-sm">
+                      <option value={24}>24 heures</option>
+                      <option value={48}>48 heures</option>
+                      <option value={168}>7 jours</option>
+                    </select>
+                  </div>
+                  <button onClick={handleGenerateLink} disabled={generatingLink} className="w-full btn-primary flex items-center justify-center gap-2">
+                    <Link2 size={16} /> {generatingLink ? 'Generation...' : 'Generer le lien'}
+                  </button>
+                </>
+              ) : (
+                <>
+                  <div className="bg-gray-50 rounded-lg p-3">
+                    <p className="text-xs text-gray-500 mb-1">Lien de signature</p>
+                    <p className="text-sm font-mono break-all text-wine-700">{generatedLink}</p>
+                  </div>
+                  <div className="flex gap-2">
+                    <button onClick={handleCopyLink} className={`flex-1 flex items-center justify-center gap-1.5 px-3 py-2 text-sm rounded-lg border ${linkCopied ? 'bg-green-50 border-green-300 text-green-700' : 'border-gray-300 hover:bg-gray-50'}`}>
+                      <Copy size={14} /> {linkCopied ? 'Copie !' : 'Copier'}
+                    </button>
+                    <a href={`https://wa.me/?text=${encodeURIComponent('Bonjour, merci de signer votre bon de livraison : ' + generatedLink)}`} target="_blank" rel="noopener noreferrer" className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 text-sm rounded-lg border border-green-300 text-green-700 hover:bg-green-50">
+                      <MessageCircle size={14} /> WhatsApp
+                    </a>
+                    <a href={`mailto:?subject=Signature bon de livraison&body=${encodeURIComponent('Bonjour,\n\nMerci de signer votre bon de livraison en cliquant sur le lien suivant :\n' + generatedLink + '\n\nCordialement')}`} className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 text-sm rounded-lg border border-blue-300 text-blue-700 hover:bg-blue-50">
+                      <Send size={14} /> Email
+                    </a>
+                  </div>
+                </>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* View Signature Modal */}
+      {showViewSignature && signatureData && (
+        <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-xl shadow-xl max-w-md w-full">
+            <div className="flex items-center justify-between p-4 border-b">
+              <h2 className="text-lg font-bold">Signature - {signatureData.ref}</h2>
+              <button onClick={() => setShowViewSignature(false)} className="text-gray-400 hover:text-gray-600"><X size={20} /></button>
+            </div>
+            <div className="p-4 space-y-3">
+              <div className="grid grid-cols-2 gap-3 text-sm">
+                <div><span className="text-gray-500">Signe par :</span> <span className="font-medium">{signatureData.signed_by}</span></div>
+                <div><span className="text-gray-500">Type :</span> {signatureData.signer_type === 'client' ? 'Client' : 'Etudiant'}</div>
+                <div className="col-span-2"><span className="text-gray-500">Date :</span> {formatDate(signatureData.signed_at)}</div>
+              </div>
+              {signatureData.signature_image_url && (
+                <div className="border rounded-lg p-3 bg-gray-50">
+                  <img src={signatureData.signature_image_url} alt="Signature" className="max-w-full h-auto mx-auto" />
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
       )}
 
       {/* Items */}
@@ -384,7 +507,7 @@ export default function AdminDeliveryNotes() {
                     <td className="py-3 font-mono text-xs">{n.ref}</td>
                     <td className="py-3 font-mono text-xs text-gray-500">{n.order_ref || '—'}</td>
                     <td className="py-3"><p className="font-medium">{n.recipient_name || n.user_name}</p></td>
-                    <td className="py-3"><span className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${st.color}`}>{StIcon && <StIcon size={12} />}{st.label}</span></td>
+                    <td className="py-3"><span className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${st.color}`}>{StIcon && <StIcon size={12} />}{st.label}</span>{n.status === 'signed' && n.signed_by && <span className="block text-xs text-gray-400 mt-0.5">{n.signed_by} - {formatDate(n.signed_at)}</span>}</td>
                     <td className="py-3 text-gray-500 text-xs">{formatDate(n.planned_date)}</td>
                     <td className="py-3 font-semibold">{formatEur(n.total_ttc)}</td>
                     <td className="py-3 text-right" onClick={e => e.stopPropagation()}><button onClick={() => setSelectedNote(n.id)} className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-500" title="Voir détail"><Eye size={16} /></button></td>

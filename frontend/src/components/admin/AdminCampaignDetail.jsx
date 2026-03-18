@@ -1,12 +1,13 @@
 import { useState, useEffect } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
-import { campaignsAPI, campaignResourcesAPI } from '../../services/api';
+import { campaignsAPI, campaignResourcesAPI, deliveryNotesAPI, ordersAPI } from '../../services/api';
 import {
   ArrowLeft, Users, ShoppingCart, Wine, TrendingUp, Calendar,
   Target, Package, BarChart3, Mail, CreditCard, ExternalLink,
   Copy, Check, Store, FileText, BookOpen, Plus, Trash2, Upload,
-  FileDown, Video, Image, Link as LinkIcon, Download,
+  FileDown, Video, Image, Link as LinkIcon, Download, UserPlus, Loader2, X,
 } from 'lucide-react';
+import { copyToClipboard } from '../../utils/copyToClipboard';
 import {
   ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip,
   BarChart, Bar, PieChart, Pie, Cell,
@@ -268,9 +269,121 @@ function OverviewTab({ data }) {
   );
 }
 
+function GroupedBLModal({ participant, campaignId, onClose }) {
+  const [orders, setOrders] = useState([]);
+  const [selected, setSelected] = useState(new Set());
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const { data } = await ordersAPI.list({
+          user_id: participant.id,
+          campaign_id: campaignId,
+          status: 'validated',
+          limit: 200,
+        });
+        const list = data.data || [];
+        setOrders(list);
+        setSelected(new Set(list.map((o) => o.id)));
+      } catch (err) {
+        console.error('Error loading orders', err);
+      } finally {
+        setLoading(false);
+      }
+    })();
+  }, [participant.id, campaignId]);
+
+  const toggle = (id) => {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  };
+
+  const selectedTotal = orders.filter((o) => selected.has(o.id)).reduce((sum, o) => sum + parseFloat(o.total_ttc || 0), 0);
+
+  const handleGenerate = () => {
+    const ids = Array.from(selected);
+    if (ids.length === 0) return;
+    const url = deliveryNotesAPI.groupedStudentPdf(participant.id, campaignId, ids);
+    window.open(url + '&token=' + localStorage.getItem('accessToken'), '_blank');
+    onClose();
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40" onClick={onClose}>
+      <div className="bg-white rounded-xl shadow-xl w-full max-w-lg mx-4 max-h-[80vh] flex flex-col" onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-center justify-between px-5 py-4 border-b">
+          <h3 className="font-semibold text-gray-900">BL Groupe — {participant.name}</h3>
+          <button onClick={onClose} className="p-1 hover:bg-gray-100 rounded"><X size={18} /></button>
+        </div>
+
+        <div className="flex-1 overflow-y-auto px-5 py-3">
+          {loading ? (
+            <div className="flex items-center justify-center py-8">
+              <Loader2 size={24} className="animate-spin text-wine-600" />
+            </div>
+          ) : orders.length === 0 ? (
+            <p className="text-sm text-gray-500 py-4">Aucune commande validee pour ce participant.</p>
+          ) : (
+            <>
+              <p className="text-sm text-gray-500 mb-3">Selectionnez les commandes a inclure :</p>
+              <div className="space-y-2">
+                {orders.map((o) => (
+                  <label key={o.id} className="flex items-center gap-3 p-2 rounded-lg hover:bg-gray-50 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={selected.has(o.id)}
+                      onChange={() => toggle(o.id)}
+                      className="rounded border-gray-300 text-wine-600 focus:ring-wine-500"
+                    />
+                    <span className="flex-1 text-sm font-medium">{o.ref}</span>
+                    <span className="text-sm text-gray-500">{o.user_name || participant.name}</span>
+                    <span className="text-sm font-semibold">{formatEur(parseFloat(o.total_ttc || 0))}</span>
+                  </label>
+                ))}
+              </div>
+
+              <div className="flex gap-3 mt-3">
+                <button onClick={() => setSelected(new Set(orders.map((o) => o.id)))} className="text-xs text-wine-600 hover:underline">
+                  Tout selectionner
+                </button>
+                <button onClick={() => setSelected(new Set())} className="text-xs text-gray-500 hover:underline">
+                  Tout deselectionner
+                </button>
+              </div>
+            </>
+          )}
+        </div>
+
+        <div className="border-t px-5 py-4 flex items-center justify-between">
+          <span className="text-sm font-semibold">
+            Total selection : {formatEur(selectedTotal)}
+          </span>
+          <div className="flex gap-2">
+            <button onClick={onClose} className="px-4 py-2 text-sm border rounded-lg hover:bg-gray-50">
+              Annuler
+            </button>
+            <button
+              onClick={handleGenerate}
+              disabled={selected.size === 0}
+              className="px-4 py-2 text-sm bg-wine-700 text-white rounded-lg hover:bg-wine-800 disabled:opacity-50"
+            >
+              Generer le BL
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function ParticipantsTab({ participants, campaignId }) {
   const navigate = useNavigate();
   const [exporting, setExporting] = useState(null);
+  const [blModal, setBlModal] = useState(null); // participant object or null
 
   const handleExportExcel = async (e, participant) => {
     e.stopPropagation();
@@ -290,9 +403,18 @@ function ParticipantsTab({ participants, campaignId }) {
     }
   };
 
+  const openBlModal = (e, participant) => {
+    e.stopPropagation();
+    setBlModal(participant);
+  };
+
   return (
     <div className="space-y-4">
       <p className="text-sm text-gray-500">{participants.length} participant(s)</p>
+
+      {blModal && (
+        <GroupedBLModal participant={blModal} campaignId={campaignId} onClose={() => setBlModal(null)} />
+      )}
 
       {/* Mobile cards */}
       <div className="md:hidden space-y-3">
@@ -307,6 +429,9 @@ function ParticipantsTab({ participants, campaignId }) {
                 <span className="text-xs px-2 py-0.5 rounded-full bg-gray-100">{p.role}</span>
                 <button onClick={(e) => handleExportExcel(e, p)} disabled={exporting === p.id} className="p-1 text-gray-400 hover:text-wine-600 disabled:opacity-50" title="Export Excel">
                   <Download size={14} />
+                </button>
+                <button onClick={(e) => openBlModal(e, p)} className="p-1 text-gray-400 hover:text-wine-600" title="BL Groupe">
+                  <FileDown size={14} />
                 </button>
               </div>
             </div>
@@ -326,7 +451,7 @@ function ParticipantsTab({ participants, campaignId }) {
               <th className="px-4 py-3 text-left">#</th>
               <th className="px-4 py-3 text-left">Nom</th>
               <th className="px-4 py-3 text-left">Email</th>
-              <th className="px-4 py-3 text-left">Rôle</th>
+              <th className="px-4 py-3 text-left">Role</th>
               <th className="px-4 py-3 text-right">CA TTC</th>
               <th className="px-4 py-3 text-right">Commandes</th>
               <th className="px-4 py-3 text-left">Inscrit le</th>
@@ -346,6 +471,9 @@ function ParticipantsTab({ participants, campaignId }) {
                 <td className="px-4 py-3 text-center">
                   <button onClick={(e) => handleExportExcel(e, p)} disabled={exporting === p.id} className="p-1.5 rounded hover:bg-gray-100 text-gray-400 hover:text-wine-600 disabled:opacity-50" title="Export Excel">
                     <Download size={14} />
+                  </button>
+                  <button onClick={(e) => openBlModal(e, p)} className="p-1.5 rounded hover:bg-gray-100 text-gray-400 hover:text-wine-600" title="BL Groupe">
+                    <FileDown size={14} />
                   </button>
                 </td>
               </tr>
@@ -504,6 +632,20 @@ function ClassesTab({ classes }) {
   );
 }
 
+function JoinQRCode({ url }) {
+  const [QRCode, setQRCode] = useState(null);
+  useEffect(() => {
+    import('react-qr-code').then((mod) => setQRCode(() => mod.default)).catch(() => {});
+  }, []);
+  if (!QRCode) return <div className="text-center py-4 text-sm text-gray-400">Chargement...</div>;
+  return (
+    <div className="mt-3 flex flex-col items-center gap-2 p-4 bg-white rounded-lg border border-emerald-200">
+      <QRCode value={url} size={200} />
+      <p className="text-xs text-gray-500 text-center break-all">{url}</p>
+    </div>
+  );
+}
+
 export default function AdminCampaignDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -512,6 +654,8 @@ export default function AdminCampaignDetail() {
   const [tab, setTab] = useState('overview');
   const [sendingReport, setSendingReport] = useState(false);
   const [linkCopied, setLinkCopied] = useState(false);
+  const [joinLinkCopied, setJoinLinkCopied] = useState(false);
+  const [showJoinQR, setShowJoinQR] = useState(false);
   const [exportingCampaign, setExportingCampaign] = useState(false);
 
   const handleExportCampaignExcel = async () => {
@@ -594,6 +738,12 @@ export default function AdminCampaignDetail() {
             <FileText size={16} /> Rapport PDF
           </button>
           <button
+            onClick={() => { const url = deliveryNotesAPI.groupedCampaignPdf(id); window.open(url + '?token=' + localStorage.getItem('accessToken'), '_blank'); }}
+            className="flex items-center gap-2 px-4 py-2 border rounded-lg hover:bg-gray-50 text-sm"
+          >
+            <FileDown size={16} /> BL Groupes
+          </button>
+          <button
             onClick={handleSendReport}
             disabled={sendingReport}
             className="flex items-center gap-2 px-4 py-2 border rounded-lg hover:bg-gray-50 text-sm disabled:opacity-50"
@@ -640,9 +790,10 @@ export default function AdminCampaignDetail() {
           />
           <button
             onClick={() => {
-              navigator.clipboard.writeText(`${window.location.origin}/boutique?campagne=${id}`);
-              setLinkCopied(true);
-              setTimeout(() => setLinkCopied(false), 2000);
+              copyToClipboard(`${window.location.origin}/boutique?campagne=${id}`).then(() => {
+                setLinkCopied(true);
+                setTimeout(() => setLinkCopied(false), 2000);
+              }).catch(() => {});
             }}
             className="flex items-center gap-1.5 px-3 py-2 text-sm rounded-lg bg-wine-700 text-white hover:bg-wine-800"
           >
@@ -651,6 +802,44 @@ export default function AdminCampaignDetail() {
           </button>
         </div>
         <p className="text-xs text-wine-600 mt-1.5">Partagez ce lien pour afficher uniquement les vins de cette campagne dans la boutique.</p>
+      </div>
+
+      {/* Join campaign link */}
+      <div className="card bg-emerald-50 border border-emerald-200">
+        <div className="flex items-center gap-2 mb-2">
+          <UserPlus size={18} className="text-emerald-700" />
+          <h3 className="text-sm font-semibold text-emerald-800">Lien d'inscription campagne</h3>
+        </div>
+        <div className="flex items-center gap-2">
+          <input
+            type="text"
+            readOnly
+            value={`${window.location.origin}/join-campaign/${id}`}
+            className="flex-1 text-sm bg-white border border-emerald-200 rounded-lg px-3 py-2 text-gray-700"
+          />
+          <button
+            onClick={() => {
+              copyToClipboard(`${window.location.origin}/join-campaign/${id}`).then(() => {
+                setJoinLinkCopied(true);
+                setTimeout(() => setJoinLinkCopied(false), 2000);
+              }).catch(() => {});
+            }}
+            className="flex items-center gap-1.5 px-3 py-2 text-sm rounded-lg bg-emerald-700 text-white hover:bg-emerald-800"
+          >
+            {joinLinkCopied ? <Check size={14} /> : <Copy size={14} />}
+            {joinLinkCopied ? 'Copié' : 'Copier'}
+          </button>
+        </div>
+        <div className="flex items-center gap-2 mt-2">
+          <button
+            onClick={() => setShowJoinQR(v => !v)}
+            className={`flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-lg border ${showJoinQR ? 'bg-emerald-100 border-emerald-300 text-emerald-700' : 'border-emerald-200 text-emerald-600 hover:bg-emerald-50'}`}
+          >
+            QR Code
+          </button>
+          <p className="text-xs text-emerald-600">Les étudiants scannent ce QR code ou ouvrent ce lien pour s'inscrire.</p>
+        </div>
+        {showJoinQR && <JoinQRCode url={`${window.location.origin}/join-campaign/${id}`} />}
       </div>
 
       {/* Tabs */}

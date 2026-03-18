@@ -33,7 +33,7 @@ const EMPTY_PRODUCT = {
   serving_temp: '', food_pairing: [], tasting_notes: null, winemaker_notes: '', awards: [],
   visible_boutique: false, allow_backorder: false, bundle_products: [],
   // Dynamic fields per category type
-  weight: '', allergens: '', conservation: '', volume: '', bottle_count: '',
+  weight: '', allergens: '', conservation: '', volume: '', bottle_count: null,
 };
 
 function parseJsonField(val) {
@@ -271,6 +271,29 @@ function ProductForm({ product, onSave, onCancel, allProducts = [], categoriesLi
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    // Validation champs obligatoires
+    const missing = [];
+    if (!form.name?.trim()) missing.push('Nom');
+    if (!form.category_id) missing.push('Catégorie');
+    if (!form.price_ht && form.price_ht !== 0) missing.push('Prix HT');
+    if (!form.price_ttc && form.price_ttc !== 0) missing.push('Prix TTC');
+    if (!form.purchase_price && form.purchase_price !== 0) missing.push('Prix achat');
+    if (missing.length) {
+      alert(`Champs obligatoires manquants : ${missing.join(', ')}`);
+      return;
+    }
+    // Validation cohérence des prix
+    const ht = parseFloat(form.price_ht);
+    const ttc = parseFloat(form.price_ttc);
+    const achat = parseFloat(form.purchase_price);
+    const errors = [];
+    if (ht <= 0 || ttc <= 0 || achat <= 0) errors.push('Tous les prix doivent être supérieurs à 0');
+    if (achat >= ht) errors.push(`Prix achat (${achat.toFixed(2)}€) doit être inférieur au prix HT (${ht.toFixed(2)}€)`);
+    if (ttc <= ht) errors.push(`Prix TTC (${ttc.toFixed(2)}€) doit être supérieur au prix HT (${ht.toFixed(2)}€)`);
+    if (errors.length) {
+      alert(errors.join('\n'));
+      return;
+    }
     setSaving(true);
     try {
       const payload = {
@@ -285,7 +308,7 @@ function ProductForm({ product, onSave, onCancel, allProducts = [], categoriesLi
       };
       await onSave(payload);
     } catch (err) {
-      alert(err.response?.data?.message || 'Erreur');
+      alert(err.response?.data?.message || err.message || 'Erreur inconnue');
     } finally { setSaving(false); }
   };
 
@@ -320,9 +343,9 @@ function ProductForm({ product, onSave, onCancel, allProducts = [], categoriesLi
           </div>
           )}
           <div>
-            <label className="block text-xs font-medium text-gray-500 mb-1">Catégorie</label>
-            <select value={form.category_id || ''} onChange={e => { handleChange('category_id', e.target.value || null); const cat = categoriesList.find(c => c.id === e.target.value); if (cat) handleChange('category', cat.name); }} className="w-full border rounded-lg px-3 py-2 text-sm">
-              <option value="">— Aucune —</option>
+            <label className="block text-xs font-medium text-gray-500 mb-1">Catégorie *</label>
+            <select value={form.category_id || ''} onChange={e => { handleChange('category_id', e.target.value || null); const cat = categoriesList.find(c => c.id === e.target.value); if (cat) handleChange('category', cat.name); }} className="w-full border rounded-lg px-3 py-2 text-sm" required>
+              <option value="">— Sélectionner —</option>
               {categoriesList.filter(c => c.active).map(c => <option key={c.id} value={c.id}>{c.icon_emoji || c.icon} {c.name}{c.is_alcohol === false ? ' (sans alcool)' : ''}</option>)}
             </select>
           </div>
@@ -433,7 +456,7 @@ function ProductForm({ product, onSave, onCancel, allProducts = [], categoriesLi
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <label className="block text-xs font-medium text-gray-500 mb-1">Nombre de bouteilles</label>
-              <input type="number" min="1" value={form.bottle_count || ''} onChange={e => handleChange('bottle_count', e.target.value)} className="w-full border rounded-lg px-3 py-2 text-sm" placeholder="Ex: 3, 6" />
+              <input type="number" min="1" value={form.bottle_count || ''} onChange={e => handleChange('bottle_count', e.target.value ? parseInt(e.target.value) : null)} className="w-full border rounded-lg px-3 py-2 text-sm" placeholder="Ex: 3, 6" />
             </div>
           </div>
           <p className="text-xs text-gray-500">Sélectionnez les produits inclus dans ce coffret :</p>
@@ -598,16 +621,17 @@ export default function AdminCatalog() {
     fetchProducts();
   };
 
+
   const handleDelete = async (id, name) => {
     if (!confirm(`Désactiver le produit "${name}" ?`)) return;
-    try { await productsAPI.remove(id); fetchProducts(); } catch { alert('Erreur'); }
+    try { await productsAPI.remove(id); fetchProducts(); } catch (err) { alert(err.response?.data?.message || err.message || 'Erreur inconnue'); }
   };
 
   const toggleBoutique = async (id, current) => {
     try {
       await productsAPI.update(id, { visible_boutique: !current });
       setProducts(prev => prev.map(p => p.id === id ? { ...p, visible_boutique: !current } : p));
-    } catch { alert('Erreur'); }
+    } catch (err) { alert(err.response?.data?.message || err.message || 'Erreur inconnue'); }
   };
 
   const toggleFeatured = async (id, current, categoryId) => {
@@ -620,7 +644,7 @@ export default function AdminCatalog() {
         if (newVal && categoryId && p.category_id === categoryId) return { ...p, is_featured: false };
         return p;
       }));
-    } catch { alert('Erreur'); }
+    } catch (err) { alert(err.response?.data?.message || err.message || 'Erreur inconnue'); }
   };
 
   const handleDownloadPdf = (segment = 'public') => {

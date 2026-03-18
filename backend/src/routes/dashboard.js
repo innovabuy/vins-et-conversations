@@ -215,10 +215,12 @@ router.get(
         return res.status(403).json({ error: 'FORBIDDEN', message: 'Accès interdit à cette campagne' });
       }
 
-      // V4.4: CSE sub_role (responsable vs collaborateur)
-      // Collaborateur: peut commander, voit ses propres commandes
-      // Responsable: peut commander, voit toutes les commandes de la campagne
-      const cseSubRole = req.user.sub_role || 'responsable';
+      // V4.5: CSE role from users.cse_role (manager/member)
+      // member: peut commander, voit ses propres commandes
+      // manager: peut commander, voit toutes les commandes de la campagne
+      const cseRole = req.user.cse_role || 'manager';
+      // Backward compat: also check sub_role
+      const cseSubRole = cseRole === 'member' ? 'collaborateur' : (req.user.sub_role || 'responsable');
       const canOrder = true; // Both roles can order
 
       // Collaborateur: own orders only. Responsable: all campaign orders.
@@ -236,7 +238,7 @@ router.get(
         )
         .orderBy('orders.created_at', 'desc');
 
-      if (cseSubRole === 'collaborateur') {
+      if (cseRole === 'member' || cseSubRole === 'collaborateur') {
         ordersQuery.where('orders.user_id', req.user.userId);
       }
 
@@ -282,6 +284,7 @@ router.get(
         next_tier: tier.next,
         tier_progress_pct: tier.progress,
         sub_role: cseSubRole,
+        cse_role: cseRole,
         can_order: canOrder,
       });
     } catch (err) {

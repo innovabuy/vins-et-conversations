@@ -46,7 +46,7 @@ router.post(
   auditAction('invitations'),
   async (req, res) => {
     try {
-      const { campaign_id, role, method, email, count = 1 } = req.body;
+      const { campaign_id, role, method, email, count = 1, sub_role } = req.body;
 
       if (!campaign_id || !role) {
         return res.status(400).json({ error: 'VALIDATION_ERROR', message: 'campaign_id and role required' });
@@ -68,6 +68,7 @@ router.post(
           code,
           campaign_id,
           role,
+          sub_role: role === 'cse' && sub_role ? sub_role : null,
           method: method || 'link',
           email: method === 'email' ? email : null,
           expires_at: expiresAt,

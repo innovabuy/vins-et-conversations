@@ -11,6 +11,7 @@ export default function CSEDashboard() {
   const [ordering, setOrdering] = useState(false);
   const [error, setError] = useState(null);
   const [activeTab, setActiveTab] = useState('products');
+  const [productQtys, setProductQtys] = useState({});
 
   const campaignId = user?.campaigns?.[0]?.campaign_id;
 
@@ -30,13 +31,13 @@ export default function CSEDashboard() {
     }
   };
 
-  const addToCart = (product) => {
+  const addToCart = (product, quantity = 1) => {
     setCart((prev) => {
       const existing = prev.find((i) => i.id === product.id);
       if (existing) {
-        return prev.map((i) => i.id === product.id ? { ...i, qty: i.qty + 1 } : i);
+        return prev.map((i) => i.id === product.id ? { ...i, qty: i.qty + quantity } : i);
       }
-      return [...prev, { ...product, qty: 1 }];
+      return [...prev, { ...product, qty: quantity }];
     });
   };
 
@@ -120,11 +121,17 @@ export default function CSEDashboard() {
 
   return (
     <div>
-      {/* Responsable info banner */}
-      {data?.sub_role === 'responsable' && (
+      {/* Manager info banner */}
+      {(data?.cse_role === 'manager' || data?.sub_role === 'responsable') && (
         <div className="bg-green-50 border border-green-200 rounded-lg p-3 mb-4 text-green-700 text-sm flex items-center gap-2">
           <Users size={16} />
           Responsable CSE — vous voyez toutes les commandes de l'équipe.
+        </div>
+      )}
+      {data?.cse_role === 'member' && (
+        <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-4 text-blue-700 text-sm flex items-center gap-2">
+          <Users size={16} />
+          Membre CSE — vous pouvez consulter le catalogue et passer commande.
         </div>
       )}
 
@@ -263,9 +270,35 @@ export default function CSEDashboard() {
                 <span className="text-sm text-gray-400 line-through">{p.original_price_ttc.toFixed(2)} EUR</span>
                 <span className="text-xs bg-green-100 text-green-700 px-1.5 py-0.5 rounded">-{data.discountPct}%</span>
               </div>
-              <button onClick={() => addToCart(p)} className="btn-primary w-full text-sm py-1.5">
-                Ajouter au panier
-              </button>
+              <div className="flex items-center gap-2">
+                <div className="flex items-center border rounded-lg">
+                  <button
+                    onClick={() => setProductQtys(prev => ({ ...prev, [p.id]: Math.max(1, (prev[p.id] || 1) - 1) }))}
+                    className="w-7 h-7 flex items-center justify-center hover:bg-gray-50 text-gray-600"
+                  >-</button>
+                  <input
+                    type="number"
+                    min="1"
+                    max="999"
+                    value={productQtys[p.id] || 1}
+                    onChange={(e) => {
+                      const val = parseInt(e.target.value, 10);
+                      if (!isNaN(val) && val >= 1 && val <= 999) setProductQtys(prev => ({ ...prev, [p.id]: val }));
+                    }}
+                    className="w-12 text-center text-sm border-0 focus:outline-none focus:ring-0 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                  />
+                  <button
+                    onClick={() => setProductQtys(prev => ({ ...prev, [p.id]: Math.min(999, (prev[p.id] || 1) + 1) }))}
+                    className="w-7 h-7 flex items-center justify-center hover:bg-gray-50 text-gray-600"
+                  >+</button>
+                </div>
+                <button
+                  onClick={() => { addToCart(p, productQtys[p.id] || 1); setProductQtys(prev => ({ ...prev, [p.id]: 1 })); }}
+                  className="btn-primary flex-1 text-sm py-1.5"
+                >
+                  Ajouter
+                </button>
+              </div>
             </div>
           ))}
         </div>
@@ -287,7 +320,17 @@ export default function CSEDashboard() {
                     </div>
                     <div className="flex items-center gap-2">
                       <button onClick={() => updateCartQty(item.id, item.qty - 1)} className="w-7 h-7 rounded border text-center">-</button>
-                      <span className="w-8 text-center text-sm">{item.qty}</span>
+                      <input
+                        type="number"
+                        min="1"
+                        max="999"
+                        value={item.qty}
+                        onChange={(e) => {
+                          const val = parseInt(e.target.value, 10);
+                          if (!isNaN(val) && val >= 1 && val <= 999) updateCartQty(item.id, val);
+                        }}
+                        className="w-12 text-center text-sm border rounded px-1 py-0.5 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                      />
                       <button onClick={() => updateCartQty(item.id, item.qty + 1)} className="w-7 h-7 rounded border text-center">+</button>
                       <span className="font-medium text-sm w-20 text-right">{(item.cse_price_ttc * item.qty).toFixed(2)} EUR</span>
                     </div>
@@ -325,7 +368,7 @@ export default function CSEDashboard() {
       {/* Order history */}
       {activeTab === 'orders' && (
         <div className="card">
-          <h3 className="font-semibold mb-3">{data?.sub_role === 'responsable' ? 'Commandes de l\'équipe' : 'Mes commandes'}</h3>
+          <h3 className="font-semibold mb-3">{data?.cse_role === 'manager' || data?.sub_role === 'responsable' ? 'Commandes de l\'équipe' : 'Mes commandes'}</h3>
           {data.orders.length === 0 ? (
             <p className="text-gray-500 text-sm">Aucune commande</p>
           ) : (
@@ -333,7 +376,7 @@ export default function CSEDashboard() {
               {data.orders.map((order) => (
                 <div key={order.id} className="flex items-center justify-between border-b pb-2 text-sm">
                   <div>
-                    <p className="font-medium">{order.ref}{data?.sub_role === 'responsable' && order.user_name ? ` — ${order.user_name}` : ''}</p>
+                    <p className="font-medium">{order.ref}{(data?.cse_role === 'manager' || data?.sub_role === 'responsable') && order.user_name ? ` — ${order.user_name}` : ''}</p>
                     <p className="text-xs text-gray-500">{new Date(order.created_at).toLocaleDateString('fr-FR')}</p>
                   </div>
                   <div className="flex items-center gap-3">

@@ -1,10 +1,11 @@
 import { useState, useEffect } from 'react';
 import { Link2, Copy, Check, Share2, QrCode, ShoppingCart, Users, TrendingUp } from 'lucide-react';
 import { referralAPI } from '../../services/api';
+import { copyToClipboard } from '../../utils/copyToClipboard';
 
 const formatEur = (v) => new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR' }).format(v);
 
-export default function ReferralSection({ campaignId, brandName }) {
+export default function ReferralSection({ campaignId, brandName, caReferred = 0 }) {
   const [linkData, setLinkData] = useState(null);
   const [stats, setStats] = useState(null);
   const [copied, setCopied] = useState(false);
@@ -28,19 +29,11 @@ export default function ReferralSection({ campaignId, brandName }) {
 
   const handleCopy = async () => {
     try {
-      await navigator.clipboard.writeText(linkData.referral_link);
+      await copyToClipboard(linkData.referral_link);
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
-    } catch {
-      // Fallback
-      const el = document.createElement('textarea');
-      el.value = linkData.referral_link;
-      document.body.appendChild(el);
-      el.select();
-      document.execCommand('copy');
-      document.body.removeChild(el);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
+    } catch (err) {
+      console.error('Copie échouée:', err);
     }
   };
 
@@ -107,24 +100,24 @@ export default function ReferralSection({ campaignId, brandName }) {
       {/* QR Code (lazy loaded) */}
       {showQR && <QRCodeDisplay url={linkData.referral_link} />}
 
-      {/* Stats */}
-      {stats && (stats.total_orders > 0 || stats.total_revenue > 0) && (
+      {/* Stats — use caReferred prop (from dashboard) as reliable source */}
+      {(caReferred > 0 || (stats && (stats.total_orders > 0 || stats.total_revenue > 0))) && (
         <div className="mt-3 pt-3 border-t">
           <p className="text-xs font-medium text-gray-500 mb-2">Mes ventes par partage</p>
           <div className="grid grid-cols-3 gap-2">
             <div className="bg-gray-50 rounded-lg p-2 text-center">
               <ShoppingCart size={14} className="text-wine-600 mx-auto mb-1" />
-              <p className="text-lg font-bold text-gray-800">{stats.total_orders}</p>
+              <p className="text-lg font-bold text-gray-800">{stats?.total_orders || '-'}</p>
               <p className="text-[10px] text-gray-500">Commandes</p>
             </div>
             <div className="bg-gray-50 rounded-lg p-2 text-center">
               <TrendingUp size={14} className="text-wine-600 mx-auto mb-1" />
-              <p className="text-lg font-bold text-gray-800">{formatEur(stats.total_revenue)}</p>
+              <p className="text-lg font-bold text-gray-800">{formatEur(stats?.total_revenue ?? caReferred)}</p>
               <p className="text-[10px] text-gray-500">CA référé</p>
             </div>
             <div className="bg-gray-50 rounded-lg p-2 text-center">
               <Users size={14} className="text-wine-600 mx-auto mb-1" />
-              <p className="text-lg font-bold text-gray-800">{stats.unique_clients}</p>
+              <p className="text-lg font-bold text-gray-800">{stats?.unique_clients || '-'}</p>
               <p className="text-[10px] text-gray-500">Clients</p>
             </div>
           </div>

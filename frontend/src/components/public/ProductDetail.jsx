@@ -89,7 +89,17 @@ export default function ProductDetail() {
           <div className="flex items-center gap-4">
             <div className="flex items-center border rounded-lg">
               <button onClick={() => setQty(Math.max(1, qty - 1))} className="p-2 hover:bg-gray-50 text-gray-600"><Minus size={16} /></button>
-              <span className="w-12 text-center font-semibold">{qty}</span>
+              <input
+                type="number"
+                min="1"
+                max="999"
+                value={qty}
+                onChange={(e) => {
+                  const val = parseInt(e.target.value, 10);
+                  if (!isNaN(val) && val >= 1 && val <= 999) setQty(val);
+                }}
+                className="w-14 text-center font-semibold border-0 focus:outline-none focus:ring-0 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+              />
               <button onClick={() => setQty(qty + 1)} className="p-2 hover:bg-gray-50 text-gray-600"><Plus size={16} /></button>
             </div>
             <button

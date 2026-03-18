@@ -247,6 +247,31 @@ describe('Ambassador Workflow', () => {
     await db('contacts').where({ id: sophie.id }).update({ ambassador_bio: sophie.ambassador_bio });
   });
 
+  test('Editing contact without sending type preserves ambassador type and fields', async () => {
+    const sophie = await db('contacts').where('name', 'Sophie Laurent').first();
+    expect(sophie.type).toBe('ambassadeur');
+    const originalBio = sophie.ambassador_bio;
+    const originalRegion = sophie.region_id;
+    const originalPhoto = sophie.ambassador_photo_url;
+    const originalShowOnPublic = sophie.show_on_public_page;
+
+    // Update only name — NO type in payload
+    const res = await request(app)
+      .put(`/api/v1/admin/contacts/${sophie.id}`)
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send({ name: 'Sophie Laurent Updated' });
+
+    expect(res.status).toBe(200);
+    expect(res.body.type).toBe('ambassadeur');
+    expect(res.body.ambassador_bio).toBe(originalBio);
+    expect(res.body.region_id).toBe(originalRegion);
+    expect(res.body.ambassador_photo_url).toBe(originalPhoto);
+    expect(res.body.show_on_public_page).toBe(originalShowOnPublic);
+
+    // Restore name
+    await db('contacts').where({ id: sophie.id }).update({ name: 'Sophie Laurent' });
+  });
+
   test('Changing contact type from ambassadeur resets ambassador fields', async () => {
     const sophie = await db('contacts').where('name', 'Sophie Laurent').first();
     const originalBio = sophie.ambassador_bio;

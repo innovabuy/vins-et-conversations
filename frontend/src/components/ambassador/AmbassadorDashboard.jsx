@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { ambassadorAPI } from '../../services/api';
 import { Trophy, Share2, ShoppingCart, ShoppingBag, Gift, Copy, Check, ExternalLink, User, Camera, Save, Upload } from 'lucide-react';
+import { copyToClipboard } from '../../utils/copyToClipboard';
 
 const TIER_COLORS = {
   Bronze: { bg: 'bg-amber-100', text: 'text-amber-800', border: 'border-amber-400', bar: 'bg-amber-500' },
@@ -46,10 +47,14 @@ export default function AmbassadorDashboard() {
     ? `${window.location.origin}/boutique?ref=${referralCode}`
     : `${window.location.origin}/boutique`;
 
-  const copyLink = () => {
-    navigator.clipboard.writeText(referralLink);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
+  const copyLink = async () => {
+    try {
+      await copyToClipboard(referralLink);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch (err) {
+      console.error('Copie échouée:', err);
+    }
   };
 
   if (loading) {

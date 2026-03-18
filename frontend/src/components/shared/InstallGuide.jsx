@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Download, Smartphone, Monitor, ArrowRight, Check, Wine } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import { copyToClipboard } from '../../utils/copyToClipboard';
 
 function detectPlatform() {
   const ua = navigator.userAgent;
@@ -111,11 +112,14 @@ function DesktopGuide() {
   const [copied, setCopied] = useState(false);
   const url = window.location.origin;
 
-  const copyUrl = () => {
-    navigator.clipboard.writeText(url).then(() => {
+  const copyUrl = async () => {
+    try {
+      await copyToClipboard(url);
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
-    });
+    } catch (err) {
+      console.error('Copie échouée:', err);
+    }
   };
 
   return (

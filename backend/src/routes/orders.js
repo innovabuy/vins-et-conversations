@@ -26,6 +26,7 @@ const createOrderSchema = Joi.object({
   customer_notes: Joi.string().max(500).allow(null, ''),
   payment_method: Joi.string().valid('cash', 'check', 'card', 'transfer', 'pending').allow(null),
   notes: Joi.string().allow(null, ''),
+  promo_code: Joi.string().allow(null, ''),
 });
 
 // GET /api/v1/orders/my-customers — Liste clients de l'étudiant (MUST be before /:id)
@@ -85,6 +86,7 @@ router.post(
         customerNotes: req.body.customer_notes,
         paymentMethod: req.body.payment_method,
         notes: req.body.notes,
+        promoCode: req.body.promo_code || null,
       });
       res.status(201).json(order);
     } catch (err) {
@@ -183,9 +185,14 @@ router.get(
 router.get('/:id', authenticate, async (req, res) => {
   try {
     const order = await db('orders')
-      .join('users', 'orders.user_id', 'users.id')
+      .leftJoin('users', 'orders.user_id', 'users.id')
+      .leftJoin('contacts', 'orders.customer_id', 'contacts.id')
       .where('orders.id', req.params.id)
-      .select('orders.*', 'users.name as user_name')
+      .select(
+        'orders.*',
+        db.raw("COALESCE(users.name, contacts.name, 'Client boutique') as user_name"),
+        db.raw("COALESCE(users.email, contacts.email) as user_email")
+      )
       .first();
 
     if (!order) return res.status(404).json({ error: 'NOT_FOUND' });
@@ -198,9 +205,13 @@ router.get('/:id', authenticate, async (req, res) => {
     }
 
     const items = await db('order_items')
-      .join('products', 'order_items.product_id', 'products.id')
+      .leftJoin('products', 'order_items.product_id', 'products.id')
       .where('order_items.order_id', req.params.id)
-      .select('order_items.*', 'products.name as product_name', 'products.image_url');
+      .select(
+        'order_items.*',
+        db.raw("COALESCE(products.name, 'Frais de port') as product_name"),
+        'products.image_url'
+      );
 
     res.json({ ...order, order_items: items });
   } catch (err) {
@@ -352,7 +363,7 @@ router.post(
   auditAction('orders'),
   async (req, res) => {
     try {
-      const { campaign_id, customer_id, items, notes } = req.body;
+      const { campaign_id, customer_id, items, notes, promo_code } = req.body;
       if (!campaign_id || !items || !items.length) {
         return res.status(400).json({ error: 'MISSING_FIELDS', message: 'campaign_id et items sont requis' });
       }
@@ -362,6 +373,7 @@ router.post(
         items,
         customerId: customer_id,
         notes,
+        promoCode: promo_code || null,
       });
       res.status(201).json(order);
     } catch (err) {

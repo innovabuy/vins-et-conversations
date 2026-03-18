@@ -6,7 +6,7 @@ const db = require('../config/database');
 const { authenticate, requireRole, requireCampaignAccess } = require('../middleware/auth');
 const { validate } = require('../middleware/validate');
 const { auditAction } = require('../middleware/audit');
-const { cacheMiddleware } = require('../middleware/cache');
+const { cacheMiddleware, invalidateCache } = require('../middleware/cache');
 const { addCapNumerikFooter } = require('../utils/pdfFooter');
 
 // Multer config for product images
@@ -337,6 +337,7 @@ adminRouter.post(
   async (req, res) => {
     try {
       const body = { ...req.body };
+      sanitizeNumericFields(body);
       if (Array.isArray(body.grape_varieties)) body.grape_varieties = JSON.stringify(body.grape_varieties);
       if (Array.isArray(body.food_pairing)) body.food_pairing = JSON.stringify(body.food_pairing);
       if (Array.isArray(body.awards)) body.awards = JSON.stringify(body.awards);
@@ -353,12 +354,45 @@ adminRouter.post(
           .update({ is_featured: false });
       }
       const [product] = await db('products').insert(body).returning('*');
+      await invalidateCache('vc:cache:/api/v1/products*');
       res.status(201).json(product);
     } catch (err) {
-      res.status(500).json({ error: 'SERVER_ERROR' });
+      res.status(500).json({ error: 'SERVER_ERROR', message: err.message });
     }
   }
 );
+
+// Sanitize numeric fields: empty strings → null for nullable int/numeric columns
+function sanitizeNumericFields(body) {
+  const intFields = ['vintage', 'bottle_count', 'sort_order'];
+  const numFields = ['price_ht', 'price_ttc', 'purchase_price', 'tva_rate'];
+  for (const f of intFields) {
+    if (f in body) body[f] = (body[f] === '' || body[f] === null || body[f] === undefined) ? null : parseInt(body[f], 10);
+  }
+  for (const f of numFields) {
+    if (f in body) body[f] = (body[f] === '' || body[f] === null || body[f] === undefined) ? null : parseFloat(body[f]);
+  }
+  // Remove non-column keys that the frontend may send
+  delete body.id;
+  delete body.created_at;
+  delete body.updated_at;
+  delete body.bundle_products;
+  delete body.category_name;
+  delete body.category_type;
+  delete body.category_details;
+  delete body.cat_id;
+  delete body.cat_name;
+  delete body.cat_slug;
+  delete body.cat_icon;
+  delete body.cat_color;
+  delete body.cat_type;
+  delete body.cat_product_type;
+  delete body.cat_is_alcohol;
+  delete body.cat_icon_emoji;
+  delete body.cat_has_tasting;
+  delete body.cat_tasting_axes;
+  return body;
+}
 
 // PUT /api/v1/admin/products/:id — Modifier un produit
 adminRouter.put(
@@ -369,6 +403,7 @@ adminRouter.put(
   async (req, res) => {
     try {
       const body = { ...req.body, updated_at: new Date() };
+      sanitizeNumericFields(body);
       if (Array.isArray(body.grape_varieties)) body.grape_varieties = JSON.stringify(body.grape_varieties);
       if (Array.isArray(body.food_pairing)) body.food_pairing = JSON.stringify(body.food_pairing);
       if (Array.isArray(body.awards)) body.awards = JSON.stringify(body.awards);
@@ -394,9 +429,10 @@ adminRouter.put(
         .update(body)
         .returning('*');
       if (!product) return res.status(404).json({ error: 'NOT_FOUND' });
+      await invalidateCache('vc:cache:/api/v1/products*');
       res.json(product);
     } catch (err) {
-      res.status(500).json({ error: 'SERVER_ERROR' });
+      res.status(500).json({ error: 'SERVER_ERROR', message: err.message });
     }
   }
 );
@@ -426,6 +462,7 @@ adminRouter.post(
         .where({ id: req.params.id })
         .update({ image_url, updated_at: new Date() })
         .returning('*');
+      await invalidateCache('vc:cache:/api/v1/products*');
       res.json(updated);
     } catch (err) {
       res.status(500).json({ error: 'SERVER_ERROR' });
@@ -442,6 +479,7 @@ adminRouter.delete(
   async (req, res) => {
     try {
       await db('products').where({ id: req.params.id }).update({ active: false });
+      await invalidateCache('vc:cache:/api/v1/products*');
       res.json({ message: 'Produit désactivé' });
     } catch (err) {
       res.status(500).json({ error: 'SERVER_ERROR' });

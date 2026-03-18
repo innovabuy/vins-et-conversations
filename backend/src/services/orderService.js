@@ -35,7 +35,7 @@ async function generateOrderRef(trx = null) {
  * Créer une commande (CDC §Commandes)
  * @param {Object} params - { userId, campaignId, items: [{ productId, qty }], customerId?, notes?, customerName?, customerPhone?, customerEmail?, customerNotes?, paymentMethod? }
  */
-async function createOrder({ userId, campaignId, items, customerId, notes, customerName, customerPhone, customerEmail, customerNotes, paymentMethod }) {
+async function createOrder({ userId, campaignId, items, customerId, notes, customerName, customerPhone, customerEmail, customerNotes, paymentMethod, promoCode }) {
   // Charger les règles de la campagne
   const rules = await rulesEngine.loadRulesForCampaign(campaignId);
 
@@ -125,6 +125,34 @@ async function createOrder({ userId, campaignId, items, customerId, notes, custo
     });
   }
 
+  // ─── Promo code validation & discount ─────────────
+  let promoCodeId = null;
+  let promoDiscount = 0;
+  let promoCodeValue = null;
+  if (promoCode) {
+    const code = promoCode.toUpperCase().trim();
+    const promo = await db('promo_codes').where({ code, active: true }).first();
+    if (promo) {
+      const now = new Date();
+      const validFrom = promo.valid_from ? new Date(promo.valid_from) <= now : true;
+      const validUntil = promo.valid_until ? new Date(promo.valid_until) >= now : true;
+      const usesOk = promo.max_uses === null || promo.current_uses < promo.max_uses;
+      const minOk = totalTTC >= parseFloat(promo.min_order_ttc || 0);
+
+      if (validFrom && validUntil && usesOk && minOk) {
+        promoCodeId = promo.id;
+        promoCodeValue = code;
+        if (promo.type === 'percentage') {
+          promoDiscount = Math.round(totalTTC * (parseFloat(promo.value) / 100) * 100) / 100;
+        } else {
+          promoDiscount = Math.min(parseFloat(promo.value), totalTTC);
+        }
+        totalTTC = Math.round((totalTTC - promoDiscount) * 100) / 100;
+        totalHT = Math.round((totalHT - promoDiscount / (1 + 0.20)) * 100) / 100;
+      }
+    }
+  }
+
   // CSE min_order check — done AFTER totals are computed
   const user = await db('users').where({ id: userId }).first();
   if (user && user.role === 'cse') {
@@ -153,6 +181,8 @@ async function createOrder({ userId, campaignId, items, customerId, notes, custo
       total_items: totalItems,
       notes,
       payment_method: paymentMethod || null,
+      promo_code_id: promoCodeId,
+      promo_discount: promoDiscount,
     });
 
     // Insérer les lignes
@@ -166,6 +196,20 @@ async function createOrder({ userId, campaignId, items, customerId, notes, custo
       amount: parseFloat(totalTTC.toFixed(2)),
       description: `Commande ${ref}`,
     });
+
+    // Promo code: increment usage + financial event
+    if (promoCodeId) {
+      await trx('promo_codes')
+        .where({ id: promoCodeId })
+        .increment('current_uses', 1);
+      await trx('financial_events').insert({
+        order_id: orderId,
+        campaign_id: campaignId,
+        type: 'correction',
+        amount: -promoDiscount,
+        description: `Code promo ${promoCodeValue} appliqué`,
+      });
+    }
 
     // Mouvement de stock (sortie)
     const stockMovements = items.map((item) => ({

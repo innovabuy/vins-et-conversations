@@ -28,6 +28,7 @@ const allNavItems = [
   { to: '/admin/routes', icon: Map, label: 'Tournées' },
   { to: '/admin/shipping', icon: Truck, label: 'Transport', adminOnly: true },
   { to: '/admin/pricing', icon: FileText, label: 'Conditions', adminOnly: true },
+  { to: '/admin/promo-codes', icon: Tag, label: 'Codes promo' },
   { to: '/admin/exports', icon: Download, label: 'Exports', adminOnly: true },
   { to: '/admin/users', icon: Settings, label: 'Utilisateurs', adminOnly: true },
   { to: '/admin/organization-types', icon: Building2, label: "Types d'org.", adminOnly: true },

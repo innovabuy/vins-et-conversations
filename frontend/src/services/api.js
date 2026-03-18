@@ -127,6 +127,19 @@ export const deliveryNotesAPI = {
   sign: (id, data) => api.post(`/admin/delivery-notes/${id}/sign`, data),
   pdf: (id) => `${api.defaults.baseURL}/admin/delivery-notes/${id}/pdf`,
   sendEmail: (id) => api.post(`/admin/delivery-notes/${id}/send-email`),
+  groupedStudentPdf: (userId, campaignId, orderIds) => {
+    let url = `${api.defaults.baseURL}/admin/delivery-notes/grouped/student/${userId}?campaign_id=${campaignId}`;
+    if (orderIds && orderIds.length > 0) url += `&order_ids=${orderIds.join(',')}`;
+    return url;
+  },
+  groupedCampaignPdf: (campaignId) => `${api.defaults.baseURL}/admin/delivery-notes/grouped/campaign/${campaignId}`,
+  generateSignatureLink: (id, data) => api.post(`/admin/delivery-notes/${id}/signature-link`, data),
+  getSignature: (id) => api.get(`/admin/delivery-notes/${id}/signature`),
+};
+
+export const signaturePublicAPI = {
+  getBLInfo: (token) => api.get(`/public/sign/${token}`),
+  submitSignature: (token, data) => api.post(`/public/sign/${token}`, data),
 };
 
 // ─── Contacts / CRM ─────────────────────────────────
@@ -199,6 +212,8 @@ export const freeBottlesAPI = {
   ambassadors: (campaignId) => api.get('/admin/free-bottles/ambassadors', { params: { campaign_id: campaignId } }),
   toggle: (data) => api.patch('/admin/free-bottles/toggle', data),
   record: (data) => api.post('/admin/free-bottles/record', data),
+  history: (params) => api.get('/admin/free-bottles/history', { params }),
+  historyExport: (params) => api.get('/admin/free-bottles/history/export', { params, responseType: 'blob', headers: { Accept: 'text/csv' } }),
 };
 
 // ─── Pricing Conditions ─────────────────────────────
@@ -355,6 +370,15 @@ export const organizationsAPI = {
     fd.append('logo', file);
     return api.put(`/admin/settings/organizations/${id}/logo`, fd, { headers: { 'Content-Type': 'multipart/form-data' } });
   },
+};
+
+// ─── Promo Codes ─────────────────────────────────
+export const promoCodesAPI = {
+  list: () => api.get('/admin/promo-codes'),
+  create: (data) => api.post('/admin/promo-codes', data),
+  update: (id, data) => api.put(`/admin/promo-codes/${id}`, data),
+  delete: (id) => api.delete(`/admin/promo-codes/${id}`),
+  validate: (data) => api.post('/promo-codes/validate', data),
 };
 
 // ─── Boutique E-commerce ──────────────────────────
