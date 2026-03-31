@@ -156,7 +156,8 @@ describe('CSE Workflow', () => {
     // Find a different campaign
     const otherCampaign = await db('campaigns')
       .whereNot('id', cseCampaignId)
-      .where('name', 'like', '%Sacr%')
+      .where({ status: 'active' })
+      .whereNull('deleted_at')
       .first();
     if (!otherCampaign) return;
 

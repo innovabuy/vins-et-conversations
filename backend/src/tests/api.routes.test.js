@@ -29,7 +29,7 @@ beforeAll(async () => {
   ambassadorToken = ambassadorRes.body.accessToken;
 
   // Get campaign IDs
-  const sacreCoeur = await db('campaigns').where('name', 'like', '%Sacré-Cœur%').first();
+  const sacreCoeur = await db('campaigns').where('name', 'like', '%Sacré-Cœur%').whereNull('deleted_at').where({ status: 'active' }).first();
   const cseCamp = await db('campaigns').where('name', 'like', '%CSE%').first();
   const ambCamp = await db('campaigns').where('name', 'like', '%Ambassadeurs%').first();
   campaignId = sacreCoeur?.id;

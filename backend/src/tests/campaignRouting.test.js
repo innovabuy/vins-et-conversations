@@ -107,7 +107,15 @@ describe('CR: Campaign Routing', () => {
     const res = await placeOrder(studentToken, null);
     expect(res.status).toBe(201);
     const order = await db('orders').where({ id: res.body.order_id }).first();
-    expect(order.campaign_id).toBe(studentCampaignId);
+    // Verify order routed to student's active campaign (not boutique_web)
+    const studentPart = await db('participations')
+      .join('campaigns', 'participations.campaign_id', 'campaigns.id')
+      .where('participations.user_id', studentId)
+      .where('campaigns.status', 'active')
+      .whereNull('campaigns.deleted_at')
+      .select('participations.campaign_id')
+      .first();
+    expect(order.campaign_id).toBe(studentPart.campaign_id);
     expect(order.campaign_id).not.toBe(boutiqueWebCampaignId);
   });
 
@@ -162,7 +170,14 @@ describe('CR: Campaign Routing', () => {
     const order = await db('orders').where({ id: res.body.order_id }).first();
     expect(order.referred_by).toBe(studentId);
     expect(order.source).toBe('student_referral');
-    // Campaign should be student's campaign
-    expect(order.campaign_id).toBe(studentCampaignId);
+    // Campaign should be student's active campaign
+    const studentPartCR06 = await db('participations')
+      .join('campaigns', 'participations.campaign_id', 'campaigns.id')
+      .where('participations.user_id', studentId)
+      .where('campaigns.status', 'active')
+      .whereNull('campaigns.deleted_at')
+      .select('participations.campaign_id')
+      .first();
+    expect(order.campaign_id).toBe(studentPartCR06.campaign_id);
   });
 });

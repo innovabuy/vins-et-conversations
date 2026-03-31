@@ -155,8 +155,9 @@ describe('Caution Display in Order Detail', () => {
   });
 
   test('CAU-03: caution_info.caution_check = null if no check for user', async () => {
-    // Remove the check temporarily
-    await db('caution_checks').where({ id: cautionCheckId }).del();
+    // Remove ALL checks for this user temporarily
+    const savedChecks = await db('caution_checks').where({ user_id: studentId }).select('*');
+    await db('caution_checks').where({ user_id: studentId }).del();
     try {
       const res = await request(app)
         .get(`/api/v1/orders/${orderWithDeferred}`)
@@ -165,16 +166,10 @@ describe('Caution Display in Order Detail', () => {
       expect(res.body.caution_info.has_deferred_products).toBe(true);
       expect(res.body.caution_info.caution_check).toBeNull();
     } finally {
-      // Re-insert the check
-      const [cc] = await db('caution_checks').insert({
-        id: cautionCheckId,
-        user_id: studentId,
-        amount: 150.00,
-        check_number: 'CHQ-TEST-001',
-        check_date: '2026-03-20',
-        status: 'held',
-      }).returning('*');
-      cautionCheckId = cc.id;
+      // Re-insert all checks
+      for (const cc of savedChecks) {
+        await db('caution_checks').insert(cc).onConflict('id').merge().catch(() => {});
+      }
     }
   });
 

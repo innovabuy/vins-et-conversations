@@ -87,8 +87,16 @@ test('E2E-01: FLUX 1 — commande étudiant boutique → 10 vérifications', asy
   // 4. financial_events
   const fe = await db('financial_events').where({ order_id: oid });
   expect(fe.length).toBeGreaterThan(0);
-  // 5. campaign_id = student's campaign
-  expect(order.campaign_id).toBe(campaignId);
+  // 5. campaign_id = student's active campaign
+  const activePart = await db('participations')
+    .join('campaigns', 'participations.campaign_id', 'campaigns.id')
+    .where('participations.user_id', studentId)
+    .where('campaigns.status', 'active')
+    .whereNull('campaigns.deleted_at')
+    .orderBy('participations.created_at', 'desc')
+    .select('participations.campaign_id')
+    .first();
+  expect(order.campaign_id).toBe(activePart.campaign_id);
   // 6. source = student_order (connected student)
   expect(order.source).toBe('student_order');
 });

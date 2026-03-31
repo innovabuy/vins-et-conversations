@@ -209,8 +209,7 @@ describe('Ambassador Workflow', () => {
 
   test('Contact with show_on_public_page=false is NOT returned', async () => {
     // Set one ambassador contact to hidden
-    const sophie = await db('contacts').where('name', 'Sophie Laurent').first();
-    await db('contacts').where({ id: sophie.id }).update({ show_on_public_page: false });
+    await db('contacts').where('name', 'Sophie Laurent').update({ show_on_public_page: false });
     await invalidateCache('vc:cache:*/ambassador/*');
 
     const res = await request(app).get('/api/v1/ambassador/public');
@@ -221,7 +220,7 @@ describe('Ambassador Workflow', () => {
     expect(visibleNames).toContain('Marc Dupont');
 
     // Restore
-    await db('contacts').where({ id: sophie.id }).update({ show_on_public_page: true });
+    await db('contacts').where('name', 'Sophie Laurent').update({ show_on_public_page: true });
     await invalidateCache('vc:cache:*/ambassador/*');
   });
 

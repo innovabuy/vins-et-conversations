@@ -40,6 +40,8 @@ afterAll(async () => {
   }
   // Clean up any lingering test client types
   await db('client_types').where('name', 'like', `%test_ct_${uniqueSuffix}%`).del().catch(() => {});
+  // Always restore Sacré-Cœur in case test failed mid-way
+  await db('campaigns').where('name', 'like', '%Sacré-Cœur%').update({ deleted_at: null, status: 'active', updated_at: new Date() }).catch(() => {});
   await db.destroy();
 });
 
@@ -87,7 +89,7 @@ describe('Campaign DELETE', () => {
 
   test('2. DELETE campagne avec commandes → 200 action "archived"', async () => {
     // Use Sacré-Cœur which has orders
-    const sacreCoeur = await db('campaigns').where('name', 'like', '%Sacré-Cœur%').first();
+    const sacreCoeur = await db('campaigns').where('name', 'like', '%Sacré-Cœur%').whereNull('deleted_at').first();
     expect(sacreCoeur).toBeDefined();
 
     const res = await request(app)
@@ -188,7 +190,7 @@ describe('Campaign GET with archived filter', () => {
 
 describe('Campaign GET dependencies', () => {
   test('8. GET /admin/campaigns/:id/dependencies → compteurs corrects', async () => {
-    const sacreCoeur = await db('campaigns').where('name', 'like', '%Sacré-Cœur%').first();
+    const sacreCoeur = await db('campaigns').where('name', 'like', '%Sacré-Cœur%').whereNull('deleted_at').first();
 
     const res = await request(app)
       .get(`/api/v1/admin/campaigns/${sacreCoeur.id}/dependencies`)

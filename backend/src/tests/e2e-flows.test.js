@@ -32,7 +32,7 @@ beforeAll(async () => {
   cseToken = cseRes.body.accessToken;
 
   // Get campaign IDs
-  const sacreCampaign = await db('campaigns').where('name', 'like', '%Sacr%').first();
+  const sacreCampaign = await db('campaigns').where('name', 'like', '%Sacr%').whereNull('deleted_at').where({ status: 'active' }).first();
   sacreCoeurCampaignId = sacreCampaign?.id;
 
   const cseCampaign = await db('campaigns').where('name', 'like', '%CSE%').first();
