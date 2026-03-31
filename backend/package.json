@@ -10,7 +10,7 @@
     "migrate:rollback": "knex migrate:rollback --knexfile src/config/knexfile.js",
     "seed": "knex seed:run --knexfile src/config/knexfile.js",
     "seed:fresh": "npm run migrate:rollback && npm run migrate && npm run seed",
-    "test": "jest --coverage --forceExit --detectOpenHandles",
+    "test": "jest --runInBand --coverage --forceExit --detectOpenHandles",
     "test:watch": "jest --watch",
     "lint": "eslint src/",
     "swagger": "node src/docs/generate-swagger.js"

@@ -10,6 +10,7 @@ const PASSWORD = 'VinsConv2026!';
 let adminToken, studentToken;
 let studentId, campaignId;
 let deferredProductId, normalProductId;
+let testDeferredProductId; // created by test if none exists
 let orderWithDeferred, orderWithoutDeferred;
 let cautionCheckId;
 let replenishIds = [];
@@ -36,8 +37,26 @@ beforeAll(async () => {
     .whereIn('status', ['submitted', 'validated'])
     .update({ status: 'cancelled', updated_at: new Date() });
 
-  // Get deferred product (Apertus)
-  const deferred = await db('products').where({ allows_deferred: true }).first();
+  // Get or create a deferred product
+  let deferred = await db('products').where({ allows_deferred: true, active: true }).first();
+  if (!deferred) {
+    // No deferred product in seeds — create one for this test
+    const cat = await db('product_categories').first();
+    const [created] = await db('products').insert({
+      name: 'Test Deferred Product',
+      price_ttc: 15.00,
+      price_ht: 12.50,
+      purchase_price: 7.00,
+      tva_rate: 20,
+      active: true,
+      visible_boutique: false,
+      category_id: cat.id,
+      allows_deferred: true,
+      caution_amount: 150,
+    }).returning('*');
+    deferred = created;
+    testDeferredProductId = created.id;
+  }
   deferredProductId = deferred.id;
 
   // Ensure deferred product is in the campaign
@@ -128,6 +147,11 @@ afterAll(async () => {
   await db('stock_movements').where({ reference: 'TEST_REPLENISH_CAUTION' }).del().catch(() => {});
   for (const id of replenishIds) {
     await db('stock_movements').where({ id }).del().catch(() => {});
+  }
+  // Cleanup test-created deferred product
+  if (testDeferredProductId) {
+    await db('campaign_products').where({ product_id: testDeferredProductId }).del().catch(() => {});
+    await db('products').where({ id: testDeferredProductId }).del().catch(() => {});
   }
   await db.destroy();
 });
