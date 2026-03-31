@@ -342,7 +342,7 @@ describe('Orders', () => {
         campaign_id: campaignId,
         items: [{ productId: cp.id, qty: 2 }],
         customer_name: 'Client Test Routes',
-        payment_method: 'cash',
+        payment_method: 'card',
       });
     expect(res.status).toBe(201);
     expect(res.body.ref).toMatch(/^VC-\d{4}-\d{4}$/);

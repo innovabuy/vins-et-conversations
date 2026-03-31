@@ -293,6 +293,137 @@ router.get(
   }
 );
 
+// GET /api/v1/dashboard/cse/collaborator — Espace personnel collaborateur CSE
+router.get(
+  '/cse/collaborator',
+  authenticate,
+  requireRole('cse', 'super_admin'),
+  async (req, res) => {
+    try {
+      const userId = req.user.userId;
+      const campaignId = req.query.campaign_id || req.user.campaign_ids?.[0];
+      const validStatuses = ['submitted', 'validated', 'preparing', 'shipped', 'delivered'];
+
+      // User info
+      const user = await db('users').where({ id: userId }).select('id', 'name', 'email').first();
+
+      // Orders with items and delivery notes — strict user_id scope
+      const orders = await db('orders')
+        .leftJoin('delivery_notes', 'orders.id', 'delivery_notes.order_id')
+        .where('orders.user_id', userId)
+        .modify((qb) => { if (campaignId) qb.where('orders.campaign_id', campaignId); })
+        .whereNot('orders.status', 'cancelled')
+        .select(
+          'orders.id', 'orders.ref as reference', 'orders.created_at', 'orders.status',
+          'orders.payment_method', 'orders.total_ttc', 'orders.total_ht',
+          'delivery_notes.id as dn_id', 'delivery_notes.status as dn_status',
+          'delivery_notes.signed_at as dn_signed_at'
+        )
+        .orderBy('orders.created_at', 'desc');
+
+      // Fetch items for each order
+      const orderIds = orders.map((o) => o.id);
+      const allItems = orderIds.length > 0
+        ? await db('order_items')
+            .leftJoin('products', 'order_items.product_id', 'products.id')
+            .whereIn('order_items.order_id', orderIds)
+            .where('order_items.type', 'product')
+            .select(
+              'order_items.order_id', 'order_items.qty',
+              'order_items.unit_price_ht', 'order_items.unit_price_ttc',
+              'order_items.vat_rate',
+              db.raw("COALESCE(products.name, 'Produit') as product_name"),
+              db.raw('order_items.qty * order_items.unit_price_ttc as line_ttc')
+            )
+        : [];
+
+      // Build items map
+      const itemsByOrder = {};
+      for (const item of allItems) {
+        if (!itemsByOrder[item.order_id]) itemsByOrder[item.order_id] = [];
+        itemsByOrder[item.order_id].push({
+          product_name: item.product_name,
+          qty: item.qty,
+          unit_price_ttc: parseFloat(item.unit_price_ttc),
+          unit_price_ht: parseFloat(item.unit_price_ht),
+          vat_rate: parseFloat(item.vat_rate),
+          line_ttc: parseFloat(item.line_ttc),
+        });
+      }
+
+      // Format orders
+      const formattedOrders = orders.map((o) => ({
+        id: o.id,
+        reference: o.reference,
+        created_at: o.created_at,
+        status: o.status,
+        payment_method: o.payment_method,
+        total_ttc: parseFloat(o.total_ttc),
+        total_ht: parseFloat(o.total_ht),
+        items: itemsByOrder[o.id] || [],
+        delivery_note: o.dn_id ? { id: o.dn_id, status: o.dn_status, signed_at: o.dn_signed_at } : null,
+      }));
+
+      // Stats from validated+ orders
+      const statsOrders = orders.filter((o) => validStatuses.includes(o.status));
+      const totalTTC = statsOrders.reduce((s, o) => s + parseFloat(o.total_ttc), 0);
+      const totalHT = statsOrders.reduce((s, o) => s + parseFloat(o.total_ht), 0);
+      const pendingOrders = orders.filter((o) => o.status === 'submitted').length;
+      const lastOrderDate = statsOrders.length > 0 ? statsOrders[0].created_at : null;
+
+      // VAT breakdown from order_items.vat_rate
+      const statsOrderIds = statsOrders.map((o) => o.id);
+      const vatRows = statsOrderIds.length > 0
+        ? await db('order_items')
+            .whereIn('order_id', statsOrderIds)
+            .where('type', 'product')
+            .groupBy('vat_rate')
+            .select(
+              'vat_rate as rate',
+              db.raw('SUM(unit_price_ht * qty) as amount_ht'),
+              db.raw('SUM(unit_price_ttc * qty) as amount_ttc')
+            )
+        : [];
+
+      const vatBreakdown = vatRows.map((r) => ({
+        rate: parseFloat(r.rate),
+        amount_ht: parseFloat(parseFloat(r.amount_ht).toFixed(2)),
+        amount_ttc: parseFloat(parseFloat(r.amount_ttc).toFixed(2)),
+      }));
+
+      // Payments
+      const payments = orderIds.length > 0
+        ? await db('payments')
+            .whereIn('order_id', orderIds)
+            .select('id', 'amount', 'method', 'status', 'created_at as date')
+            .orderBy('created_at', 'desc')
+        : [];
+
+      res.json({
+        user,
+        stats: {
+          total_orders: statsOrders.length,
+          total_ttc: parseFloat(totalTTC.toFixed(2)),
+          total_ht: parseFloat(totalHT.toFixed(2)),
+          vat_breakdown: vatBreakdown,
+          pending_orders: pendingOrders,
+          last_order_date: lastOrderDate,
+        },
+        orders: formattedOrders,
+        payments: payments.map((p) => ({
+          id: p.id,
+          amount: parseFloat(p.amount),
+          method: p.method,
+          status: p.status,
+          date: p.date,
+        })),
+      });
+    } catch (err) {
+      res.status(500).json({ error: 'SERVER_ERROR', message: err.message });
+    }
+  }
+);
+
 // GET /api/v1/dashboard/ambassador?campaign_id=xxx — Ambassador Dashboard
 router.get(
   '/ambassador',

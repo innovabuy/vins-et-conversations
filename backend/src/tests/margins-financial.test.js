@@ -93,7 +93,7 @@ describe('Financial Events — Append-Only Integrity', () => {
       .send({
         campaign_id: campaignId,
         customer_name: 'Client Test Margins',
-        payment_method: 'cash',
+        payment_method: 'card',
         items: [{ productId: cp.product_id, qty: 2 }],
       });
 
@@ -192,7 +192,7 @@ describe('Toggle OFF — financial_event still created at order creation', () =>
       .send({
         campaign_id: campaignId,
         customer_name: 'Client Toggle OFF',
-        payment_method: 'cash',
+        payment_method: 'card',
         items: [{ productId: cp.product_id, qty: 1 }],
       });
 
@@ -338,13 +338,16 @@ describe('Cockpit CA consistency', () => {
     expect(cockpitRes.body.kpis).toHaveProperty('caTTC');
     expect(cockpitRes.body.kpis).toHaveProperty('caHT');
 
-    // Verify CA TTC matches sum of active orders (including pending_payment/pending_stock)
-    const dbTotal = await db('orders')
-      .whereIn('status', ['submitted', 'pending_payment', 'pending_stock', 'validated', 'preparing', 'shipped', 'delivered'])
-      .sum('total_ttc as total')
-      .first();
+    // Verify CA TTC matches sum from order_items (excluding shipping), aligned with new calculation
+    const dbTotal = await db.raw(`
+      SELECT COALESCE(SUM(oi.qty * oi.unit_price_ttc), 0) as total
+      FROM order_items oi
+      JOIN orders o ON oi.order_id = o.id
+      WHERE o.status IN ('submitted','pending_payment','pending_stock','validated','preparing','shipped','delivered')
+        AND COALESCE(oi.type, 'product') != 'shipping'
+    `);
 
-    const dbCaTTC = parseFloat(dbTotal?.total || 0);
+    const dbCaTTC = parseFloat(dbTotal.rows?.[0]?.total || 0);
     const cockpitCaTTC = parseFloat(cockpitRes.body.kpis.caTTC);
 
     // Allow small difference due to orders created by other test suites running concurrently

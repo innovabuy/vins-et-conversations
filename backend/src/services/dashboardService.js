@@ -7,6 +7,31 @@ const ACTIVE_STATUSES = ['submitted', 'pending_payment', 'pending_stock', 'valid
 const ACTIVE_STATUSES_SQL = "('submitted','pending_payment','pending_stock','validated','preparing','shipped','delivered')";
 
 /**
+ * Sous-requête SQL centralisée : commandes attribuées à un étudiant.
+ * CA étudiant = commandes directes (user_id) + commandes referral (referred_by + student_referral).
+ *
+ * Retourne une sous-requête nommée "student_orders" avec colonnes :
+ *   effective_user_id, id, total_ttc, total_ht, total_items, campaign_id, status, created_at
+ *
+ * @param {string|null} campaignId - filtrer par campagne (null = toutes)
+ * @returns {{ sql: string, params: any[] }}
+ */
+function studentOrdersCombinedSQL(campaignId = null) {
+  const campaignFilter = campaignId ? ' AND campaign_id = ?' : '';
+  const params = campaignId ? [campaignId, campaignId] : [];
+  const sql = `(
+    SELECT user_id as effective_user_id, id, total_ttc, total_ht, total_items, campaign_id, status, created_at
+    FROM orders
+    WHERE status IN ${ACTIVE_STATUSES_SQL} AND user_id IS NOT NULL${campaignFilter}
+    UNION ALL
+    SELECT referred_by as effective_user_id, id, total_ttc, total_ht, total_items, campaign_id, status, created_at
+    FROM orders
+    WHERE referred_by IS NOT NULL AND source = 'student_referral' AND status IN ${ACTIVE_STATUSES_SQL}${campaignFilter}
+  )`;
+  return { sql, params };
+}
+
+/**
  * Dashboard Étudiant (CDC §4.2)
  */
 async function getStudentDashboard(userId, campaignId) {
@@ -335,17 +360,26 @@ async function getAdminCockpit(campaignIds) {
     ? (q) => q.whereIn('campaign_id', campaignIds)
     : (q) => q;
 
-  // KPIs principaux
-  const ordersStats = await campaignFilter(db('orders')
-    .whereIn('status', ACTIVE_STATUSES))
-    .sum('total_ttc as ca_ttc')
-    .sum('total_ht as ca_ht')
-    .count('id as total_orders')
-    .first();
-
-  const caTTC = parseFloat(ordersStats?.ca_ttc || 0);
-  const caHT = parseFloat(ordersStats?.ca_ht || 0);
-  const totalOrders = parseInt(ordersStats?.total_orders || 0, 10);
+  // KPIs principaux — CA calculé depuis order_items (aligné avec margins.js), hors frais de port
+  const campaignClause = campaignIds?.length
+    ? `AND o.campaign_id IN (${campaignIds.map(() => '?').join(',')})`
+    : '';
+  const cockpitParams = campaignIds?.length ? campaignIds : [];
+  const cockpitKPIs = await db.raw(`
+    SELECT
+      COALESCE(SUM(oi.qty * oi.unit_price_ttc), 0) as ca_ttc,
+      COALESCE(SUM(oi.qty * oi.unit_price_ht), 0) as ca_ht,
+      COUNT(DISTINCT o.id) as total_orders
+    FROM order_items oi
+    JOIN orders o ON oi.order_id = o.id
+    WHERE o.status IN ${ACTIVE_STATUSES_SQL}
+      AND COALESCE(oi.type, 'product') != 'shipping'
+      ${campaignClause}
+  `, cockpitParams);
+  const kpiRow = cockpitKPIs.rows?.[0] || cockpitKPIs[0] || {};
+  const caTTC = parseFloat(kpiRow.ca_ttc || 0);
+  const caHT = parseFloat(kpiRow.ca_ht || 0);
+  const totalOrders = parseInt(kpiRow.total_orders || 0, 10);
 
   // Marge globale (brute - coût 12+1 = nette)
   const marginResult = await db.raw(`
@@ -377,25 +411,21 @@ async function getAdminCockpit(campaignIds) {
     .where({ method: 'cash', status: 'pending' })
     .sum('amount as total').first();
 
-  // Classement étudiants (top 8)
-  const topStudents = await db('orders')
-    .join('users', 'orders.user_id', 'users.id')
-    .join('participations', function () {
-      this.on('participations.user_id', 'orders.user_id')
-        .andOn('participations.campaign_id', 'orders.campaign_id');
-    })
-    .where('users.role', 'etudiant')
-    .whereIn('orders.status', ACTIVE_STATUSES)
-    .groupBy('orders.user_id', 'users.name', 'participations.class_group')
-    .select(
-      'orders.user_id',
-      'users.name',
-      'participations.class_group',
-      db.raw('SUM(orders.total_ttc) as ca'),
-      db.raw('COUNT(orders.id) as orders_count')
-    )
-    .orderBy('ca', 'desc')
-    .limit(8);
+  // Classement étudiants (top 8) — inclut CA referral via UNION ALL
+  // Si campaignIds fournis, filtrer sur la première campagne — sinon toutes
+  const cockpitCampaignFilter = campaignIds && campaignIds.length > 0 ? campaignIds[0] : null;
+  const { sql: studentSQL, params: studentParams } = studentOrdersCombinedSQL(cockpitCampaignFilter);
+  const topStudentsResult = await db.raw(`
+    SELECT so.effective_user_id as user_id, u.name,
+           (SELECT p.class_group FROM participations p WHERE p.user_id = so.effective_user_id LIMIT 1) as class_group,
+           SUM(so.total_ttc) as ca, COUNT(so.id) as orders_count
+    FROM ${studentSQL} so
+    JOIN users u ON so.effective_user_id = u.id
+    WHERE u.role = 'etudiant'
+    GROUP BY so.effective_user_id, u.name
+    ORDER BY ca DESC LIMIT 8
+  `, studentParams);
+  const topStudents = (topStudentsResult.rows || topStudentsResult);
 
   // Top 3 produits
   const topProducts = await db('order_items')
@@ -482,27 +512,129 @@ async function getTeacherDashboard(userId, campaignId) {
   const ca = parseFloat(caResult?.ca || 0);
   const progress = campaign.goal > 0 ? Math.round((ca / campaign.goal) * 100) : 0;
 
-  // Classement élèves — SANS CA, uniquement nombre de ventes
-  const students = await db('orders')
-    .join('users', 'orders.user_id', 'users.id')
-    .join('participations', function () {
-      this.on('participations.user_id', 'orders.user_id')
-        .andOn('participations.campaign_id', 'orders.campaign_id');
-    })
-    .where('orders.campaign_id', campaignId)
-    .where('users.role', 'etudiant')
-    .whereIn('orders.status', ACTIVE_STATUSES)
-    .groupBy('orders.user_id', 'users.name', 'participations.class_group')
-    .select(
-      'users.name',
-      'participations.class_group',
-      db.raw('COUNT(orders.id) as sales_count'),
-      db.raw('SUM(orders.total_items) as bottles_sold')
-    )
-    .orderBy('bottles_sold', 'desc');
+  // Classement élèves — SANS CA, uniquement nombre de ventes (inclut referral)
+  const { sql: teacherStudentSQL, params: teacherStudentParams } = studentOrdersCombinedSQL(campaignId);
+  const studentsResult = await db.raw(`
+    SELECT u.name, p.class_group, so.effective_user_id,
+           COUNT(so.id) as sales_count, SUM(so.total_items) as bottles_sold
+    FROM ${teacherStudentSQL} so
+    JOIN users u ON so.effective_user_id = u.id
+    JOIN participations p ON p.user_id = so.effective_user_id AND p.campaign_id = ?
+    WHERE u.role = 'etudiant'
+    GROUP BY so.effective_user_id, u.name, p.class_group
+    ORDER BY bottles_sold DESC
+  `, [...teacherStudentParams, campaignId]);
+  const students = (studentsResult.rows || studentsResult);
 
-  // AUCUN montant en euros n'est retourné ici
-  // CDC §4.6 : "l'enseignant ne doit JAMAIS voir les montants en euros"
+  // ─── CA de l'action (levée partielle de la restriction euros) ───
+  // L'enseignant voit le CA global et par étudiant, la ventilation TVA et la rémunération asso.
+  const { sql: caStudentSQL, params: caStudentParams } = studentOrdersCombinedSQL(campaignId);
+
+  // Per-student CA (includes referral)
+  const studentCaResult = await db.raw(`
+    SELECT so.effective_user_id,
+           COALESCE(SUM(so.total_ttc), 0) as ca_ttc,
+           COALESCE(SUM(so.total_ht), 0) as ca_ht,
+           MAX(so.created_at) as last_order_date
+    FROM ${caStudentSQL} so
+    JOIN users u ON so.effective_user_id = u.id
+    WHERE u.role = 'etudiant'
+    GROUP BY so.effective_user_id
+  `, caStudentParams);
+  const studentCaMap = {};
+  for (const r of (studentCaResult.rows || studentCaResult)) {
+    studentCaMap[r.effective_user_id] = {
+      ca_ttc: parseFloat(parseFloat(r.ca_ttc).toFixed(2)),
+      ca_ht: parseFloat(parseFloat(r.ca_ht).toFixed(2)),
+      last_order_date: r.last_order_date,
+    };
+  }
+
+  // Global campaign CA (from studentOrdersCombinedSQL to include referral)
+  const globalCaResult = await db.raw(`
+    SELECT COALESCE(SUM(so.total_ttc), 0) as ca_ttc,
+           COALESCE(SUM(so.total_ht), 0) as ca_ht
+    FROM ${caStudentSQL} so
+  `, caStudentParams);
+  const globalCa = (globalCaResult.rows || globalCaResult)[0];
+  const campCaTTC = parseFloat(parseFloat(globalCa?.ca_ttc || 0).toFixed(2));
+  const campCaHT = parseFloat(parseFloat(globalCa?.ca_ht || 0).toFixed(2));
+
+  // Global VAT breakdown from order_items.vat_rate
+  const globalOrderIds = await db('orders')
+    .where({ campaign_id: campaignId })
+    .whereIn('status', ACTIVE_STATUSES)
+    .select('id');
+  const gIds = globalOrderIds.map((o) => o.id);
+  const globalVatRows = gIds.length > 0
+    ? await db('order_items')
+        .whereIn('order_id', gIds)
+        .whereIn('type', ['product', 'component'])
+        .where(function () {
+          this.where('type', 'component')
+            .orWhere(function () {
+              this.where('type', 'product').whereNotExists(
+                db.select(db.raw('1')).from('order_items as child')
+                  .whereRaw('child.parent_item_id = order_items.id').where('child.type', 'component')
+              );
+            });
+        })
+        .groupBy('vat_rate')
+        .select('vat_rate as rate', db.raw('SUM(unit_price_ht * qty) as amount_ht'), db.raw('SUM(unit_price_ttc * qty) as amount_ttc'))
+    : [];
+  const globalVatBreakdown = globalVatRows.map((r) => ({
+    rate: parseFloat(r.rate),
+    amount_ht: parseFloat(parseFloat(r.amount_ht).toFixed(2)),
+    amount_ttc: parseFloat(parseFloat(r.amount_ttc).toFixed(2)),
+  }));
+
+  // Per-student VAT breakdown
+  const studentVatResult = gIds.length > 0
+    ? await db('order_items')
+        .join('orders', 'order_items.order_id', 'orders.id')
+        .whereIn('orders.id', gIds)
+        .whereIn('order_items.type', ['product', 'component'])
+        .where(function () {
+          this.where('order_items.type', 'component')
+            .orWhere(function () {
+              this.where('order_items.type', 'product').whereNotExists(
+                db.select(db.raw('1')).from('order_items as child')
+                  .whereRaw('child.parent_item_id = order_items.id').where('child.type', 'component')
+              );
+            });
+        })
+        .whereNotNull('orders.user_id')
+        .groupBy('orders.user_id', 'order_items.vat_rate')
+        .select('orders.user_id', 'order_items.vat_rate as rate',
+          db.raw('SUM(order_items.unit_price_ht * order_items.qty) as amount_ht'),
+          db.raw('SUM(order_items.unit_price_ttc * order_items.qty) as amount_ttc'))
+    : [];
+  const studentVatMap = {};
+  for (const r of studentVatResult) {
+    if (!studentVatMap[r.user_id]) studentVatMap[r.user_id] = [];
+    studentVatMap[r.user_id].push({
+      rate: parseFloat(r.rate),
+      amount_ht: parseFloat(parseFloat(r.amount_ht).toFixed(2)),
+      amount_ttc: parseFloat(parseFloat(r.amount_ttc).toFixed(2)),
+    });
+  }
+
+  // Association remuneration from client_types.commission_rules
+  let commissionRate = 0;
+  try {
+    const ct = await db('campaigns')
+      .join('client_types', 'campaigns.client_type_id', 'client_types.id')
+      .where('campaigns.id', campaignId)
+      .select('client_types.commission_rules')
+      .first();
+    const commRules = typeof ct?.commission_rules === 'string' ? JSON.parse(ct.commission_rules) : (ct?.commission_rules || {});
+    commissionRate = commRules.fund_collective?.value || 0;
+  } catch (_) { /* graceful */ }
+
+  const associationRemuneration = {
+    rate_percent: commissionRate,
+    amount_ht: parseFloat((campCaHT * commissionRate / 100).toFixed(2)),
+  };
 
   // Alertes inactivité
   const allStudents = await db('participations')
@@ -539,25 +671,30 @@ async function getTeacherDashboard(userId, campaignId) {
     .where({ campaign_id: campaignId, role_in_campaign: 'student' })
     .select('users.id', 'users.name', 'participations.class_group');
 
+  // Per-class aggregation (includes referral orders via UNION ALL)
+  const { sql: classSQL, params: classParams } = studentOrdersCombinedSQL(campaignId);
+  const classStatsResult = await db.raw(`
+    SELECT so.effective_user_id, SUM(so.total_items) as bottles, COUNT(so.id) as sales_count
+    FROM ${classSQL} so
+    WHERE so.effective_user_id IN (${allStudentsWithGroup.map(() => '?').join(',')})
+    GROUP BY so.effective_user_id
+  `, [...classParams, ...allStudentsWithGroup.map((s) => s.id)]);
+  const classStatsRows = classStatsResult.rows || classStatsResult;
+  const classStatsMap = {};
+  classStatsRows.forEach((r) => { classStatsMap[r.effective_user_id] = r; });
+
   const classTotals = {};
   for (const cg of classGroups) {
     const studentIds = allStudentsWithGroup.filter((s) => s.class_group === cg).map((s) => s.id);
-    if (studentIds.length === 0) {
-      classTotals[cg] = { bottles: 0, salesCount: 0, studentCount: studentIds.length };
-      continue;
+    let bottles = 0, salesCount = 0;
+    for (const sid of studentIds) {
+      const stat = classStatsMap[sid];
+      if (stat) {
+        bottles += parseInt(stat.bottles || 0, 10);
+        salesCount += parseInt(stat.sales_count || 0, 10);
+      }
     }
-    const result = await db('orders')
-      .where({ campaign_id: campaignId })
-      .whereIn('user_id', studentIds)
-      .whereIn('status', ACTIVE_STATUSES)
-      .sum('total_items as bottles')
-      .count('id as sales_count')
-      .first();
-    classTotals[cg] = {
-      bottles: parseInt(result?.bottles || 0, 10),
-      salesCount: parseInt(result?.sales_count || 0, 10),
-      studentCount: studentIds.length,
-    };
+    classTotals[cg] = { bottles, salesCount, studentCount: studentIds.length };
   }
 
   return {
@@ -566,14 +703,27 @@ async function getTeacherDashboard(userId, campaignId) {
     totalStudents: allStudents.length,
     classGroups,
     classTotals,
-    students: students.map((s, i) => ({
-      rank: i + 1,
-      name: s.name,
-      classGroup: s.class_group,
-      salesCount: parseInt(s.sales_count, 10),
-      bottlesSold: parseInt(s.bottles_sold, 10),
-      // PAS de champ ca, amount, total, etc.
-    })),
+    campaign_financials: {
+      ca_ttc: campCaTTC,
+      ca_ht: campCaHT,
+      vat_breakdown: globalVatBreakdown,
+      association_remuneration: associationRemuneration,
+    },
+    students: students.map((s, i) => {
+      const caData = studentCaMap[s.effective_user_id] || { ca_ttc: 0, ca_ht: 0, last_order_date: null };
+      return {
+        id: s.effective_user_id,
+        rank: i + 1,
+        name: s.name,
+        classGroup: s.class_group,
+        salesCount: parseInt(s.sales_count, 10),
+        bottlesSold: parseInt(s.bottles_sold, 10),
+        ca_ttc: caData.ca_ttc,
+        ca_ht: caData.ca_ht,
+        vat_breakdown: studentVatMap[s.effective_user_id] || [],
+        last_order_date: caData.last_order_date,
+      };
+    }),
     inactiveStudents: inactiveStudents.map((s) => s.name),
     inactivityThreshold,
   };
@@ -711,4 +861,4 @@ async function getStudentLeaderboard(userId, campaignId, { period = 'all', class
   };
 }
 
-module.exports = { getStudentDashboard, getStudentRanking, getStudentLeaderboard, getAdminCockpit, getTeacherDashboard };
+module.exports = { getStudentDashboard, getStudentRanking, getStudentLeaderboard, getAdminCockpit, getTeacherDashboard, studentOrdersCombinedSQL, ACTIVE_STATUSES, ACTIVE_STATUSES_SQL };

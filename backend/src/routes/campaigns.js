@@ -141,28 +141,22 @@ router.get('/:id', authenticate, requireRole('super_admin', 'commercial'), async
     const daysRemaining = campaign.end_date
       ? Math.max(0, Math.ceil((new Date(campaign.end_date) - new Date()) / 86400000)) : null;
 
-    // Participants avec stats individuelles
-    const participants = await db('participations')
-      .where('participations.campaign_id', campaign.id)
-      .join('users', 'participations.user_id', 'users.id')
-      .leftJoin(
-        db('orders')
-          .where('campaign_id', campaign.id)
-          .whereIn('status', validStatuses)
-          .select('user_id')
-          .sum('total_ttc as ca')
-          .count('id as orders_count')
-          .groupBy('user_id')
-          .as('o'),
-        'o.user_id', 'users.id'
-      )
-      .select(
-        'users.id', 'users.name', 'users.email', 'users.role',
-        'participations.created_at as joined_at',
-        db.raw('COALESCE(o.ca, 0) as ca'),
-        db.raw('COALESCE(o.orders_count, 0) as orders_count')
-      )
-      .orderBy('ca', 'desc');
+    // Participants avec stats individuelles (inclut CA referral via UNION ALL)
+    const { studentOrdersCombinedSQL } = require('../services/dashboardService');
+    const { sql: partSQL, params: partParams } = studentOrdersCombinedSQL(campaign.id);
+    const participantsResult = await db.raw(`
+      SELECT u.id, u.name, u.email, u.role, p.created_at as joined_at,
+             COALESCE(o.ca, 0) as ca, COALESCE(o.orders_count, 0) as orders_count
+      FROM participations p
+      JOIN users u ON p.user_id = u.id
+      LEFT JOIN (
+        SELECT effective_user_id, SUM(total_ttc) as ca, COUNT(id) as orders_count
+        FROM ${partSQL} so GROUP BY effective_user_id
+      ) o ON o.effective_user_id = u.id
+      WHERE p.campaign_id = ?
+      ORDER BY ca DESC
+    `, [...partParams, campaign.id]);
+    const participants = participantsResult.rows || participantsResult;
 
     // Vins / produits avec stats
     const products = await db('campaign_products')
@@ -189,29 +183,24 @@ router.get('/:id', authenticate, requireRole('super_admin', 'commercial'), async
       )
       .orderBy('qty_sold', 'desc');
 
-    // Stats par classe (group by organization pour multi-classes)
-    const classeStats = await db('participations')
-      .where('participations.campaign_id', campaign.id)
-      .join('users', 'participations.user_id', 'users.id')
-      .leftJoin(
-        db('orders')
-          .where('campaign_id', campaign.id)
-          .whereIn('status', validStatuses)
-          .select('user_id')
-          .sum('total_ttc as ca')
-          .count('id as orders_count')
-          .groupBy('user_id')
-          .as('o'),
-        'o.user_id', 'users.id'
-      )
-      .select(
-        db.raw("COALESCE(participations.class_group, 'Non assigné') as class_name"),
-        db.raw('COUNT(DISTINCT users.id) as students'),
-        db.raw('COALESCE(SUM(o.ca), 0) as ca'),
-        db.raw('COALESCE(SUM(o.orders_count), 0) as orders_count')
-      )
-      .groupBy('class_name')
-      .orderBy('ca', 'desc');
+    // Stats par classe (inclut CA referral via UNION ALL)
+    const { sql: classSQL, params: classParams } = studentOrdersCombinedSQL(campaign.id);
+    const classeStatsResult = await db.raw(`
+      SELECT COALESCE(p.class_group, 'Non assigné') as class_name,
+             COUNT(DISTINCT u.id) as students,
+             COALESCE(SUM(o.ca), 0) as ca,
+             COALESCE(SUM(o.orders_count), 0) as orders_count
+      FROM participations p
+      JOIN users u ON p.user_id = u.id
+      LEFT JOIN (
+        SELECT effective_user_id, SUM(total_ttc) as ca, COUNT(id) as orders_count
+        FROM ${classSQL} so GROUP BY effective_user_id
+      ) o ON o.effective_user_id = u.id
+      WHERE p.campaign_id = ?
+      GROUP BY class_name
+      ORDER BY ca DESC
+    `, [...classParams, campaign.id]);
+    const classeStats = classeStatsResult.rows || classeStatsResult;
 
     // Evolution CA par jour
     const dailyCA = await db('orders')
@@ -1186,7 +1175,7 @@ router.get('/:campaignId/participants/:userId/export-excel', authenticate, requi
         'order_items.unit_price_ht',
         'order_items.unit_price_ttc',
         db.raw('order_items.qty * order_items.unit_price_ttc as line_total_ttc'),
-        'products.tva_rate',
+        'order_items.vat_rate',
         'payments.status as payment_status'
       )
       .orderBy('orders.created_at', 'desc');

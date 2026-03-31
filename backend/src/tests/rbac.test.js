@@ -311,7 +311,7 @@ describe('RBAC — Étudiant', () => {
         campaign_id: campaignId,
         items: [{ productId: cp.id, qty: 1 }],
         customer_name: 'Client RBAC Test',
-        payment_method: 'cash',
+        payment_method: 'card',
       });
     expect(res.status).toBe(201);
 
@@ -390,7 +390,7 @@ describe('RBAC — Lecture seule', () => {
         campaign_id: campaignId,
         items: [{ productId: product.id, qty: 1 }],
         customer_name: 'Test',
-        payment_method: 'cash',
+        payment_method: 'card',
       });
     // Will get 403 from antifraudCheck/participation check or from role check
     expect([400, 403, 500]).toContain(res.status);

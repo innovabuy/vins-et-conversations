@@ -89,7 +89,8 @@ async function antifraudCheck(req, res, next) {
     // --- Vérification 1: Limite commandes impayées ---
     // Load max_unpaid_orders from campaign config (CDC §2.2 — zero hardcoded constants)
     const campaignId = req.body.campaign_id;
-    let maxUnpaid = 3; // default if no campaign config
+    // Limite temporaire augmentée — réduire à 3 après activation Stripe en production
+    let maxUnpaid = 10;
     if (campaignId) {
       const campaign = await db('campaigns').where({ id: campaignId }).select('config').first();
       const config = typeof campaign?.config === 'string' ? JSON.parse(campaign.config) : (campaign?.config || {});
@@ -142,4 +143,31 @@ function requireCseRole(...cseRoles) {
   };
 }
 
-module.exports = { authenticate, requireRole, requireCampaignAccess, antifraudCheck, requireCseRole };
+/**
+ * Optional authentication — extracts user from JWT if present, continues as guest if absent.
+ */
+function authenticateOptional(req, res, next) {
+  const authHeader = req.headers.authorization;
+  let token;
+
+  if (authHeader && authHeader.startsWith('Bearer ')) {
+    token = authHeader.split(' ')[1];
+  } else if (req.query.token) {
+    token = req.query.token;
+  }
+
+  if (!token) {
+    req.user = null;
+    return next();
+  }
+
+  try {
+    const decoded = authService.verifyAccessToken(token);
+    req.user = decoded;
+  } catch (err) {
+    req.user = null; // Invalid token → treat as guest
+  }
+  next();
+}
+
+module.exports = { authenticate, authenticateOptional, requireRole, requireCampaignAccess, antifraudCheck, requireCseRole };

@@ -111,7 +111,7 @@ describe('Auto-validate toggle OFF', () => {
       .send({
         campaign_id: campaignId,
         customer_name: 'Client AutoValidate OFF',
-        payment_method: 'cash',
+        payment_method: 'card',
         items: [{ productId: cp.product_id, qty: 1 }],
       });
 
@@ -155,7 +155,7 @@ describe('Auto-validate toggle ON', () => {
       .send({
         campaign_id: campaignId,
         customer_name: 'Client AutoValidate ON',
-        payment_method: 'cash',
+        payment_method: 'card',
         items: [{ productId: cp.product_id, qty: 1 }],
       });
 

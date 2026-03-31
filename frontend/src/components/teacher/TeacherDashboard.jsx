@@ -1,16 +1,20 @@
 import { useState, useEffect } from 'react';
 import { dashboardAPI } from '../../services/api';
-import { Users, Target, AlertTriangle, BarChart3 } from 'lucide-react';
+import { Users, Target, AlertTriangle, BarChart3, TrendingUp, ChevronDown, ChevronUp } from 'lucide-react';
+
+const formatEur = (v) => new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR' }).format(v);
+const formatDate = (d) => d ? new Date(d).toLocaleDateString('fr-FR') : '—';
 
 /**
- * Teacher Dashboard — CDC §4.6
- * CRITICAL: No euro amounts (€) anywhere in this component.
- * Teacher sees: progress %, bottles sold, sales count, inactivity alerts.
+ * Teacher Dashboard — CDC §4.6 (amendement Nicolas : CA action + detail etudiants)
+ * L'enseignant voit : CA global, ventilation TVA, remuneration asso, detail par etudiant.
+ * NE voit PAS : prix produits, marges, commissions individuelles.
  */
 export default function TeacherDashboard() {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [classFilter, setClassFilter] = useState('all');
+  const [expandedStudent, setExpandedStudent] = useState(null);
 
   useEffect(() => {
     loadDashboard();
@@ -33,7 +37,7 @@ export default function TeacherDashboard() {
 
   if (!data) return <p className="text-center text-gray-500 py-12">Impossible de charger le tableau de bord.</p>;
 
-  const { progress, totalStudents, classGroups, classTotals, students, inactiveStudents } = data;
+  const { progress, totalStudents, classGroups, classTotals, students, inactiveStudents, campaign_financials } = data;
 
   // Filter students by class
   const filteredStudents = classFilter === 'all'
@@ -69,6 +73,47 @@ export default function TeacherDashboard() {
         </div>
         <p className="text-sm text-gray-500">{totalStudents} élèves participent</p>
       </div>
+
+      {/* CA de l'action */}
+      {campaign_financials && (
+        <div className="card">
+          <div className="flex items-center gap-2 mb-4">
+            <TrendingUp size={18} className="text-wine-700" />
+            <h3 className="font-semibold">CA de l'action</h3>
+          </div>
+          <div className="grid grid-cols-2 gap-4 mb-4">
+            <div className="bg-wine-50 rounded-lg p-4 text-center">
+              <p className="text-xs text-gray-500">CA TTC</p>
+              <p className="text-2xl font-bold text-wine-700">{formatEur(campaign_financials.ca_ttc)}</p>
+            </div>
+            <div className="bg-gray-50 rounded-lg p-4 text-center">
+              <p className="text-xs text-gray-500">CA HT</p>
+              <p className="text-2xl font-bold text-gray-700">{formatEur(campaign_financials.ca_ht)}</p>
+            </div>
+          </div>
+          {campaign_financials.vat_breakdown?.length > 0 && (
+            <div className="mb-4">
+              <p className="text-xs text-gray-500 mb-2">Ventilation TVA</p>
+              <div className="border rounded-lg divide-y text-sm">
+                {campaign_financials.vat_breakdown.map((v) => (
+                  <div key={v.rate} className="flex justify-between px-3 py-2">
+                    <span className="text-gray-600">TVA {v.rate}%</span>
+                    <span>HT {formatEur(v.amount_ht)} — TTC {formatEur(v.amount_ttc)}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+          {campaign_financials.association_remuneration && campaign_financials.association_remuneration.rate_percent > 0 && (
+            <div className="bg-green-50 border border-green-200 rounded-lg p-3">
+              <p className="text-sm font-medium text-green-800">
+                Remuneration association ({campaign_financials.association_remuneration.rate_percent}% du CA HT)
+              </p>
+              <p className="text-xl font-bold text-green-700">{formatEur(campaign_financials.association_remuneration.amount_ht)}</p>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Class group comparison */}
       {classGroups && classGroups.length > 1 && classTotals && (
@@ -118,12 +163,12 @@ export default function TeacherDashboard() {
         </div>
       )}
 
-      {/* Student ranking — NO euros */}
+      {/* Student detail — with CA */}
       <div className="card">
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-2">
             <Users size={18} className="text-wine-700" />
-            <h3 className="font-semibold">Classement des élèves</h3>
+            <h3 className="font-semibold">Detail par etudiant</h3>
           </div>
           {classGroups && classGroups.length > 1 && (
             <select
@@ -139,35 +184,61 @@ export default function TeacherDashboard() {
           )}
         </div>
 
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="border-b text-left text-gray-500">
-              <th className="py-2 w-8">#</th>
-              <th className="py-2">Nom</th>
-              {classGroups && classGroups.length > 1 && <th className="py-2">Classe</th>}
-              <th className="py-2 text-right">Ventes</th>
-              <th className="py-2 text-right">Bouteilles</th>
-            </tr>
-          </thead>
-          <tbody>
-            {filteredStudents.map((s, i) => (
-              <tr key={`${s.name}-${i}`} className="border-b hover:bg-gray-50">
-                <td className="py-2 text-gray-400">{i + 1}</td>
-                <td className="py-2 font-medium">{s.name}</td>
-                {classGroups && classGroups.length > 1 && (
-                  <td className="py-2">
-                    <span className="text-xs bg-gray-100 px-2 py-0.5 rounded">{s.classGroup}</span>
-                  </td>
+        <div className="space-y-1">
+          {filteredStudents.map((s) => {
+            const expanded = expandedStudent === s.id;
+            return (
+              <div key={s.id || s.name} className="border rounded-lg overflow-hidden">
+                <button
+                  onClick={() => setExpandedStudent(expanded ? null : s.id)}
+                  className="w-full flex items-center justify-between p-3 text-left hover:bg-gray-50 text-sm"
+                >
+                  <div className="flex items-center gap-3 min-w-0">
+                    <span className="w-6 text-center text-xs font-bold text-gray-400">{s.rank}</span>
+                    <div className="min-w-0">
+                      <p className="font-medium truncate">{s.name}</p>
+                      <p className="text-xs text-gray-500">{s.classGroup} — {s.salesCount} ventes, {s.bottlesSold} bout.</p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2 shrink-0">
+                    <span className="font-semibold text-wine-700">{formatEur(s.ca_ttc || 0)}</span>
+                    {expanded ? <ChevronUp size={14} className="text-gray-400" /> : <ChevronDown size={14} className="text-gray-400" />}
+                  </div>
+                </button>
+                {expanded && (
+                  <div className="border-t px-4 py-3 bg-gray-50 text-sm space-y-2">
+                    <div className="flex justify-between">
+                      <span className="text-gray-500">CA HT</span>
+                      <span className="font-medium">{formatEur(s.ca_ht || 0)}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-gray-500">CA TTC</span>
+                      <span className="font-medium">{formatEur(s.ca_ttc || 0)}</span>
+                    </div>
+                    {s.vat_breakdown?.length > 0 && (
+                      <div>
+                        <p className="text-xs text-gray-400 mb-1">Ventilation TVA</p>
+                        {s.vat_breakdown.map((v) => (
+                          <div key={v.rate} className="flex justify-between text-xs">
+                            <span className="text-gray-500">TVA {v.rate}%</span>
+                            <span>HT {formatEur(v.amount_ht)} — TTC {formatEur(v.amount_ttc)}</span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                    <div className="flex justify-between text-xs text-gray-400 pt-1 border-t">
+                      <span>Derniere commande</span>
+                      <span>{formatDate(s.last_order_date)}</span>
+                    </div>
+                  </div>
                 )}
-                <td className="py-2 text-right">{s.salesCount}</td>
-                <td className="py-2 text-right font-medium">{s.bottlesSold}</td>
-              </tr>
-            ))}
-            {filteredStudents.length === 0 && (
-              <tr><td colSpan={5} className="py-4 text-center text-gray-400">Aucune vente pour le moment</td></tr>
-            )}
-          </tbody>
-        </table>
+              </div>
+            );
+          })}
+          {filteredStudents.length === 0 && (
+            <p className="py-4 text-center text-gray-400 text-sm">Aucune vente pour le moment</p>
+          )}
+        </div>
       </div>
     </div>
   );

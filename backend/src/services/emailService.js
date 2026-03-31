@@ -341,6 +341,20 @@ async function sendContactNotification({ name, email, phone, company, type, mess
   });
 }
 
+async function sendDeferredRefused({ email, name, orderRef, items }) {
+  const refusedLines = (items || []).map((i) =>
+    `${i.name} (x${i.qty}) — ${formatEur(i.unit_price_ttc * i.qty)}`
+  ).join('<br>');
+
+  const html = renderTemplate('deferred-refused', {
+    SUBJECT: `Paiement différé refusé — ${orderRef}`,
+    NAME: name,
+    ORDER_REF: orderRef,
+    REFUSED_ITEMS: refusedLines,
+  });
+  return sendEmail({ to: email, subject: `Paiement différé non accepté — ${orderRef}`, html });
+}
+
 module.exports = {
   sendEmail,
   renderTemplate,
@@ -358,4 +372,5 @@ module.exports = {
   sendPaymentFailed,
   sendContactReceived,
   sendContactNotification,
+  sendDeferredRefused,
 };

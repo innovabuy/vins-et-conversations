@@ -42,8 +42,8 @@ export default function AdminCockpit() {
       {/* KPIs principaux */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
         {[
-          { label: 'CA Total TTC', value: formatEur(data.kpis.caTTC), icon: TrendingUp, gradient: 'from-wine-700 to-wine-900' },
-          { label: 'CA HT', value: formatEur(data.kpis.caHT), icon: Wine, gradient: 'from-blue-500 to-blue-700' },
+          { label: 'CA Total TTC', value: formatEur(data.kpis.caTTC), icon: TrendingUp, gradient: 'from-wine-700 to-wine-900', hint: 'CA engage (commandes soumises et validees)' },
+          { label: 'CA HT', value: formatEur(data.kpis.caHT), icon: Wine, gradient: 'from-blue-500 to-blue-700', hint: 'CA engage (commandes soumises et validees)' },
           { label: 'Marge globale', value: formatEur(data.kpis.marge), icon: Trophy, gradient: 'from-emerald-500 to-emerald-700' },
           { label: 'Commandes', value: data.kpis.totalOrders, icon: ShoppingCart, gradient: 'from-purple-500 to-purple-700' },
           ...(data.kpis.boutiqueCaTTC ? [{ label: 'Boutique Web', value: `${formatEur(data.kpis.boutiqueCaTTC)} (${data.kpis.boutiqueOrders} cmd)`, icon: Globe, gradient: 'from-indigo-500 to-indigo-700' }] : []),
@@ -54,6 +54,7 @@ export default function AdminCockpit() {
             </div>
             <p className="text-2xl font-bold">{kpi.value}</p>
             <p className="text-sm opacity-80 mt-1">{kpi.label}</p>
+            {kpi.hint && <p className="text-xs opacity-50 mt-0.5">{kpi.hint}</p>}
           </div>
         ))}
       </div>

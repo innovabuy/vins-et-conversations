@@ -48,6 +48,8 @@ const productSchema = Joi.object({
   visible_boutique: Joi.boolean().default(false),
   is_featured: Joi.boolean().default(false),
   allow_backorder: Joi.boolean().default(false),
+  allows_deferred: Joi.boolean().default(false),
+  caution_amount: Joi.number().min(0).allow(null).default(0),
   sort_order: Joi.number().integer().default(0),
   // Enriched fields
   region: Joi.string().max(100).allow(null, ''),
@@ -486,6 +488,78 @@ adminRouter.delete(
     }
   }
 );
+
+// ─── Product Components (coffret TVA ventilation) ────
+
+// GET /api/v1/admin/products/:id/components
+adminRouter.get('/:id/components', async (req, res) => {
+  try {
+    const components = await db('product_components')
+      .where({ product_id: req.params.id })
+      .orderBy('sort_order');
+    res.json({ data: components });
+  } catch (err) {
+    res.status(500).json({ error: 'SERVER_ERROR', message: err.message });
+  }
+});
+
+// POST /api/v1/admin/products/:id/components
+adminRouter.post('/:id/components', async (req, res) => {
+  try {
+    const { component_name, amount_ht, vat_rate, sort_order } = req.body;
+    if (!component_name || amount_ht == null || vat_rate == null) {
+      return res.status(400).json({ error: 'MISSING_FIELDS', message: 'component_name, amount_ht et vat_rate requis' });
+    }
+    const [component] = await db('product_components').insert({
+      product_id: req.params.id,
+      component_name,
+      amount_ht: parseFloat(amount_ht),
+      vat_rate: parseFloat(vat_rate),
+      sort_order: sort_order || 0,
+    }).returning('*');
+
+    try { const redis = require('../config/redis'); if (redis.client) await redis.client.flushDb(); } catch (_) {}
+    res.status(201).json({ data: component });
+  } catch (err) {
+    res.status(500).json({ error: 'SERVER_ERROR', message: err.message });
+  }
+});
+
+// PUT /api/v1/admin/products/:id/components/:cid
+adminRouter.put('/:id/components/:cid', async (req, res) => {
+  try {
+    const { component_name, amount_ht, vat_rate, sort_order } = req.body;
+    const update = { updated_at: new Date() };
+    if (component_name !== undefined) update.component_name = component_name;
+    if (amount_ht !== undefined) update.amount_ht = parseFloat(amount_ht);
+    if (vat_rate !== undefined) update.vat_rate = parseFloat(vat_rate);
+    if (sort_order !== undefined) update.sort_order = sort_order;
+
+    const [component] = await db('product_components')
+      .where({ id: req.params.cid, product_id: req.params.id })
+      .update(update).returning('*');
+    if (!component) return res.status(404).json({ error: 'NOT_FOUND' });
+
+    try { const redis = require('../config/redis'); if (redis.client) await redis.client.flushDb(); } catch (_) {}
+    res.json({ data: component });
+  } catch (err) {
+    res.status(500).json({ error: 'SERVER_ERROR', message: err.message });
+  }
+});
+
+// DELETE /api/v1/admin/products/:id/components/:cid
+adminRouter.delete('/:id/components/:cid', async (req, res) => {
+  try {
+    const deleted = await db('product_components')
+      .where({ id: req.params.cid, product_id: req.params.id }).del();
+    if (!deleted) return res.status(404).json({ error: 'NOT_FOUND' });
+
+    try { const redis = require('../config/redis'); if (redis.client) await redis.client.flushDb(); } catch (_) {}
+    res.json({ message: 'Composant supprimé' });
+  } catch (err) {
+    res.status(500).json({ error: 'SERVER_ERROR', message: err.message });
+  }
+});
 
 module.exports = router;
 module.exports.adminRouter = adminRouter;

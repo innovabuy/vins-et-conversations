@@ -94,7 +94,15 @@ export default function JoinCampaignPage() {
           </p>
           {success.accessToken ? (
             <button
-              onClick={() => navigate('/student')}
+              onClick={() => {
+                const role = success.user?.role;
+                const dest = role === 'cse' ? '/cse' :
+                  role === 'ambassadeur' ? '/ambassador' :
+                  role === 'enseignant' ? '/teacher' :
+                  role === 'etudiant' ? '/student' :
+                  '/login';
+                navigate(dest);
+              }}
               className="w-full py-3 bg-wine-700 text-white rounded-xl font-medium hover:bg-wine-800 transition-colors"
             >
               Accéder à mon espace
@@ -177,7 +185,7 @@ export default function JoinCampaignPage() {
             />
           </div>
 
-          <div>
+          {(!campaign.campaign_type_code || ['scolaire', 'lycee', 'bts_ndrc'].includes(campaign.campaign_type_code)) && <div>
             <label className="block text-xs font-medium text-gray-500 mb-1">Classe / Groupe (optionnel)</label>
             <input
               type="text"
@@ -186,7 +194,7 @@ export default function JoinCampaignPage() {
               className="w-full border rounded-xl px-4 py-2.5 text-sm focus:ring-2 focus:ring-wine-500 focus:border-wine-500"
               placeholder="Ex: BTS NDRC 1, GA..."
             />
-          </div>
+          </div>}
 
           {error && <p className="text-sm text-red-600 bg-red-50 rounded-lg px-3 py-2">{error}</p>}
 

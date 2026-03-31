@@ -14,6 +14,7 @@ import AdminDeliveryNotes from './components/admin/AdminDeliveryNotes';
 import AdminCRM from './components/admin/AdminCRM';
 import AdminSuppliers from './components/admin/AdminSuppliers';
 import AdminPayments from './components/admin/AdminPayments';
+import AdminCautionChecks from './components/admin/AdminCautionChecks';
 import AdminRoutes from './components/admin/AdminRoutes';
 import AdminNotifications from './components/admin/AdminNotifications';
 import AdminPricing from './components/admin/AdminPricing';
@@ -32,6 +33,7 @@ import AdminPromoCodes from './components/admin/AdminPromoCodes';
 import StudentDashboard from './components/student/StudentDashboard';
 import CSELayout from './components/layout/CSELayout';
 import CSEDashboard from './components/cse/CSEDashboard';
+import CollaboratorCSEDashboard from './components/cse/CollaboratorCSEDashboard';
 import AmbassadorLayout from './components/layout/AmbassadorLayout';
 import AmbassadorDashboard from './components/ambassador/AmbassadorDashboard';
 import BTSLayout from './components/layout/BTSLayout';
@@ -69,6 +71,12 @@ function ProtectedRoute({ children, roles }) {
   if (!user) return <Navigate to="/login" replace />;
   if (roles && !roles.includes(user.role)) return <Navigate to="/login" replace />;
   return children;
+}
+
+function CSERouteSwitch() {
+  const { user } = useAuth();
+  if (user?.cse_role === 'member') return <CollaboratorCSEDashboard />;
+  return <CSEDashboard />;
 }
 
 function AppRoutes() {
@@ -118,6 +126,7 @@ function AppRoutes() {
         <Route path="crm" element={<AdminCRM />} />
         <Route path="finance" element={<AdminFinance />} />
         <Route path="payments" element={<AdminPayments />} />
+        <Route path="caution-checks" element={<AdminCautionChecks />} />
         <Route path="analytics" element={<AdminAnalytics />} />
         <Route path="audit" element={<AdminAuditLog />} />
         <Route path="catalog" element={<AdminCatalog />} />
@@ -141,7 +150,7 @@ function AppRoutes() {
           <CSELayout />
         </ProtectedRoute>
       }>
-        <Route index element={<CSEDashboard />} />
+        <Route index element={<CSERouteSwitch />} />
       </Route>
 
       {/* Ambassador routes */}

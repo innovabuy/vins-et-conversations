@@ -9,18 +9,64 @@ const logger = require('../utils/logger');
 const router = express.Router();
 
 const VALID_STATUSES = ['validated', 'preparing', 'shipped', 'delivered'];
+const VALID_BL_STATUSES = ['draft', 'ready', 'shipped', 'delivered', 'signed'];
+
+/**
+ * Parse and validate grouped BL filter params from query string.
+ */
+function parseGroupedFilters(query) {
+  const filters = {};
+
+  // status[] — delivery_notes.status filter (multi-value)
+  if (query.status) {
+    const statuses = Array.isArray(query.status) ? query.status : [query.status];
+    const invalid = statuses.filter((s) => !VALID_BL_STATUSES.includes(s));
+    if (invalid.length > 0) {
+      return { error: `Statut(s) invalide(s) : ${invalid.join(', ')}. Valides : ${VALID_BL_STATUSES.join(', ')}` };
+    }
+    filters.blStatuses = statuses;
+  }
+
+  // date_from / date_to
+  if (query.date_from) {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(query.date_from)) {
+      return { error: 'date_from doit etre au format YYYY-MM-DD' };
+    }
+    filters.dateFrom = query.date_from;
+  }
+  if (query.date_to) {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(query.date_to)) {
+      return { error: 'date_to doit etre au format YYYY-MM-DD' };
+    }
+    filters.dateTo = query.date_to;
+  }
+  if (filters.dateFrom && filters.dateTo && filters.dateFrom > filters.dateTo) {
+    return { error: 'date_from doit etre anterieure ou egale a date_to' };
+  }
+
+  return filters;
+}
 
 /**
  * Fetch grouped order data for one or all students in a campaign
+ * @param {object} opts - { blStatuses?, dateFrom?, dateTo? }
  */
-async function fetchGroupedData(campaignId, userId, orderIds) {
+async function fetchGroupedData(campaignId, userId, orderIds, opts = {}) {
   let query = db('orders')
     .join('users', 'orders.user_id', 'users.id')
     .join('order_items', 'order_items.order_id', 'orders.id')
     .join('products', 'products.id', 'order_items.product_id')
     .where('orders.campaign_id', campaignId)
-    .whereIn('orders.status', VALID_STATUSES)
-    .select(
+    .whereIn('orders.status', VALID_STATUSES);
+
+  // Join delivery_notes if BL status filter is active
+  if (opts.blStatuses && opts.blStatuses.length > 0) {
+    query = query
+      .join('delivery_notes', 'delivery_notes.order_id', 'orders.id')
+      .whereIn('delivery_notes.status', opts.blStatuses);
+  }
+
+  query = query.select(
       'users.id as user_id',
       'users.name as user_name',
       'users.email as user_email',
@@ -40,6 +86,14 @@ async function fetchGroupedData(campaignId, userId, orderIds) {
 
   if (orderIds && orderIds.length > 0) {
     query = query.whereIn('orders.id', orderIds);
+  }
+
+  // Date filters on orders.created_at
+  if (opts.dateFrom) {
+    query = query.where('orders.created_at', '>=', opts.dateFrom);
+  }
+  if (opts.dateTo) {
+    query = query.where('orders.created_at', '<=', `${opts.dateTo}T23:59:59.999Z`);
   }
 
   return query;
@@ -185,6 +239,10 @@ router.get('/grouped/student/:userId', authenticate, requireRole('super_admin', 
     const campaignId = req.query.campaign_id;
     if (!campaignId) return res.status(400).json({ error: 'MISSING_CAMPAIGN_ID', message: 'campaign_id requis' });
 
+    // Parse and validate filters
+    const filters = parseGroupedFilters(req.query);
+    if (filters.error) return res.status(400).json({ error: 'INVALID_FILTERS', message: filters.error });
+
     const campaign = await db('campaigns').where({ id: campaignId }).first();
     if (!campaign) return res.status(404).json({ error: 'CAMPAIGN_NOT_FOUND' });
 
@@ -196,9 +254,9 @@ router.get('/grouped/student/:userId', authenticate, requireRole('super_admin', 
       ? req.query.order_ids.split(',').map(s => s.trim()).filter(Boolean)
       : null;
 
-    const rows = await fetchGroupedData(campaignId, userId, orderIds);
+    const rows = await fetchGroupedData(campaignId, userId, orderIds, filters);
     if (rows.length === 0) {
-      return res.status(404).json({ error: 'NO_ORDERS', message: 'Aucune commande validee pour cet etudiant' });
+      return res.status(404).json({ error: 'NO_DELIVERY_NOTES_FOUND', message: 'Aucun bon de livraison correspondant aux filtres' });
     }
 
     const users = groupByUser(rows);
@@ -231,12 +289,17 @@ router.get('/grouped/student/:userId', authenticate, requireRole('super_admin', 
 router.get('/grouped/campaign/:campaignId', authenticate, requireRole('super_admin', 'commercial'), async (req, res) => {
   try {
     const { campaignId } = req.params;
+
+    // Parse and validate filters
+    const filters = parseGroupedFilters(req.query);
+    if (filters.error) return res.status(400).json({ error: 'INVALID_FILTERS', message: filters.error });
+
     const campaign = await db('campaigns').where({ id: campaignId }).first();
     if (!campaign) return res.status(404).json({ error: 'CAMPAIGN_NOT_FOUND' });
 
-    const rows = await fetchGroupedData(campaignId, null);
+    const rows = await fetchGroupedData(campaignId, null, null, filters);
     if (rows.length === 0) {
-      return res.status(404).json({ error: 'NO_ORDERS', message: 'Aucune commande validee pour cette campagne' });
+      return res.status(404).json({ error: 'NO_DELIVERY_NOTES_FOUND', message: 'Aucun bon de livraison correspondant aux filtres' });
     }
 
     const users = groupByUser(rows);

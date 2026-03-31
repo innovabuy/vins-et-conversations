@@ -380,6 +380,77 @@ function GroupedBLModal({ participant, campaignId, onClose }) {
   );
 }
 
+const BL_STATUS_OPTIONS = [
+  { value: 'draft', label: 'Brouillon' },
+  { value: 'ready', label: 'Pret' },
+  { value: 'shipped', label: 'Expedie' },
+  { value: 'delivered', label: 'Livre' },
+  { value: 'signed', label: 'Signe' },
+];
+
+function GroupedBLFilters({ campaignId, onClose }) {
+  const [statuses, setStatuses] = useState(['ready']);
+  const [dateFrom, setDateFrom] = useState('');
+  const [dateTo, setDateTo] = useState('');
+
+  const toggleStatus = (val) => {
+    setStatuses((prev) => prev.includes(val) ? prev.filter((s) => s !== val) : [...prev, val]);
+  };
+
+  const handleGenerate = () => {
+    const filters = {};
+    if (statuses.length > 0 && statuses.length < BL_STATUS_OPTIONS.length) filters.statuses = statuses;
+    if (dateFrom) filters.dateFrom = dateFrom;
+    if (dateTo) filters.dateTo = dateTo;
+    const url = deliveryNotesAPI.groupedCampaignPdf(campaignId, filters);
+    const sep = url.includes('?') ? '&' : '?';
+    window.open(url + sep + 'token=' + localStorage.getItem('accessToken'), '_blank');
+    onClose();
+  };
+
+  return (
+    <div className="bg-gray-50 border rounded-xl p-4 space-y-3">
+      <div className="flex items-center justify-between">
+        <h4 className="text-sm font-semibold text-gray-700">Filtres BL Groupes</h4>
+        <button onClick={onClose} className="text-gray-400 hover:text-gray-600"><X size={16} /></button>
+      </div>
+      <div>
+        <p className="text-xs font-medium text-gray-500 mb-1.5">Statut des BL</p>
+        <div className="flex flex-wrap gap-2">
+          {BL_STATUS_OPTIONS.map((opt) => (
+            <button
+              key={opt.value}
+              onClick={() => toggleStatus(opt.value)}
+              className={`px-3 py-1.5 text-xs rounded-full border transition-colors ${
+                statuses.includes(opt.value)
+                  ? 'bg-wine-600 text-white border-wine-600'
+                  : 'bg-white text-gray-600 border-gray-300 hover:border-gray-400'
+              }`}
+            >
+              {opt.label}
+            </button>
+          ))}
+        </div>
+      </div>
+      <div className="grid grid-cols-2 gap-3">
+        <div>
+          <label className="block text-xs font-medium text-gray-500 mb-1">Date debut</label>
+          <input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)}
+            className="w-full text-sm border rounded-lg px-3 py-2" />
+        </div>
+        <div>
+          <label className="block text-xs font-medium text-gray-500 mb-1">Date fin</label>
+          <input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)}
+            className="w-full text-sm border rounded-lg px-3 py-2" />
+        </div>
+      </div>
+      <button onClick={handleGenerate} className="w-full sm:w-auto px-5 py-2 bg-wine-700 text-white text-sm rounded-lg hover:bg-wine-800 flex items-center justify-center gap-2">
+        <FileDown size={16} /> Generer le PDF
+      </button>
+    </div>
+  );
+}
+
 function ParticipantsTab({ participants, campaignId }) {
   const navigate = useNavigate();
   const [exporting, setExporting] = useState(null);
@@ -657,6 +728,7 @@ export default function AdminCampaignDetail() {
   const [joinLinkCopied, setJoinLinkCopied] = useState(false);
   const [showJoinQR, setShowJoinQR] = useState(false);
   const [exportingCampaign, setExportingCampaign] = useState(false);
+  const [showBlFilters, setShowBlFilters] = useState(false);
 
   const handleExportCampaignExcel = async () => {
     setExportingCampaign(true);
@@ -738,8 +810,8 @@ export default function AdminCampaignDetail() {
             <FileText size={16} /> Rapport PDF
           </button>
           <button
-            onClick={() => { const url = deliveryNotesAPI.groupedCampaignPdf(id); window.open(url + '?token=' + localStorage.getItem('accessToken'), '_blank'); }}
-            className="flex items-center gap-2 px-4 py-2 border rounded-lg hover:bg-gray-50 text-sm"
+            onClick={() => setShowBlFilters((v) => !v)}
+            className={`flex items-center gap-2 px-4 py-2 border rounded-lg hover:bg-gray-50 text-sm ${showBlFilters ? 'bg-wine-50 border-wine-300' : ''}`}
           >
             <FileDown size={16} /> BL Groupes
           </button>
@@ -752,6 +824,10 @@ export default function AdminCampaignDetail() {
             Envoyer rapports
           </button>
         </div>
+
+        {/* BL Groupes — Filter Panel */}
+        {showBlFilters && <GroupedBLFilters campaignId={id} onClose={() => setShowBlFilters(false)} />}
+
         {campaign.start_date && (
           <div className="text-right text-sm text-gray-500 hidden sm:block">
             <div className="flex items-center gap-1"><Calendar size={14} /> {new Date(campaign.start_date).toLocaleDateString('fr-FR')} → {campaign.end_date ? new Date(campaign.end_date).toLocaleDateString('fr-FR') : '…'}</div>
@@ -837,7 +913,7 @@ export default function AdminCampaignDetail() {
           >
             QR Code
           </button>
-          <p className="text-xs text-emerald-600">Les étudiants scannent ce QR code ou ouvrent ce lien pour s'inscrire.</p>
+          <p className="text-xs text-emerald-600">Les participants scannent ce QR code ou ouvrent ce lien pour s'inscrire.</p>
         </div>
         {showJoinQR && <JoinQRCode url={`${window.location.origin}/join-campaign/${id}`} />}
       </div>

@@ -143,6 +143,8 @@ app.use('/api/v1/admin/free-bottles', require('./routes/freeBottles'));
 app.use('/api/v1/paypal', require('./routes/paypal'));
 app.use('/api/v1/admin/promo-codes', require('./routes/promoCodes'));
 app.use('/api/v1/promo-codes', require('./routes/promoCodes').publicRouter);
+app.use('/api/v1/admin/backup', require('./routes/backup'));
+app.use('/api/v1/admin/caution-checks', require('./routes/cautionChecks'));
 
 // ─── Health check ─────────────────────────────────────
 app.get('/api/health', async (req, res) => {

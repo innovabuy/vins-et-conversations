@@ -8,7 +8,7 @@ const db = require('../config/database');
 
 const PASSWORD = 'VinsConv2026!';
 let adminToken, studentToken, cseToken;
-let sacreCoeurCampaignId, cseCampaignId;
+let sacreCoeurCampaignId, cseCampaignId, ambassadeurCampaignId;
 
 beforeAll(async () => {
   await db.raw('SELECT 1');
@@ -37,6 +37,9 @@ beforeAll(async () => {
 
   const cseCampaign = await db('campaigns').where('name', 'like', '%CSE%').first();
   cseCampaignId = cseCampaign?.id;
+
+  const ambassadeurCampaign = await db('campaigns').where('name', 'like', '%mbassadeur%').first();
+  ambassadeurCampaignId = ambassadeurCampaign?.id;
 });
 
 afterAll(async () => {
@@ -647,6 +650,101 @@ describe('FLUX-13: Inscription publique campagne', () => {
   });
 });
 
+describe('FLUX-14: Inscription publique — rôle déduit du type campagne', () => {
+  const cseEmail = `join-cse-${Date.now()}@test.fr`;
+  const ambEmail = `join-amb-${Date.now()}@test.fr`;
+
+  afterAll(async () => {
+    for (const email of [cseEmail, ambEmail]) {
+      const user = await db('users').where({ email }).first();
+      if (user) {
+        await db('participations').where({ user_id: user.id }).del();
+        await db('refresh_tokens').where({ user_id: user.id }).del();
+        await db('users').where({ id: user.id }).del();
+      }
+    }
+  });
+
+  test('CSE campaign join → role=cse, role_in_campaign=cse_member, cse_role=member', async () => {
+    if (!cseCampaignId) return;
+    const res = await request(app)
+      .post(`/api/v1/public/campaigns/${cseCampaignId}/join`)
+      .send({ first_name: 'CSE', last_name: 'Test', email: cseEmail, password: 'MonMotDePasse123' });
+    expect(res.status).toBe(201);
+    expect(res.body.success).toBe(true);
+    expect(res.body.user.role).toBe('cse');
+
+    const user = await db('users').where({ email: cseEmail }).first();
+    expect(user.role).toBe('cse');
+    expect(user.cse_role).toBe('member');
+
+    const participation = await db('participations')
+      .where({ user_id: user.id, campaign_id: cseCampaignId }).first();
+    expect(participation.role_in_campaign).toBe('cse_member');
+    expect(participation.sub_role).toBe('collaborateur');
+  });
+
+  test('Ambassadeur campaign join → role=ambassadeur, role_in_campaign=ambassador', async () => {
+    if (!ambassadeurCampaignId) return;
+    const res = await request(app)
+      .post(`/api/v1/public/campaigns/${ambassadeurCampaignId}/join`)
+      .send({ first_name: 'Amb', last_name: 'Test', email: ambEmail, password: 'MonMotDePasse123' });
+    expect(res.status).toBe(201);
+    expect(res.body.success).toBe(true);
+    expect(res.body.user.role).toBe('ambassadeur');
+
+    const user = await db('users').where({ email: ambEmail }).first();
+    expect(user.role).toBe('ambassadeur');
+
+    const participation = await db('participations')
+      .where({ user_id: user.id, campaign_id: ambassadeurCampaignId }).first();
+    expect(participation.role_in_campaign).toBe('ambassador');
+  });
+
+  test('Scolaire campaign join → role=etudiant (non-régression)', async () => {
+    // Already tested in FLUX-13, but verify role_in_campaign
+    const user = await db('users').where({ email: `join-test-${Date.now()}@test.fr` }).first();
+    // This test validates that existing scolaire flow still assigns etudiant
+    if (!sacreCoeurCampaignId) return;
+    const testEmail2 = `join-scol-${Date.now()}@test.fr`;
+    const res = await request(app)
+      .post(`/api/v1/public/campaigns/${sacreCoeurCampaignId}/join`)
+      .send({ first_name: 'Scol', last_name: 'Test', email: testEmail2, password: 'MonMotDePasse123' });
+    expect(res.status).toBe(201);
+    expect(res.body.user.role).toBe('etudiant');
+
+    const created = await db('users').where({ email: testEmail2 }).first();
+    expect(created.role).toBe('etudiant');
+
+    const participation = await db('participations')
+      .where({ user_id: created.id, campaign_id: sacreCoeurCampaignId }).first();
+    expect(participation.role_in_campaign).toBe('participant');
+
+    // Cleanup
+    await db('participations').where({ user_id: created.id }).del();
+    await db('refresh_tokens').where({ user_id: created.id }).del();
+    await db('users').where({ id: created.id }).del();
+  });
+
+  test('Boutique campaign join → 400 UNSUPPORTED_CAMPAIGN_TYPE', async () => {
+    const boutiqueCampaign = await db('campaigns').where('name', 'like', '%outique%').first();
+    if (!boutiqueCampaign) return;
+    const res = await request(app)
+      .post(`/api/v1/public/campaigns/${boutiqueCampaign.id}/join`)
+      .send({ first_name: 'Bot', last_name: 'Test', email: 'bot@test.fr', password: 'MonMotDePasse123' });
+    expect(res.status).toBe(400);
+    expect(res.body.error).toBe('UNSUPPORTED_CAMPAIGN_TYPE');
+  });
+
+  test('GET /public/campaigns/:id/info retourne campaign_type_code', async () => {
+    if (!cseCampaignId) return;
+    const res = await request(app)
+      .get(`/api/v1/public/campaigns/${cseCampaignId}/info`);
+    expect(res.status).toBe(200);
+    expect(res.body.campaign_type_code).toBe('cse');
+  });
+});
+
 describe('FLUX-12: Aucun endpoint courant ne retourne 500', () => {
   const adminEndpoints = [
     '/api/v1/admin/products',
@@ -668,5 +766,89 @@ describe('FLUX-12: Aucun endpoint courant ne retourne 500', () => {
       .get(endpoint)
       .set('Authorization', `Bearer ${adminToken}`);
     expect(res.status).not.toBe(500);
+  });
+});
+
+describe('FLUX-15: Commande boutique liée au user_id si email connu', () => {
+  let boutiqueOrderId;
+
+  afterAll(async () => {
+    if (boutiqueOrderId) {
+      await db('financial_events').where({ order_id: boutiqueOrderId }).del();
+      await db('order_items').where({ order_id: boutiqueOrderId }).del();
+      await db('orders').where({ id: boutiqueOrderId }).del();
+    }
+  });
+
+  test('Commande boutique avec email étudiant → user_id renseigné', async () => {
+    // Get a visible boutique product
+    const product = await db('products')
+      .where({ active: true, visible_boutique: true })
+      .first();
+    if (!product) return;
+
+    // Create cart
+    const cartRes = await request(app)
+      .post('/api/v1/public/cart')
+      .send({ items: [{ product_id: product.id, qty: 1 }] });
+    expect(cartRes.status).toBe(200);
+    const sessionId = cartRes.body.session_id;
+
+    // Checkout with existing student email
+    const res = await request(app)
+      .post('/api/v1/public/checkout')
+      .send({
+        session_id: sessionId,
+        customer: {
+          name: 'Test Boutique Link',
+          email: 'ackavong@eleve.sc.fr',
+          phone: '0600000000',
+          address: '1 rue de test',
+          city: 'Nantes',
+          postal_code: '44000',
+        },
+      });
+    expect(res.status).toBe(201);
+    boutiqueOrderId = res.body.order_id;
+
+    // Verify user_id is set in DB
+    const order = await db('orders').where({ id: boutiqueOrderId }).first();
+    const student = await db('users').where({ email: 'ackavong@eleve.sc.fr' }).first();
+    expect(order.user_id).toBe(student.id);
+  });
+
+  test('Commande boutique avec email inconnu → user_id null', async () => {
+    const product = await db('products')
+      .where({ active: true, visible_boutique: true })
+      .first();
+    if (!product) return;
+
+    const cartRes = await request(app)
+      .post('/api/v1/public/cart')
+      .send({ items: [{ product_id: product.id, qty: 1 }] });
+    const sessionId = cartRes.body.session_id;
+
+    const res = await request(app)
+      .post('/api/v1/public/checkout')
+      .send({
+        session_id: sessionId,
+        customer: {
+          name: 'Guest Inconnu',
+          email: 'guest-unknown@nowhere.fr',
+          phone: '0600000000',
+          address: '1 rue guest',
+          city: 'Paris',
+          postal_code: '75001',
+        },
+      });
+    expect(res.status).toBe(201);
+
+    const order = await db('orders').where({ id: res.body.order_id }).first();
+    expect(order.user_id).toBeNull();
+
+    // Cleanup
+    await db('financial_events').where({ order_id: res.body.order_id }).del();
+    await db('order_items').where({ order_id: res.body.order_id }).del();
+    await db('orders').where({ id: res.body.order_id }).del();
   });
 });

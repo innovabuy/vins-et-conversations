@@ -7,6 +7,23 @@ const notificationService = require('./notificationService');
 const badgeService = require('./badgeService');
 
 /**
+ * Modes de paiement autorisés par rôle.
+ * TODO: migrer vers client_types.payment_methods JSONB quand le champ existera.
+ */
+const ALLOWED_PAYMENT_METHODS = {
+  etudiant: ['card', 'paypal', 'deferred'], // deferred soumis à allows_deferred + caution
+  cse: ['card', 'transfer', 'check'],
+  ambassadeur: ['card', 'transfer'],
+  super_admin: ['card', 'transfer', 'check', 'cash', 'pending', 'deferred', 'paypal'],
+  commercial: ['card', 'transfer', 'check', 'cash', 'pending', 'deferred', 'paypal'],
+  comptable: ['card', 'transfer', 'check', 'cash', 'pending', 'deferred', 'paypal'],
+};
+
+function getAllowedPaymentMethods(role) {
+  return ALLOWED_PAYMENT_METHODS[role] || ['card'];
+}
+
+/**
  * Génère une référence commande unique : VC-2026-0001
  */
 async function generateOrderRef(trx = null) {
@@ -94,6 +111,25 @@ async function createOrder({ userId, campaignId, items, customerId, notes, custo
     }
   }
 
+  // Deferred payment pre-check (before building items, so hasCautionHeld is available)
+  let hasDeferredItems = false;
+  let hasCautionHeld = false;
+  let requiresCautionReview = false;
+  if (paymentMethod === 'deferred') {
+    const deferredProducts = products.filter((p) => p.allows_deferred);
+    if (deferredProducts.length === 0) {
+      throw new Error('DEFERRED_NOT_ELIGIBLE:aucun produit éligible');
+    }
+    hasDeferredItems = true;
+    const cautionCheck = await db('caution_checks')
+      .where({ user_id: userId, status: 'held' })
+      .first();
+    hasCautionHeld = !!cautionCheck;
+    if (!hasCautionHeld) {
+      requiresCautionReview = true;
+    }
+  }
+
   const orderId = uuidv4();
 
   let totalHT = 0;
@@ -115,13 +151,17 @@ async function createOrder({ userId, campaignId, items, customerId, notes, custo
     totalTTC += lineTTC;
     totalItems += item.qty;
 
+    const isDeferred = paymentMethod === 'deferred' && !!product.allows_deferred;
     orderItems.push({
       order_id: orderId,
       product_id: item.productId,
       qty: item.qty,
       unit_price_ht: priced.price_ht,
       unit_price_ttc: priced.price_ttc,
+      vat_rate: product.tva_rate,
       free_qty: 0,
+      is_deferred: isDeferred,
+      deferred_status: isDeferred ? (hasCautionHeld ? 'validated' : 'pending') : null,
     });
   }
 
@@ -153,6 +193,8 @@ async function createOrder({ userId, campaignId, items, customerId, notes, custo
     }
   }
 
+  // (Deferred validation already done above, before items loop)
+
   // CSE min_order check — done AFTER totals are computed
   const user = await db('users').where({ id: userId }).first();
   if (user && user.role === 'cse') {
@@ -161,6 +203,8 @@ async function createOrder({ userId, campaignId, items, customerId, notes, custo
       throw new Error('MIN_ORDER_NOT_MET');
     }
   }
+
+  const initialStatus = (paymentMethod === 'deferred' && requiresCautionReview) ? 'pending' : 'submitted';
 
   let ref;
   await db.transaction(async (trx) => {
@@ -174,7 +218,7 @@ async function createOrder({ userId, campaignId, items, customerId, notes, custo
       campaign_id: campaignId,
       user_id: userId,
       customer_id: resolvedCustomerId,
-      status: 'submitted',
+      status: initialStatus,
       items: JSON.stringify(items), // snapshot
       total_ht: parseFloat(totalHT.toFixed(2)),
       total_ttc: parseFloat(totalTTC.toFixed(2)),
@@ -183,10 +227,41 @@ async function createOrder({ userId, campaignId, items, customerId, notes, custo
       payment_method: paymentMethod || null,
       promo_code_id: promoCodeId,
       promo_discount: promoDiscount,
+      requires_caution_review: requiresCautionReview,
     });
 
     // Insérer les lignes
-    await trx('order_items').insert(orderItems);
+    const insertedItems = await trx('order_items').insert(orderItems).returning('*');
+
+    // Expand coffret components: if a product has product_components, create component lines
+    const productIdsWithItems = insertedItems.filter((oi) => oi.product_id).map((oi) => oi.product_id);
+    const allComponents = productIdsWithItems.length > 0
+      ? await trx('product_components').whereIn('product_id', productIdsWithItems).orderBy('sort_order')
+      : [];
+
+    if (allComponents.length > 0) {
+      const componentLines = [];
+      for (const oi of insertedItems) {
+        const comps = allComponents.filter((c) => c.product_id === oi.product_id);
+        if (comps.length === 0) continue;
+        for (const comp of comps) {
+          const compTTC = parseFloat(comp.amount_ht) * (1 + parseFloat(comp.vat_rate) / 100);
+          componentLines.push({
+            order_id: orderId,
+            product_id: oi.product_id,
+            parent_item_id: oi.id,
+            qty: oi.qty,
+            unit_price_ht: parseFloat(comp.amount_ht),
+            unit_price_ttc: parseFloat(compTTC.toFixed(2)),
+            vat_rate: parseFloat(comp.vat_rate),
+            type: 'component',
+          });
+        }
+      }
+      if (componentLines.length > 0) {
+        await trx('order_items').insert(componentLines);
+      }
+    }
 
     // Événement financier append-only
     await trx('financial_events').insert({
@@ -288,22 +363,35 @@ async function createOrder({ userId, campaignId, items, customerId, notes, custo
     logger.error(`Order confirmation hook error: ${e.message}`);
   }
 
-  // Auto-validate if setting enabled
-  let finalStatus = 'submitted';
-  try {
-    const autoValidateSetting = await db('app_settings')
-      .where({ key: 'auto_validate_orders' })
-      .first();
-    if (autoValidateSetting?.value === 'true') {
-      await db('orders').where({ id: orderId }).update({
-        status: 'validated',
-        updated_at: new Date(),
-      });
-      finalStatus = 'validated';
-      logger.info(`Order ${ref} auto-validated (auto_validate_orders=true)`);
+  // Auto-validate if setting enabled (skip for pending/caution-review orders)
+  let finalStatus = initialStatus;
+  if (initialStatus === 'submitted') {
+    try {
+      const autoValidateSetting = await db('app_settings')
+        .where({ key: 'auto_validate_orders' })
+        .first();
+      if (autoValidateSetting?.value === 'true') {
+        await db('orders').where({ id: orderId }).update({
+          status: 'validated',
+          updated_at: new Date(),
+        });
+        finalStatus = 'validated';
+        logger.info(`Order ${ref} auto-validated (auto_validate_orders=true)`);
+      }
+    } catch (e) {
+      logger.error(`Auto-validate check failed: ${e.message}`);
     }
-  } catch (e) {
-    logger.error(`Auto-validate check failed: ${e.message}`);
+  }
+
+  // Calculate split amounts for deferred
+  let amountImmediate = parseFloat(totalTTC.toFixed(2));
+  let amountDeferred = 0;
+  if (hasDeferredItems) {
+    amountDeferred = orderItems
+      .filter((oi) => oi.is_deferred)
+      .reduce((sum, oi) => sum + oi.unit_price_ttc * oi.qty, 0);
+    amountDeferred = parseFloat(amountDeferred.toFixed(2));
+    amountImmediate = parseFloat((totalTTC - amountDeferred).toFixed(2));
   }
 
   return {
@@ -315,6 +403,9 @@ async function createOrder({ userId, campaignId, items, customerId, notes, custo
     status: finalStatus,
     paymentMethod: paymentMethod || null,
     customerName: customerName || null,
+    requiresCautionReview: requiresCautionReview,
+    amountImmediate: hasDeferredItems ? amountImmediate : undefined,
+    amountDeferred: hasDeferredItems ? amountDeferred : undefined,
   };
 }
 
@@ -348,6 +439,25 @@ async function validateOrder(orderId, adminUserId) {
       .catch((e) => logger.error(`Order validated notification failed: ${e.message}`));
   } catch (e) {
     logger.error(`Order validated hook error: ${e.message}`);
+  }
+
+  // Auto-create delivery note (draft) if none exists
+  try {
+    const existingBL = await db('delivery_notes').where({ order_id: orderId }).first();
+    if (!existingBL) {
+      const user = await db('users').where({ id: order.user_id }).first();
+      const blCount = await db('delivery_notes').count('id as c').first();
+      const blNum = parseInt(blCount?.c || 0, 10) + 1;
+      await db('delivery_notes').insert({
+        order_id: orderId,
+        ref: `BL-${new Date().getFullYear()}-${String(blNum).padStart(4, '0')}`,
+        status: 'draft',
+        recipient_name: user?.name || 'Client',
+      });
+      logger.info(`Auto-created draft BL for order ${order.ref}`);
+    }
+  } catch (e) {
+    logger.error(`Auto-create BL failed: ${e.message}`);
   }
 
   return { ...order, status: 'validated' };
@@ -388,4 +498,4 @@ async function listOrders({ campaignId, status, userId, source, page = 1, limit 
   };
 }
 
-module.exports = { createOrder, validateOrder, listOrders, generateOrderRef };
+module.exports = { createOrder, validateOrder, listOrders, generateOrderRef, getAllowedPaymentMethods, ALLOWED_PAYMENT_METHODS };

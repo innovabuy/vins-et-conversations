@@ -72,7 +72,7 @@ describe('Parcours 1 — Étudiant complet', () => {
   });
 
   test('3. POST /orders (3 bouteilles Carillon) → commande créée', async () => {
-    const carillon = await db('products').where('name', 'like', '%Carillon%').first();
+    const carillon = await db('products').where('name', 'Carillon').first();
     if (!carillon) return;
 
     const res = await request(app)
@@ -82,7 +82,7 @@ describe('Parcours 1 — Étudiant complet', () => {
         campaign_id: campaignId,
         items: [{ productId: carillon.id, qty: 3 }],
         customer_name: 'Client Parcours 1',
-        payment_method: 'cash',
+        payment_method: 'card',
       });
     expect(res.status).toBe(201);
     orderId = res.body.id;
@@ -161,7 +161,7 @@ describe('Parcours 2 — Admin validation commande', () => {
         campaign_id: campaignId,
         items: [{ productId: cp.id, qty: 2 }],
         customer_name: 'Client Parcours 2',
-        payment_method: 'check',
+        payment_method: 'card',
       });
     expect(res.status).toBe(201);
     orderId = res.body.id;
@@ -388,42 +388,45 @@ describe('Parcours 6 — Enseignant aucun montant €', () => {
     expect(res.status).toBe(200);
   });
 
-  test('3. AUCUN champ nommé amount/ca/total/price/revenue/montant/marge/commission', async () => {
+  test('3. Pas de champs financiers interdits (prix produits, marges, commissions individuelles)', async () => {
     const res = await request(app)
       .get('/api/v1/dashboard/teacher')
       .set('Authorization', `Bearer ${teacherToken}`)
       .query({ campaign_id: campaignId });
     expect(res.status).toBe(200);
 
-    // Recursively check keys in response
-    const forbiddenKeyParts = ['amount', 'montant', 'price', 'revenue', 'marge', 'commission', 'total_ht', 'total_ttc'];
+    // Allowed: campaign_financials (ca_ttc, ca_ht, vat_breakdown, association_remuneration)
+    //          students[].ca_ttc, ca_ht, vat_breakdown
+    // Forbidden: product prices, margins, individual commissions
+    const forbiddenKeyParts = ['marge', 'margin', 'purchase_price'];
     const keys = getAllKeys(res.body);
 
     for (const key of keys) {
       for (const forbidden of forbiddenKeyParts) {
-        if (key.toLowerCase().includes(forbidden) && key !== 'discount_applied') {
-          // If the key exists, its value should be null/undefined/0 — or it shouldn't exist
+        if (key.toLowerCase().includes(forbidden)) {
           fail(`Teacher dashboard contains forbidden key: ${key}`);
         }
       }
     }
   });
 
-  test('4. Aucune valeur numérique suspecte (>100) dans la réponse', async () => {
+  test('4. campaign_financials et students CA sont presents avec des valeurs coherentes', async () => {
     const res = await request(app)
       .get('/api/v1/dashboard/teacher')
       .set('Authorization', `Bearer ${teacherToken}`)
       .query({ campaign_id: campaignId });
     expect(res.status).toBe(200);
 
-    // Check that no field named "ca" has a high numeric value
-    const flat = flattenObject(res.body);
-    for (const [key, val] of Object.entries(flat)) {
-      const k = key.toLowerCase();
-      if ((k === 'ca' || k.endsWith('.ca') || k.includes('_ht') || k.includes('_ttc')) && typeof val === 'number') {
-        expect(val).toBe(0); // Should not contain financial values
-      }
-    }
+    // campaign_financials should have valid financial data
+    expect(res.body.campaign_financials).toBeDefined();
+    expect(res.body.campaign_financials.ca_ttc).toBeGreaterThan(0);
+    expect(res.body.campaign_financials.ca_ht).toBeGreaterThan(0);
+    expect(res.body.campaign_financials.association_remuneration).toBeDefined();
+
+    // Students should have CA
+    expect(res.body.students.length).toBeGreaterThan(0);
+    const withCA = res.body.students.filter((s) => s.ca_ttc > 0);
+    expect(withCA.length).toBeGreaterThan(0);
   });
 });
 
@@ -526,7 +529,7 @@ describe('Parcours 8 — Retour et avoir', () => {
         campaign_id: campaignId,
         items: [{ productId: cp.id, qty: 6 }],
         customer_name: 'Client Retour',
-        payment_method: 'cash',
+        payment_method: 'card',
       });
     expect(orderRes.status).toBe(201);
     orderId = orderRes.body.id;

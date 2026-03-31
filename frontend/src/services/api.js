@@ -71,6 +71,10 @@ export const productsAPI = {
     fd.append('image', file);
     return api.post(`/admin/products/${id}/image`, fd, { headers: { 'Content-Type': 'multipart/form-data' } });
   },
+  components: (id) => api.get(`/admin/products/${id}/components`),
+  addComponent: (id, data) => api.post(`/admin/products/${id}/components`, data),
+  updateComponent: (id, cid, data) => api.put(`/admin/products/${id}/components/${cid}`, data),
+  removeComponent: (id, cid) => api.delete(`/admin/products/${id}/components/${cid}`),
 };
 
 // ─── Orders ───────────────────────────────────────────
@@ -87,6 +91,9 @@ export const ordersAPI = {
   sendEmail: (id) => api.post(`/orders/${id}/send-email`),
   myCustomers: () => api.get('/orders/my-customers'),
   my: (params) => api.get('/orders/my', { params }),
+  allowedPaymentMethods: () => api.get('/orders/allowed-payment-methods'),
+  deferredItems: (id, data) => api.put(`/orders/admin/${id}/deferred-items`, data),
+  markPaid: (id, data) => api.put(`/orders/admin/${id}/mark-paid`, data),
 };
 
 // ─── Campaigns ────────────────────────────────────────
@@ -127,12 +134,23 @@ export const deliveryNotesAPI = {
   sign: (id, data) => api.post(`/admin/delivery-notes/${id}/sign`, data),
   pdf: (id) => `${api.defaults.baseURL}/admin/delivery-notes/${id}/pdf`,
   sendEmail: (id) => api.post(`/admin/delivery-notes/${id}/send-email`),
-  groupedStudentPdf: (userId, campaignId, orderIds) => {
+  groupedStudentPdf: (userId, campaignId, orderIds, filters = {}) => {
     let url = `${api.defaults.baseURL}/admin/delivery-notes/grouped/student/${userId}?campaign_id=${campaignId}`;
     if (orderIds && orderIds.length > 0) url += `&order_ids=${orderIds.join(',')}`;
+    if (filters.statuses?.length) filters.statuses.forEach((s) => { url += `&status[]=${s}`; });
+    if (filters.dateFrom) url += `&date_from=${filters.dateFrom}`;
+    if (filters.dateTo) url += `&date_to=${filters.dateTo}`;
     return url;
   },
-  groupedCampaignPdf: (campaignId) => `${api.defaults.baseURL}/admin/delivery-notes/grouped/campaign/${campaignId}`,
+  groupedCampaignPdf: (campaignId, filters = {}) => {
+    let url = `${api.defaults.baseURL}/admin/delivery-notes/grouped/campaign/${campaignId}`;
+    const params = [];
+    if (filters.statuses?.length) filters.statuses.forEach((s) => { params.push(`status[]=${s}`); });
+    if (filters.dateFrom) params.push(`date_from=${filters.dateFrom}`);
+    if (filters.dateTo) params.push(`date_to=${filters.dateTo}`);
+    if (params.length) url += '?' + params.join('&');
+    return url;
+  },
   generateSignatureLink: (id, data) => api.post(`/admin/delivery-notes/${id}/signature-link`, data),
   getSignature: (id) => api.get(`/admin/delivery-notes/${id}/signature`),
 };
@@ -199,6 +217,7 @@ export const stripeAPI = {
 // ─── CSE Dashboard ──────────────────────────────────
 export const cseDashboardAPI = {
   get: (campaignId) => api.get('/dashboard/cse', { params: { campaign_id: campaignId } }),
+  collaborator: (campaignId) => api.get('/dashboard/cse/collaborator', { params: { campaign_id: campaignId } }),
 };
 
 // ─── Invoices ───────────────────────────────────────
@@ -391,6 +410,8 @@ export const boutiqueAPI = {
   resolveAmbassador: (code) => api.get(`/public/ambassador/${code}`),
   resolveReferral: (code) => api.get(`/public/referral/${code}`),
   register: (data) => api.post('/public/register', data),
+  myContact: () => api.get('/public/my-contact'),
+  userLookup: (email) => api.get('/public/user-lookup', { params: { email } }),
 };
 
 // ─── PayPal ─────────────────────────────────────
@@ -446,6 +467,13 @@ export const shippingAPI = {
   rates: (params) => api.get('/admin/shipping-rates', { params }),
   updateRate: (id, data) => api.put(`/admin/shipping-rates/${id}`, data),
   importGrid: () => api.post('/admin/shipping-rates/import'),
+};
+
+export const cautionChecksAPI = {
+  list: (params) => api.get('/admin/caution-checks', { params }),
+  summary: () => api.get('/admin/caution-checks/summary'),
+  create: (data) => api.post('/admin/caution-checks', data),
+  update: (id, data) => api.put(`/admin/caution-checks/${id}`, data),
 };
 
 export default api;

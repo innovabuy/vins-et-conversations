@@ -22,6 +22,27 @@ async function getBoutiqueWebCampaignId() {
 }
 
 /**
+ * Resolve campaign_id based on authenticated user.
+ * If user is logged in with an active participation → use their campaign.
+ * Otherwise → fallback to boutique_web campaign.
+ */
+async function resolveCampaignId(authenticatedUserId) {
+  if (!authenticatedUserId) return getBoutiqueWebCampaignId();
+
+  const participation = await db('participations')
+    .join('campaigns', 'participations.campaign_id', 'campaigns.id')
+    .where('participations.user_id', authenticatedUserId)
+    .where('campaigns.status', 'active')
+    .whereNull('campaigns.deleted_at')
+    .orderBy('participations.created_at', 'desc')
+    .select('participations.campaign_id')
+    .first();
+
+  if (participation) return participation.campaign_id;
+  return getBoutiqueWebCampaignId();
+}
+
+/**
  * Find or create a contact by email
  */
 async function upsertContact({ name, email, phone, address, city, postal_code, referralSource }) {
@@ -64,12 +85,11 @@ async function upsertContact({ name, email, phone, address, city, postal_code, r
 /**
  * Create a boutique order (status: pending_payment)
  */
-async function createBoutiqueOrder({ cartItems, customer, referralCode, delivery_type, promoCode }) {
-  const campaignId = await getBoutiqueWebCampaignId();
+async function createBoutiqueOrder({ cartItems, customer, referralCode, delivery_type, promoCode, authenticatedUserId }) {
   const orderId = uuidv4();
   // ref generated inside transaction below for concurrency safety
 
-  // Resolve referral
+  // Resolve referral FIRST (needed for campaign routing)
   let source = 'boutique_web';
   let referredBy = null;
 
@@ -81,6 +101,18 @@ async function createBoutiqueOrder({ cartItems, customer, referralCode, delivery
       referredBy = referralResult.user_id;
     }
   }
+
+  // Resolve source based on authenticated user role (if no referral)
+  if (!referredBy && authenticatedUserId) {
+    const authUser = await db('users').where({ id: authenticatedUserId }).select('role').first();
+    if (authUser) {
+      const roleSourceMap = { etudiant: 'student_order', ambassadeur: 'ambassador_order', cse: 'cse_order' };
+      source = roleSourceMap[authUser.role] || 'boutique_web';
+    }
+  }
+
+  // Resolve campaign: authenticated user > referrer > boutique_web fallback
+  const campaignId = await resolveCampaignId(authenticatedUserId || referredBy);
 
   // Upsert contact with referral source
   let referralSource = null;
@@ -151,6 +183,7 @@ async function createBoutiqueOrder({ cartItems, customer, referralCode, delivery
       qty,
       unit_price_ht: parseFloat(product.price_ht),
       unit_price_ttc: parseFloat(product.price_ttc),
+      vat_rate: parseFloat(product.tva_rate),
       free_qty: 0,
     });
   }
@@ -236,6 +269,13 @@ async function createBoutiqueOrder({ cartItems, customer, referralCode, delivery
 
   const orderStatus = hasBackorderItems ? 'pending_stock' : 'pending_payment';
 
+  // Link to authenticated user if present, otherwise lookup by email
+  let orderUserId = authenticatedUserId || null;
+  if (!orderUserId && customer.email) {
+    const existingUser = await db('users').where({ email: customer.email.toLowerCase().trim() }).first();
+    orderUserId = existingUser?.id || null;
+  }
+
   let ref;
   await db.transaction(async (trx) => {
     ref = await generateOrderRef(trx);
@@ -247,7 +287,7 @@ async function createBoutiqueOrder({ cartItems, customer, referralCode, delivery
       id: orderId,
       ref,
       campaign_id: campaignId,
-      user_id: null, // No logged-in user for boutique
+      user_id: orderUserId,
       customer_id: contact.id,
       status: orderStatus,
       source,
@@ -274,6 +314,7 @@ async function createBoutiqueOrder({ cartItems, customer, referralCode, delivery
         qty: 1,
         unit_price_ht: shippingHT,
         unit_price_ttc: shippingTTC,
+        vat_rate: 20.00,
         free_qty: 0,
         type: 'shipping',
       });
@@ -435,6 +476,7 @@ async function resolveReferralCode(code) {
 
 module.exports = {
   getBoutiqueWebCampaignId,
+  resolveCampaignId,
   upsertContact,
   createBoutiqueOrder,
   confirmBoutiqueOrder,

@@ -1024,18 +1024,31 @@ router.get('/pennylane', async (req, res) => {
 router.get('/sales-journal', async (req, res) => {
   try {
     const { start, end } = req.query;
+    // Use component lines for coffret TVA ventilation, product lines for non-coffrets
+    // Exclude product lines that have component children (to avoid double counting)
     let query = db('order_items')
       .join('orders', 'order_items.order_id', 'orders.id')
-      .join('products', 'order_items.product_id', 'products.id')
       .leftJoin('users', 'orders.user_id', 'users.id')
       .leftJoin('contacts', 'orders.customer_id', 'contacts.id')
       .whereIn('orders.status', ['validated', 'preparing', 'shipped', 'delivered'])
-      .where('order_items.type', 'product')
+      .whereIn('order_items.type', ['product', 'component'])
+      .where(function () {
+        // Include: component lines OR product lines without children
+        this.where('order_items.type', 'component')
+          .orWhere(function () {
+            this.where('order_items.type', 'product')
+              .whereNotExists(function () {
+                this.select(db.raw('1')).from('order_items as child')
+                  .whereRaw('child.parent_item_id = order_items.id')
+                  .where('child.type', 'component');
+              });
+          });
+      })
       .select(
         'orders.ref', 'orders.created_at',
         db.raw("COALESCE(users.name, contacts.name, 'Boutique Web') as client"),
         'order_items.qty', 'order_items.unit_price_ht', 'order_items.unit_price_ttc',
-        'products.tva_rate'
+        'order_items.vat_rate'
       );
 
     if (start) query = query.where('orders.created_at', '>=', start);
@@ -1056,7 +1069,7 @@ router.get('/sales-journal', async (req, res) => {
         };
       }
       const lineHT = parseFloat(item.unit_price_ht) * item.qty;
-      const rate = parseFloat(item.tva_rate);
+      const rate = parseFloat(item.vat_rate);
       const lineTVA = parseFloat((lineHT * rate / 100).toFixed(2));
       orderMap[key].ht += lineHT;
       if (rate === 5.5) {
@@ -1419,19 +1432,21 @@ router.get('/activity-report', async (req, res) => {
       .orderBy('qty', 'desc')
       .limit(5);
 
-    // Top sellers (only user-linked orders, not boutique)
-    let sellerQuery = db('orders')
-      .join('users', 'orders.user_id', 'users.id')
-      .whereIn('orders.status', ['validated', 'preparing', 'shipped', 'delivered'])
-      .whereNotNull('orders.user_id');
-    if (start) sellerQuery = sellerQuery.where('orders.created_at', '>=', start);
-    if (end) sellerQuery = sellerQuery.where('orders.created_at', '<=', end);
-
-    const topSellers = await sellerQuery
-      .groupBy('users.id', 'users.name')
-      .select('users.name', db.raw('SUM(orders.total_ttc) as ca'), db.raw('COUNT(orders.id) as orders_count'))
-      .orderBy('ca', 'desc')
-      .limit(5);
+    // Top sellers (includes referral CA via UNION ALL)
+    const { studentOrdersCombinedSQL } = require('../services/dashboardService');
+    const { sql: sellerSQL, params: sellerParams } = studentOrdersCombinedSQL(null);
+    let dateFilter = '';
+    const dateParams = [];
+    if (start) { dateFilter += ' AND so.created_at >= ?'; dateParams.push(start); }
+    if (end) { dateFilter += ' AND so.created_at <= ?'; dateParams.push(end); }
+    const topSellersResult = await db.raw(`
+      SELECT u.name, SUM(so.total_ttc) as ca, COUNT(so.id) as orders_count
+      FROM ${sellerSQL} so
+      JOIN users u ON so.effective_user_id = u.id
+      WHERE 1=1${dateFilter}
+      GROUP BY u.id, u.name ORDER BY ca DESC LIMIT 5
+    `, [...sellerParams, ...dateParams]);
+    const topSellers = topSellersResult.rows || topSellersResult;
 
     // Generate PDF
     const doc = new PDFDocument({ margin: 50, size: 'A4' });

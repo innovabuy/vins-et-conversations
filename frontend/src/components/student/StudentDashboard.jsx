@@ -33,15 +33,32 @@ const STATUS_LABELS = {
   cancelled: 'Annulee',
 };
 
-const PAYMENT_METHODS = [
+const ALL_PAYMENT_METHODS = [
   { value: 'cash', label: 'Especes', icon: Banknote },
   { value: 'check', label: 'Cheque', icon: FileText },
   { value: 'card', label: 'Carte', icon: CreditCard },
   { value: 'transfer', label: 'Virement', icon: Building },
   { value: 'pending', label: 'A encaisser', icon: HelpCircle },
+  { value: 'paypal', label: 'PayPal', icon: CreditCard },
+  { value: 'deferred', label: 'Paiement differe', icon: Clock },
 ];
 
-const PAYMENT_LABELS = { cash: 'Especes', check: 'Cheque', card: 'Carte', transfer: 'Virement', pending: 'A encaisser' };
+// Modes autorisés par rôle (mirroir du backend orderService.ALLOWED_PAYMENT_METHODS)
+const ROLE_PAYMENT_METHODS = {
+  etudiant: ['card', 'paypal', 'deferred'],
+  cse: ['card', 'transfer', 'check'],
+  ambassadeur: ['card', 'transfer'],
+  super_admin: ['card', 'transfer', 'check', 'cash', 'pending', 'deferred', 'paypal'],
+  commercial: ['card', 'transfer', 'check', 'cash', 'pending', 'deferred', 'paypal'],
+  comptable: ['card', 'transfer', 'check', 'cash', 'pending', 'deferred', 'paypal'],
+};
+
+function getPaymentMethodsForRole(role) {
+  const allowed = ROLE_PAYMENT_METHODS[role] || ['card'];
+  return ALL_PAYMENT_METHODS.filter((pm) => allowed.includes(pm.value));
+}
+
+const PAYMENT_LABELS = { cash: 'Especes', check: 'Cheque', card: 'Carte', transfer: 'Virement', pending: 'A encaisser', paypal: 'PayPal', deferred: 'Paiement differe' };
 
 function StreakBadge({ streak }) {
   if (streak === 0) return <span className="text-gray-400 text-sm">Pas de streak</span>;
@@ -138,7 +155,7 @@ function RankingTab({ campaignId }) {
 }
 
 // ========== ORDER FLOW (3 steps) ==========
-function OrderFlow({ campaignId, products, customers, onComplete }) {
+function OrderFlow({ campaignId, products, customers, onComplete, userRole }) {
   const [step, setStep] = useState(1); // 1: client, 2: products, 3: recap
   const [customerName, setCustomerName] = useState('');
   const [customerPhone, setCustomerPhone] = useState('');
@@ -148,6 +165,14 @@ function OrderFlow({ campaignId, products, customers, onComplete }) {
   const [paymentMethod, setPaymentMethod] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [suggestions, setSuggestions] = useState([]);
+  const [hasCautionHeld, setHasCautionHeld] = useState(false);
+  const [orderError, setOrderError] = useState('');
+
+  useEffect(() => {
+    ordersAPI.allowedPaymentMethods().then((res) => {
+      setHasCautionHeld(res.data?.deferred_info?.has_caution_held || false);
+    }).catch(() => {});
+  }, []);
 
   const updateCart = (productId, delta) => {
     setCart((prev) => {
@@ -172,6 +197,13 @@ function OrderFlow({ campaignId, products, customers, onComplete }) {
 
   const cartItems = useMemo(() => Object.entries(cart).reduce((sum, [, qty]) => sum + qty, 0), [cart]);
 
+  const hasDeferred = useMemo(() => {
+    return Object.keys(cart).some((pid) => {
+      const p = products.find((x) => x.id === pid);
+      return p && p.allows_deferred;
+    });
+  }, [cart, products]);
+
   // Autocomplete suggestions
   useEffect(() => {
     if (!customerName || customerName.length < 2) { setSuggestions([]); return; }
@@ -188,9 +220,10 @@ function OrderFlow({ campaignId, products, customers, onComplete }) {
 
   const submitOrder = async () => {
     setSubmitting(true);
+    setOrderError('');
     try {
       const items = Object.entries(cart).map(([productId, qty]) => ({ productId, qty }));
-      await ordersAPI.create({
+      const result = await ordersAPI.create({
         campaign_id: campaignId,
         items,
         customer_name: customerName,
@@ -199,9 +232,16 @@ function OrderFlow({ campaignId, products, customers, onComplete }) {
         customer_notes: customerNotes || undefined,
         payment_method: paymentMethod,
       });
-      onComplete();
+      const isPendingReview = result.data?.requiresCautionReview;
+      onComplete(isPendingReview ? 'deferred_pending' : null);
     } catch (err) {
-      alert(err.response?.data?.message || 'Erreur');
+      const code = err.response?.data?.error || '';
+      const ERROR_MESSAGES = {
+        CAUTION_REQUIRED: 'Aucun cheque de caution enregistre pour votre compte. Contactez votre commercial.',
+        DEFERRED_NOT_ELIGIBLE: 'Ce produit ne permet pas le paiement differe.',
+        PAYMENT_METHOD_NOT_ALLOWED: 'Mode de paiement non autorise pour votre compte.',
+      };
+      setOrderError(ERROR_MESSAGES[code] || err.response?.data?.message || 'Une erreur est survenue. Veuillez reessayer.');
     } finally {
       setSubmitting(false);
     }
@@ -383,22 +423,40 @@ function OrderFlow({ campaignId, products, customers, onComplete }) {
       <div className="card">
         <h3 className="font-semibold text-sm mb-3">Moyen de paiement *</h3>
         <div className="grid grid-cols-2 gap-2">
-          {PAYMENT_METHODS.map((pm) => (
-            <button
-              key={pm.value}
-              onClick={() => setPaymentMethod(pm.value)}
-              className={`flex items-center gap-2 p-3 rounded-xl border-2 transition-all text-sm ${
-                paymentMethod === pm.value
-                  ? 'border-wine-700 bg-wine-50 text-wine-800'
-                  : 'border-gray-200 text-gray-600 hover:border-gray-300'
-              }`}
-            >
-              <pm.icon size={18} />
-              {pm.label}
-            </button>
-          ))}
+          {getPaymentMethodsForRole(userRole).map((pm) => {
+            if (pm.value === 'deferred' && !hasDeferred) return null;
+            const deferredDisabled = pm.value === 'deferred' && hasDeferred && !hasCautionHeld;
+            return (
+              <button
+                key={pm.value}
+                onClick={() => !deferredDisabled && setPaymentMethod(pm.value)}
+                disabled={deferredDisabled}
+                className={`flex items-center gap-2 p-3 rounded-xl border-2 transition-all text-sm ${
+                  deferredDisabled
+                    ? 'border-gray-200 bg-gray-50 text-gray-400 cursor-not-allowed'
+                    : paymentMethod === pm.value
+                      ? 'border-wine-700 bg-wine-50 text-wine-800'
+                      : 'border-gray-200 text-gray-600 hover:border-gray-300'
+                }`}
+              >
+                <pm.icon size={18} />
+                {pm.label}
+              </button>
+            );
+          })}
         </div>
+        {hasDeferred && !hasCautionHeld && (
+          <p className="text-xs text-amber-600 mt-2">
+            Paiement differe disponible pour ce produit — un cheque de caution doit etre enregistre par le commercial.
+          </p>
+        )}
       </div>
+
+      {orderError && (
+        <div className="bg-red-50 border border-red-200 text-red-700 rounded-xl p-3 text-sm">
+          {orderError}
+        </div>
+      )}
 
       <button
         onClick={submitOrder}
@@ -421,6 +479,7 @@ export default function StudentDashboard() {
   const [resources, setResources] = useState([]);
   const [loading, setLoading] = useState(true);
   const [orderSuccess, setOrderSuccess] = useState(false);
+  const [orderDeferredPending, setOrderDeferredPending] = useState(false);
   const [showFreeHistory, setShowFreeHistory] = useState(false);
 
   const campaignId = user?.campaigns?.[0]?.campaign_id;
@@ -443,13 +502,15 @@ export default function StudentDashboard() {
 
   useEffect(() => { fetchAll(); }, [campaignId]);
 
-  const handleOrderComplete = () => {
+  const handleOrderComplete = (info) => {
     setOrderSuccess(true);
+    setOrderDeferredPending(info === 'deferred_pending');
     fetchAll();
     setTimeout(() => {
       setOrderSuccess(false);
+      setOrderDeferredPending(false);
       setTab('home');
-    }, 2000);
+    }, info === 'deferred_pending' ? 5000 : 2000);
   };
 
   if (loading) return <div className="flex justify-center py-20"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-wine-700" /></div>;
@@ -748,7 +809,11 @@ export default function StudentDashboard() {
                 <Check size={32} className="text-green-600" />
               </div>
               <h2 className="text-lg font-bold text-green-700 mb-1">Commande envoyee !</h2>
-              <p className="text-sm text-gray-500">Retour a l'accueil...</p>
+              {orderDeferredPending ? (
+                <p className="text-sm text-amber-600 max-w-xs mx-auto">Votre commande a ete transmise. Les produits en paiement differe sont en attente de validation par le commercial. Vous recevrez un email de confirmation.</p>
+              ) : (
+                <p className="text-sm text-gray-500">Retour a l'accueil...</p>
+              )}
             </div>
           ) : (
             <OrderFlow
@@ -756,6 +821,7 @@ export default function StudentDashboard() {
               products={products}
               customers={customers}
               onComplete={handleOrderComplete}
+              userRole={user?.role}
             />
           )
         )}

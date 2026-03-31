@@ -114,15 +114,30 @@ export default function CheckoutPage() {
     getStripePromise().then(setStripeObj);
   }, []);
 
-  // Pre-fill from logged-in user
+  // Pre-fill from logged-in user + contact address
   useEffect(() => {
     if (user) {
-      setForm((prev) => ({
-        ...prev,
-        name: prev.name || user.name || '',
-        email: prev.email || user.email || '',
-      }));
-      setStep(2); // Skip identification if logged in
+      boutiqueAPI.myContact().then((res) => {
+        if (res.data.found) {
+          setForm((prev) => ({
+            ...prev,
+            name: prev.name || res.data.name || user.name || '',
+            email: user.email,
+            address: prev.address || res.data.address || '',
+            city: prev.city || res.data.city || '',
+            postal_code: prev.postal_code || res.data.zip || '',
+          }));
+        } else {
+          setForm((prev) => ({
+            ...prev,
+            name: prev.name || user.name || '',
+            email: user.email,
+          }));
+        }
+      }).catch(() => {
+        setForm((prev) => ({ ...prev, name: prev.name || user.name || '', email: user.email }));
+      });
+      setStep(2);
     }
   }, [user]);
 
@@ -240,12 +255,25 @@ export default function CheckoutPage() {
     }
   };
 
-  const handleGuestContinue = () => {
+  const handleGuestContinue = async () => {
     const errs = {};
     if (!form.name || form.name.length < 2) errs.name = 'Nom requis';
     if (!form.email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email)) errs.email = 'Email invalide';
     setErrors(errs);
     if (Object.keys(errs).length) return;
+    // Lookup existing contact by email for address prefill
+    try {
+      const res = await boutiqueAPI.userLookup(form.email);
+      if (res.data.found) {
+        setForm((prev) => ({
+          ...prev,
+          name: prev.name || res.data.name || '',
+          address: prev.address || res.data.address || '',
+          city: prev.city || res.data.city || '',
+          postal_code: prev.postal_code || res.data.zip || '',
+        }));
+      }
+    } catch (_) { /* ignore lookup errors */ }
     setStep(2);
   };
 
@@ -708,9 +736,39 @@ export default function CheckoutPage() {
               ))}
             </div>
 
-            <div className="border-t pt-3 flex justify-between text-sm">
-              <span className="text-gray-600">Sous-total</span>
-              <span className="font-medium">{formatEur(cart.total_ttc)}</span>
+            <div className="border-t pt-3 space-y-1">
+              <div className="flex justify-between text-sm">
+                <span className="text-gray-600">Sous-total HT</span>
+                <span className="font-medium">{formatEur(cart.total_ht || cart.items.reduce((s, i) => s + (i.price_ttc / (1 + (i.tva_rate || 20) / 100)) * i.qty, 0))}</span>
+              </div>
+              {(() => {
+                const vatMap = {};
+                (cart.items || []).forEach((i) => {
+                  const rate = i.tva_rate || 20;
+                  const ht = (i.price_ttc / (1 + rate / 100)) * i.qty;
+                  const tva = i.price_ttc * i.qty - ht;
+                  vatMap[rate] = (vatMap[rate] || 0) + tva;
+                });
+                const rates = Object.keys(vatMap).sort((a, b) => b - a);
+                if (rates.length <= 1 && rates[0] === '20') {
+                  return (
+                    <div className="flex justify-between text-xs text-gray-500">
+                      <span>dont TVA 20%</span>
+                      <span>{formatEur(vatMap[20] || 0)}</span>
+                    </div>
+                  );
+                }
+                return rates.map((r) => (
+                  <div key={r} className="flex justify-between text-xs text-gray-500">
+                    <span>dont TVA {r}%</span>
+                    <span>{formatEur(vatMap[r])}</span>
+                  </div>
+                ));
+              })()}
+              <div className="flex justify-between text-sm mt-1">
+                <span className="text-gray-600">Sous-total TTC</span>
+                <span className="font-medium">{formatEur(cart.total_ttc)}</span>
+              </div>
             </div>
 
             <div className="flex justify-between text-sm">

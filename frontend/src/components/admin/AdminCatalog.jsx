@@ -31,7 +31,7 @@ const EMPTY_PRODUCT = {
   tva_rate: 20, category: '', label: '', image_url: '', description: '', active: true,
   region: '', appellation: '', color: '', vintage: '', grape_varieties: [],
   serving_temp: '', food_pairing: [], tasting_notes: null, winemaker_notes: '', awards: [],
-  visible_boutique: false, allow_backorder: false, bundle_products: [],
+  visible_boutique: false, allow_backorder: false, allows_deferred: false, caution_amount: 0, bundle_products: [],
   // Dynamic fields per category type
   weight: '', allergens: '', conservation: '', volume: '', bottle_count: null,
 };
@@ -164,6 +164,92 @@ function ProductDetail({ product, onClose, onEdit }) {
         )}
       </div>
     </div>
+  );
+}
+
+// ─── Components Section (coffret TVA ventilation) ────
+function ComponentsSection({ productId, priceTTC }) {
+  const [components, setComponents] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [adding, setAdding] = useState(false);
+  const [newComp, setNewComp] = useState({ component_name: '', amount_ht: '', vat_rate: '20.00' });
+
+  useEffect(() => {
+    productsAPI.components(productId).then((r) => setComponents(r.data.data || [])).catch(() => {}).finally(() => setLoading(false));
+  }, [productId]);
+
+  const handleAdd = async () => {
+    if (!newComp.component_name || !newComp.amount_ht) return;
+    try {
+      const res = await productsAPI.addComponent(productId, {
+        component_name: newComp.component_name,
+        amount_ht: parseFloat(newComp.amount_ht),
+        vat_rate: parseFloat(newComp.vat_rate),
+        sort_order: components.length,
+      });
+      setComponents([...components, res.data.data]);
+      setNewComp({ component_name: '', amount_ht: '', vat_rate: '20.00' });
+      setAdding(false);
+    } catch (e) { alert(e.response?.data?.message || 'Erreur'); }
+  };
+
+  const handleDelete = async (cid) => {
+    try {
+      await productsAPI.removeComponent(productId, cid);
+      setComponents(components.filter((c) => c.id !== cid));
+    } catch (e) { alert('Erreur'); }
+  };
+
+  if (loading) return null;
+
+  const sumTTC = components.reduce((s, c) => s + parseFloat(c.amount_ht) * (1 + parseFloat(c.vat_rate) / 100), 0);
+  const coherent = components.length === 0 || Math.abs(sumTTC - priceTTC) < 0.02;
+  const formatEur = (v) => new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR' }).format(v);
+
+  return (
+    <fieldset className="border rounded-lg p-4 space-y-3">
+      <legend className="text-sm font-semibold text-gray-700 px-2">Composition (ventilation TVA coffret)</legend>
+      {components.length > 0 && (
+        <div className="space-y-2">
+          {components.map((c) => (
+            <div key={c.id} className="flex items-center justify-between bg-gray-50 rounded-lg p-2 text-sm">
+              <div>
+                <span className="font-medium">{c.component_name}</span>
+                <span className="text-gray-500 ml-2">{formatEur(c.amount_ht)} HT — TVA {c.vat_rate}%</span>
+              </div>
+              <button type="button" onClick={() => handleDelete(c.id)} className="text-red-500 hover:text-red-700 text-xs">Supprimer</button>
+            </div>
+          ))}
+          <div className={`text-xs font-medium px-2 py-1 rounded ${coherent ? 'text-green-700 bg-green-50' : 'text-red-700 bg-red-50'}`}>
+            Total composants TTC : {formatEur(sumTTC)} — Prix produit TTC : {formatEur(priceTTC)}
+            {coherent ? ' — Coherent' : ' — Ecart detecte'}
+          </div>
+        </div>
+      )}
+      {adding ? (
+        <div className="flex gap-2 items-end flex-wrap">
+          <div>
+            <label className="text-xs text-gray-500">Nom</label>
+            <input value={newComp.component_name} onChange={(e) => setNewComp({ ...newComp, component_name: e.target.value })} className="block border rounded px-2 py-1 text-sm w-40" />
+          </div>
+          <div>
+            <label className="text-xs text-gray-500">Montant HT</label>
+            <input type="number" step="0.01" value={newComp.amount_ht} onChange={(e) => setNewComp({ ...newComp, amount_ht: e.target.value })} className="block border rounded px-2 py-1 text-sm w-24" />
+          </div>
+          <div>
+            <label className="text-xs text-gray-500">TVA %</label>
+            <select value={newComp.vat_rate} onChange={(e) => setNewComp({ ...newComp, vat_rate: e.target.value })} className="block border rounded px-2 py-1 text-sm">
+              <option value="20.00">20%</option>
+              <option value="5.50">5,5%</option>
+            </select>
+          </div>
+          <button type="button" onClick={handleAdd} className="px-3 py-1.5 bg-wine-700 text-white text-sm rounded-lg">Ajouter</button>
+          <button type="button" onClick={() => setAdding(false)} className="px-3 py-1.5 text-sm text-gray-600">Annuler</button>
+        </div>
+      ) : (
+        <button type="button" onClick={() => setAdding(true)} className="text-xs text-wine-700 hover:text-wine-800 font-medium">+ Ajouter un composant</button>
+      )}
+    </fieldset>
   );
 }
 
@@ -395,6 +481,23 @@ function ProductForm({ product, onSave, onCancel, allProducts = [], categoriesLi
               <p className="text-xs text-gray-400">Ce produit peut être commandé même si le stock est à 0</p>
             </div>
           </div>
+          <div className="md:col-span-2 flex items-center gap-3">
+            <button type="button" onClick={() => handleChange('allows_deferred', !form.allows_deferred)}
+              className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${form.allows_deferred ? 'bg-blue-500' : 'bg-gray-300'}`}>
+              <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${form.allows_deferred ? 'translate-x-6' : 'translate-x-1'}`} />
+            </button>
+            <div>
+              <span className="text-sm font-medium text-gray-700">Éligible paiement différé (caution)</span>
+              <p className="text-xs text-gray-400">Ce produit peut être payé par caution avec chèque de garantie</p>
+            </div>
+          </div>
+          {form.allows_deferred && (
+            <div>
+              <label className="block text-xs font-medium text-gray-500 mb-1">Montant de la caution (€)</label>
+              <input type="number" step="0.01" min="0" value={form.caution_amount || ''} onChange={(e) => handleChange('caution_amount', e.target.value)}
+                className="w-full border rounded-xl px-4 py-2.5 text-sm" placeholder="0.00" />
+            </div>
+          )}
           {/* Image produit */}
           <div className="md:col-span-2">
             <label className="block text-xs font-medium text-gray-500 mb-2">Photo du produit</label>
@@ -569,6 +672,11 @@ function ProductForm({ product, onSave, onCancel, allProducts = [], categoriesLi
         ))}
         <button type="button" onClick={addAward} className="text-xs text-wine-700 hover:text-wine-800 font-medium">+ Ajouter une distinction</button>
       </fieldset>
+      )}
+
+      {/* Section Composition (coffrets) */}
+      {product?.id && (
+        <ComponentsSection productId={product.id} priceTTC={parseFloat(form.price_ttc || 0)} />
       )}
 
       <div className="flex justify-end gap-3 pt-2">

@@ -154,7 +154,7 @@ describe('API Integration Tests', () => {
           campaign_id: campaignId,
           items: [{ productId: cpRes.product_id, qty: 2 }],
           customer_name: 'Client Test',
-          payment_method: 'cash',
+          payment_method: 'card',
         });
 
       expect(res.status).toBe(201);
@@ -332,6 +332,9 @@ describe('API Integration Tests', () => {
   describe('Delivery Notes — BL generation from validated order', () => {
     test('Generate BL from validated order', async () => {
       if (!orderId) return;
+
+      // Remove auto-created BL draft (CORR-5 creates one at validation)
+      await db('delivery_notes').where({ order_id: orderId }).del();
 
       const res = await request(app)
         .post('/api/v1/admin/delivery-notes')
@@ -3024,11 +3027,11 @@ describe('API Integration Tests', () => {
           customer_name: 'Mme Dupont',
           customer_phone: '0612345678',
           customer_email: 'dupont@example.fr',
-          payment_method: 'cash',
+          payment_method: 'card',
         });
 
       expect(res.status).toBe(201);
-      expect(res.body.paymentMethod).toBe('cash');
+      expect(res.body.paymentMethod).toBe('card');
       expect(res.body.customerName).toBe('Mme Dupont');
       studentCustomerOrderId = res.body.id;
 
@@ -3050,7 +3053,7 @@ describe('API Integration Tests', () => {
         .send({
           campaign_id: campaignId,
           items: [{ productId: cpRes.product_id, qty: 1 }],
-          payment_method: 'cash',
+          payment_method: 'card',
         });
 
       expect(res.status).toBe(400);

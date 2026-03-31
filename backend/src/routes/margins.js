@@ -64,11 +64,12 @@ router.get('/', ...adminAuth, async (req, res) => {
   try {
     const filters = parseMarginFilters(req.query);
 
-    // By product: margin = price_ht - purchase_price
+    // By product: margin = price_ht - purchase_price (exclude shipping items)
     const byProductQ = db('order_items')
       .join('products', 'order_items.product_id', 'products.id')
       .join('orders', 'order_items.order_id', 'orders.id')
       .whereIn('orders.status', VALID_STATUSES)
+      .whereRaw("COALESCE(order_items.type, 'product') != 'shipping'")
       .groupBy('products.id', 'products.name', 'products.purchase_price')
       .select(
         'products.id',

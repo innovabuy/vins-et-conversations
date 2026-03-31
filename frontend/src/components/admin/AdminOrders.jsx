@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate, useSearchParams, Link } from 'react-router-dom';
 import { ordersAPI, campaignsAPI, contactsAPI, productsAPI, deliveryNotesAPI, usersAPI, promoCodesAPI } from '../../services/api';
 import {
-  ShoppingCart, Search, Plus, Check, Eye, EyeOff, FileText, Printer, Mail,
+  ShoppingCart, Search, Plus, Check, Eye, EyeOff, FileText, Printer, Mail, CreditCard,
   ChevronLeft, ChevronRight, X, Trash2, Save, Truck, ExternalLink, AlertTriangle, UserPlus
 } from 'lucide-react';
 
@@ -10,6 +10,7 @@ const formatEur = (v) => new Intl.NumberFormat('fr-FR', { style: 'currency', cur
 const formatDate = (d) => new Date(d).toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
 
 const STATUS_LABELS = {
+  pending: { label: 'En attente caution', color: 'bg-amber-100 text-amber-800' },
   pending_payment: { label: 'Paiement en cours', color: 'bg-orange-100 text-orange-800' },
   draft: { label: 'Brouillon', color: 'bg-gray-100 text-gray-700' },
   submitted: { label: 'En attente', color: 'bg-yellow-100 text-yellow-800' },
@@ -35,8 +36,12 @@ function NewOrderForm({ onClose, onCreated }) {
   const [products, setProducts] = useState([]);
   const [contactSearch, setContactSearch] = useState('');
   const [contacts, setContacts] = useState([]);
-  const [form, setForm] = useState({ campaign_id: '', customer_id: null, items: [], notes: '' });
+  const [form, setForm] = useState({ campaign_id: '', customer_id: null, target_user_id: null, items: [], notes: '' });
   const [saving, setSaving] = useState(false);
+  const [userSearch, setUserSearch] = useState('');
+  const [userResults, setUserResults] = useState([]);
+  const [selectedUser, setSelectedUser] = useState(null);
+  const userDebounceRef = useRef(null);
   const [promoInput, setPromoInput] = useState('');
   const [promoResult, setPromoResult] = useState(null);
   const [promoError, setPromoError] = useState('');
@@ -110,6 +115,7 @@ function NewOrderForm({ onClose, onCreated }) {
       await ordersAPI.adminCreate({
         campaign_id: form.campaign_id,
         customer_id: form.customer_id,
+        target_user_id: form.target_user_id || undefined,
         items: form.items.map(i => ({ productId: i.productId, qty: i.qty })),
         notes: form.notes,
         promo_code: promoResult ? promoInput.trim() : undefined,
@@ -141,6 +147,39 @@ function NewOrderForm({ onClose, onCreated }) {
                 {campaigns.filter(c => c.status === 'active').map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
               </select>
             </div>
+            <div>
+              <label className="block text-xs font-medium text-gray-500 mb-1">Pour le compte de (optionnel)</label>
+              <div className="relative">
+                <input type="text" value={userSearch} onChange={(e) => {
+                  setUserSearch(e.target.value);
+                  if (userDebounceRef.current) clearTimeout(userDebounceRef.current);
+                  if (e.target.value.length < 3) { setUserResults([]); return; }
+                  userDebounceRef.current = setTimeout(async () => {
+                    try {
+                      const res = await usersAPI.list({ search: e.target.value, limit: 5 });
+                      setUserResults(res.data.data || []);
+                    } catch (_) {}
+                  }, 300);
+                }} placeholder={selectedUser ? `${selectedUser.name} (${selectedUser.email})` : 'Rechercher un utilisateur...'} className="w-full border rounded-lg px-3 py-2 text-sm" />
+                {userResults.length > 0 && (
+                  <div className="absolute z-10 top-full left-0 right-0 bg-white border rounded-lg mt-1 shadow-lg max-h-32 overflow-y-auto">
+                    {userResults.map((u) => (
+                      <button key={u.id} type="button" onClick={() => {
+                        setForm((f) => ({ ...f, target_user_id: u.id }));
+                        setSelectedUser(u);
+                        setUserSearch('');
+                        setUserResults([]);
+                      }} className="block w-full text-left px-3 py-2 text-sm hover:bg-gray-50">{u.name} <span className="text-gray-400">({u.email})</span></button>
+                    ))}
+                  </div>
+                )}
+                {selectedUser && (
+                  <button type="button" onClick={() => { setSelectedUser(null); setForm((f) => ({ ...f, target_user_id: null })); }} className="absolute right-2 top-2 text-gray-400 hover:text-red-500"><X size={14} /></button>
+                )}
+              </div>
+            </div>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label className="block text-xs font-medium text-gray-500 mb-1">Client (contact CRM)</label>
               <div className="relative">
@@ -250,6 +289,9 @@ function OrderDetail({ orderId, onClose, onUpdated }) {
   const [order, setOrder] = useState(null);
   const [loading, setLoading] = useState(true);
   const [creatingBL, setCreatingBL] = useState(false);
+  const [showMarkPaid, setShowMarkPaid] = useState(false);
+  const [markPaidMethod, setMarkPaidMethod] = useState('card');
+  const [markPaidNotes, setMarkPaidNotes] = useState('');
 
   useEffect(() => {
     ordersAPI.get(orderId)
@@ -328,6 +370,11 @@ function OrderDetail({ orderId, onClose, onUpdated }) {
             <Check size={14} /> Valider
           </button>
         )}
+        {order.status === 'pending_payment' && (
+          <button onClick={() => setShowMarkPaid(true)} className="flex items-center gap-1.5 px-3 py-1.5 text-sm rounded-lg bg-emerald-600 text-white hover:bg-emerald-700">
+            <CreditCard size={14} /> Marquer comme paye
+          </button>
+        )}
         {order.status === 'validated' && (
           <button onClick={handleCreateBL} disabled={creatingBL} className="flex items-center gap-1.5 px-3 py-1.5 text-sm rounded-lg bg-purple-600 text-white hover:bg-purple-700 disabled:opacity-50">
             <Truck size={14} /> {creatingBL ? 'Création...' : 'Générer BL'}
@@ -346,18 +393,127 @@ function OrderDetail({ orderId, onClose, onUpdated }) {
         </button>
       </div>
 
+      {/* Mark-paid modal */}
+      {showMarkPaid && (
+        <div className="border border-emerald-200 rounded-lg p-4 bg-emerald-50 space-y-3">
+          <h4 className="text-sm font-semibold text-emerald-800">Marquer comme paye</h4>
+          <div>
+            <label className="text-xs text-gray-600">Mode de paiement</label>
+            <select value={markPaidMethod} onChange={(e) => setMarkPaidMethod(e.target.value)} className="w-full mt-1 border rounded-lg px-3 py-2 text-sm">
+              <option value="card">Carte</option>
+              <option value="transfer">Virement</option>
+              <option value="check">Cheque</option>
+              <option value="cash">Especes</option>
+            </select>
+          </div>
+          <div>
+            <label className="text-xs text-gray-600">Notes (optionnel)</label>
+            <input value={markPaidNotes} onChange={(e) => setMarkPaidNotes(e.target.value)} className="w-full mt-1 border rounded-lg px-3 py-2 text-sm" placeholder="Reference paiement..." />
+          </div>
+          <div className="flex gap-2">
+            <button
+              onClick={async () => {
+                try {
+                  await ordersAPI.markPaid(orderId, { payment_method: markPaidMethod, notes: markPaidNotes || undefined });
+                  setShowMarkPaid(false);
+                  onUpdated();
+                } catch (e) { alert(e.response?.data?.message || 'Erreur'); }
+              }}
+              className="px-3 py-1.5 text-sm rounded-lg bg-emerald-600 text-white hover:bg-emerald-700"
+            >Confirmer</button>
+            <button onClick={() => setShowMarkPaid(false)} className="px-3 py-1.5 text-sm rounded-lg border hover:bg-gray-50">Annuler</button>
+          </div>
+        </div>
+      )}
+
       <h3 className="font-semibold text-sm mt-4">Lignes de commande</h3>
       <div className="border rounded-lg divide-y">
-        {order.order_items?.map((item) => (
-          <div key={item.id} className="flex items-center justify-between p-3 text-sm">
-            <div>
-              <p className="font-medium">{item.product_name}</p>
-              <p className="text-xs text-gray-500">{formatEur(item.unit_price_ttc)} x {item.qty}</p>
+        {order.order_items?.map((item) => {
+          const DEFERRED_LABELS = { pending: 'En attente', validated: 'Valide', refused: 'Refuse' };
+          const DEFERRED_COLORS = { pending: 'bg-amber-100 text-amber-800', validated: 'bg-green-100 text-green-800', refused: 'bg-red-100 text-red-800' };
+          return (
+            <div key={item.id} className="flex items-center justify-between p-3 text-sm">
+              <div>
+                <p className="font-medium">{item.product_name}</p>
+                <p className="text-xs text-gray-500">{formatEur(item.unit_price_ttc)} x {item.qty}</p>
+                {item.is_deferred && (
+                  <span className={`mt-1 inline-block px-2 py-0.5 rounded-full text-xs font-medium ${DEFERRED_COLORS[item.deferred_status] || 'bg-gray-100 text-gray-700'}`}>
+                    Differe : {DEFERRED_LABELS[item.deferred_status] || item.deferred_status}
+                  </span>
+                )}
+              </div>
+              <span className="font-semibold">{formatEur(item.unit_price_ttc * item.qty)}</span>
             </div>
-            <span className="font-semibold">{formatEur(item.unit_price_ttc * item.qty)}</span>
-          </div>
-        ))}
+          );
+        })}
       </div>
+
+      {/* Deferred items management — Nicolas validate/refuse */}
+      {order.requires_caution_review && order.order_items?.some((i) => i.is_deferred && i.deferred_status === 'pending') && (
+        <div className="mt-4 border border-amber-200 rounded-lg p-4 bg-amber-50">
+          <h3 className="font-semibold text-sm mb-2 text-amber-800">Lignes en paiement differe a valider</h3>
+          <div className="space-y-2 mb-3">
+            {order.order_items.filter((i) => i.is_deferred && i.deferred_status === 'pending').map((item) => (
+              <div key={item.id} className="flex items-center justify-between text-sm bg-white rounded-lg p-2 border">
+                <span>{item.product_name} x{item.qty} — {formatEur(item.unit_price_ttc * item.qty)}</span>
+              </div>
+            ))}
+          </div>
+          <div className="flex gap-2">
+            <button
+              onClick={async () => {
+                const ids = order.order_items.filter((i) => i.is_deferred && i.deferred_status === 'pending').map((i) => i.id);
+                try { await ordersAPI.deferredItems(orderId, { action: 'validate', item_ids: ids }); onUpdated(); } catch (e) { alert(e.response?.data?.message || 'Erreur'); }
+              }}
+              className="flex items-center gap-1.5 px-3 py-1.5 text-sm rounded-lg bg-green-600 text-white hover:bg-green-700"
+            >
+              <Check size={14} /> Valider tout
+            </button>
+            <button
+              onClick={async () => {
+                if (!confirm('Refuser les lignes differees ? Un email sera envoye au client.')) return;
+                const ids = order.order_items.filter((i) => i.is_deferred && i.deferred_status === 'pending').map((i) => i.id);
+                try { await ordersAPI.deferredItems(orderId, { action: 'refuse', item_ids: ids }); onUpdated(); } catch (e) { alert(e.response?.data?.message || 'Erreur'); }
+              }}
+              className="flex items-center gap-1.5 px-3 py-1.5 text-sm rounded-lg bg-red-600 text-white hover:bg-red-700"
+            >
+              <X size={14} /> Refuser tout
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Caution check indicator for deferred-eligible products */}
+      {order.caution_info?.has_deferred_products && (
+        <div className="mt-4">
+          <h3 className="font-semibold text-sm mb-2">Paiement differe / Caution</h3>
+          <div className={`border rounded-lg p-3 text-sm ${
+            order.caution_info.caution_check?.status === 'held'
+              ? 'bg-green-50 border-green-200'
+              : order.caution_info.caution_check
+                ? 'bg-amber-50 border-amber-200'
+                : 'bg-red-50 border-red-200'
+          }`}>
+            <p className="text-xs text-gray-500 mb-1">
+              Produits eligibles : {order.caution_info.deferred_products.join(', ')}
+            </p>
+            {order.caution_info.caution_check ? (
+              <div className="flex items-center gap-2">
+                <span className={`text-sm font-medium ${
+                  order.caution_info.caution_check.status === 'held' ? 'text-green-700' : 'text-amber-700'
+                }`}>
+                  {order.caution_info.caution_check.status === 'held' && 'Cheque de caution enregistre'}
+                  {order.caution_info.caution_check.status === 'cashed' && `Cheque encaisse le ${formatDate(order.caution_info.caution_check.returned_date || order.caution_info.caution_check.received_at)}`}
+                  {order.caution_info.caution_check.status === 'returned' && `Cheque restitue le ${formatDate(order.caution_info.caution_check.returned_date || order.caution_info.caution_check.received_at)}`}
+                </span>
+                <span className="text-xs text-gray-500">({formatEur(order.caution_info.caution_check.amount)})</span>
+              </div>
+            ) : (
+              <p className="text-sm font-medium text-red-700">Aucun cheque de caution enregistre pour ce client</p>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -580,6 +736,7 @@ export default function AdminOrders() {
                     <div className="flex items-center gap-1">
                       {hasFlagged(o) && <span className="text-orange-500" title="À vérifier"><AlertTriangle size={14} /></span>}
                       <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${status.color}`}>{status.label}</span>
+                      {o.requires_caution_review && <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-800">Caution requise</span>}
                     </div>
                   </div>
                   <p className="font-medium text-sm">{o.user_name}</p>
@@ -629,6 +786,7 @@ export default function AdminOrders() {
                     <td className="py-3">
                       <span className={`px-2 py-1 rounded-full text-xs font-medium ${status.color}`}>{status.label}</span>
                       {hasFlagged(o) && <span className="ml-1 text-orange-500" title="À vérifier"><AlertTriangle size={14} className="inline" /></span>}
+                      {o.requires_caution_review && <span className="ml-1 px-2 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-800">Caution requise</span>}
                     </td>
                     <td className="py-3 text-right" onClick={e => e.stopPropagation()}>
                       <div className="flex items-center justify-end gap-1">

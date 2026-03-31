@@ -119,8 +119,8 @@ describe('Security & Edge Cases', () => {
   test('Double confirm on boutique order is idempotent — returns 400', async () => {
     // Step 1: Get a product for the cart
     const product = await db('products')
-      .where({ active: true })
-      .whereNot('name', 'like', '%Coffret%') // avoid non-visible-boutique products
+      .where({ active: true, visible_boutique: true })
+      .whereNot('name', 'like', '%Coffret%')
       .first();
     expect(product).toBeDefined();
 

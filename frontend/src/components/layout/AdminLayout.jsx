@@ -21,6 +21,7 @@ const allNavItems = [
   { to: '/admin/crm', icon: Users, label: 'Contacts / CRM' },
   { to: '/admin/finance', icon: CreditCard, label: 'Finance & Marges', adminOnly: true },
   { to: '/admin/payments', icon: CreditCard, label: 'Paiements' },
+  { to: '/admin/caution-checks', icon: Shield, label: 'Chèques caution' },
   { to: '/admin/analytics', icon: BarChart3, label: 'Analytics' },
   { to: '/admin/catalog', icon: Wine, label: 'Catalogue' },
   { to: '/admin/categories', icon: Tag, label: 'Catégories' },

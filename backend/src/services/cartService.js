@@ -70,7 +70,13 @@ async function updateCart(sessionId, items) {
     .filter((i) => productMap[i.product_id] && i.qty > 0)
     .map((i) => {
       const p = productMap[i.product_id];
-      const qty = Math.max(1, Math.min(i.qty, 99));
+      if (i.qty > 999) {
+        const err = new Error('Quantité maximum : 999 par référence');
+        err.status = 400;
+        err.code = 'QTY_TOO_HIGH';
+        throw err;
+      }
+      const qty = Math.max(1, i.qty);
       total_ht += parseFloat(p.price_ht) * qty;
       total_ttc += parseFloat(p.price_ttc) * qty;
       total_items += qty;
@@ -80,6 +86,7 @@ async function updateCart(sessionId, items) {
         name: p.name,
         price_ht: parseFloat(p.price_ht),
         price_ttc: parseFloat(p.price_ttc),
+        tva_rate: parseFloat(p.tva_rate),
       };
     });
 

@@ -317,17 +317,18 @@ describe('Types client_types — entreprise et particulier', () => {
     entrepriseType = await db('client_types').where('name', 'entreprise').first();
     particulierType = await db('client_types').where('name', 'particulier').first();
 
+    // Use seed products only (by known names) to avoid interference from Wix imports
     wines = await db('products')
       .join('product_categories', 'products.category_id', 'product_categories.id')
       .where('product_categories.is_alcohol', true)
       .where('products.active', true)
+      .whereIn('products.name', ['Oriolus Blanc', 'Cuvée Clémence', 'Carillon', 'Apertus', 'Crémant de Loire', 'Coteaux du Layon'])
       .select('products.*')
       .orderBy('products.purchase_price', 'asc')
       .limit(3);
 
     juice = await db('products')
-      .join('product_categories', 'products.category_id', 'product_categories.id')
-      .where('product_categories.is_alcohol', false)
+      .where('products.name', 'Jus de Pomme')
       .where('products.active', true)
       .select('products.*')
       .first();

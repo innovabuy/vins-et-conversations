@@ -111,7 +111,7 @@ describe('Grouped BL (Delivery Notes)', () => {
         .set('Authorization', `Bearer ${adminToken}`);
 
       expect(res.status).toBe(404);
-      expect(res.body.error).toBe('NO_ORDERS');
+      expect(res.body.error).toBe('NO_DELIVERY_NOTES_FOUND');
 
       // Cleanup
       await db('users').where({ id: tempUserId }).del();

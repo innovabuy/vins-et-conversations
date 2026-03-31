@@ -16,12 +16,13 @@ const TABS = [
   { key: 'campaigns', label: 'Par campagne', icon: Building2 },
 ];
 
-function KPIGradient({ label, value, icon: Icon, gradient }) {
+function KPIGradient({ label, value, icon: Icon, gradient, hint }) {
   return (
     <div className={`bg-gradient-to-br ${gradient} rounded-2xl p-5 text-white shadow-lg`}>
       <div className="flex items-center justify-between mb-3"><Icon size={22} className="opacity-80" /></div>
       <p className="text-2xl font-bold">{value}</p>
       <p className="text-sm opacity-80 mt-1">{label}</p>
+      {hint && <p className="text-xs opacity-50 mt-0.5">{hint}</p>}
     </div>
   );
 }
@@ -154,7 +155,7 @@ function OverviewTab({ data }) {
   return (
     <div className="space-y-6">
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <KPIGradient label="Ventes TTC" value={formatEur(data.sales.total_ttc)} icon={TrendingUp} gradient="from-wine-700 to-wine-900" />
+        <KPIGradient label="Ventes TTC" value={formatEur(data.sales.total_ttc)} icon={TrendingUp} gradient="from-wine-700 to-wine-900" hint="CA reel (commandes validees uniquement)" />
         <KPIGradient label="Achats (cout)" value={formatEur(data.purchases.total_cost)} icon={DollarSign} gradient="from-blue-500 to-blue-700" />
         <KPIGradient label="Marge nette" value={formatEur(data.margin)} icon={BarChart3} gradient="from-emerald-500 to-emerald-700" />
         <KPIGradient label="Taux de marge" value={`${data.margin_pct}%`} icon={TrendingUp} gradient="from-purple-500 to-purple-700" />
@@ -238,7 +239,7 @@ function ProductsTab({ data }) {
   return (
     <div className="space-y-6">
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <KPIGradient label="CA HT" value={formatEur(data.global.ca_ht)} icon={DollarSign} gradient="from-blue-500 to-blue-700" />
+        <KPIGradient label="CA HT" value={formatEur(data.global.ca_ht)} icon={DollarSign} gradient="from-blue-500 to-blue-700" hint="CA reel (commandes validees uniquement)" />
         <KPIGradient label="Marge nette" value={formatEur(data.global.margin)} icon={TrendingUp} gradient="from-emerald-500 to-emerald-700" />
         <KPIGradient label="Taux de marge" value={`${data.global.margin_pct}%`} icon={BarChart3} gradient="from-purple-500 to-purple-700" />
       </div>

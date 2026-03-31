@@ -59,7 +59,7 @@ describe('Student Workflow', () => {
       .send({
         campaign_id: campaignId,
         customer_name: 'Client Test',
-        payment_method: 'cash',
+        payment_method: 'card',
         items: [{ productId: testProductId, qty: 1 }],
       });
     expect(res.status).toBe(201);
@@ -74,7 +74,7 @@ describe('Student Workflow', () => {
       .set('Authorization', `Bearer ${studentToken}`)
       .send({
         campaign_id: campaignId,
-        payment_method: 'cash',
+        payment_method: 'card',
         items: [{ productId: testProductId, qty: 1 }],
         // customer_name intentionally omitted
       });

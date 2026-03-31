@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { appSettingsAPI } from '../../services/api';
-import { Settings, Palette, Save, Image, Type, Check, CreditCard, AlertTriangle, Wifi, WifiOff, Eye, EyeOff, Mail, Send, Upload } from 'lucide-react';
+import { Settings, Palette, Save, Image, Type, Check, CreditCard, AlertTriangle, Wifi, WifiOff, Eye, EyeOff, Mail, Send, Upload, Database, Download } from 'lucide-react';
 
 export default function AppSettings() {
   const [settings, setSettings] = useState({
@@ -30,6 +30,8 @@ export default function AppSettings() {
   const [testingEmail, setTestingEmail] = useState(false);
   const [showSecrets, setShowSecrets] = useState({});
   const [uploadingLogo, setUploadingLogo] = useState(false);
+  const [backupLoading, setBackupLoading] = useState(false);
+  const [lastBackup, setLastBackup] = useState(null);
 
   useEffect(() => {
     appSettingsAPI.getAdmin()
@@ -81,6 +83,32 @@ export default function AppSettings() {
       alert(err.response?.data?.message || 'Erreur upload logo');
     } finally {
       setUploadingLogo(false);
+    }
+  };
+
+  const handleBackup = async () => {
+    setBackupLoading(true);
+    try {
+      const token = localStorage.getItem('accessToken');
+      const res = await fetch(`${import.meta.env.VITE_API_URL || '/api/v1'}/admin/backup/database`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) {
+        alert('Erreur lors de la sauvegarde');
+        return;
+      }
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `vc_backup_${new Date().toISOString().slice(0, 10)}.sql`;
+      a.click();
+      URL.revokeObjectURL(url);
+      setLastBackup(new Date().toLocaleString('fr-FR'));
+    } catch (err) {
+      alert('Erreur lors de la sauvegarde');
+    } finally {
+      setBackupLoading(false);
     }
   };
 
@@ -463,6 +491,32 @@ export default function AppSettings() {
                 : `Erreur : ${emailTest.error}`
               }
             </div>
+          )}
+        </div>
+      </div>
+
+      {/* Backup section */}
+      <div className="card">
+        <h2 className="font-semibold text-lg mb-4 flex items-center gap-2">
+          <Database size={18} className="text-wine-700" />
+          Sauvegarde de la base de donnees
+        </h2>
+        <p className="text-sm text-gray-500 mb-4">
+          Telecharge un fichier SQL complet de toutes les donnees.
+        </p>
+        <div className="flex items-center gap-3">
+          <button
+            onClick={handleBackup}
+            disabled={backupLoading}
+            className="px-4 py-2 bg-gray-100 hover:bg-gray-200 rounded-lg text-sm font-medium transition-colors disabled:opacity-50 flex items-center gap-2"
+          >
+            <Download size={14} />
+            {backupLoading ? 'Sauvegarde en cours...' : 'Telecharger la sauvegarde'}
+          </button>
+          {lastBackup && (
+            <span className="text-sm text-green-600">
+              Derniere sauvegarde : {lastBackup}
+            </span>
           )}
         </div>
       </div>

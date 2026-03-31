@@ -8,6 +8,8 @@ const boutiqueOrderService = require('../services/boutiqueOrderService');
 const paymentService = require('../services/paymentService');
 const logger = require('../utils/logger');
 
+const { authenticateOptional } = require('../middleware/auth');
+
 const router = express.Router();
 
 // ─── Validation schemas ──────────────────────────────
@@ -17,7 +19,7 @@ const cartSchema = Joi.object({
   items: Joi.array().items(
     Joi.object({
       product_id: Joi.string().uuid().required(),
-      qty: Joi.number().integer().min(1).max(99).required(),
+      qty: Joi.number().integer().min(1).max(999).required(),
     })
   ).min(0).required(),
 });
@@ -70,6 +72,72 @@ router.post('/cart', async (req, res) => {
     if (err.message === 'INVALID_PRODUCTS') {
       return res.status(400).json({ error: 'INVALID_PRODUCTS', message: 'Produits invalides ou indisponibles' });
     }
+    if (err.code === 'QTY_TOO_HIGH') {
+      return res.status(400).json({ error: 'QTY_TOO_HIGH', message: err.message });
+    }
+    res.status(500).json({ error: 'SERVER_ERROR', message: err.message });
+  }
+});
+
+// ─── GET /my-contact — Contact info for logged-in user ──
+const rateLimitMap = new Map();
+function rateLimit(key, maxPerMin = 10) {
+  const now = Date.now();
+  const entries = rateLimitMap.get(key) || [];
+  const recent = entries.filter((t) => now - t < 60000);
+  if (recent.length >= maxPerMin) return false;
+  recent.push(now);
+  rateLimitMap.set(key, recent);
+  return true;
+}
+
+router.get('/my-contact', authenticateOptional, async (req, res) => {
+  try {
+    if (!req.user) return res.json({ found: false });
+    const contact = await db('contacts')
+      .where(function () {
+        this.where('source_user_id', req.user.userId)
+          .orWhere('email', req.user.email);
+      })
+      .orderBy('updated_at', 'desc')
+      .first();
+    if (!contact) return res.json({ found: false });
+    const notes = typeof contact.notes === 'string' ? JSON.parse(contact.notes || '{}') : (contact.notes || {});
+    res.json({
+      found: true,
+      name: contact.name,
+      address: contact.address,
+      city: notes.city || null,
+      zip: notes.postal_code || null,
+    });
+  } catch (err) {
+    res.status(500).json({ error: 'SERVER_ERROR', message: err.message });
+  }
+});
+
+// ─── GET /user-lookup?email=X — Contact lookup by email (rate limited) ──
+router.get('/user-lookup', async (req, res) => {
+  try {
+    const { email } = req.query;
+    if (!email) return res.status(400).json({ error: 'EMAIL_REQUIRED' });
+    const ip = req.ip || req.connection?.remoteAddress || 'unknown';
+    if (!rateLimit(`lookup:${ip}`)) {
+      return res.status(429).json({ error: 'RATE_LIMIT', message: 'Trop de requêtes. Réessayez dans une minute.' });
+    }
+    const contact = await db('contacts')
+      .where('email', email.toLowerCase().trim())
+      .orderBy('updated_at', 'desc')
+      .first();
+    if (!contact) return res.json({ found: false });
+    const notes = typeof contact.notes === 'string' ? JSON.parse(contact.notes || '{}') : (contact.notes || {});
+    res.json({
+      found: true,
+      name: contact.name,
+      address: contact.address,
+      city: notes.city || null,
+      zip: notes.postal_code || null,
+    });
+  } catch (err) {
     res.status(500).json({ error: 'SERVER_ERROR', message: err.message });
   }
 });
@@ -88,7 +156,7 @@ router.get('/cart/:session_id', async (req, res) => {
 
 // ─── POST /checkout — Create order + Stripe PaymentIntent ──
 
-router.post('/checkout', async (req, res) => {
+router.post('/checkout', authenticateOptional, async (req, res) => {
   try {
     const { error, value } = checkoutSchema.validate(req.body);
     if (error) return res.status(400).json({ error: 'VALIDATION_ERROR', message: error.details[0].message });
@@ -99,13 +167,14 @@ router.post('/checkout', async (req, res) => {
       return res.status(400).json({ error: 'EMPTY_CART', message: 'Le panier est vide' });
     }
 
-    // Create boutique order
+    // Create boutique order — pass authenticated user for campaign routing
     const order = await boutiqueOrderService.createBoutiqueOrder({
       cartItems: cart.items,
       customer: value.customer,
       referralCode: value.referral_code || null,
       delivery_type: value.delivery_type || 'home_delivery',
       promoCode: value.promo_code || null,
+      authenticatedUserId: req.user?.userId || null,
     });
 
     // Skip Stripe for backorder (pending_stock) — payment will happen when stock arrives
@@ -300,12 +369,14 @@ router.get('/campaigns/:id/info', async (req, res) => {
   try {
     const campaign = await db('campaigns')
       .leftJoin('organizations', 'campaigns.org_id', 'organizations.id')
+      .leftJoin('campaign_types', 'campaigns.campaign_type_id', 'campaign_types.id')
       .where('campaigns.id', req.params.id)
       .whereIn('campaigns.status', ['active', 'draft'])
       .select(
         'campaigns.id', 'campaigns.name', 'campaigns.brand_name',
         'campaigns.goal', 'campaigns.start_date', 'campaigns.end_date',
-        'organizations.name as org_name'
+        'organizations.name as org_name',
+        'campaign_types.code as campaign_type_code'
       )
       .first();
 
@@ -319,6 +390,7 @@ router.get('/campaigns/:id/info', async (req, res) => {
       goal: campaign.goal ? parseFloat(campaign.goal) : null,
       start_date: campaign.start_date,
       end_date: campaign.end_date,
+      campaign_type_code: campaign.campaign_type_code || null,
     });
   } catch (err) {
     logger.error(`Campaign info error: ${err.message}`);
@@ -348,6 +420,39 @@ router.post('/campaigns/:id/join', async (req, res) => {
 
     if (!campaign) return res.status(404).json({ error: 'CAMPAIGN_NOT_FOUND', message: 'Campagne introuvable' });
 
+    // Resolve role from campaign_type
+    const campaignType = campaign.campaign_type_id
+      ? await db('campaign_types').where({ id: campaign.campaign_type_id }).first()
+      : null;
+
+    const CAMPAIGN_TYPE_ROLE_MAP = {
+      scolaire: 'etudiant',
+      lycee: 'etudiant',
+      bts_ndrc: 'etudiant',
+      cse: 'cse',
+      ambassadeur: 'ambassadeur',
+    };
+
+    const typeCode = campaignType?.code;
+    const userRole = CAMPAIGN_TYPE_ROLE_MAP[typeCode];
+
+    if (!userRole) {
+      return res.status(400).json({
+        error: 'UNSUPPORTED_CAMPAIGN_TYPE',
+        message: `L'inscription par lien n'est pas disponible pour ce type de campagne${typeCode ? ` (${typeCode})` : ''}`,
+      });
+    }
+
+    const CAMPAIGN_TYPE_ROLE_IN_CAMPAIGN = {
+      scolaire: 'participant',
+      lycee: 'participant',
+      bts_ndrc: 'participant',
+      cse: 'cse_member',
+      ambassadeur: 'ambassador',
+    };
+
+    const roleInCampaign = CAMPAIGN_TYPE_ROLE_IN_CAMPAIGN[typeCode];
+
     const email = value.email.toLowerCase().trim();
     const fullName = `${value.first_name.trim()} ${value.last_name.trim()}`;
     const bcrypt = require('bcryptjs');
@@ -367,17 +472,22 @@ router.post('/campaigns/:id/join', async (req, res) => {
         return res.json({ success: true, already_registered: true, ...loginData });
       }
     } else {
-      // Create new account
+      // Create new account with role derived from campaign type
       const passwordHash = await bcrypt.hash(value.password, 10);
       const userId = uuidv4();
-      await db('users').insert({
+      const insertData = {
         id: userId,
         name: fullName,
         email,
         password_hash: passwordHash,
-        role: 'etudiant',
+        role: userRole,
         status: 'active',
-      });
+      };
+      // CSE members get cse_role = 'member' (QR join = collaborateur by default)
+      if (userRole === 'cse') {
+        insertData.cse_role = 'member';
+      }
+      await db('users').insert(insertData);
       user = { id: userId };
       isNew = true;
     }
@@ -386,14 +496,20 @@ router.post('/campaigns/:id/join', async (req, res) => {
     const { generateUniqueReferralCode } = require('../utils/referralCode');
     const referralCode = await generateUniqueReferralCode(campaign.name, fullName);
 
-    await db('participations').insert({
+    const participationData = {
       user_id: user.id,
       campaign_id: campaign.id,
-      role_in_campaign: 'participant',
+      role_in_campaign: roleInCampaign,
       class_group: value.class_group || null,
       referral_code: referralCode,
       config: JSON.stringify({}),
-    });
+    };
+    // CSE: store sub_role for collaborator differentiation
+    if (userRole === 'cse') {
+      participationData.sub_role = 'collaborateur';
+    }
+
+    await db('participations').insert(participationData);
 
     // Auto-login: generate tokens
     const authService = require('../auth/authService');

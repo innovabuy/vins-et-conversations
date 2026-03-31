@@ -14,13 +14,15 @@ const BADGE_DEFINITIONS = [
     icon: 'trophy',
     description: '1er au classement de la campagne',
     check: async (userId, campaignId, badgeConfig) => {
-      const ranking = await db('orders')
-        .where({ campaign_id: campaignId })
-        .whereNot('status', 'cancelled')
-        .groupBy('user_id')
-        .select('user_id')
-        .sum('total_ttc as ca')
-        .orderBy('ca', 'desc');
+      // Includes referral CA (UNION ALL direct + referred orders)
+      const { studentOrdersCombinedSQL } = require('./dashboardService');
+      const { sql, params } = studentOrdersCombinedSQL(campaignId);
+      const result = await db.raw(`
+        SELECT effective_user_id as user_id, SUM(total_ttc) as ca
+        FROM ${sql} so
+        GROUP BY effective_user_id ORDER BY ca DESC
+      `, params);
+      const ranking = result.rows || result;
       return ranking.length > 0 && ranking[0].user_id === userId;
     },
   },

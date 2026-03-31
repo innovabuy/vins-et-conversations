@@ -97,7 +97,7 @@ describe('Parcours étudiant complet', () => {
       .send({
         campaign_id: studentCampaignId,
         customer_name: 'Client E2E Test',
-        payment_method: 'cash',
+        payment_method: 'card',
         items: [{ productId, qty: 2 }],
       });
 

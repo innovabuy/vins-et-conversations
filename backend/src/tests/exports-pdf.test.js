@@ -19,7 +19,7 @@ beforeAll(async () => {
     .send({ email: 'nicolas@vins-conversations.fr', password: 'VinsConv2026!' });
   adminToken = adminRes.body.accessToken;
 
-  const studentUser = await db('users').where({ role: 'etudiant' }).whereNot('email', 'like', '%deleted%').first();
+  const studentUser = await db('users').where({ email: 'ackavong@eleve.sc.fr' }).first();
   if (studentUser) {
     const studentRes = await request(app)
       .post('/api/v1/auth/login')
