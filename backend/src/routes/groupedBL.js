@@ -53,7 +53,7 @@ function parseGroupedFilters(query) {
  */
 async function fetchGroupedData(campaignId, userId, orderIds, opts = {}) {
   let query = db('orders')
-    .join('users', 'orders.user_id', 'users.id')
+    .leftJoin('users', 'orders.user_id', 'users.id')
     .join('order_items', 'order_items.order_id', 'orders.id')
     .join('products', 'products.id', 'order_items.product_id')
     .where('orders.campaign_id', campaignId)
@@ -77,11 +77,19 @@ async function fetchGroupedData(campaignId, userId, orderIds, opts = {}) {
       'products.name as product_name',
       'order_items.qty',
       'order_items.unit_price_ttc',
+      db.raw("CASE WHEN orders.referred_by IS NOT NULL AND orders.source = 'student_referral' THEN true ELSE false END as is_referral"),
     )
     .orderBy(['users.name', 'orders.created_at', 'products.name']);
 
   if (userId) {
-    query = query.where('orders.user_id', userId);
+    // Include direct orders AND referral orders attributed to this student
+    query = query.where(function () {
+      this.where('orders.user_id', userId)
+        .orWhere(function () {
+          this.where('orders.referred_by', userId)
+            .where('orders.source', 'student_referral');
+        });
+    });
   }
 
   if (orderIds && orderIds.length > 0) {
@@ -102,23 +110,29 @@ async function fetchGroupedData(campaignId, userId, orderIds, opts = {}) {
 /**
  * Group flat rows by user, then by order
  */
-function groupByUser(rows) {
+function groupByUser(rows, targetUserId) {
   const users = new Map();
   for (const row of rows) {
-    if (!users.has(row.user_id)) {
-      users.set(row.user_id, {
-        user_id: row.user_id,
-        user_name: row.user_name,
-        user_email: row.user_email,
+    // For referral orders, group under the target user (the referrer), not the buyer
+    const effectiveUserId = targetUserId && row.is_referral ? targetUserId : row.user_id;
+    const effectiveName = targetUserId && row.is_referral ? null : row.user_name;
+    const effectiveEmail = targetUserId && row.is_referral ? null : row.user_email;
+
+    if (!users.has(effectiveUserId)) {
+      users.set(effectiveUserId, {
+        user_id: effectiveUserId,
+        user_name: effectiveName || row.user_name,
+        user_email: effectiveEmail || row.user_email,
         orders: new Map(),
       });
     }
-    const user = users.get(row.user_id);
+    const user = users.get(effectiveUserId);
     if (!user.orders.has(row.order_id)) {
       user.orders.set(row.order_id, {
         ref: row.order_ref,
         date: row.order_date,
         total_ttc: parseFloat(row.order_total_ttc),
+        is_referral: row.is_referral,
         items: [],
       });
     }
@@ -187,7 +201,8 @@ function renderStudentPage(doc, student, brandName) {
       const y = doc.y;
       // Only show ref + date on first item line of each order
       if (ii === 0) {
-        doc.text(order.ref, colX.ref, y, { width: 85 });
+        const refLabel = order.is_referral ? `${order.ref} *` : order.ref;
+        doc.text(refLabel, colX.ref, y, { width: 85 });
         doc.text(dateStr, colX.date, y, { width: 70 });
       }
       doc.text(item.product_name, colX.product, y, { width: 170 });
@@ -224,6 +239,14 @@ function renderStudentPage(doc, student, brandName) {
   doc.text('TOTAL GENERAL', colX.product, totalY, { width: 170 });
   doc.text(`${grandTotal.toFixed(2)} EUR`, colX.total, totalY, { width: 55, align: 'right' });
 
+  // Referral legend if any referral orders
+  const hasReferrals = orders.some(o => o.is_referral);
+  if (hasReferrals) {
+    doc.moveDown(1);
+    doc.font('Helvetica-Oblique').fontSize(7).fillColor('#888');
+    doc.text('* Via parrainage', margin);
+  }
+
   // Generation date
   doc.moveDown(2);
   doc.font('Helvetica').fontSize(7).fillColor('#aaa');
@@ -259,8 +282,11 @@ router.get('/grouped/student/:userId', authenticate, requireRole('super_admin', 
       return res.status(404).json({ error: 'NO_DELIVERY_NOTES_FOUND', message: 'Aucun bon de livraison correspondant aux filtres' });
     }
 
-    const users = groupByUser(rows);
+    const users = groupByUser(rows, userId);
     const student = users.values().next().value;
+    // Ensure name/email from the actual user (not from a referral buyer)
+    student.user_name = user.name;
+    student.user_email = user.email;
     const branding = await getAppBranding();
     const brandName = campaign.brand_name || branding.app_name;
 
