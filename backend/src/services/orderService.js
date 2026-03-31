@@ -415,7 +415,7 @@ async function createOrder({ userId, campaignId, items, customerId, notes, custo
 async function validateOrder(orderId, adminUserId) {
   const order = await db('orders').where({ id: orderId }).first();
   if (!order) throw new Error('ORDER_NOT_FOUND');
-  if (order.status !== 'submitted') throw new Error('ORDER_NOT_SUBMITTABLE');
+  if (!['submitted', 'pending_stock'].includes(order.status)) throw new Error('ORDER_NOT_SUBMITTABLE');
 
   await db('orders').where({ id: orderId }).update({
     status: 'validated',

@@ -12,6 +12,7 @@ const formatDate = (d) => new Date(d).toLocaleDateString('fr-FR', { day: '2-digi
 const STATUS_LABELS = {
   pending: { label: 'En attente caution', color: 'bg-amber-100 text-amber-800' },
   pending_payment: { label: 'Paiement en cours', color: 'bg-orange-100 text-orange-800' },
+  pending_stock: { label: 'Stock insuffisant', color: 'bg-orange-100 text-orange-800' },
   draft: { label: 'Brouillon', color: 'bg-gray-100 text-gray-700' },
   submitted: { label: 'En attente', color: 'bg-yellow-100 text-yellow-800' },
   validated: { label: 'Validée', color: 'bg-green-100 text-green-800' },
@@ -24,8 +25,11 @@ const STATUS_LABELS = {
 const SOURCE_LABELS = {
   campaign: { label: 'Campagne', color: 'bg-blue-50 text-blue-700' },
   boutique_web: { label: 'Boutique Web', color: 'bg-purple-50 text-purple-700' },
+  student_order: { label: 'Commande étudiant', color: 'bg-sky-50 text-sky-700' },
+  ambassador_order: { label: 'Commande ambassadeur', color: 'bg-green-50 text-green-700' },
+  cse_order: { label: 'Commande CSE', color: 'bg-teal-50 text-teal-700' },
   student_referral: { label: 'Parrainage étudiant', color: 'bg-amber-50 text-amber-700' },
-  ambassador_referral: { label: 'Ambassadeur', color: 'bg-green-50 text-green-700' },
+  ambassador_referral: { label: 'Parrainage ambassadeur', color: 'bg-green-50 text-green-700' },
   phone: { label: 'Téléphone', color: 'bg-gray-50 text-gray-700' },
   email: { label: 'Email', color: 'bg-sky-50 text-sky-700' },
 };
@@ -344,7 +348,7 @@ function OrderDetail({ orderId, onClose, onUpdated }) {
   if (!order) return <p className="text-center text-gray-500 py-8">Commande introuvable</p>;
 
   const status = STATUS_LABELS[order.status] || { label: order.status, color: 'bg-gray-100 text-gray-700' };
-  const canEdit = ['draft', 'submitted'].includes(order.status);
+  const canEdit = ['draft', 'submitted', 'pending_stock'].includes(order.status);
 
   return (
     <div className="space-y-4">
@@ -365,9 +369,9 @@ function OrderDetail({ orderId, onClose, onUpdated }) {
 
       {/* Action buttons */}
       <div className="flex flex-wrap gap-2">
-        {order.status === 'submitted' && (
+        {(order.status === 'submitted' || order.status === 'pending_stock') && (
           <button onClick={handleValidate} className="flex items-center gap-1.5 px-3 py-1.5 text-sm rounded-lg bg-green-600 text-white hover:bg-green-700">
-            <Check size={14} /> Valider
+            <Check size={14} /> {order.status === 'pending_stock' ? 'Marquer disponible' : 'Valider'}
           </button>
         )}
         {order.status === 'pending_payment' && (
@@ -744,9 +748,9 @@ export default function AdminOrders() {
                     <span className="font-semibold">{formatEur(o.total_ttc)}</span>
                     <span className="text-gray-500 text-xs">{o.total_items} art. · {formatDate(o.created_at)}</span>
                   </div>
-                  {o.status === 'submitted' && (
+                  {(o.status === 'submitted' || o.status === 'pending_stock') && (
                     <div className="pt-1" onClick={e => e.stopPropagation()}>
-                      <button onClick={() => handleValidate(o.id)} className="text-xs px-3 py-1 rounded-lg bg-green-600 text-white hover:bg-green-700">Valider</button>
+                      <button onClick={() => handleValidate(o.id)} className="text-xs px-3 py-1 rounded-lg bg-green-600 text-white hover:bg-green-700">{o.status === 'pending_stock' ? 'Disponible' : 'Valider'}</button>
                     </div>
                   )}
                 </div>
@@ -794,8 +798,8 @@ export default function AdminOrders() {
                         {o.source === 'boutique_web' && !o.referred_by && (
                           <button onClick={() => setAssignOrder(o)} className="p-1.5 rounded-lg hover:bg-amber-50 text-amber-600" title="Rattacher à un étudiant"><UserPlus size={16} /></button>
                         )}
-                        {o.status === 'submitted' && (
-                          <button onClick={() => handleValidate(o.id)} className="p-1.5 rounded-lg hover:bg-green-50 text-green-600" title="Valider"><Check size={16} /></button>
+                        {(o.status === 'submitted' || o.status === 'pending_stock') && (
+                          <button onClick={() => handleValidate(o.id)} className="p-1.5 rounded-lg hover:bg-green-50 text-green-600" title={o.status === 'pending_stock' ? 'Marquer disponible' : 'Valider'}><Check size={16} /></button>
                         )}
                       </div>
                     </td>

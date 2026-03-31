@@ -1001,7 +1001,7 @@ function ProfileOrders({ campaignId }) {
               <p className="font-semibold">{formatEur(o.total_ttc)}</p>
               <p className="text-xs text-gray-400">{STATUS_LABELS[o.status] || o.status}</p>
               {o.payment_method && <p className="text-[10px] text-gray-300">{PAYMENT_LABELS[o.payment_method] || o.payment_method}</p>}
-              {['validated', 'delivered'].includes(o.status) && (
+              {['validated', 'preparing', 'shipped', 'delivered'].includes(o.status) && (
                 <button
                   onClick={() => handleDownloadInvoice(o)}
                   disabled={downloading === o.id}
