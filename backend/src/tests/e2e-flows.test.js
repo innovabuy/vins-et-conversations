@@ -364,11 +364,13 @@ describe('FLUX-06: CA étudiant inclut pending_stock et pending_payment', () => 
     const ACTIVE_STATUSES = ['submitted', 'pending_payment', 'pending_stock', 'validated', 'preparing', 'shipped', 'delivered'];
 
     const dbCount = await db('orders')
-      .where({ referred_by: studentUser.id, source: 'student_referral' })
+      .where({ referred_by: studentUser.id, source: 'student_referral', campaign_id: sacreCoeurCampaignId })
+      .whereRaw('(user_id IS NULL OR user_id != referred_by)')
       .whereIn('status', ACTIVE_STATUSES)
       .count('id as count')
       .first();
 
+    // Both stats endpoint and DB count are now scoped to the same campaign
     expect(statsRes.body.total_orders).toBe(parseInt(dbCount.count, 10));
   });
 });

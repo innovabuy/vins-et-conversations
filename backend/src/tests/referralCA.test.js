@@ -106,13 +106,13 @@ beforeAll(async () => {
     replenishIds.push(mv.id || mv);
   }
 
-  // Insert referral order directly with referred_by = studentId
+  // Insert referral order in the same campaign as the student (so it counts in their CA)
   const { v4: uuidv4 } = require('uuid');
   referralOrderId = uuidv4();
   await db('orders').insert({
     id: referralOrderId,
     ref: 'VC-TEST-REF1',
-    campaign_id: boutiqueCampaign.id,
+    campaign_id: campaignId,
     user_id: null,
     customer_id: contactId,
     status: 'validated',
@@ -127,7 +127,7 @@ beforeAll(async () => {
   createdOrderIds.push(referralOrderId);
   await db('order_items').insert({
     order_id: referralOrderId,
-    product_id: boutiqueCp.product_id,
+    product_id: productId,
     qty: 3,
     unit_price_ht: 5.42,
     unit_price_ttc: 6.50,
@@ -138,11 +138,11 @@ beforeAll(async () => {
   await db('orders').insert({
     id: cancelledReferralOrderId,
     ref: 'VC-TEST-REF2',
-    campaign_id: boutiqueCampaign.id,
+    campaign_id: campaignId,
     user_id: null,
     customer_id: contactId,
     status: 'cancelled',
-    items: JSON.stringify([{ productId: boutiqueCp.product_id, qty: 5 }]),
+    items: JSON.stringify([{ productId, qty: 5 }]),
     total_ht: 27.10,
     total_ttc: 32.50,
     total_items: 5,

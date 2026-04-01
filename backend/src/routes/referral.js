@@ -58,8 +58,9 @@ router.get('/stats', authenticate, requireRole('etudiant'), async (req, res) => 
     const validStatuses = ['submitted', 'pending_payment', 'pending_stock', 'validated', 'preparing', 'shipped', 'delivered'];
 
     const stats = await db('orders')
-      .where({ referred_by: req.user.userId })
+      .where({ referred_by: req.user.userId, campaign_id })
       .where('source', 'student_referral')
+      .whereRaw('(user_id IS NULL OR user_id != referred_by)')
       .whereIn('status', validStatuses)
       .select(
         db.raw('COUNT(id) as total_orders'),
@@ -69,16 +70,18 @@ router.get('/stats', authenticate, requireRole('etudiant'), async (req, res) => 
       .first();
 
     const uniqueClients = await db('orders')
-      .where({ referred_by: req.user.userId })
+      .where({ referred_by: req.user.userId, campaign_id })
       .where('source', 'student_referral')
+      .whereRaw('(user_id IS NULL OR user_id != referred_by)')
       .whereIn('status', validStatuses)
       .countDistinct('customer_id as count')
       .first();
 
     const recentOrders = await db('orders')
       .leftJoin('contacts', 'orders.customer_id', 'contacts.id')
-      .where({ 'orders.referred_by': req.user.userId })
+      .where({ 'orders.referred_by': req.user.userId, 'orders.campaign_id': campaign_id })
       .where('orders.source', 'student_referral')
+      .whereRaw('(orders.user_id IS NULL OR orders.user_id != orders.referred_by)')
       .whereIn('orders.status', validStatuses)
       .orderBy('orders.created_at', 'desc')
       .limit(5)

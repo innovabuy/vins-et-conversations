@@ -144,7 +144,10 @@ async function calculateFunds(campaignId, userId, commissionRules) {
       .whereIn('status', FUND_STATUSES)
       .where(function () {
         this.where({ user_id: userId })
-          .orWhere({ referred_by: userId, source: 'student_referral' });
+          .orWhere(function () {
+            this.where({ referred_by: userId, source: 'student_referral' })
+              .whereRaw('(user_id IS NULL OR user_id != referred_by)');
+          });
       })
       .sum('total_ht as total')
       .first();

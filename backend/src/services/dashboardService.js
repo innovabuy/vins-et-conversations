@@ -26,7 +26,7 @@ function studentOrdersCombinedSQL(campaignId = null) {
     UNION ALL
     SELECT referred_by as effective_user_id, id, total_ttc, total_ht, total_items, campaign_id, status, created_at
     FROM orders
-    WHERE referred_by IS NOT NULL AND source = 'student_referral' AND status IN ${ACTIVE_STATUSES_SQL}${campaignFilter}
+    WHERE referred_by IS NOT NULL AND source = 'student_referral' AND (user_id IS NULL OR user_id != referred_by) AND status IN ${ACTIVE_STATUSES_SQL}${campaignFilter}
   )`;
   return { sql, params };
 }
@@ -56,15 +56,16 @@ async function getStudentDashboard(userId, campaignId) {
     .where(function () {
       this.where({ user_id: userId, campaign_id: campaignId })
         .orWhere(function () {
-          this.where({ referred_by: userId, source: 'student_referral' });
+          this.where({ referred_by: userId, source: 'student_referral', campaign_id: campaignId })
+            .whereRaw('(user_id IS NULL OR user_id != referred_by)');
         });
     })
     .select(
       db.raw('SUM(CASE WHEN user_id = ? AND campaign_id = ? THEN total_ttc ELSE 0 END) as direct_ca', [userId, campaignId]),
       db.raw('COUNT(CASE WHEN user_id = ? AND campaign_id = ? THEN 1 END) as order_count', [userId, campaignId]),
       db.raw('SUM(CASE WHEN user_id = ? AND campaign_id = ? THEN total_items ELSE 0 END) as direct_bottles', [userId, campaignId]),
-      db.raw('SUM(CASE WHEN referred_by = ? AND source = \'student_referral\' THEN total_ttc ELSE 0 END) as referred_ca', [userId]),
-      db.raw('SUM(CASE WHEN referred_by = ? AND source = \'student_referral\' THEN total_items ELSE 0 END) as referred_bottles', [userId]),
+      db.raw('SUM(CASE WHEN referred_by = ? AND source = \'student_referral\' AND campaign_id = ? AND (user_id IS NULL OR user_id != referred_by) THEN total_ttc ELSE 0 END) as referred_ca', [userId, campaignId]),
+      db.raw('SUM(CASE WHEN referred_by = ? AND source = \'student_referral\' AND campaign_id = ? AND (user_id IS NULL OR user_id != referred_by) THEN total_items ELSE 0 END) as referred_bottles', [userId, campaignId]),
     )
     .first();
 
@@ -82,9 +83,9 @@ async function getStudentDashboard(userId, campaignId) {
         WHERE campaign_id = ? AND status IN ${ACTIVE_STATUSES_SQL} AND user_id IS NOT NULL
       UNION ALL
       SELECT referred_by as user_id, total_ttc FROM orders
-        WHERE referred_by IS NOT NULL AND source = 'student_referral' AND status IN ${ACTIVE_STATUSES_SQL}
+        WHERE referred_by IS NOT NULL AND source = 'student_referral' AND (user_id IS NULL OR user_id != referred_by) AND status IN ${ACTIVE_STATUSES_SQL} AND campaign_id = ?
     ) combined GROUP BY user_id ORDER BY ca DESC
-  `, [campaignId]);
+  `, [campaignId, campaignId]);
   const rankingRows = ranking.rows || ranking;
 
   const position = rankingRows.findIndex((r) => r.user_id === userId) + 1;
@@ -325,14 +326,14 @@ async function getStudentRanking(userId, campaignId) {
         WHERE campaign_id = ? AND status IN ${validStatusList} AND user_id IS NOT NULL
       UNION ALL
       SELECT id, referred_by as user_id, total_ttc, total_items FROM orders
-        WHERE referred_by IS NOT NULL AND source = 'student_referral' AND status IN ${validStatusList}
+        WHERE referred_by IS NOT NULL AND source = 'student_referral' AND (user_id IS NULL OR user_id != referred_by) AND status IN ${validStatusList} AND campaign_id = ?
     ) combined
     JOIN users u ON combined.user_id = u.id
     JOIN participations p ON p.user_id = combined.user_id AND p.campaign_id = ?
     WHERE u.role = 'etudiant'
     GROUP BY combined.user_id, u.name, p.class_group
     ORDER BY ca DESC
-  `, [campaignId, campaignId]);
+  `, [campaignId, campaignId, campaignId]);
   const rankingData = rankingResult.rows || rankingResult;
 
   const myPosition = rankingData.findIndex((r) => r.user_id === userId) + 1;
@@ -800,7 +801,7 @@ async function getStudentLeaderboard(userId, campaignId, { period = 'all', class
     classParams.push(classFilter);
   }
 
-  const allParams = [...params, ...referralParams, campaignId, ...classParams];
+  const allParams = [...params, campaignId, ...referralParams, campaignId, ...classParams];
 
   const rankingResult = await db.raw(`
     SELECT combined.user_id, u.name, p.class_group,
@@ -812,7 +813,7 @@ async function getStudentLeaderboard(userId, campaignId, { period = 'all', class
         WHERE campaign_id = ? AND status IN ${validStatusList} AND user_id IS NOT NULL${periodFilter}
       UNION ALL
       SELECT id, referred_by as user_id, total_ttc, total_items, created_at FROM orders
-        WHERE referred_by IS NOT NULL AND source = 'student_referral' AND status IN ${validStatusList}${periodFilter ? ' AND created_at >= ?' : ''}
+        WHERE referred_by IS NOT NULL AND source = 'student_referral' AND (user_id IS NULL OR user_id != referred_by) AND status IN ${validStatusList} AND campaign_id = ?${periodFilter ? ' AND created_at >= ?' : ''}
     ) combined
     JOIN users u ON combined.user_id = u.id
     JOIN participations p ON p.user_id = combined.user_id AND p.campaign_id = ?
