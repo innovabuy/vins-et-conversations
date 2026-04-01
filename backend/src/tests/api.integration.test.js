@@ -2302,10 +2302,10 @@ describe('API Integration Tests', () => {
     });
 
     test('Full flow: 2 products → cart → checkout → confirm → contact + notification', async () => {
-      // 1. Get 2 visible seed products (avoid coffrets that may lack campaign_products)
+      // 1. Get 2 visible active products (works for both seed and Wix)
       const products = await db('products')
         .where({ visible_boutique: true, active: true })
-        .whereIn('name', ['Oriolus Blanc - Cheval Quancard', 'Cuvée Clémence - Cheval Quancard'])
+        .orderBy('price_ttc', 'asc')
         .limit(2);
       expect(products.length).toBeGreaterThanOrEqual(1);
 
@@ -2759,14 +2759,9 @@ describe('API Integration Tests', () => {
     });
 
     test('Migration mapped all seeded products to category_id', async () => {
-      const seededNames = [
-        'Oriolus Blanc - Cheval Quancard', 'Cuvée Clémence - Cheval Quancard',
-        'Le Carillon Rouge - Château le Virou', 'Apertus - Cheval Quancard',
-        'Crémant de Loire Extra Brut - Domaine de La Bougrie', 'Coffret Découverte 3bt',
-        'Coteaux du Layon - Domaine de La Bougrie', 'Jus de Pomme - Les fruits D\'Altho',
-      ];
-      const products = await db('products').whereIn('name', seededNames).select('name', 'category', 'category_id');
-      for (const p of products) {
+      // Verify active products have category_id mapped (works for both seed and Wix)
+      const productsToCheck = await db('products').where('active', true).select('name', 'category', 'category_id').limit(10);
+      for (const p of productsToCheck) {
         expect(p.category_id).toBeTruthy();
       }
     });

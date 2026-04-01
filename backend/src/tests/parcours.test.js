@@ -76,7 +76,12 @@ describe('Parcours 1 — Étudiant complet', () => {
   });
 
   test('3. POST /orders (3 bouteilles Carillon) → commande créée', async () => {
-    const carillon = await db('products').where('name', 'Le Carillon Rouge - Château le Virou').where('active', true).first();
+    // Get an active product from this campaign (works for both seed and Wix)
+    const carillon = await db('campaign_products')
+      .join('products', 'campaign_products.product_id', 'products.id')
+      .where({ 'campaign_products.campaign_id': campaignId, 'campaign_products.active': true, 'products.active': true })
+      .select('products.*')
+      .first();
     if (!carillon) return;
 
     const res = await request(app)

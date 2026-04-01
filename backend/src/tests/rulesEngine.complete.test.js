@@ -326,25 +326,22 @@ describe('Types client_types — entreprise et particulier', () => {
     entrepriseType = await db('client_types').where('name', 'entreprise').first();
     particulierType = await db('client_types').where('name', 'particulier').first();
 
-    // Use Wix products (active) by known names
+    // Load active alcohol products dynamically (works for both seed and Wix)
     wines = await db('products')
       .join('product_categories', 'products.category_id', 'product_categories.id')
       .where('product_categories.is_alcohol', true)
       .where('products.active', true)
-      .whereIn('products.name', [
-        'Oriolus Blanc - Cheval Quancard', 'Cuvée Clémence - Cheval Quancard',
-        'Le Carillon Rouge - Château le Virou', 'Apertus - Cheval Quancard',
-        'Crémant de Loire Extra Brut - Domaine de La Bougrie',
-        'Coteaux du Layon - Domaine de La Bougrie',
-      ])
       .select('products.*')
       .orderBy('products.purchase_price', 'asc')
       .limit(3);
 
+    // Load active non-alcohol product (Jus)
     juice = await db('products')
-      .where('products.name', 'Jus de Pomme - Les fruits D\'Altho')
+      .join('product_categories', 'products.category_id', 'product_categories.id')
+      .where('product_categories.is_alcohol', false)
       .where('products.active', true)
       .select('products.*')
+      .orderBy('products.purchase_price', 'asc')
       .first();
   });
 

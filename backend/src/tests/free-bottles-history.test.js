@@ -43,12 +43,17 @@ describe('Free bottles history in student dashboard', () => {
   test('freeBottles.history entries have date, product_name, quantity', async () => {
     // Insert a test free_bottle financial_event for this student
     const student = await db('users').where({ email: 'ackavong@eleve.sc.fr' }).first();
-    const product = await db('products').where({ name: 'Le Carillon Rouge - Château le Virou', active: true }).first();
+    const product = await db('products')
+      .join('product_categories', 'products.category_id', 'product_categories.id')
+      .where('product_categories.is_alcohol', true)
+      .where('products.active', true)
+      .select('products.*')
+      .first();
 
     const [inserted] = await db('financial_events').insert({
       campaign_id: campaignId,
       type: 'free_bottle',
-      amount: 6.60,
+      amount: parseFloat(product.purchase_price),
       description: 'Test gratuite historique',
       metadata: JSON.stringify({
         user_id: student.id,
@@ -80,7 +85,7 @@ describe('Free bottles history in student dashboard', () => {
       }
 
       // Our inserted entry should be first (most recent)
-      const testEntry = history.find((h) => h.product_name === 'Le Carillon Rouge - Château le Virou');
+      const testEntry = history.find((h) => h.product_name === product.name);
       expect(testEntry).toBeTruthy();
     } finally {
       // Cleanup test financial_event (append-only in prod, but test needs cleanup)
