@@ -471,6 +471,13 @@ router.post('/campaigns/:id/join', async (req, res) => {
         const loginData = await authService.login(email, value.password);
         return res.json({ success: true, already_registered: true, ...loginData });
       }
+
+      // Upgrade role if joining a higher-privilege campaign (CSE or ambassadeur)
+      if (userRole === 'cse' && user.role !== 'cse') {
+        await db('users').where({ id: user.id }).update({ role: 'cse', cse_role: 'member' });
+      } else if (userRole === 'ambassadeur' && user.role !== 'ambassadeur') {
+        await db('users').where({ id: user.id }).update({ role: 'ambassadeur' });
+      }
     } else {
       // Create new account with role derived from campaign type
       const passwordHash = await bcrypt.hash(value.password, 10);
