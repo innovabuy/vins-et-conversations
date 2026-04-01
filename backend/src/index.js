@@ -56,19 +56,20 @@ app.use(morgan('combined', {
 
 // Rate limiting
 if (process.env.NODE_ENV !== 'test' && !process.env.JEST_WORKER_ID && !process.env.LOAD_TEST) {
+  // Global: 2000 req/15min — absorbe polling notifications + refresh tokens multi-users
   const limiter = rateLimit({
     windowMs: 15 * 60 * 1000,
-    max: 500,
+    max: 2000,
     standardHeaders: true,
     legacyHeaders: false,
     message: { error: 'RATE_LIMITED', message: 'Trop de requêtes' },
   });
   app.use('/api/', limiter);
 
-  // Rate limit plus strict pour l'auth
+  // Auth: 100 req/15min — plusieurs users sur même IP sortante (prod multi-users)
   const authLimiter = rateLimit({
     windowMs: 15 * 60 * 1000,
-    max: 30,
+    max: 100,
     message: { error: 'RATE_LIMITED', message: 'Trop de tentatives de connexion' },
   });
   app.use('/api/v1/auth/', authLimiter);
