@@ -33,8 +33,10 @@ describe('Diagnostic V4.3 — Avertissements corrigés', () => {
   // ⚠️ 2. Pas de produits seedés sans image
   test('All seeded products have an image_url', async () => {
     const seededNames = [
-      'Oriolus Blanc', 'Cuvée Clémence', 'Carillon', 'Apertus',
-      'Crémant de Loire', 'Coffret Découverte 3bt', 'Coteaux du Layon', 'Jus de Pomme',
+      'Oriolus Blanc - Cheval Quancard', 'Cuvée Clémence - Cheval Quancard',
+      'Le Carillon Rouge - Château le Virou', 'Apertus - Cheval Quancard',
+      'Crémant de Loire Extra Brut - Domaine de La Bougrie', 'Coffret Découverte 3bt',
+      'Coteaux du Layon - Domaine de La Bougrie', 'Jus de Pomme - Les fruits D\'Altho',
     ];
     const productsNoImage = await db('products')
       .whereIn('name', seededNames)

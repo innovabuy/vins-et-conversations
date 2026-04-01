@@ -482,6 +482,10 @@ describe('API Integration Tests', () => {
     let cseCampaignId;
 
     beforeAll(async () => {
+      // Ensure CSE min_order=200 (may have been set to 0 by other test suites)
+      await db('client_types').where({ name: 'cse' })
+        .update({ pricing_rules: JSON.stringify({ type: 'percentage_discount', value: 10, min_order: 200, applies_to: 'all' }) });
+
       const res = await request(app)
         .post('/api/v1/auth/login')
         .send({ email: 'cse@leroymerlin.fr', password: 'VinsConv2026!' });
@@ -498,9 +502,11 @@ describe('API Integration Tests', () => {
     test('CSE order < 200 EUR returns 400 MIN_ORDER_NOT_MET', async () => {
       if (!cseToken || !cseCampaignId) return;
 
-      // Get a cheap product
+      // Get a cheap active product
       const cp = await db('campaign_products')
-        .where({ campaign_id: cseCampaignId, active: true })
+        .join('products', 'campaign_products.product_id', 'products.id')
+        .where({ 'campaign_products.campaign_id': cseCampaignId, 'campaign_products.active': true, 'products.active': true })
+        .select('campaign_products.*')
         .first();
       if (!cp) return;
 
@@ -522,7 +528,7 @@ describe('API Integration Tests', () => {
       // Get a product and order enough to exceed 200 EUR
       const cp = await db('campaign_products')
         .join('products', 'campaign_products.product_id', 'products.id')
-        .where({ 'campaign_products.campaign_id': cseCampaignId, 'campaign_products.active': true })
+        .where({ 'campaign_products.campaign_id': cseCampaignId, 'campaign_products.active': true, 'products.active': true })
         .orderBy('products.price_ttc', 'desc')
         .first();
       if (!cp) return;
@@ -1658,7 +1664,7 @@ describe('API Integration Tests', () => {
 
       const cp = await db('campaign_products')
         .join('products', 'campaign_products.product_id', 'products.id')
-        .where({ 'campaign_products.campaign_id': participation.campaign_id, 'campaign_products.active': true })
+        .where({ 'campaign_products.campaign_id': participation.campaign_id, 'campaign_products.active': true, 'products.active': true })
         .orderBy('products.price_ttc', 'desc')
         .first();
       if (!cp) return;
@@ -2299,7 +2305,7 @@ describe('API Integration Tests', () => {
       // 1. Get 2 visible seed products (avoid coffrets that may lack campaign_products)
       const products = await db('products')
         .where({ visible_boutique: true, active: true })
-        .whereIn('name', ['Oriolus Blanc', 'Cuvée Clémence'])
+        .whereIn('name', ['Oriolus Blanc - Cheval Quancard', 'Cuvée Clémence - Cheval Quancard'])
         .limit(2);
       expect(products.length).toBeGreaterThanOrEqual(1);
 
@@ -2754,8 +2760,10 @@ describe('API Integration Tests', () => {
 
     test('Migration mapped all seeded products to category_id', async () => {
       const seededNames = [
-        'Oriolus Blanc', 'Cuvée Clémence', 'Carillon', 'Apertus',
-        'Crémant de Loire', 'Coffret Découverte 3bt', 'Coteaux du Layon', 'Jus de Pomme',
+        'Oriolus Blanc - Cheval Quancard', 'Cuvée Clémence - Cheval Quancard',
+        'Le Carillon Rouge - Château le Virou', 'Apertus - Cheval Quancard',
+        'Crémant de Loire Extra Brut - Domaine de La Bougrie', 'Coffret Découverte 3bt',
+        'Coteaux du Layon - Domaine de La Bougrie', 'Jus de Pomme - Les fruits D\'Altho',
       ];
       const products = await db('products').whereIn('name', seededNames).select('name', 'category', 'category_id');
       for (const p of products) {
@@ -3205,18 +3213,18 @@ describe('API Integration Tests', () => {
       // Find the CSE pricing condition
       const pc = await db('pricing_conditions').where({ client_type: 'cse' }).first();
       csePricingConditionId = pc?.id;
-      originalMinOrder = pc ? parseFloat(pc.min_order) : 200;
+      originalMinOrder = 200; // seed default — pricing_conditions may have drifted
     });
 
     afterAll(async () => {
-      // Restore original min_order
+      // Restore min_order to seed default (200)
       if (csePricingConditionId) {
         await request(app)
           .put(`/api/v1/admin/pricing-conditions/${csePricingConditionId}`)
           .set('Authorization', `Bearer ${adminToken}`)
           .send({
             client_type: 'cse', label: 'CSE Standard', discount_pct: 10,
-            commission_pct: 0, min_order: originalMinOrder, payment_terms: '30_days', active: true,
+            commission_pct: 0, min_order: 200, payment_terms: '30_days', active: true,
           });
       }
     });
@@ -3295,7 +3303,7 @@ describe('API Integration Tests', () => {
       // Order 1 cheap product (should be < 50 EUR)
       const cp = await db('campaign_products')
         .join('products', 'campaign_products.product_id', 'products.id')
-        .where({ 'campaign_products.campaign_id': cseCampaignId, 'campaign_products.active': true })
+        .where({ 'campaign_products.campaign_id': cseCampaignId, 'campaign_products.active': true, 'products.active': true })
         .orderBy('products.price_ttc', 'asc')
         .first();
       if (!cp) return;

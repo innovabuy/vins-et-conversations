@@ -295,7 +295,10 @@ describe('loadRulesForCampaign', () => {
     const rules = await loadRulesForCampaign(cseCampaignId);
     expect(rules.pricing.type).toBe('percentage_discount');
     expect(rules.pricing.value).toBe(10);
-    expect(rules.pricing.min_order).toBe(200);
+    // min_order is at campaign config level, not pricing_rules
+    const cseCamp = await db('campaigns').where('id', cseCampaignId).first();
+    const config = typeof cseCamp.config === 'string' ? JSON.parse(cseCamp.config) : cseCamp.config;
+    expect(config.min_order).toBe(200);
   });
 
   test('Charge les règles Ambassadeur avec tier_rules', async () => {
@@ -323,18 +326,23 @@ describe('Types client_types — entreprise et particulier', () => {
     entrepriseType = await db('client_types').where('name', 'entreprise').first();
     particulierType = await db('client_types').where('name', 'particulier').first();
 
-    // Use seed products only (by known names) to avoid interference from Wix imports
+    // Use Wix products (active) by known names
     wines = await db('products')
       .join('product_categories', 'products.category_id', 'product_categories.id')
       .where('product_categories.is_alcohol', true)
       .where('products.active', true)
-      .whereIn('products.name', ['Oriolus Blanc', 'Cuvée Clémence', 'Carillon', 'Apertus', 'Crémant de Loire', 'Coteaux du Layon'])
+      .whereIn('products.name', [
+        'Oriolus Blanc - Cheval Quancard', 'Cuvée Clémence - Cheval Quancard',
+        'Le Carillon Rouge - Château le Virou', 'Apertus - Cheval Quancard',
+        'Crémant de Loire Extra Brut - Domaine de La Bougrie',
+        'Coteaux du Layon - Domaine de La Bougrie',
+      ])
       .select('products.*')
       .orderBy('products.purchase_price', 'asc')
       .limit(3);
 
     juice = await db('products')
-      .where('products.name', 'Jus de Pomme')
+      .where('products.name', 'Jus de Pomme - Les fruits D\'Altho')
       .where('products.active', true)
       .select('products.*')
       .first();

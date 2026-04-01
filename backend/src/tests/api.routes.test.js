@@ -13,6 +13,10 @@ let testOrderId, testProductId, testCategoryId, testBLId;
 beforeAll(async () => {
   await db.raw('SELECT 1');
 
+  // Ensure CSE min_order=200 (may have been set to 0 by other test suites)
+  await db('client_types').where({ name: 'cse' })
+    .update({ pricing_rules: JSON.stringify({ type: 'percentage_discount', value: 10, min_order: 200, applies_to: 'all' }) });
+
   // Login all test accounts
   const [adminRes, studentRes, cseRes, teacherRes, ambassadorRes] = await Promise.all([
     request(app).post('/api/v1/auth/login').send({ email: 'nicolas@vins-conversations.fr', password: 'VinsConv2026!' }),
@@ -407,7 +411,7 @@ describe('Orders', () => {
   test('POST /orders sous min_order CSE → 400', async () => {
     const cp = await db('campaign_products')
       .join('products', 'campaign_products.product_id', 'products.id')
-      .where({ 'campaign_products.campaign_id': cseCampaignId, 'campaign_products.active': true })
+      .where({ 'campaign_products.campaign_id': cseCampaignId, 'campaign_products.active': true, 'products.active': true })
       .select('products.*')
       .first();
     if (!cp) return;
@@ -432,7 +436,7 @@ describe('Orders', () => {
 
     const cp = await db('campaign_products')
       .join('products', 'campaign_products.product_id', 'products.id')
-      .where({ 'campaign_products.campaign_id': cseCampaignId, 'campaign_products.active': true })
+      .where({ 'campaign_products.campaign_id': cseCampaignId, 'campaign_products.active': true, 'products.active': true })
       .select('products.*')
       .first();
     if (!cp) return;

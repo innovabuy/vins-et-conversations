@@ -12,6 +12,10 @@ let campaignId, cseCampaignId, ambassadorCampaignId;
 beforeAll(async () => {
   await db.raw('SELECT 1');
 
+  // Ensure CSE min_order=200 (may have been set to 0 by other test suites)
+  await db('client_types').where({ name: 'cse' })
+    .update({ pricing_rules: JSON.stringify({ type: 'percentage_discount', value: 10, min_order: 200, applies_to: 'all' }) });
+
   const [adminRes, studentRes, cseRes, teacherRes, ambassadorRes] = await Promise.all([
     request(app).post('/api/v1/auth/login').send({ email: 'nicolas@vins-conversations.fr', password: 'VinsConv2026!' }),
     request(app).post('/api/v1/auth/login').send({ email: 'ackavong@eleve.sc.fr', password: 'VinsConv2026!' }),
@@ -72,7 +76,7 @@ describe('Parcours 1 — Étudiant complet', () => {
   });
 
   test('3. POST /orders (3 bouteilles Carillon) → commande créée', async () => {
-    const carillon = await db('products').where('name', 'Carillon').first();
+    const carillon = await db('products').where('name', 'Le Carillon Rouge - Château le Virou').where('active', true).first();
     if (!carillon) return;
 
     const res = await request(app)
@@ -285,7 +289,7 @@ describe('Parcours 4 — CSE e-commerce', () => {
   test('3. CSE commande sous min_order → 400', async () => {
     const cp = await db('campaign_products')
       .join('products', 'campaign_products.product_id', 'products.id')
-      .where({ 'campaign_products.campaign_id': cseCampaignId, 'campaign_products.active': true })
+      .where({ 'campaign_products.campaign_id': cseCampaignId, 'campaign_products.active': true, 'products.active': true })
       .select('products.*').first();
     if (!cp) return;
 
@@ -303,7 +307,7 @@ describe('Parcours 4 — CSE e-commerce', () => {
   test('4. CSE commande >= min_order → 201', async () => {
     const cp = await db('campaign_products')
       .join('products', 'campaign_products.product_id', 'products.id')
-      .where({ 'campaign_products.campaign_id': cseCampaignId, 'campaign_products.active': true })
+      .where({ 'campaign_products.campaign_id': cseCampaignId, 'campaign_products.active': true, 'products.active': true })
       .select('products.*').first();
     if (!cp) return;
 
