@@ -518,6 +518,29 @@ router.get(
       // Free bottles (12+1) — respects per-ambassador free_bottle_enabled flag
       const freeBottles = await rulesEngine.calculateFreeBottles(req.user.userId, campaignId, rules.freeBottle);
 
+      // Monthly stats — current calendar month
+      const now = new Date();
+      const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
+      const monthlyResult = await db('orders')
+        .where(function () {
+          this.where({ user_id: req.user.userId, campaign_id: campaignId })
+            .orWhere({ referred_by: req.user.userId });
+        })
+        .whereIn('status', ['submitted', 'validated', 'preparing', 'shipped', 'delivered'])
+        .where('created_at', '>=', monthStart)
+        .sum('total_ttc as ca_ttc')
+        .sum('total_ht as ca_ht')
+        .count('id as orders_count')
+        .first();
+
+      const monthLabel = now.toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' });
+      const monthly = {
+        ca_ttc: parseFloat(monthlyResult?.ca_ttc || 0),
+        ca_ht: parseFloat(monthlyResult?.ca_ht || 0),
+        orders_count: parseInt(monthlyResult?.orders_count || 0, 10),
+        month: monthLabel.charAt(0).toUpperCase() + monthLabel.slice(1),
+      };
+
       res.json({
         campaignId,
         alcohol_free: campaignData?.alcohol_free || false,
@@ -533,6 +556,7 @@ router.get(
           bottles: parseInt(referralOrders?.total_bottles || 0, 10),
         },
         gains,
+        monthly,
         free_bottles: freeBottles,
         ui: rules.ui,
       });

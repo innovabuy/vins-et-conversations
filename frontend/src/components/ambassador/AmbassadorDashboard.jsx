@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
-import { ambassadorAPI } from '../../services/api';
-import { Trophy, Share2, ShoppingCart, ShoppingBag, Gift, Copy, Check, ExternalLink, User, Camera, Save, Upload } from 'lucide-react';
+import { ambassadorAPI, ordersAPI } from '../../services/api';
+import { Trophy, Share2, ShoppingCart, ShoppingBag, Gift, Copy, Check, ExternalLink, User, Camera, Save, Upload, QrCode, Eye, X, Calendar } from 'lucide-react';
 import { copyToClipboard } from '../../utils/copyToClipboard';
 
 const TIER_COLORS = {
@@ -19,6 +19,8 @@ export default function AmbassadorDashboard() {
   const [regions, setRegions] = useState([]);
   const [profileSaving, setProfileSaving] = useState(false);
   const [profileSaved, setProfileSaved] = useState(false);
+  const [showQR, setShowQR] = useState(false);
+  const [selectedOrder, setSelectedOrder] = useState(null);
 
   useEffect(() => {
     loadDashboard();
@@ -63,7 +65,7 @@ export default function AmbassadorDashboard() {
 
   if (!data) return <p className="text-center text-gray-500 py-12">Impossible de charger le tableau de bord.</p>;
 
-  const { tier, sales, recentOrders, referralClicks, gains } = data;
+  const { tier, sales, recentOrders, referralClicks, gains, monthly } = data;
   const tierStyle = TIER_COLORS[tier.current?.label] || TIER_COLORS.Bronze;
 
   return (
@@ -172,7 +174,15 @@ export default function AmbassadorDashboard() {
           >
             Email
           </a>
+          <button
+            onClick={() => setShowQR(!showQR)}
+            className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${showQR ? 'bg-wine-100 text-wine-700' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`}
+          >
+            <QrCode size={16} />
+          </button>
         </div>
+
+        {showQR && <QRCodeDisplay url={referralLink} />}
       </div>}
 
       {/* Section 3 — Ventes */}
@@ -197,12 +207,25 @@ export default function AmbassadorDashboard() {
           </div>
         </div>
 
+        {monthly && (
+          <div className="bg-orange-50 border border-orange-200 rounded-lg p-3 mb-4">
+            <div className="flex items-center gap-2 mb-1">
+              <Calendar size={14} className="text-orange-600" />
+              <span className="text-xs font-medium text-orange-700">{monthly.month}</span>
+            </div>
+            <div className="flex items-center justify-between">
+              <span className="text-lg font-bold text-orange-800">{parseFloat(monthly.ca_ttc).toFixed(0)} EUR</span>
+              <span className="text-xs text-orange-600">{monthly.orders_count} commande{monthly.orders_count > 1 ? 's' : ''}</span>
+            </div>
+          </div>
+        )}
+
         {recentOrders.length > 0 && (
           <div>
             <h3 className="text-sm font-medium text-gray-700 mb-2">Dernières commandes</h3>
             <div className="space-y-2">
               {recentOrders.slice(0, 5).map((o) => (
-                <div key={o.id} className="flex items-center justify-between text-sm bg-gray-50 rounded p-2">
+                <div key={o.id} onClick={() => setSelectedOrder(o.id)} className="flex items-center justify-between text-sm bg-gray-50 rounded p-2 cursor-pointer hover:bg-gray-100 transition-colors">
                   <div>
                     <span className="font-medium">{o.ref}</span>
                     <span className="text-xs text-gray-400 ml-2">{new Date(o.created_at).toLocaleDateString('fr-FR')}</span>
@@ -214,6 +237,7 @@ export default function AmbassadorDashboard() {
                       'bg-gray-100 text-gray-600'
                     }`}>{o.status}</span>
                     <span className="font-medium">{parseFloat(o.total_ttc).toFixed(0)} EUR</span>
+                    <Eye size={14} className="text-gray-400" />
                   </div>
                 </div>
               ))}
@@ -300,6 +324,8 @@ export default function AmbassadorDashboard() {
 
       {/* Section 6 — Mon Profil */}
       <ProfileSection profile={profile} setProfile={setProfile} regions={regions} />
+
+      {selectedOrder && <AmbassadorOrderDetail orderId={selectedOrder} onClose={() => setSelectedOrder(null)} />}
     </div>
   );
 }
@@ -414,6 +440,86 @@ function ProfileSection({ profile, setProfile, regions }) {
         >
           {saved ? <><Check size={16} /> Enregistre</> : <><Save size={16} /> {saving ? 'Enregistrement...' : 'Mettre a jour mon profil public'}</>}
         </button>
+      </div>
+    </div>
+  );
+}
+
+function QRCodeDisplay({ url }) {
+  const [QRCode, setQRCode] = useState(null);
+  useEffect(() => {
+    import('react-qr-code').then((mod) => setQRCode(() => mod.default)).catch(() => {});
+  }, []);
+  if (!QRCode) return <div className="text-center py-4 text-sm text-gray-400">Chargement QR code...</div>;
+  return (
+    <div className="flex justify-center mt-3 p-4 bg-white rounded-lg border">
+      <QRCode value={url} size={180} />
+    </div>
+  );
+}
+
+const STATUS_LABELS = {
+  submitted: 'En attente', validated: 'Validée', preparing: 'En préparation',
+  shipped: 'Expédiée', delivered: 'Livrée', pending_payment: 'Paiement en attente',
+};
+const PAYMENT_LABELS = {
+  cash: 'Espèces', check: 'Chèque', card: 'Carte', transfer: 'Virement',
+  pending: 'À encaisser', deferred: 'Différé',
+};
+
+function AmbassadorOrderDetail({ orderId, onClose }) {
+  const [order, setOrder] = useState(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    ordersAPI.get(orderId).then(res => setOrder(res.data)).catch(console.error).finally(() => setLoading(false));
+  }, [orderId]);
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40" onClick={onClose}>
+      <div className="bg-white rounded-xl shadow-xl w-full max-w-md mx-4 max-h-[80vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
+        <div className="flex items-center justify-between p-4 border-b">
+          <h3 className="font-semibold">Détail commande</h3>
+          <button onClick={onClose} className="p-1 hover:bg-gray-100 rounded"><X size={18} /></button>
+        </div>
+        {loading ? (
+          <div className="flex justify-center py-8"><div className="animate-spin rounded-full h-6 w-6 border-b-2 border-wine-700" /></div>
+        ) : !order ? (
+          <p className="text-center text-gray-500 py-8">Commande introuvable</p>
+        ) : (
+          <div className="p-4 space-y-4">
+            <div className="flex justify-between items-start">
+              <div>
+                <p className="font-bold text-wine-700">{order.ref}</p>
+                <p className="text-xs text-gray-500">{new Date(order.created_at).toLocaleDateString('fr-FR', { day: '2-digit', month: 'long', year: 'numeric' })}</p>
+              </div>
+              <span className={`text-xs px-2 py-1 rounded ${order.status === 'delivered' ? 'bg-green-100 text-green-700' : order.status === 'shipped' ? 'bg-blue-100 text-blue-700' : 'bg-gray-100 text-gray-600'}`}>
+                {STATUS_LABELS[order.status] || order.status}
+              </span>
+            </div>
+
+            <div className="divide-y">
+              {(order.order_items || []).filter(i => i.type !== 'shipping').map((item, idx) => (
+                <div key={idx} className="flex justify-between py-2 text-sm">
+                  <div>
+                    <p className="font-medium">{item.product_name}</p>
+                    <p className="text-xs text-gray-400">{item.qty} x {parseFloat(item.unit_price_ttc).toFixed(2)} EUR</p>
+                  </div>
+                  <p className="font-medium">{(item.qty * parseFloat(item.unit_price_ttc)).toFixed(2)} EUR</p>
+                </div>
+              ))}
+            </div>
+
+            <div className="border-t pt-3 flex justify-between items-center">
+              <span className="text-sm text-gray-600">Total TTC</span>
+              <span className="text-lg font-bold text-wine-700">{parseFloat(order.total_ttc).toFixed(2)} EUR</span>
+            </div>
+
+            {order.payment_method && (
+              <p className="text-xs text-gray-500">Paiement : {PAYMENT_LABELS[order.payment_method] || order.payment_method}</p>
+            )}
+          </div>
+        )}
       </div>
     </div>
   );

@@ -235,7 +235,7 @@ router.get('/:id', authenticate, async (req, res) => {
 
     // Vérifier accès
     if (req.user.role !== 'super_admin' && req.user.role !== 'commercial' && req.user.role !== 'comptable') {
-      if (order.user_id !== req.user.userId) {
+      if (order.user_id !== req.user.userId && order.referred_by !== req.user.userId) {
         return res.status(403).json({ error: 'FORBIDDEN' });
       }
     }

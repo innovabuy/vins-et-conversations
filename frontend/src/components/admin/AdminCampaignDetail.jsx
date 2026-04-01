@@ -455,6 +455,19 @@ function ParticipantsTab({ participants, campaignId }) {
   const navigate = useNavigate();
   const [exporting, setExporting] = useState(null);
   const [blModal, setBlModal] = useState(null); // participant object or null
+  const [groups, setGroups] = useState(() => Object.fromEntries(participants.map(p => [p.id, p.class_group || ''])));
+
+  const handleGroupChange = async (e, participant) => {
+    e.stopPropagation();
+    const val = e.target.value || null;
+    setGroups(g => ({ ...g, [participant.id]: val || '' }));
+    try {
+      await campaignsAPI.updateParticipantGroup(campaignId, participant.id, val);
+    } catch (err) {
+      setGroups(g => ({ ...g, [participant.id]: participant.class_group || '' }));
+      alert('Erreur: ' + (err.response?.data?.message || err.message));
+    }
+  };
 
   const handleExportExcel = async (e, participant) => {
     e.stopPropagation();
@@ -506,9 +519,14 @@ function ParticipantsTab({ participants, campaignId }) {
                 </button>
               </div>
             </div>
-            <div className="flex gap-4 mt-2 text-sm">
+            <div className="flex items-center gap-4 mt-2 text-sm">
               <span className="font-bold text-wine-700">{formatEur(parseFloat(p.ca))}</span>
               <span className="text-gray-500">{p.orders_count} cmd</span>
+              <select value={groups[p.id] || ''} onChange={(e) => handleGroupChange(e, p)} onClick={e => e.stopPropagation()} className="text-xs border rounded px-1.5 py-0.5 bg-white">
+                <option value="">—</option>
+                <option value="GA">GA</option>
+                <option value="GB">GB</option>
+              </select>
             </div>
           </div>
         ))}
@@ -523,6 +541,7 @@ function ParticipantsTab({ participants, campaignId }) {
               <th className="px-4 py-3 text-left">Nom</th>
               <th className="px-4 py-3 text-left">Email</th>
               <th className="px-4 py-3 text-left">Role</th>
+              <th className="px-4 py-3 text-center">Groupe</th>
               <th className="px-4 py-3 text-right">CA TTC</th>
               <th className="px-4 py-3 text-right">Commandes</th>
               <th className="px-4 py-3 text-left">Inscrit le</th>
@@ -536,6 +555,13 @@ function ParticipantsTab({ participants, campaignId }) {
                 <td className="px-4 py-3 font-medium text-wine-700">{p.name} <ExternalLink size={12} className="inline text-gray-300" /></td>
                 <td className="px-4 py-3 text-gray-500">{p.email}</td>
                 <td className="px-4 py-3"><span className="px-2 py-0.5 rounded-full text-xs bg-gray-100">{p.role}</span></td>
+                <td className="px-4 py-3 text-center">
+                  <select value={groups[p.id] || ''} onChange={(e) => handleGroupChange(e, p)} onClick={e => e.stopPropagation()} className="text-xs border rounded px-1.5 py-0.5 bg-white cursor-pointer">
+                    <option value="">—</option>
+                    <option value="GA">GA</option>
+                    <option value="GB">GB</option>
+                  </select>
+                </td>
                 <td className="px-4 py-3 text-right font-bold text-wine-700">{formatEur(parseFloat(p.ca))}</td>
                 <td className="px-4 py-3 text-right">{p.orders_count}</td>
                 <td className="px-4 py-3 text-gray-500">{new Date(p.joined_at).toLocaleDateString('fr-FR')}</td>

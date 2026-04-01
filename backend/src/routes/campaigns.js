@@ -145,7 +145,7 @@ router.get('/:id', authenticate, requireRole('super_admin', 'commercial'), async
     const { studentOrdersCombinedSQL } = require('../services/dashboardService');
     const { sql: partSQL, params: partParams } = studentOrdersCombinedSQL(campaign.id);
     const participantsResult = await db.raw(`
-      SELECT u.id, u.name, u.email, u.role, p.created_at as joined_at,
+      SELECT u.id, u.name, u.email, u.role, p.created_at as joined_at, p.class_group,
              COALESCE(o.ca, 0) as ca, COALESCE(o.orders_count, 0) as orders_count
       FROM participations p
       JOIN users u ON p.user_id = u.id
@@ -1295,6 +1295,23 @@ router.get('/:campaignId/participants/:userId/export-excel', authenticate, requi
     res.end();
   } catch (err) {
     logger.error(`Participant export-excel error: ${err.message}`);
+    res.status(500).json({ error: 'SERVER_ERROR', message: err.message });
+  }
+});
+
+// PUT /api/v1/admin/campaigns/:campaignId/participants/:userId/group
+router.put('/:campaignId/participants/:userId/group', authenticate, requireRole('super_admin', 'commercial'), async (req, res) => {
+  try {
+    const { class_group } = req.body;
+    if (class_group !== null && class_group !== 'GA' && class_group !== 'GB') {
+      return res.status(400).json({ error: 'INVALID_GROUP', message: 'class_group must be GA, GB, or null' });
+    }
+    const updated = await db('participations')
+      .where({ campaign_id: req.params.campaignId, user_id: req.params.userId })
+      .update({ class_group: class_group || null });
+    if (!updated) return res.status(404).json({ error: 'NOT_FOUND' });
+    res.json({ success: true, class_group: class_group || null });
+  } catch (err) {
     res.status(500).json({ error: 'SERVER_ERROR', message: err.message });
   }
 });
