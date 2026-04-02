@@ -574,6 +574,12 @@ router.get(
         monthly_amount: indivMonthly?.amount || 0,
       };
 
+      // Commission tiers progressifs (paliers par CA TTC mensuel)
+      const commissionTiers = rulesEngine.calculateCommissionTiers(
+        monthly.ca_ttc,
+        rules.commission
+      );
+
       // Monthly history — 6 derniers mois (mois en cours inclus)
       const monthlyHistory = [];
       for (let i = 5; i >= 0; i--) {
@@ -625,6 +631,7 @@ router.get(
         },
         gains,
         commission,
+        commission_tiers: commissionTiers,
         monthly,
         monthlyTier,
         monthlyHistory,

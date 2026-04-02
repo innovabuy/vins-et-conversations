@@ -36,6 +36,7 @@ const allNavItems = [
   { to: '/admin/campaign-types', icon: Tag, label: 'Types campagne', adminOnly: true },
   { to: '/admin/audit', icon: Shield, label: 'Audit', adminOnly: true },
   { to: '/admin/site-images', icon: Image, label: 'Images site', adminOnly: true },
+  { to: '/admin/site-pages', icon: FileText, label: 'Pages vitrine', adminOnly: true },
   { to: '/admin/settings', icon: Settings, label: 'Paramètres', adminOnly: true },
 ];
 

@@ -162,7 +162,7 @@ describe('Ambassador Features', () => {
 
   test('AMB-06: CSE member login → cse_role=member in JWT payload', async () => {
     // Temporarily set cse_role to 'member' on the CSE user
-    const cseUser = await db('users').where({ role: 'cse' }).first();
+    const cseUser = await db('users').where({ email: 'cse@leroymerlin.fr' }).first();
     if (!cseUser) {
       console.log('No CSE user — skipping AMB-06');
       return;

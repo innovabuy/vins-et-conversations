@@ -3,10 +3,46 @@ import { productsAPI, catalogPdfAPI, categoriesAPI } from '../../services/api';
 import {
   RadarChart, Radar, PolarGrid, PolarAngleAxis, PolarRadiusAxis, ResponsiveContainer
 } from 'recharts';
-import { Wine, Plus, Pencil, Trash2, X, Save, ChevronLeft, Award, Thermometer, Grape, UtensilsCrossed, Download, Mail, FileText, Package, Eye, EyeOff, Star, Upload } from 'lucide-react';
+import { Wine, Plus, Pencil, Trash2, X, Save, ChevronLeft, Award, Thermometer, Grape, UtensilsCrossed, Download, Mail, FileText, Package, Eye, EyeOff, Star, Upload, CheckCircle, AlertCircle, Info } from 'lucide-react';
 import { WINE_TYPE_OPTIONS, TASTING_CRITERIA, resolveWineType, getCriteriaForProduct, buildRadarData } from '../../config/tastingCriteria';
 
 const formatEur = (v) => new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR' }).format(v);
+
+// ─── Toast system ────────────────────────────────────
+const TOAST_ICONS = { success: CheckCircle, error: AlertCircle, info: Info };
+const TOAST_STYLES = {
+  success: 'bg-green-50 border-green-300 text-green-800',
+  error: 'bg-red-50 border-red-300 text-red-800',
+  info: 'bg-blue-50 border-blue-300 text-blue-800',
+};
+
+function ToastContainer({ toasts, onDismiss }) {
+  return (
+    <div className="fixed bottom-4 right-4 z-50 space-y-2">
+      {toasts.map((t) => {
+        const Icon = TOAST_ICONS[t.type] || Info;
+        return (
+          <div key={t.id} className={`flex items-center gap-2 px-4 py-3 rounded-lg border shadow-lg text-sm max-w-sm animate-slide-in ${TOAST_STYLES[t.type] || TOAST_STYLES.info}`}>
+            <Icon size={16} className="shrink-0" />
+            <span className="flex-1">{t.message}</span>
+            <button onClick={() => onDismiss(t.id)} className="shrink-0 opacity-60 hover:opacity-100"><X size={14} /></button>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+function useToasts() {
+  const [toasts, setToasts] = useState([]);
+  const addToast = useCallback((message, type = 'info') => {
+    const id = Date.now() + Math.random();
+    setToasts((prev) => [...prev, { id, message, type }]);
+    setTimeout(() => setToasts((prev) => prev.filter((t) => t.id !== id)), 3000);
+  }, []);
+  const dismissToast = useCallback((id) => setToasts((prev) => prev.filter((t) => t.id !== id)), []);
+  return { toasts, addToast, dismissToast };
+}
 
 const COLOR_OPTIONS = [
   { value: '', label: 'Toutes' },
@@ -168,7 +204,7 @@ function ProductDetail({ product, onClose, onEdit }) {
 }
 
 // ─── Components Section (coffret TVA ventilation) ────
-const ComponentsSection = React.forwardRef(function ComponentsSection({ productId, priceTTC }, ref) {
+const ComponentsSection = React.forwardRef(function ComponentsSection({ productId, priceTTC, onToast }, ref) {
   const [components, setComponents] = useState([]);
   const [loading, setLoading] = useState(true);
   const [adding, setAdding] = useState(false);
@@ -192,7 +228,7 @@ const ComponentsSection = React.forwardRef(function ComponentsSection({ productI
       setComponents([...components, res.data.data]);
       setNewComp({ component_name: '', amount_ht: '', vat_rate: '20.00' });
       setAdding(false);
-    } catch (e) { alert(e.response?.data?.message || 'Erreur'); }
+    } catch (e) { onToast?.(e.response?.data?.message || 'Erreur ajout composant', 'error'); }
   };
 
   // Expose validateAndSave to parent form via ref
@@ -220,7 +256,7 @@ const ComponentsSection = React.forwardRef(function ComponentsSection({ productI
     try {
       await productsAPI.removeComponent(productId, cid);
       setComponents(components.filter((c) => c.id !== cid));
-    } catch (e) { alert('Erreur'); }
+    } catch (e) { onToast?.('Erreur suppression composant', 'error'); }
   };
 
   if (loading) return null;
@@ -280,8 +316,9 @@ const ComponentsSection = React.forwardRef(function ComponentsSection({ productI
 });
 
 // ─── Product Form (enriched) ─────────────────────────
-function ProductForm({ product, onSave, onCancel, allProducts = [], categoriesList = [] }) {
+function ProductForm({ product, onSave, onCancel, allProducts = [], categoriesList = [], onToast }) {
   const componentsRef = useRef(null);
+  const [coffretMessage, setCoffretMessage] = useState(null);
   const initial = product ? {
     ...product,
     grape_varieties: parseJsonField(product.grape_varieties),
@@ -378,7 +415,7 @@ function ProductForm({ product, onSave, onCancel, allProducts = [], categoriesLi
       const { data } = await productsAPI.uploadImage(product.id, file);
       setForm(f => ({ ...f, image_url: data.image_url }));
     } catch (err) {
-      alert(err.response?.data?.message || 'Erreur upload image');
+      onToast?.(err.response?.data?.message || 'Erreur upload image', 'error');
     } finally { setUploading(false); }
   };
 
@@ -397,7 +434,7 @@ function ProductForm({ product, onSave, onCancel, allProducts = [], categoriesLi
     if (!form.price_ttc && form.price_ttc !== 0) missing.push('Prix TTC');
     if (!form.purchase_price && form.purchase_price !== 0) missing.push('Prix achat');
     if (missing.length) {
-      alert(`Champs obligatoires manquants : ${missing.join(', ')}`);
+      onToast?.(`Champs obligatoires manquants : ${missing.join(', ')}`, 'error');
       return;
     }
     // Validation cohérence des prix
@@ -409,7 +446,7 @@ function ProductForm({ product, onSave, onCancel, allProducts = [], categoriesLi
     if (achat >= ht) errors.push(`Prix achat (${achat.toFixed(2)}€) doit être inférieur au prix HT (${ht.toFixed(2)}€)`);
     if (ttc <= ht) errors.push(`Prix TTC (${ttc.toFixed(2)}€) doit être supérieur au prix HT (${ht.toFixed(2)}€)`);
     if (errors.length) {
-      alert(errors.join('\n'));
+      onToast?.(errors.join(' / '), 'error');
       return;
     }
     setSaving(true);
@@ -424,9 +461,13 @@ function ProductForm({ product, onSave, onCancel, allProducts = [], categoriesLi
         tasting_notes: form.tasting_notes || null,
         bundle_products: isCoffret ? (form.bundle_products || []) : [],
       };
-      await onSave(payload);
+      const result = await onSave(payload);
+      // Auto-reopen for new coffret so user can add components immediately
+      if (!product?.id && (isGiftSet || isCoffret) && result?.id) {
+        setCoffretMessage('Coffret créé — ajoutez maintenant les composants ci-dessous');
+      }
     } catch (err) {
-      alert(err.response?.data?.message || err.message || 'Erreur inconnue');
+      onToast?.(err.response?.data?.message || err.message || 'Erreur inconnue', 'error');
     } finally { setSaving(false); }
   };
 
@@ -706,10 +747,18 @@ function ProductForm({ product, onSave, onCancel, allProducts = [], categoriesLi
       </fieldset>
       )}
 
-      {/* Section Composition (coffrets) */}
-      {product?.id ? (
-        <ComponentsSection ref={componentsRef} productId={product.id} priceTTC={parseFloat(form.price_ttc || 0)} />
-      ) : (isGiftSet || isCoffret) ? (
+      {/* Section Composition (coffrets uniquement) */}
+      {product?.id && (isGiftSet || isCoffret) ? (
+        <>
+          {coffretMessage && (
+            <div className="flex items-center gap-2 bg-green-50 border border-green-300 text-green-800 px-4 py-3 rounded-lg text-sm">
+              <CheckCircle size={16} />
+              {coffretMessage}
+            </div>
+          )}
+          <ComponentsSection ref={componentsRef} productId={product.id} priceTTC={parseFloat(form.price_ttc || 0)} onToast={onToast} />
+        </>
+      ) : !product?.id && (isGiftSet || isCoffret) ? (
         <fieldset className="border rounded-lg p-4">
           <legend className="text-sm font-semibold text-gray-700 px-2">Composition (ventilation TVA coffret)</legend>
           <p className="text-sm text-gray-500 italic">Enregistrez d'abord le produit pour pouvoir ajouter des composants.</p>
@@ -728,6 +777,7 @@ function ProductForm({ product, onSave, onCancel, allProducts = [], categoriesLi
 
 // ─── Main Component ──────────────────────────────────
 export default function AdminCatalog() {
+  const { toasts, addToast, dismissToast } = useToasts();
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [editing, setEditing] = useState(null);
@@ -760,23 +810,39 @@ export default function AdminCatalog() {
   useEffect(() => { fetchProducts(); }, [fetchProducts]);
 
   const handleSave = async (payload) => {
-    if (editing?.id) await productsAPI.update(editing.id, payload);
-    else await productsAPI.create(payload);
-    setEditing(null);
+    if (editing?.id) {
+      await productsAPI.update(editing.id, payload);
+      addToast('Produit mis à jour', 'success');
+      setEditing(null);
+    } else {
+      const { data } = await productsAPI.create(payload);
+      const newProduct = data.data || data;
+      const cat = categoriesList.find(c => c.id === payload.category_id);
+      const isCoffretProduct = cat?.product_type === 'gift_set' || payload.category === 'Coffrets';
+      if (isCoffretProduct && newProduct?.id) {
+        // Auto-reopen in edit mode so user can add components
+        addToast('Coffret créé — ajoutez les composants', 'success');
+        setEditing({ ...payload, ...newProduct });
+      } else {
+        addToast('Produit créé', 'success');
+        setEditing(null);
+      }
+    }
     fetchProducts();
+    return editing?.id ? { id: editing.id } : undefined;
   };
 
 
   const handleDelete = async (id, name) => {
     if (!confirm(`Désactiver le produit "${name}" ?`)) return;
-    try { await productsAPI.remove(id); fetchProducts(); } catch (err) { alert(err.response?.data?.message || err.message || 'Erreur inconnue'); }
+    try { await productsAPI.remove(id); fetchProducts(); addToast('Produit désactivé', 'success'); } catch (err) { addToast(err.response?.data?.message || err.message || 'Erreur', 'error'); }
   };
 
   const toggleBoutique = async (id, current) => {
     try {
       await productsAPI.update(id, { visible_boutique: !current });
       setProducts(prev => prev.map(p => p.id === id ? { ...p, visible_boutique: !current } : p));
-    } catch (err) { alert(err.response?.data?.message || err.message || 'Erreur inconnue'); }
+    } catch (err) { addToast(err.response?.data?.message || err.message || 'Erreur', 'error'); }
   };
 
   const toggleFeatured = async (id, current, categoryId) => {
@@ -789,7 +855,7 @@ export default function AdminCatalog() {
         if (newVal && categoryId && p.category_id === categoryId) return { ...p, is_featured: false };
         return p;
       }));
-    } catch (err) { alert(err.response?.data?.message || err.message || 'Erreur inconnue'); }
+    } catch (err) { addToast(err.response?.data?.message || err.message || 'Erreur', 'error'); }
   };
 
   const handleDownloadPdf = (segment = 'public') => {
@@ -808,11 +874,11 @@ export default function AdminCatalog() {
     setSending(true);
     try {
       await catalogPdfAPI.sendEmail({ ...emailForm, segment: pdfSegment });
-      alert('Catalogue envoyé !');
+      addToast('Catalogue envoyé', 'success');
       setEmailModal(false);
       setEmailForm({ email: '', subject: 'Catalogue Vins & Conversations', message: '' });
     } catch (err) {
-      alert(err.response?.data?.message || 'Erreur d\'envoi');
+      addToast(err.response?.data?.message || 'Erreur d\'envoi', 'error');
     } finally {
       setSending(false);
     }
@@ -831,7 +897,7 @@ export default function AdminCatalog() {
   if (editing) {
     return (
       <div className="card">
-        <ProductForm product={editing === 'new' ? null : editing} onSave={handleSave} onCancel={() => setEditing(null)} allProducts={products} categoriesList={categoriesList} />
+        <ProductForm product={editing === 'new' ? null : editing} onSave={handleSave} onCancel={() => setEditing(null)} allProducts={products} categoriesList={categoriesList} onToast={addToast} />
       </div>
     );
   }
@@ -1044,6 +1110,7 @@ export default function AdminCatalog() {
           </>
         )}
       </div>
+      <ToastContainer toasts={toasts} onDismiss={dismissToast} />
     </div>
   );
 }

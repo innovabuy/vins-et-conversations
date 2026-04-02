@@ -64,6 +64,16 @@ import InviteErrorPage from './pages/InviteErrorPage';
 import AmbassadorsPage from './components/public/AmbassadorsPage';
 import SignaturePage from './pages/SignaturePage';
 import JoinCampaignPage from './pages/JoinCampaignPage';
+import PrestationCSEPage from './pages/vitrine/PrestationCSEPage';
+import PrestationEcolesPage from './pages/vitrine/PrestationEcolesPage';
+import PrestationRepasPage from './pages/vitrine/PrestationRepasPage';
+import AProposPage from './pages/vitrine/AProposPage';
+import EquipePage from './pages/vitrine/EquipePage';
+import FAQPage from './pages/vitrine/FAQPage';
+import AvisPage from './pages/vitrine/AvisPage';
+import PartenairesPage from './pages/vitrine/PartenairesPage';
+import CoffretsVitrinePage from './pages/vitrine/CoffretsVitrinePage';
+import SitePagesAdmin from './pages/admin/SitePagesAdmin';
 
 function ProtectedRoute({ children, roles }) {
   const { user, loading } = useAuth();
@@ -103,6 +113,15 @@ function AppRoutes() {
         <Route path="wizard" element={<TasteWizard />} />
         <Route path="selection" element={<SelectionPage />} />
         <Route path="ambassadeurs" element={<AmbassadorsPage />} />
+        <Route path="prestations/cse" element={<PrestationCSEPage />} />
+        <Route path="prestations/ecoles" element={<PrestationEcolesPage />} />
+        <Route path="prestations/repas" element={<PrestationRepasPage />} />
+        <Route path="apropos" element={<AProposPage />} />
+        <Route path="equipe" element={<EquipePage />} />
+        <Route path="faq" element={<FAQPage />} />
+        <Route path="avis" element={<AvisPage />} />
+        <Route path="partenaires" element={<PartenairesPage />} />
+        <Route path="coffrets" element={<CoffretsVitrinePage />} />
         <Route path="cgv" element={<CGVPage />} />
         <Route path="mentions-legales" element={<MentionsLegalesPage />} />
       </Route>
@@ -141,6 +160,7 @@ function AppRoutes() {
         <Route path="campaign-types" element={<AdminCampaignTypes />} />
         <Route path="promo-codes" element={<AdminPromoCodes />} />
         <Route path="site-images" element={<SiteImages />} />
+        <Route path="site-pages" element={<SitePagesAdmin />} />
         <Route path="settings" element={<AppSettings />} />
       </Route>
 
@@ -204,7 +224,7 @@ function AppRoutes() {
           user.role === 'etudiant' ? '/student' :
           user.role === 'customer' ? '/mon-compte' :
           '/login'
-        } replace /> : <Navigate to="/login" replace />
+        } replace /> : <Navigate to="/boutique" replace />
       } />
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>

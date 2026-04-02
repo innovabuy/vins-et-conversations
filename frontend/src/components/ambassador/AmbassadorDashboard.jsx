@@ -3,6 +3,8 @@ import { ambassadorAPI, ordersAPI } from '../../services/api';
 import { Trophy, Share2, ShoppingCart, ShoppingBag, Gift, Copy, Check, ExternalLink, User, Camera, Save, Upload, QrCode, Eye, X, Calendar, Wallet } from 'lucide-react';
 import { copyToClipboard } from '../../utils/copyToClipboard';
 
+const fmtEur = (v, decimals = 2) => new Intl.NumberFormat('fr-FR', { minimumFractionDigits: decimals, maximumFractionDigits: decimals }).format(v);
+
 const TIER_COLORS = {
   Bronze: { bg: 'bg-amber-100', text: 'text-amber-800', border: 'border-amber-400', bar: 'bg-amber-500' },
   Argent: { bg: 'bg-gray-100', text: 'text-gray-700', border: 'border-gray-400', bar: 'bg-gray-500' },
@@ -65,7 +67,7 @@ export default function AmbassadorDashboard() {
 
   if (!data) return <p className="text-center text-gray-500 py-12">Impossible de charger le tableau de bord.</p>;
 
-  const { tier, sales, recentOrders, referralClicks, gains, commission, monthly, monthlyTier, monthlyHistory } = data;
+  const { tier, sales, recentOrders, referralClicks, gains, commission, commission_tiers, monthly, monthlyTier, monthlyHistory } = data;
   const tierStyle = TIER_COLORS[tier.current?.label] || TIER_COLORS.Bronze;
   const monthlyTierStyle = TIER_COLORS[monthlyTier?.current?.label] || TIER_COLORS.Bronze;
 
@@ -93,7 +95,7 @@ export default function AmbassadorDashboard() {
           <div className={`p-3 rounded-lg border ${tierStyle.bg} ${tierStyle.border} mb-4`}>
             <div className="flex items-center justify-between">
               <span className={`font-bold text-lg ${tierStyle.text}`}>{tier.current.label}</span>
-              <span className="text-sm text-gray-600">{tier.ca.toFixed(0)} EUR de CA</span>
+              <span className="text-sm text-gray-600">{fmtEur(tier.ca, 0)} EUR de CA</span>
             </div>
           </div>
         ) : (
@@ -113,7 +115,7 @@ export default function AmbassadorDashboard() {
               />
             </div>
             <p className="text-xs text-gray-500 mt-1">
-              Plus que {gains.amountToNext.toFixed(0)} EUR pour atteindre {tier.next.label}
+              Plus que {fmtEur(gains.amountToNext, 0)} EUR pour atteindre {tier.next.label}
             </p>
           </div>
         )}
@@ -195,7 +197,7 @@ export default function AmbassadorDashboard() {
 
         <div className="grid grid-cols-3 gap-3 mb-4">
           <div className="bg-blue-50 rounded-lg p-3 text-center">
-            <p className="text-xl font-bold text-blue-700">{sales.caTTC.toFixed(0)} EUR</p>
+            <p className="text-xl font-bold text-blue-700">{fmtEur(sales.caTTC, 0)} EUR</p>
             <p className="text-xs text-gray-500">CA TTC</p>
           </div>
           <div className="bg-green-50 rounded-lg p-3 text-center">
@@ -215,7 +217,7 @@ export default function AmbassadorDashboard() {
               <span className="text-xs font-medium text-orange-700">{monthly.month}</span>
             </div>
             <div className="flex items-center justify-between">
-              <span className="text-lg font-bold text-orange-800">{parseFloat(monthly.ca_ttc).toFixed(0)} EUR</span>
+              <span className="text-lg font-bold text-orange-800">{fmtEur(parseFloat(monthly.ca_ttc), 0)} EUR</span>
               <span className="text-xs text-orange-600">{monthly.orders_count} commande{monthly.orders_count > 1 ? 's' : ''}</span>
             </div>
             {monthlyTier && (
@@ -263,7 +265,7 @@ export default function AmbassadorDashboard() {
                       o.status === 'shipped' ? 'bg-blue-100 text-blue-700' :
                       'bg-gray-100 text-gray-600'
                     }`}>{o.status}</span>
-                    <span className="font-medium">{parseFloat(o.total_ttc).toFixed(0)} EUR</span>
+                    <span className="font-medium">{fmtEur(parseFloat(o.total_ttc))} EUR</span>
                     <Eye size={14} className="text-gray-400" />
                   </div>
                 </div>
@@ -296,7 +298,7 @@ export default function AmbassadorDashboard() {
                   return (
                     <tr key={idx} className="border-b last:border-0">
                       <td className="py-2">{m.month}</td>
-                      <td className="py-2 text-right font-medium">{m.ca_ttc.toFixed(0)} EUR</td>
+                      <td className="py-2 text-right font-medium">{fmtEur(m.ca_ttc, 0)} EUR</td>
                       <td className="py-2 text-right">{m.orders_count}</td>
                       <td className="py-2 text-right">
                         {m.tier_label ? (
@@ -328,7 +330,7 @@ export default function AmbassadorDashboard() {
             </div>
             <div className="bg-wine-50 rounded-lg p-3 text-center">
               <p className="text-xl font-bold text-wine-700">
-                {referralData.referredOrders.reduce((s, o) => s + parseFloat(o.total_ttc || 0), 0).toFixed(0)} EUR
+                {fmtEur(referralData.referredOrders.reduce((s, o) => s + parseFloat(o.total_ttc || 0), 0), 0)} EUR
               </p>
               <p className="text-xs text-gray-500">CA parrainé</p>
             </div>
@@ -340,7 +342,7 @@ export default function AmbassadorDashboard() {
                   <span className="font-medium">{o.ref}</span>
                   <span className="text-xs text-gray-400 ml-2">{new Date(o.created_at).toLocaleDateString('fr-FR')}</span>
                 </div>
-                <span className="font-medium">{parseFloat(o.total_ttc).toFixed(0)} EUR</span>
+                <span className="font-medium">{fmtEur(parseFloat(o.total_ttc))} EUR</span>
               </div>
             ))}
           </div>
@@ -361,11 +363,11 @@ export default function AmbassadorDashboard() {
           return (
             <div className="grid grid-cols-2 gap-3 mb-4">
               <div className="bg-blue-50 rounded-lg p-3 text-center">
-                <p className="text-lg font-bold text-blue-700">{directCA.toFixed(0)} EUR</p>
+                <p className="text-lg font-bold text-blue-700">{fmtEur(directCA, 0)} EUR</p>
                 <p className="text-xs text-gray-500">Ventes directes</p>
               </div>
               <div className="bg-indigo-50 rounded-lg p-3 text-center">
-                <p className="text-lg font-bold text-indigo-700">{referredCA.toFixed(0)} EUR</p>
+                <p className="text-lg font-bold text-indigo-700">{fmtEur(referredCA, 0)} EUR</p>
                 <p className="text-xs text-gray-500">Via parrainage</p>
               </div>
             </div>
@@ -381,16 +383,56 @@ export default function AmbassadorDashboard() {
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div className="bg-white rounded-lg p-3 text-center">
-                <p className="text-xl font-bold text-wine-700">{commission.amount.toFixed(2)} EUR</p>
+                <p className="text-xl font-bold text-wine-700">{fmtEur(commission.amount)} EUR</p>
                 <p className="text-xs text-gray-500">Commission totale</p>
-                <p className="text-xs text-gray-400">sur {commission.total_ht.toFixed(0)} EUR HT</p>
+                <p className="text-xs text-gray-400">sur {fmtEur(commission.total_ht, 0)} EUR HT</p>
               </div>
               <div className="bg-white rounded-lg p-3 text-center">
-                <p className="text-xl font-bold text-orange-700">{commission.monthly_amount.toFixed(2)} EUR</p>
+                <p className="text-xl font-bold text-orange-700">{fmtEur(commission.monthly_amount)} EUR</p>
                 <p className="text-xs text-gray-500">Ce mois</p>
-                <p className="text-xs text-gray-400">sur {commission.monthly_ht.toFixed(0)} EUR HT</p>
+                <p className="text-xs text-gray-400">sur {fmtEur(commission.monthly_ht, 0)} EUR HT</p>
               </div>
             </div>
+          </div>
+        )}
+
+        {commission_tiers && commission_tiers.rate > 0 && (
+          <div className="bg-indigo-50 border border-indigo-200 rounded-lg p-4 mb-3">
+            <div className="flex items-center gap-2 mb-3">
+              <Calendar size={18} className="text-indigo-700" />
+              <h3 className="font-semibold text-indigo-800">Mes commissions du mois</h3>
+              <span className="text-xs bg-indigo-100 text-indigo-700 px-2 py-0.5 rounded-full ml-auto">
+                Palier {commission_tiers.palier_actuel} — {(commission_tiers.rate * 100).toFixed(0)}%
+              </span>
+            </div>
+            <div className="grid grid-cols-2 gap-3 mb-3">
+              <div className="bg-white rounded-lg p-3 text-center">
+                <p className="text-xl font-bold text-indigo-700">{fmtEur(commission_tiers.commission_mensuelle_ht)} EUR</p>
+                <p className="text-xs text-gray-500">Commission du mois</p>
+              </div>
+              <div className="bg-white rounded-lg p-3 text-center">
+                <p className="text-xl font-bold text-gray-700">{fmtEur(commission_tiers.ca_ttc_mensuel, 0)} EUR</p>
+                <p className="text-xs text-gray-500">CA TTC mensuel</p>
+              </div>
+            </div>
+            {commission_tiers.prochain_palier_seuil && (
+              <div>
+                <div className="flex justify-between text-xs text-gray-500 mb-1">
+                  <span>Prochain palier : {fmtEur(commission_tiers.prochain_palier_seuil, 0)} EUR</span>
+                  <span>{Math.max(0, 100 - (commission_tiers.ecart_prochain_palier / commission_tiers.prochain_palier_seuil * 100)).toFixed(0)}%</span>
+                </div>
+                <div className="w-full bg-indigo-100 rounded-full h-3">
+                  <div
+                    className="h-3 rounded-full bg-indigo-500 transition-all"
+                    style={{ width: `${Math.min(100, (commission_tiers.ca_ttc_mensuel / commission_tiers.prochain_palier_seuil * 100)).toFixed(0)}%` }}
+                  />
+                </div>
+                <p className="text-xs text-gray-400 mt-1">Encore {fmtEur(commission_tiers.ecart_prochain_palier, 0)} EUR pour le palier suivant</p>
+              </div>
+            )}
+            {!commission_tiers.prochain_palier_seuil && (
+              <p className="text-xs text-indigo-600 font-medium">Palier maximum atteint !</p>
+            )}
           </div>
         )}
 
@@ -407,7 +449,7 @@ export default function AmbassadorDashboard() {
           <div className="bg-gray-50 rounded-lg p-3">
             <p className="text-xs text-gray-500">Prochaine récompense ({gains.nextTierLabel})</p>
             <p className="font-medium text-gray-700">{gains.nextReward}</p>
-            <p className="text-xs text-gray-400 mt-1">Encore {gains.amountToNext.toFixed(0)} EUR de CA</p>
+            <p className="text-xs text-gray-400 mt-1">Encore {fmtEur(gains.amountToNext, 0)} EUR de CA</p>
           </div>
         )}
       </div>
@@ -593,16 +635,16 @@ function AmbassadorOrderDetail({ orderId, onClose }) {
                 <div key={idx} className="flex justify-between py-2 text-sm">
                   <div>
                     <p className="font-medium">{item.product_name}</p>
-                    <p className="text-xs text-gray-400">{item.qty} x {parseFloat(item.unit_price_ttc).toFixed(2)} EUR</p>
+                    <p className="text-xs text-gray-400">{item.qty} x {fmtEur(parseFloat(item.unit_price_ttc))} EUR</p>
                   </div>
-                  <p className="font-medium">{(item.qty * parseFloat(item.unit_price_ttc)).toFixed(2)} EUR</p>
+                  <p className="font-medium">{fmtEur(item.qty * parseFloat(item.unit_price_ttc))} EUR</p>
                 </div>
               ))}
             </div>
 
             <div className="border-t pt-3 flex justify-between items-center">
               <span className="text-sm text-gray-600">Total TTC</span>
-              <span className="text-lg font-bold text-wine-700">{parseFloat(order.total_ttc).toFixed(2)} EUR</span>
+              <span className="text-lg font-bold text-wine-700">{fmtEur(parseFloat(order.total_ttc))} EUR</span>
             </div>
 
             {order.payment_method && (

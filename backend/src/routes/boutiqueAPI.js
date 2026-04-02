@@ -584,6 +584,16 @@ router.post('/join-school', async (req, res) => {
 
     if (!campaign) return res.status(404).json({ error: 'CAMPAIGN_NOT_FOUND', message: 'Code campagne invalide' });
 
+    // Resolve role from campaign type (same map as /campaigns/:id/join)
+    const campaignType = campaign.campaign_type_id
+      ? await db('campaign_types').where({ id: campaign.campaign_type_id }).first()
+      : null;
+    const TYPE_ROLE_MAP = { scolaire: 'etudiant', lycee: 'etudiant', bts_ndrc: 'etudiant', cse: 'cse', ambassadeur: 'ambassadeur' };
+    const TYPE_PARTICIPATION_ROLE = { scolaire: 'participant', lycee: 'participant', bts_ndrc: 'participant', cse: 'cse_member', ambassadeur: 'ambassador' };
+    const typeCode = campaignType?.code;
+    const userRole = TYPE_ROLE_MAP[typeCode] || 'etudiant';
+    const participationRole = TYPE_PARTICIPATION_ROLE[typeCode] || 'student';
+
     // Check if user already exists
     let user = await db('users').where({ email: value.email }).first();
     const bcrypt = require('bcryptjs');
@@ -596,20 +606,29 @@ router.post('/join-school', async (req, res) => {
       if (existing) {
         return res.json({ message: 'Déjà inscrit', user_id: user.id, referral_code: existing.referral_code, already_registered: true });
       }
+      // Upgrade role if joining a higher-privilege campaign
+      if (userRole === 'cse' && user.role !== 'cse') {
+        await db('users').where({ id: user.id }).update({ role: 'cse', cse_role: 'member' });
+      } else if (userRole === 'ambassadeur' && user.role !== 'ambassadeur') {
+        await db('users').where({ id: user.id }).update({ role: 'ambassadeur' });
+      }
     } else {
-      // Create new student account with random password (must reset)
+      // Create new account with role derived from campaign type
       const tempPassword = crypto.randomBytes(8).toString('hex');
       const passwordHash = await bcrypt.hash(tempPassword, 10);
       const userId = require('uuid').v4();
 
-      await db('users').insert({
+      const insertData = {
         id: userId,
         name: value.name,
         email: value.email,
         password_hash: passwordHash,
-        role: 'etudiant',
+        role: userRole,
         status: 'active',
-      });
+      };
+      if (userRole === 'cse') insertData.cse_role = 'member';
+
+      await db('users').insert(insertData);
       user = { id: userId, name: value.name, isNew: true };
     }
 
@@ -620,7 +639,7 @@ router.post('/join-school', async (req, res) => {
     await db('participations').insert({
       user_id: user.id,
       campaign_id: campaign.id,
-      role: 'student',
+      role: participationRole,
       class_group: value.class_group || null,
       referral_code: referralCode,
       config: JSON.stringify({}),

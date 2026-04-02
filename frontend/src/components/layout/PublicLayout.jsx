@@ -28,8 +28,6 @@ function useReferral() {
   return ambassador;
 }
 
-const SITE_URL = window.location.protocol + '//' + window.location.hostname + ':8082';
-
 function NavDropdown({ label, items }) {
   const [open, setOpen] = useState(false);
   const ref = useRef(null);
@@ -94,21 +92,21 @@ export default function PublicLayout() {
               <NavDropdown label="Boutique" items={[
                 { href: '/boutique', label: 'Nos vins' },
                 { href: '/boutique/selection', label: 'Sélection du moment' },
-                { href: `${SITE_URL}/coffrets.html`, label: 'Coffrets' },
+                { href: '/boutique/coffrets', label: 'Coffrets' },
               ]} />
               <NavDropdown label="Nos Prestations" items={[
-                { href: `${SITE_URL}/cse.html`, label: 'Espace CSE' },
-                { href: `${SITE_URL}/ecoles.html`, label: 'Partenariat Écoles' },
-                { href: `${SITE_URL}/ambassadeurs.html`, label: 'Devenir Ambassadeur' },
-                { href: `${SITE_URL}/repas-soirees.html`, label: 'Repas & Soirées' },
+                { href: '/boutique/prestations/cse', label: 'Espace CSE' },
+                { href: '/boutique/prestations/ecoles', label: 'Partenariat Écoles' },
+                { href: '/boutique/ambassadeurs', label: 'Devenir Ambassadeur' },
+                { href: '/boutique/prestations/repas', label: 'Repas & Soirées' },
               ]} />
               <NavDropdown label="À Propos" items={[
-                { href: `${SITE_URL}/apropos.html`, label: 'Notre histoire' },
-                { href: `${SITE_URL}/equipe.html`, label: "L'équipe" },
+                { href: '/boutique/apropos', label: 'Notre histoire' },
+                { href: '/boutique/equipe', label: "L'équipe" },
                 { href: '/boutique/ambassadeurs', label: 'Nos Ambassadeurs' },
-                { href: `${SITE_URL}/faq.html`, label: 'FAQ' },
-                { href: `${SITE_URL}/avis.html`, label: 'Avis' },
-                { href: `${SITE_URL}/partenaires.html`, label: 'Nos partenaires' },
+                { href: '/boutique/faq', label: 'FAQ' },
+                { href: '/boutique/avis', label: 'Avis' },
+                { href: '/boutique/partenaires', label: 'Nos partenaires' },
               ]} />
               <NavLink to="/boutique/contact" className={({ isActive }) => `text-sm font-medium transition-colors ${isActive ? 'text-wine-700' : 'text-gray-600 hover:text-gray-900'}`}>
                 Contact
@@ -137,19 +135,19 @@ export default function PublicLayout() {
             <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider pt-1 pb-1">Boutique</p>
             <NavLink to="/boutique" end onClick={() => setMenuOpen(false)} className="block py-2 pl-3 text-sm text-gray-700 hover:text-wine-700">Nos vins</NavLink>
             <NavLink to="/boutique/selection" onClick={() => setMenuOpen(false)} className="block py-2 pl-3 text-sm text-gray-700 hover:text-wine-700">Sélection du moment</NavLink>
-            <a href={`${SITE_URL}/coffrets.html`} onClick={() => setMenuOpen(false)} className="block py-2 pl-3 text-sm text-gray-700 hover:text-wine-700">Coffrets</a>
+            <NavLink to="/boutique/coffrets" onClick={() => setMenuOpen(false)} className="block py-2 pl-3 text-sm text-gray-700 hover:text-wine-700">Coffrets</NavLink>
 
             <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider pt-3 pb-1">Nos Prestations</p>
-            <a href={`${SITE_URL}/cse.html`} onClick={() => setMenuOpen(false)} className="block py-2 pl-3 text-sm text-gray-700 hover:text-wine-700">Espace CSE</a>
-            <a href={`${SITE_URL}/ecoles.html`} onClick={() => setMenuOpen(false)} className="block py-2 pl-3 text-sm text-gray-700 hover:text-wine-700">Partenariat Écoles</a>
-            <a href={`${SITE_URL}/ambassadeurs.html`} onClick={() => setMenuOpen(false)} className="block py-2 pl-3 text-sm text-gray-700 hover:text-wine-700">Devenir Ambassadeur</a>
-            <a href={`${SITE_URL}/repas-soirees.html`} onClick={() => setMenuOpen(false)} className="block py-2 pl-3 text-sm text-gray-700 hover:text-wine-700">Repas & Soirées</a>
+            <NavLink to="/boutique/prestations/cse" onClick={() => setMenuOpen(false)} className="block py-2 pl-3 text-sm text-gray-700 hover:text-wine-700">Espace CSE</NavLink>
+            <NavLink to="/boutique/prestations/ecoles" onClick={() => setMenuOpen(false)} className="block py-2 pl-3 text-sm text-gray-700 hover:text-wine-700">Partenariat Écoles</NavLink>
+            <NavLink to="/boutique/ambassadeurs" onClick={() => setMenuOpen(false)} className="block py-2 pl-3 text-sm text-gray-700 hover:text-wine-700">Devenir Ambassadeur</NavLink>
+            <NavLink to="/boutique/prestations/repas" onClick={() => setMenuOpen(false)} className="block py-2 pl-3 text-sm text-gray-700 hover:text-wine-700">Repas & Soirées</NavLink>
 
             <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider pt-3 pb-1">À Propos</p>
-            <a href={`${SITE_URL}/apropos.html`} onClick={() => setMenuOpen(false)} className="block py-2 pl-3 text-sm text-gray-700 hover:text-wine-700">Notre histoire</a>
-            <a href={`${SITE_URL}/equipe.html`} onClick={() => setMenuOpen(false)} className="block py-2 pl-3 text-sm text-gray-700 hover:text-wine-700">L'équipe</a>
+            <NavLink to="/boutique/apropos" onClick={() => setMenuOpen(false)} className="block py-2 pl-3 text-sm text-gray-700 hover:text-wine-700">Notre histoire</NavLink>
+            <NavLink to="/boutique/equipe" onClick={() => setMenuOpen(false)} className="block py-2 pl-3 text-sm text-gray-700 hover:text-wine-700">L'équipe</NavLink>
             <NavLink to="/boutique/ambassadeurs" onClick={() => setMenuOpen(false)} className="block py-2 pl-3 text-sm text-gray-700 hover:text-wine-700">Nos Ambassadeurs</NavLink>
-            <a href={`${SITE_URL}/faq.html`} onClick={() => setMenuOpen(false)} className="block py-2 pl-3 text-sm text-gray-700 hover:text-wine-700">FAQ</a>
+            <NavLink to="/boutique/faq" onClick={() => setMenuOpen(false)} className="block py-2 pl-3 text-sm text-gray-700 hover:text-wine-700">FAQ</NavLink>
 
             <div className="border-t border-gray-100 mt-3 pt-3 space-y-2">
               <NavLink to="/boutique/contact" onClick={() => setMenuOpen(false)} className="block py-2 text-sm font-medium text-gray-700 hover:text-wine-700">Contact</NavLink>
@@ -200,10 +198,10 @@ export default function PublicLayout() {
               <div className="space-y-2">
                 <Link to="/boutique" className="block text-sm text-gray-300 hover:text-white">Nos vins</Link>
                 <Link to="/boutique/selection" className="block text-sm text-gray-300 hover:text-white">Sélection du moment</Link>
-                <a href={`${SITE_URL}/coffrets.html`} className="block text-sm text-gray-300 hover:text-white">Coffrets</a>
-                <a href={`${SITE_URL}/cse.html`} className="block text-sm text-gray-300 hover:text-white">Espace CSE</a>
-                <a href={`${SITE_URL}/ecoles.html`} className="block text-sm text-gray-300 hover:text-white">Partenariat Écoles</a>
-                <a href={`${SITE_URL}/ambassadeurs.html`} className="block text-sm text-gray-300 hover:text-white">Devenir Ambassadeur</a>
+                <Link to="/boutique/coffrets" className="block text-sm text-gray-300 hover:text-white">Coffrets</Link>
+                <Link to="/boutique/prestations/cse" className="block text-sm text-gray-300 hover:text-white">Espace CSE</Link>
+                <Link to="/boutique/prestations/ecoles" className="block text-sm text-gray-300 hover:text-white">Partenariat Écoles</Link>
+                <Link to="/boutique/ambassadeurs" className="block text-sm text-gray-300 hover:text-white">Devenir Ambassadeur</Link>
                 <Link to="/boutique/ambassadeurs" className="block text-sm text-gray-300 hover:text-white">Nos Ambassadeurs</Link>
                 <Link to="/boutique/contact" className="block text-sm text-gray-300 hover:text-white">Contact</Link>
                 <Link to="/login" className="block text-sm text-gray-300 hover:text-white">Espace membre</Link>

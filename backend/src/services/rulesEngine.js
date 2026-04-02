@@ -170,6 +170,67 @@ async function calculateFunds(campaignId, userId, commissionRules, options = {})
   return { fund_collective, fund_individual };
 }
 
+// ─── §3.2c Paliers de commission progressifs (ambassadeur) ──
+
+/**
+ * Calcule la commission progressive par palier de CA TTC mensuel.
+ * Paliers stockés dans commission_rules.commission_tiers (JSONB).
+ *
+ * @param {number} caTTCMensuel - CA TTC du mois en cours
+ * @param {Object} commissionRules - commission_rules JSONB from client_types
+ * @returns {Object} { palier_actuel, rate, commission_mensuelle_ht, ca_ttc_mensuel,
+ *                     prochain_palier_seuil, ecart_prochain_palier }
+ */
+function calculateCommissionTiers(caTTCMensuel, commissionRules) {
+  const tiers = commissionRules?.commission_tiers;
+  if (!tiers || !Array.isArray(tiers) || tiers.length === 0) {
+    return {
+      palier_actuel: 0,
+      rate: 0,
+      commission_mensuelle_ht: 0,
+      ca_ttc_mensuel: caTTCMensuel,
+      prochain_palier_seuil: null,
+      ecart_prochain_palier: null,
+    };
+  }
+
+  // Sort tiers by "from" ascending
+  const sorted = tiers.slice().sort((a, b) => a.from - b.from);
+
+  // Find current tier
+  let currentIndex = 0;
+  for (let i = 0; i < sorted.length; i++) {
+    const t = sorted[i];
+    if (caTTCMensuel >= t.from && (t.to === null || caTTCMensuel <= t.to)) {
+      currentIndex = i;
+      break;
+    }
+    // If we're beyond this tier's upper bound, keep going
+    if (t.to !== null && caTTCMensuel > t.to) {
+      currentIndex = i + 1;
+    }
+  }
+  // Clamp to last tier
+  if (currentIndex >= sorted.length) currentIndex = sorted.length - 1;
+
+  const current = sorted[currentIndex];
+  const rate = current.rate;
+  const caHTMensuel = caTTCMensuel / 1.20;
+  const commissionHT = parseFloat((caHTMensuel * rate).toFixed(2));
+
+  // Next tier
+  const nextTier = currentIndex < sorted.length - 1 ? sorted[currentIndex + 1] : null;
+
+  return {
+    palier_actuel: currentIndex + 1,
+    rate,
+    commission_mensuelle_ht: commissionHT,
+    ca_ttc_mensuel: caTTCMensuel,
+    prochain_palier_seuil: nextTier ? nextTier.from : null,
+    ecart_prochain_palier: nextTier ? Math.max(0, nextTier.from - caTTCMensuel) : null,
+  };
+}
+
 // ─── §3.3 Bouteilles gratuites ───────────────────────
 
 /**
@@ -446,6 +507,7 @@ module.exports = {
   applyPricingRules,
   calculateAssociationCommission,
   calculateFunds,
+  calculateCommissionTiers,
   calculateFreeBottles,
   calculateFreeBottleCost,
   calculateTier,

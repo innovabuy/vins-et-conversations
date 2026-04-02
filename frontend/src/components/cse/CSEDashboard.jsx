@@ -4,6 +4,8 @@ import { cseDashboardAPI, ordersAPI, invoicesAPI } from '../../services/api';
 import { ShoppingCart, Package, FileText, Truck, AlertTriangle, RefreshCw, Wine, TrendingUp, Target, Award, Users } from 'lucide-react';
 import ProductModal from '../shared/ProductModal';
 
+const fmtEur = (v, decimals = 2) => new Intl.NumberFormat('fr-FR', { minimumFractionDigits: decimals, maximumFractionDigits: decimals }).format(v);
+
 export default function CSEDashboard() {
   const { user } = useAuth();
   const [data, setData] = useState(null);
@@ -268,8 +270,8 @@ export default function CSEDashboard() {
                 </div>
               </div>
               <div className="flex items-baseline gap-2 mb-3 mt-auto">
-                <span className="text-lg font-bold text-wine-700">{p.cse_price_ttc.toFixed(2)} EUR</span>
-                <span className="text-sm text-gray-400 line-through">{p.original_price_ttc.toFixed(2)} EUR</span>
+                <span className="text-lg font-bold text-wine-700">{fmtEur(p.cse_price_ttc)} EUR</span>
+                <span className="text-sm text-gray-400 line-through">{fmtEur(p.original_price_ttc)} EUR</span>
                 <span className="text-xs bg-green-100 text-green-700 px-1.5 py-0.5 rounded">-{data.discountPct}%</span>
               </div>
               <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
@@ -318,7 +320,7 @@ export default function CSEDashboard() {
                   <div key={item.id} className="flex items-center justify-between border-b pb-2">
                     <div>
                       <p className="font-medium text-sm">{item.name}</p>
-                      <p className="text-xs text-gray-500">{item.cse_price_ttc.toFixed(2)} EUR/u</p>
+                      <p className="text-xs text-gray-500">{fmtEur(item.cse_price_ttc)} EUR/u</p>
                     </div>
                     <div className="flex items-center gap-2">
                       <button onClick={() => updateCartQty(item.id, item.qty - 1)} className="w-7 h-7 rounded border text-center">-</button>
@@ -334,7 +336,7 @@ export default function CSEDashboard() {
                         className="w-12 text-center text-sm border rounded px-1 py-0.5 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                       />
                       <button onClick={() => updateCartQty(item.id, item.qty + 1)} className="w-7 h-7 rounded border text-center">+</button>
-                      <span className="font-medium text-sm w-20 text-right">{(item.cse_price_ttc * item.qty).toFixed(2)} EUR</span>
+                      <span className="font-medium text-sm w-20 text-right">{fmtEur(item.cse_price_ttc * item.qty)} EUR</span>
                     </div>
                   </div>
                 ))}
@@ -343,13 +345,13 @@ export default function CSEDashboard() {
               <div className="border-t pt-3">
                 <div className="flex justify-between text-lg font-bold mb-2">
                   <span>Total TTC</span>
-                  <span className="text-wine-700">{cartTotal.toFixed(2)} EUR</span>
+                  <span className="text-wine-700">{fmtEur(cartTotal)} EUR</span>
                 </div>
 
                 {isUnderMin && (
                   <div className="flex items-center gap-2 bg-amber-50 border border-amber-200 rounded-lg p-3 mb-3 text-amber-700 text-sm">
                     <AlertTriangle size={16} />
-                    Commande minimum: {minOrder} EUR (il manque {(minOrder - cartTotal).toFixed(2)} EUR)
+                    Commande minimum: {minOrder} EUR (il manque {fmtEur(minOrder - cartTotal)} EUR)
                   </div>
                 )}
 
@@ -382,7 +384,7 @@ export default function CSEDashboard() {
                     <p className="text-xs text-gray-500">{new Date(order.created_at).toLocaleDateString('fr-FR')}</p>
                   </div>
                   <div className="flex items-center gap-3">
-                    <span className="font-medium">{parseFloat(order.total_ttc).toFixed(2)} EUR</span>
+                    <span className="font-medium">{fmtEur(parseFloat(order.total_ttc))} EUR</span>
                     <span className={`text-xs px-2 py-0.5 rounded ${
                       order.status === 'delivered' ? 'bg-green-100 text-green-700' :
                       order.status === 'shipped' ? 'bg-blue-100 text-blue-700' :
