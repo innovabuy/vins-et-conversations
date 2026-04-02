@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { productsAPI, catalogPdfAPI, categoriesAPI } from '../../services/api';
 import {
   RadarChart, Radar, PolarGrid, PolarAngleAxis, PolarRadiusAxis, ResponsiveContainer
@@ -168,11 +168,12 @@ function ProductDetail({ product, onClose, onEdit }) {
 }
 
 // ─── Components Section (coffret TVA ventilation) ────
-function ComponentsSection({ productId, priceTTC }) {
+const ComponentsSection = React.forwardRef(function ComponentsSection({ productId, priceTTC }, ref) {
   const [components, setComponents] = useState([]);
   const [loading, setLoading] = useState(true);
   const [adding, setAdding] = useState(false);
   const [newComp, setNewComp] = useState({ component_name: '', amount_ht: '', vat_rate: '20.00' });
+  const [validationError, setValidationError] = useState('');
 
   useEffect(() => {
     productsAPI.components(productId).then((r) => setComponents(r.data.data || [])).catch(() => {}).finally(() => setLoading(false));
@@ -180,6 +181,7 @@ function ComponentsSection({ productId, priceTTC }) {
 
   const handleAdd = async () => {
     if (!newComp.component_name || !newComp.amount_ht) return;
+    setValidationError('');
     try {
       const res = await productsAPI.addComponent(productId, {
         component_name: newComp.component_name,
@@ -192,6 +194,27 @@ function ComponentsSection({ productId, priceTTC }) {
       setAdding(false);
     } catch (e) { alert(e.response?.data?.message || 'Erreur'); }
   };
+
+  // Expose validateAndSave to parent form via ref
+  React.useImperativeHandle(ref, () => ({
+    async validateAndSave() {
+      setValidationError('');
+      if (!adding) return true; // nothing pending
+      const hasName = !!newComp.component_name.trim();
+      const hasAmount = !!newComp.amount_ht;
+      if (hasName && hasAmount) {
+        // Auto-save the pending component
+        await handleAdd();
+        return true;
+      }
+      if (hasName || hasAmount) {
+        // Partially filled — block submission
+        setValidationError('Un composant est en cours de saisie — complétez-le ou annulez avant d\'enregistrer.');
+        return false;
+      }
+      return true; // form open but empty — allow
+    }
+  }));
 
   const handleDelete = async (cid) => {
     try {
@@ -209,6 +232,9 @@ function ComponentsSection({ productId, priceTTC }) {
   return (
     <fieldset className="border rounded-lg p-4 space-y-3">
       <legend className="text-sm font-semibold text-gray-700 px-2">Composition (ventilation TVA coffret)</legend>
+      {validationError && (
+        <div className="text-sm text-red-700 bg-red-50 px-3 py-2 rounded">{validationError}</div>
+      )}
       {components.length > 0 && (
         <div className="space-y-2">
           {components.map((c) => (
@@ -230,11 +256,11 @@ function ComponentsSection({ productId, priceTTC }) {
         <div className="flex gap-2 items-end flex-wrap">
           <div>
             <label className="text-xs text-gray-500">Nom</label>
-            <input value={newComp.component_name} onChange={(e) => setNewComp({ ...newComp, component_name: e.target.value })} className="block border rounded px-2 py-1 text-sm w-40" />
+            <input value={newComp.component_name} onChange={(e) => { setNewComp({ ...newComp, component_name: e.target.value }); setValidationError(''); }} className="block border rounded px-2 py-1 text-sm w-40" />
           </div>
           <div>
             <label className="text-xs text-gray-500">Montant HT</label>
-            <input type="number" step="0.01" value={newComp.amount_ht} onChange={(e) => setNewComp({ ...newComp, amount_ht: e.target.value })} className="block border rounded px-2 py-1 text-sm w-24" />
+            <input type="number" step="0.01" value={newComp.amount_ht} onChange={(e) => { setNewComp({ ...newComp, amount_ht: e.target.value }); setValidationError(''); }} className="block border rounded px-2 py-1 text-sm w-24" />
           </div>
           <div>
             <label className="text-xs text-gray-500">TVA %</label>
@@ -244,17 +270,18 @@ function ComponentsSection({ productId, priceTTC }) {
             </select>
           </div>
           <button type="button" onClick={handleAdd} className="px-3 py-1.5 bg-wine-700 text-white text-sm rounded-lg">Ajouter</button>
-          <button type="button" onClick={() => setAdding(false)} className="px-3 py-1.5 text-sm text-gray-600">Annuler</button>
+          <button type="button" onClick={() => { setAdding(false); setValidationError(''); setNewComp({ component_name: '', amount_ht: '', vat_rate: '20.00' }); }} className="px-3 py-1.5 text-sm text-gray-600">Annuler</button>
         </div>
       ) : (
         <button type="button" onClick={() => setAdding(true)} className="text-xs text-wine-700 hover:text-wine-800 font-medium">+ Ajouter un composant</button>
       )}
     </fieldset>
   );
-}
+});
 
 // ─── Product Form (enriched) ─────────────────────────
 function ProductForm({ product, onSave, onCancel, allProducts = [], categoriesList = [] }) {
+  const componentsRef = useRef(null);
   const initial = product ? {
     ...product,
     grape_varieties: parseJsonField(product.grape_varieties),
@@ -357,6 +384,11 @@ function ProductForm({ product, onSave, onCancel, allProducts = [], categoriesLi
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    // Auto-save or block pending component before product save
+    if (componentsRef.current) {
+      const ok = await componentsRef.current.validateAndSave();
+      if (!ok) return;
+    }
     // Validation champs obligatoires
     const missing = [];
     if (!form.name?.trim()) missing.push('Nom');
@@ -675,9 +707,14 @@ function ProductForm({ product, onSave, onCancel, allProducts = [], categoriesLi
       )}
 
       {/* Section Composition (coffrets) */}
-      {product?.id && (
-        <ComponentsSection productId={product.id} priceTTC={parseFloat(form.price_ttc || 0)} />
-      )}
+      {product?.id ? (
+        <ComponentsSection ref={componentsRef} productId={product.id} priceTTC={parseFloat(form.price_ttc || 0)} />
+      ) : (isGiftSet || isCoffret) ? (
+        <fieldset className="border rounded-lg p-4">
+          <legend className="text-sm font-semibold text-gray-700 px-2">Composition (ventilation TVA coffret)</legend>
+          <p className="text-sm text-gray-500 italic">Enregistrez d'abord le produit pour pouvoir ajouter des composants.</p>
+        </fieldset>
+      ) : null}
 
       <div className="flex justify-end gap-3 pt-2">
         <button type="button" onClick={onCancel} className="px-4 py-2 text-sm text-gray-600 hover:bg-gray-100 rounded-lg">Annuler</button>
