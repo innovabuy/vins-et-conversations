@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import { cseDashboardAPI, ordersAPI, invoicesAPI } from '../../services/api';
 import { ShoppingCart, Package, FileText, Truck, AlertTriangle, RefreshCw, Wine, TrendingUp, Target, Award, Users } from 'lucide-react';
+import ProductModal from '../shared/ProductModal';
 
 export default function CSEDashboard() {
   const { user } = useAuth();
@@ -12,6 +13,7 @@ export default function CSEDashboard() {
   const [error, setError] = useState(null);
   const [activeTab, setActiveTab] = useState('products');
   const [productQtys, setProductQtys] = useState({});
+  const [selectedProduct, setSelectedProduct] = useState(null);
 
   const campaignId = user?.campaigns?.[0]?.campaign_id;
 
@@ -243,7 +245,7 @@ export default function CSEDashboard() {
       {activeTab === 'products' && (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {data.products.map((p) => (
-            <div key={p.id} className="card flex flex-col">
+            <div key={p.id} className="card flex flex-col cursor-pointer hover:shadow-md transition-shadow" onClick={() => setSelectedProduct(p)}>
               <div className="flex gap-3 mb-2">
                 {p.image_url ? (
                   <img
@@ -270,7 +272,7 @@ export default function CSEDashboard() {
                 <span className="text-sm text-gray-400 line-through">{p.original_price_ttc.toFixed(2)} EUR</span>
                 <span className="text-xs bg-green-100 text-green-700 px-1.5 py-0.5 rounded">-{data.discountPct}%</span>
               </div>
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
                 <div className="flex items-center border rounded-lg">
                   <button
                     onClick={() => setProductQtys(prev => ({ ...prev, [p.id]: Math.max(1, (prev[p.id] || 1) - 1) }))}
@@ -426,6 +428,12 @@ export default function CSEDashboard() {
             </div>
           )}
         </div>
+      )}
+      {selectedProduct && (
+        <ProductModal
+          product={selectedProduct}
+          onClose={() => setSelectedProduct(null)}
+        />
       )}
     </div>
   );
