@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { ambassadorAPI, ordersAPI } from '../../services/api';
-import { Trophy, Share2, ShoppingCart, ShoppingBag, Gift, Copy, Check, ExternalLink, User, Camera, Save, Upload, QrCode, Eye, X, Calendar } from 'lucide-react';
+import { Trophy, Share2, ShoppingCart, ShoppingBag, Gift, Copy, Check, ExternalLink, User, Camera, Save, Upload, QrCode, Eye, X, Calendar, Wallet } from 'lucide-react';
 import { copyToClipboard } from '../../utils/copyToClipboard';
 
 const TIER_COLORS = {
@@ -65,7 +65,7 @@ export default function AmbassadorDashboard() {
 
   if (!data) return <p className="text-center text-gray-500 py-12">Impossible de charger le tableau de bord.</p>;
 
-  const { tier, sales, recentOrders, referralClicks, gains, monthly, monthlyTier, monthlyHistory } = data;
+  const { tier, sales, recentOrders, referralClicks, gains, commission, monthly, monthlyTier, monthlyHistory } = data;
   const tierStyle = TIER_COLORS[tier.current?.label] || TIER_COLORS.Bronze;
   const monthlyTierStyle = TIER_COLORS[monthlyTier?.current?.label] || TIER_COLORS.Bronze;
 
@@ -371,6 +371,28 @@ export default function AmbassadorDashboard() {
             </div>
           );
         })()}
+
+        {commission && commission.rate > 0 && (
+          <div className="bg-wine-50 border border-wine-200 rounded-lg p-4 mb-3">
+            <div className="flex items-center gap-2 mb-3">
+              <Wallet size={18} className="text-wine-700" />
+              <h3 className="font-semibold text-wine-800">Ma Commission</h3>
+              <span className="text-xs bg-wine-100 text-wine-700 px-2 py-0.5 rounded-full ml-auto">{commission.rate}%</span>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="bg-white rounded-lg p-3 text-center">
+                <p className="text-xl font-bold text-wine-700">{commission.amount.toFixed(2)} EUR</p>
+                <p className="text-xs text-gray-500">Commission totale</p>
+                <p className="text-xs text-gray-400">sur {commission.total_ht.toFixed(0)} EUR HT</p>
+              </div>
+              <div className="bg-white rounded-lg p-3 text-center">
+                <p className="text-xl font-bold text-orange-700">{commission.monthly_amount.toFixed(2)} EUR</p>
+                <p className="text-xs text-gray-500">Ce mois</p>
+                <p className="text-xs text-gray-400">sur {commission.monthly_ht.toFixed(0)} EUR HT</p>
+              </div>
+            </div>
+          </div>
+        )}
 
         {gains.currentReward ? (
           <div className="bg-green-50 border border-green-200 rounded-lg p-4 mb-3">

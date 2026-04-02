@@ -108,11 +108,12 @@ async function calculateAssociationCommission(campaignId, commissionRules) {
  * @param {Object} commissionRules - Rules JSONB
  * @returns {Object} { fund_collective, fund_individual }
  */
-async function calculateFunds(campaignId, userId, commissionRules) {
+async function calculateFunds(campaignId, userId, commissionRules, options = {}) {
   if (!commissionRules) return { fund_collective: null, fund_individual: null };
 
   // Statuts pris en compte pour les cagnottes (excluent pending_stock/pending_payment)
   const FUND_STATUSES = ['submitted', 'validated', 'preparing', 'shipped', 'delivered'];
+  const referralSources = options.referralSources || ['student_referral'];
 
   // Backward compat: old format uses "association", new format uses "fund_collective"
   const collectiveRule = commissionRules.fund_collective || commissionRules.association || null;
@@ -138,19 +139,24 @@ async function calculateFunds(campaignId, userId, commissionRules) {
   }
 
   if (individualRule && individualRule.type === 'percentage') {
-    // Inclut commandes directes (user_id) + commandes parrainage (referred_by + student_referral)
-    const studentHT = await db('orders')
+    // Inclut commandes directes (user_id) + commandes parrainage (referred_by + sources configurables)
+    let indivQuery = db('orders')
       .where({ campaign_id: campaignId })
       .whereIn('status', FUND_STATUSES)
       .where(function () {
         this.where({ user_id: userId })
           .orWhere(function () {
-            this.where({ referred_by: userId, source: 'student_referral' })
+            this.where({ referred_by: userId })
+              .whereIn('source', referralSources)
               .whereRaw('(user_id IS NULL OR user_id != referred_by)');
           });
-      })
-      .sum('total_ht as total')
-      .first();
+      });
+
+    // Optional date range filter (monthly commission support)
+    if (options.dateFrom) indivQuery = indivQuery.where('created_at', '>=', options.dateFrom);
+    if (options.dateTo) indivQuery = indivQuery.where('created_at', '<=', options.dateTo);
+
+    const studentHT = await indivQuery.sum('total_ht as total').first();
     const base = parseFloat(studentHT?.total || 0);
     const rate = individualRule.value / 100;
     fund_individual = {

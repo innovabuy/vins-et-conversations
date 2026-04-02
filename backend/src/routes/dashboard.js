@@ -524,6 +524,10 @@ router.get(
       // Free bottles (12+1) — respects per-ambassador free_bottle_enabled flag
       const freeBottles = await rulesEngine.calculateFreeBottles(req.user.userId, campaignId, rules.freeBottle);
 
+      // Ambassador commission (cagnotte) — total + monthly
+      const ambCommissionOpts = { referralSources: ['ambassador_referral'] };
+      const fundsTotal = await rulesEngine.calculateFunds(campaignId, req.user.userId, rules.commission, ambCommissionOpts);
+
       // Monthly stats — current calendar month
       const now = new Date();
       const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
@@ -552,6 +556,23 @@ router.get(
         dateFrom: monthStart,
         dateTo: now.toISOString(),
       });
+
+      // Monthly commission
+      const fundsMonthly = await rulesEngine.calculateFunds(campaignId, req.user.userId, rules.commission, {
+        ...ambCommissionOpts,
+        dateFrom: monthStart,
+        dateTo: now.toISOString(),
+      });
+
+      const indivTotal = fundsTotal.fund_individual;
+      const indivMonthly = fundsMonthly.fund_individual;
+      const commission = {
+        total_ht: indivTotal?.base_amount || 0,
+        rate: indivTotal?.rate || 0,
+        amount: indivTotal?.amount || 0,
+        monthly_ht: indivMonthly?.base_amount || 0,
+        monthly_amount: indivMonthly?.amount || 0,
+      };
 
       // Monthly history — 6 derniers mois (mois en cours inclus)
       const monthlyHistory = [];
@@ -603,6 +624,7 @@ router.get(
           bottles: parseInt(referralOrders?.total_bottles || 0, 10),
         },
         gains,
+        commission,
         monthly,
         monthlyTier,
         monthlyHistory,

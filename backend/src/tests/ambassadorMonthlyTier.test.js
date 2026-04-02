@@ -284,3 +284,103 @@ describe('Admin orders — referrer_name (B6)', () => {
     expect(res.body.referrer_email).toBeTruthy();
   });
 });
+
+// ═══════════════════════════════════════════════════════
+// F2 — Commission ambassadeur (cagnotte)
+// ═══════════════════════════════════════════════════════
+describe('Commission ambassadeur (F2)', () => {
+  const { calculateFunds } = require('../services/rulesEngine');
+
+  test('calculateFunds avec referralSources ambassador_referral retourne un montant', async () => {
+    const ambCampaign = await db('campaigns').where('name', 'like', '%Ambassadeurs%').first();
+    if (!ambCampaign) return;
+
+    const commissionRules = {
+      fund_individual: { type: 'percentage', value: 3, base: 'ca_ht_student', label: 'Commission ambassadeur' },
+    };
+
+    const result = await calculateFunds(ambCampaign.id, ambassadorId, commissionRules, {
+      referralSources: ['ambassador_referral'],
+    });
+
+    expect(result).toHaveProperty('fund_individual');
+    if (result.fund_individual) {
+      expect(result.fund_individual.rate).toBe(3);
+      expect(typeof result.fund_individual.amount).toBe('number');
+      expect(result.fund_individual.amount).toBeGreaterThanOrEqual(0);
+      expect(result.fund_individual.base_amount).toBeGreaterThanOrEqual(0);
+    }
+  });
+
+  test('calculateFunds sans options → rétrocompatible (student_referral par défaut)', async () => {
+    const sacreCoeur = await db('campaigns').where('name', 'like', '%Sacré-Cœur%').first();
+    if (!sacreCoeur) return;
+
+    const student = await db('users').where({ email: 'ackavong@eleve.sc.fr' }).first();
+    if (!student) return;
+
+    const commissionRules = {
+      fund_individual: { type: 'percentage', value: 3, base: 'ca_ht_student', label: 'Part des anges' },
+    };
+
+    // Without options → defaults to student_referral
+    const result = await calculateFunds(sacreCoeur.id, student.id, commissionRules);
+    expect(result).toHaveProperty('fund_individual');
+    if (result.fund_individual) {
+      expect(result.fund_individual.rate).toBe(3);
+      expect(typeof result.fund_individual.amount).toBe('number');
+    }
+  });
+
+  test('calculateFunds avec dateFrom/dateTo filtre la période', async () => {
+    const ambCampaign = await db('campaigns').where('name', 'like', '%Ambassadeurs%').first();
+    if (!ambCampaign) return;
+
+    const commissionRules = {
+      fund_individual: { type: 'percentage', value: 3, base: 'ca_ht_student', label: 'Commission ambassadeur' },
+    };
+
+    const total = await calculateFunds(ambCampaign.id, ambassadorId, commissionRules, {
+      referralSources: ['ambassador_referral'],
+    });
+    const monthly = await calculateFunds(ambCampaign.id, ambassadorId, commissionRules, {
+      referralSources: ['ambassador_referral'],
+      dateFrom: new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString(),
+      dateTo: new Date().toISOString(),
+    });
+
+    // Monthly amount should be <= total amount
+    const totalAmt = total.fund_individual?.amount || 0;
+    const monthlyAmt = monthly.fund_individual?.amount || 0;
+    expect(monthlyAmt).toBeLessThanOrEqual(totalAmt);
+  });
+});
+
+describe('Dashboard ambassador — commission field (F2)', () => {
+  let token;
+
+  beforeAll(async () => {
+    const res = await require('supertest')(require('../index'))
+      .post('/api/v1/auth/login')
+      .send({ email: 'ambassadeur@example.fr', password: 'Test1234!' });
+    token = res.body.accessToken;
+  });
+
+  test('GET /dashboard/ambassador retourne commission avec structure correcte', async () => {
+    if (!token) return;
+    const res = await require('supertest')(require('../index'))
+      .get('/api/v1/dashboard/ambassador')
+      .set('Authorization', `Bearer ${token}`);
+
+    expect(res.status).toBe(200);
+    expect(res.body).toHaveProperty('commission');
+    expect(res.body.commission).toHaveProperty('total_ht');
+    expect(res.body.commission).toHaveProperty('rate');
+    expect(res.body.commission).toHaveProperty('amount');
+    expect(res.body.commission).toHaveProperty('monthly_ht');
+    expect(res.body.commission).toHaveProperty('monthly_amount');
+    expect(typeof res.body.commission.amount).toBe('number');
+    expect(typeof res.body.commission.monthly_amount).toBe('number');
+    expect(res.body.commission.monthly_amount).toBeLessThanOrEqual(res.body.commission.amount);
+  });
+});
