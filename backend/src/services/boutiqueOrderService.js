@@ -102,6 +102,13 @@ async function createBoutiqueOrder({ cartItems, customer, referralCode, delivery
     }
   }
 
+  // Auto-parrainage : si l'utilisateur authentifié se parraine lui-même → ignorer le referral
+  if (referredBy && authenticatedUserId && referredBy === authenticatedUserId) {
+    referredBy = null;
+    referralCode = null;
+    // La source sera assignée via roleSourceMap ci-dessous
+  }
+
   // Resolve source based on authenticated user role (if no referral)
   if (!referredBy && authenticatedUserId) {
     const authUser = await db('users').where({ id: authenticatedUserId }).select('role').first();
