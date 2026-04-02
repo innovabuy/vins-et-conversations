@@ -217,4 +217,18 @@ describe('Dashboard ambassador — monthly fields', () => {
     expect(res.body).toHaveProperty('referralCode');
     expect(res.body).toHaveProperty('free_bottles');
   });
+
+  test('recentOrders contient customer_name et customer_email', async () => {
+    if (!token) return;
+    const res = await require('supertest')(require('../index'))
+      .get('/api/v1/dashboard/ambassador')
+      .set('Authorization', `Bearer ${token}`);
+
+    expect(res.status).toBe(200);
+    expect(Array.isArray(res.body.recentOrders)).toBe(true);
+    for (const order of res.body.recentOrders) {
+      expect(order).toHaveProperty('customer_name');
+      expect(order).toHaveProperty('customer_email');
+    }
+  });
 });

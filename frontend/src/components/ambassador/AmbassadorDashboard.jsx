@@ -253,6 +253,9 @@ export default function AmbassadorDashboard() {
                   <div>
                     <span className="font-medium">{o.ref}</span>
                     <span className="text-xs text-gray-400 ml-2">{new Date(o.created_at).toLocaleDateString('fr-FR')}</span>
+                    {o.customer_name && (
+                      <span className="text-sm text-gray-600 block">{o.customer_name}</span>
+                    )}
                   </div>
                   <div className="flex items-center gap-2">
                     <span className={`text-xs px-2 py-0.5 rounded ${

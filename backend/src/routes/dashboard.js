@@ -464,16 +464,22 @@ router.get(
       const bottles = parseInt(salesResult?.bottles || 0, 10);
       const orderCount = parseInt(salesResult?.order_count || 0, 10);
 
-      // Recent orders (direct + referred)
+      // Recent orders (direct + referred) — with customer info for ambassador
       const recentOrders = await db('orders')
+        .leftJoin('contacts', 'contacts.id', 'orders.customer_id')
         .where(function () {
-          this.where({ user_id: req.user.userId, campaign_id: campaignId })
-            .orWhere({ referred_by: req.user.userId });
+          this.where({ 'orders.user_id': req.user.userId, 'orders.campaign_id': campaignId })
+            .orWhere({ 'orders.referred_by': req.user.userId });
         })
-        .whereIn('status', ['submitted', 'validated', 'preparing', 'shipped', 'delivered'])
-        .orderBy('created_at', 'desc')
+        .whereIn('orders.status', ['submitted', 'validated', 'preparing', 'shipped', 'delivered'])
+        .orderBy('orders.created_at', 'desc')
         .limit(10)
-        .select('id', 'ref', 'status', 'total_ttc', 'total_items', 'created_at');
+        .select(
+          'orders.id', 'orders.ref', 'orders.status',
+          'orders.total_ttc', 'orders.total_items', 'orders.created_at',
+          'contacts.name as customer_name',
+          'contacts.email as customer_email'
+        );
 
       // Referral code from participation — generate if missing
       let referralCode = participation.referral_code;
