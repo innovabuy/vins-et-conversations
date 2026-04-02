@@ -65,8 +65,9 @@ export default function AmbassadorDashboard() {
 
   if (!data) return <p className="text-center text-gray-500 py-12">Impossible de charger le tableau de bord.</p>;
 
-  const { tier, sales, recentOrders, referralClicks, gains, monthly } = data;
+  const { tier, sales, recentOrders, referralClicks, gains, monthly, monthlyTier, monthlyHistory } = data;
   const tierStyle = TIER_COLORS[tier.current?.label] || TIER_COLORS.Bronze;
+  const monthlyTierStyle = TIER_COLORS[monthlyTier?.current?.label] || TIER_COLORS.Bronze;
 
   return (
     <div className="space-y-6">
@@ -217,6 +218,29 @@ export default function AmbassadorDashboard() {
               <span className="text-lg font-bold text-orange-800">{parseFloat(monthly.ca_ttc).toFixed(0)} EUR</span>
               <span className="text-xs text-orange-600">{monthly.orders_count} commande{monthly.orders_count > 1 ? 's' : ''}</span>
             </div>
+            {monthlyTier && (
+              <div className="mt-2 pt-2 border-t border-orange-200">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs text-orange-600">Palier du mois</span>
+                  {monthlyTier.current ? (
+                    <span className={`text-xs font-bold px-2 py-0.5 rounded ${monthlyTierStyle.bg} ${monthlyTierStyle.text}`}>{monthlyTier.current.label}</span>
+                  ) : (
+                    <span className="text-xs text-gray-400">Aucun palier</span>
+                  )}
+                </div>
+                {monthlyTier.next && (
+                  <div className="mt-1">
+                    <div className="flex justify-between text-xs text-orange-500">
+                      <span>Prochain : {monthlyTier.next.label}</span>
+                      <span>{monthlyTier.progress}%</span>
+                    </div>
+                    <div className="w-full bg-orange-200 rounded-full h-1.5 mt-0.5">
+                      <div className={`h-1.5 rounded-full ${monthlyTierStyle.bar}`} style={{ width: `${monthlyTier.progress}%` }} />
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         )}
 
@@ -245,6 +269,47 @@ export default function AmbassadorDashboard() {
           </div>
         )}
       </div>
+
+      {/* Section 3b — Historique mensuel */}
+      {monthlyHistory?.length > 0 && (
+        <div className="card">
+          <div className="flex items-center gap-2 mb-4">
+            <Calendar size={20} className="text-wine-700" />
+            <h2 className="font-semibold text-lg">Historique mensuel</h2>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b text-left text-gray-500">
+                  <th className="pb-2 font-medium">Mois</th>
+                  <th className="pb-2 font-medium text-right">CA TTC</th>
+                  <th className="pb-2 font-medium text-right">Cmd</th>
+                  <th className="pb-2 font-medium text-right">Palier</th>
+                </tr>
+              </thead>
+              <tbody>
+                {monthlyHistory.map((m, idx) => {
+                  const style = TIER_COLORS[m.tier_label];
+                  return (
+                    <tr key={idx} className="border-b last:border-0">
+                      <td className="py-2">{m.month}</td>
+                      <td className="py-2 text-right font-medium">{m.ca_ttc.toFixed(0)} EUR</td>
+                      <td className="py-2 text-right">{m.orders_count}</td>
+                      <td className="py-2 text-right">
+                        {m.tier_label ? (
+                          <span className={`text-xs px-2 py-0.5 rounded ${style?.bg || 'bg-gray-100'} ${style?.text || 'text-gray-600'}`}>{m.tier_label}</span>
+                        ) : (
+                          <span className="text-xs text-gray-400">—</span>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
 
       {/* Section 4 — Ventes via mon lien (hidden for alcohol-free) */}
       {!data.alcohol_free && referralData?.referredOrders?.length > 0 && (

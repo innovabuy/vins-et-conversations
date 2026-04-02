@@ -350,6 +350,14 @@ async function calculateTier(userId, tierRules, options = {}) {
     });
   }
 
+  // Optional date range filter (monthly reset support)
+  if (options.dateFrom) {
+    caQuery = caQuery.where('created_at', '>=', options.dateFrom);
+  }
+  if (options.dateTo) {
+    caQuery = caQuery.where('created_at', '<=', options.dateTo);
+  }
+
   const caResult = await caQuery.sum('total_ttc as total').first();
 
   const ca = parseFloat(caResult?.total || 0);

@@ -541,6 +541,47 @@ router.get(
         month: monthLabel.charAt(0).toUpperCase() + monthLabel.slice(1),
       };
 
+      // Monthly tier — palier calculé sur le mois en cours uniquement
+      const monthlyTier = await rulesEngine.calculateTier(req.user.userId, rules.tier, {
+        dateFrom: monthStart,
+        dateTo: now.toISOString(),
+      });
+
+      // Monthly history — 6 derniers mois (mois en cours inclus)
+      const monthlyHistory = [];
+      for (let i = 5; i >= 0; i--) {
+        const mStart = new Date(now.getFullYear(), now.getMonth() - i, 1);
+        const mEnd = new Date(now.getFullYear(), now.getMonth() - i + 1, 0, 23, 59, 59, 999);
+        const mLabel = mStart.toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' });
+
+        const mResult = await db('orders')
+          .where(function () {
+            this.where({ user_id: req.user.userId, campaign_id: campaignId })
+              .orWhere({ referred_by: req.user.userId });
+          })
+          .whereIn('status', ['submitted', 'validated', 'preparing', 'shipped', 'delivered'])
+          .where('created_at', '>=', mStart.toISOString())
+          .where('created_at', '<=', mEnd.toISOString())
+          .sum('total_ttc as ca_ttc')
+          .count('id as orders_count')
+          .first();
+
+        const mCA = parseFloat(mResult?.ca_ttc || 0);
+        // Determine tier label for this month's CA
+        const sortedTiers = (rules.tier?.tiers || []).slice().sort((a, b) => a.threshold - b.threshold);
+        let mTierLabel = null;
+        for (const t of sortedTiers) {
+          if (mCA >= t.threshold) mTierLabel = t.label;
+        }
+
+        monthlyHistory.push({
+          month: mLabel.charAt(0).toUpperCase() + mLabel.slice(1),
+          ca_ttc: mCA,
+          orders_count: parseInt(mResult?.orders_count || 0, 10),
+          tier_label: mTierLabel,
+        });
+      }
+
       res.json({
         campaignId,
         alcohol_free: campaignData?.alcohol_free || false,
@@ -557,6 +598,8 @@ router.get(
         },
         gains,
         monthly,
+        monthlyTier,
+        monthlyHistory,
         free_bottles: freeBottles,
         ui: rules.ui,
       });
