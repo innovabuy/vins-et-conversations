@@ -364,6 +364,7 @@ function OrderDetail({ orderId, onClose, onUpdated }) {
         <div><span className="text-gray-500">Total HT :</span> {formatEur(order.total_ht)}</div>
         <div><span className="text-gray-500">Articles :</span> {order.total_items}</div>
         {order.campaign_id && <div><span className="text-gray-500">Campagne :</span> <Link to={`/admin/campaigns/${order.campaign_id}`} className="text-wine-700 hover:underline font-medium inline-flex items-center gap-1">{order.campaign_name || 'Voir'} <ExternalLink size={12} /></Link></div>}
+        {order.referrer_name && <div><span className="text-gray-500">Parrain :</span> <span className="font-medium">{order.referrer_name}</span></div>}
       </div>
       {order.notes && <div className="text-sm"><span className="text-gray-500">Notes :</span> {order.notes}</div>}
 
@@ -786,6 +787,9 @@ export default function AdminOrders() {
                     <td className="py-3">{o.total_items}</td>
                     <td className="py-3">
                       {(() => { const src = SOURCE_LABELS[o.source] || SOURCE_LABELS.campaign; return <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${src.color}`}>{src.label}</span>; })()}
+                      {o.referrer_name && (
+                        <div className="text-xs text-gray-500 mt-0.5">{o.referrer_name}</div>
+                      )}
                     </td>
                     <td className="py-3">
                       <span className={`px-2 py-1 rounded-full text-xs font-medium ${status.color}`}>{status.label}</span>

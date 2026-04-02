@@ -232,3 +232,55 @@ describe('Dashboard ambassador — monthly fields', () => {
     }
   });
 });
+
+// ═══════════════════════════════════════════════════════
+// B6 — Parrain identifiable dans commandes admin
+// ═══════════════════════════════════════════════════════
+describe('Admin orders — referrer_name (B6)', () => {
+  let adminToken;
+
+  beforeAll(async () => {
+    const res = await require('supertest')(require('../index'))
+      .post('/api/v1/auth/login')
+      .send({ email: 'nicolas@vins-conversations.fr', password: 'VinsConv2026!' });
+    adminToken = res.body.accessToken;
+  });
+
+  test('GET /orders/admin/list retourne referrer_name et referrer_email', async () => {
+    if (!adminToken) return;
+    const res = await require('supertest')(require('../index'))
+      .get('/api/v1/orders/admin/list')
+      .set('Authorization', `Bearer ${adminToken}`);
+
+    expect(res.status).toBe(200);
+    expect(Array.isArray(res.body.data)).toBe(true);
+
+    // All orders must have referrer fields (null if no referrer)
+    for (const order of res.body.data) {
+      expect(order).toHaveProperty('referrer_name');
+      expect(order).toHaveProperty('referrer_email');
+    }
+
+    // Orders with referred_by should have a non-null referrer_name
+    const referredOrders = res.body.data.filter(o => o.referred_by);
+    for (const order of referredOrders) {
+      expect(order.referrer_name).toBeTruthy();
+      expect(order.referrer_email).toBeTruthy();
+    }
+  });
+
+  test('GET /orders/:id retourne referrer_name pour commande parrainée', async () => {
+    if (!adminToken) return;
+    // Find an order with referred_by
+    const referredOrder = await db('orders').whereNotNull('referred_by').first();
+    if (!referredOrder) return; // skip if no referred orders in seed
+
+    const res = await require('supertest')(require('../index'))
+      .get(`/api/v1/orders/${referredOrder.id}`)
+      .set('Authorization', `Bearer ${adminToken}`);
+
+    expect(res.status).toBe(200);
+    expect(res.body.referrer_name).toBeTruthy();
+    expect(res.body.referrer_email).toBeTruthy();
+  });
+});

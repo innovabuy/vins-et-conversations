@@ -223,11 +223,14 @@ router.get('/:id', authenticate, async (req, res) => {
     const order = await db('orders')
       .leftJoin('users', 'orders.user_id', 'users.id')
       .leftJoin('contacts', 'orders.customer_id', 'contacts.id')
+      .leftJoin('users as referrer', 'referrer.id', 'orders.referred_by')
       .where('orders.id', req.params.id)
       .select(
         'orders.*',
         db.raw("COALESCE(users.name, contacts.name, 'Client boutique') as user_name"),
-        db.raw("COALESCE(users.email, contacts.email) as user_email")
+        db.raw("COALESCE(users.email, contacts.email) as user_email"),
+        'referrer.name as referrer_name',
+        'referrer.email as referrer_email'
       )
       .first();
 

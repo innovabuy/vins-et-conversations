@@ -470,10 +470,13 @@ async function listOrders({ campaignId, status, userId, source, page = 1, limit 
   let query = db('orders')
     .leftJoin('users', 'orders.user_id', 'users.id')
     .leftJoin('contacts', 'orders.customer_id', 'contacts.id')
+    .leftJoin('users as referrer', 'referrer.id', 'orders.referred_by')
     .select(
       'orders.*',
       db.raw("COALESCE(users.name, contacts.name, 'Client boutique') as user_name"),
-      db.raw("COALESCE(users.email, contacts.email) as user_email")
+      db.raw("COALESCE(users.email, contacts.email) as user_email"),
+      'referrer.name as referrer_name',
+      'referrer.email as referrer_email'
     );
 
   if (campaignId) query = query.where('orders.campaign_id', campaignId);
