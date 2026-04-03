@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { usersAPI, invitationsAPI, campaignsAPI, ambassadorAPI } from '../../services/api';
-import { Users, Shield, Mail, Copy, Check, Plus, Upload, Link, QrCode, X, Download, Pencil } from 'lucide-react';
+import { Users, Shield, Mail, Copy, Check, Plus, Upload, Link, QrCode, X, Download, Pencil, AlertTriangle } from 'lucide-react';
 import { copyToClipboard } from '../../utils/copyToClipboard';
 
 const ROLES = [
@@ -29,6 +29,8 @@ export default function AdminUsers() {
   const [editUser, setEditUser] = useState(null);
   const [copiedId, setCopiedId] = useState(null);
   const [qrInvitation, setQrInvitation] = useState(null);
+  const [apiError, setApiError] = useState('');
+  const [successMsg, setSuccessMsg] = useState('');
 
   useEffect(() => {
     loadData();
@@ -65,12 +67,14 @@ export default function AdminUsers() {
     const reason = prompt(`RGPD — Anonymiser "${name}" ?\nCette action est irréversible. Saisissez la raison :`);
     if (!reason || reason.length < 5) return;
     if (!confirm(`Confirmer l'anonymisation définitive de "${name}" ?`)) return;
+    setApiError('');
+    setSuccessMsg('');
     try {
       await usersAPI.anonymize(id, reason);
-      alert('Utilisateur anonymisé');
+      setSuccessMsg('Utilisateur anonymisé');
       loadData();
     } catch (err) {
-      alert(err.response?.data?.message || 'Erreur');
+      setApiError(err.response?.data?.message || 'Erreur');
     }
   };
 
@@ -105,6 +109,21 @@ export default function AdminUsers() {
           <p className="text-sm text-gray-500 mt-1">{users.length} utilisateurs</p>
         </div>
       </div>
+
+      {apiError && (
+        <div className="flex items-center gap-2 p-3 mb-4 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">
+          <AlertTriangle size={16} className="shrink-0" />
+          <span>{apiError}</span>
+          <button onClick={() => setApiError('')} className="ml-auto text-red-400 hover:text-red-600"><X size={14} /></button>
+        </div>
+      )}
+      {successMsg && (
+        <div className="flex items-center gap-2 p-3 mb-4 bg-green-50 border border-green-200 rounded-lg text-sm text-green-700">
+          <Check size={16} className="shrink-0" />
+          <span>{successMsg}</span>
+          <button onClick={() => setSuccessMsg('')} className="ml-auto text-green-400 hover:text-green-600"><X size={14} /></button>
+        </div>
+      )}
 
       {/* Tabs */}
       <div className="flex gap-1 border-b border-gray-200 mb-6">

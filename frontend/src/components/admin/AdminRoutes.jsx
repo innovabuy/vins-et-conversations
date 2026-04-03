@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { deliveryRoutesAPI, deliveryNotesAPI } from '../../services/api';
-import { Map, Plus, Truck, Calendar, X, Save, ChevronRight, ChevronLeft, Check, Package, Printer, Eye, Pencil, Trash2, ArrowUp, ArrowDown, ArrowLeft, Play, CheckCircle, Clock } from 'lucide-react';
+import { Map, Plus, Truck, Calendar, X, Save, ChevronRight, ChevronLeft, Check, Package, Printer, Eye, Pencil, Trash2, ArrowUp, ArrowDown, ArrowLeft, Play, CheckCircle, Clock, AlertTriangle } from 'lucide-react';
 
 const formatDate = (d) => d ? new Date(d).toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit', year: 'numeric' }) : '—';
 const formatDateTime = (d) => d ? new Date(d).toLocaleString('fr-FR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '—';
@@ -23,6 +23,8 @@ function RouteWizard({ onSave, onCancel }) {
   const [selectedBLs, setSelectedBLs] = useState([]);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [apiError, setApiError] = useState('');
+  const [errors, setErrors] = useState({});
 
   useEffect(() => {
     if (step === 2) {
@@ -54,6 +56,7 @@ function RouteWizard({ onSave, onCancel }) {
   const totalItems = selectedBLs.reduce((s, bl) => s + (bl.total_items || 0), 0);
 
   const handleSubmit = async () => {
+    setApiError('');
     setSaving(true);
     try {
       const stops = selectedBLs.map(bl => ({
@@ -71,7 +74,7 @@ function RouteWizard({ onSave, onCancel }) {
         km: 0,
       });
     } catch (err) {
-      alert(err.response?.data?.message || 'Erreur lors de la création');
+      setApiError(err.response?.data?.message || 'Erreur lors de la création');
     } finally {
       setSaving(false);
     }
@@ -98,20 +101,30 @@ function RouteWizard({ onSave, onCancel }) {
         </span>
       </div>
 
+      {apiError && (
+        <div className="flex items-center gap-2 p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">
+          <AlertTriangle size={16} className="shrink-0" />
+          <span>{apiError}</span>
+          <button onClick={() => setApiError('')} className="ml-auto text-red-400 hover:text-red-600"><X size={14} /></button>
+        </div>
+      )}
+
       {step === 1 && (
         <div className="space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <label className="block text-xs font-medium text-gray-500 mb-1">Date de la tournée *</label>
-              <input type="date" value={form.date} onChange={e => setForm(f => ({ ...f, date: e.target.value }))} className="w-full border rounded-lg px-3 py-2 text-sm" required />
+              <input type="date" value={form.date} onChange={e => { setForm(f => ({ ...f, date: e.target.value })); setErrors(e2 => ({ ...e2, date: '' })); }} className={`w-full border rounded-lg px-3 py-2 text-sm ${errors.date ? 'border-red-400' : ''}`} required />
+              {errors.date && <p className="text-xs text-red-500 mt-1">{errors.date}</p>}
             </div>
             <div>
               <label className="block text-xs font-medium text-gray-500 mb-1">Chauffeur *</label>
-              <input type="text" value={form.driver} onChange={e => setForm(f => ({ ...f, driver: e.target.value }))} className="w-full border rounded-lg px-3 py-2 text-sm" placeholder="Nom du chauffeur" required />
+              <input type="text" value={form.driver} onChange={e => { setForm(f => ({ ...f, driver: e.target.value })); setErrors(e2 => ({ ...e2, driver: '' })); }} className={`w-full border rounded-lg px-3 py-2 text-sm ${errors.driver ? 'border-red-400' : ''}`} placeholder="Nom du chauffeur" required />
+              {errors.driver && <p className="text-xs text-red-500 mt-1">{errors.driver}</p>}
             </div>
           </div>
           <div className="flex justify-end">
-            <button onClick={() => { if (form.date && form.driver) setStep(2); else alert('Veuillez remplir la date et le chauffeur'); }} className="btn-primary flex items-center gap-2">
+            <button onClick={() => { const errs = {}; if (!form.date) errs.date = 'La date est requise'; if (!form.driver) errs.driver = 'Le chauffeur est requis'; setErrors(errs); if (Object.keys(errs).length === 0) setStep(2); }} className="btn-primary flex items-center gap-2">
               Suivant <ChevronRight size={16} />
             </button>
           </div>
@@ -159,7 +172,7 @@ function RouteWizard({ onSave, onCancel }) {
           )}
           <div className="flex justify-between">
             <button onClick={() => setStep(1)} className="flex items-center gap-2 px-4 py-2 text-sm text-gray-600 hover:bg-gray-100 rounded-lg"><ChevronLeft size={16} /> Retour</button>
-            <button onClick={() => { if (selectedBLs.length === 0) alert('Sélectionnez au moins un BL'); else setStep(3); }} className="btn-primary flex items-center gap-2">
+            <button onClick={() => { if (selectedBLs.length === 0) setApiError('Sélectionnez au moins un BL'); else { setApiError(''); setStep(3); } }} className="btn-primary flex items-center gap-2">
               Suivant <ChevronRight size={16} />
             </button>
           </div>
@@ -215,6 +228,7 @@ function RouteDetail({ routeId, onBack, onDeleted }) {
   const [saving, setSaving] = useState(false);
   const [availableBLs, setAvailableBLs] = useState([]);
   const [showAddBL, setShowAddBL] = useState(false);
+  const [apiError, setApiError] = useState('');
 
   const fetchRoute = useCallback(async () => {
     setLoading(true);
@@ -239,54 +253,59 @@ function RouteDetail({ routeId, onBack, onDeleted }) {
   };
 
   const handleSave = async () => {
+    setApiError('');
     setSaving(true);
     try {
       await deliveryRoutesAPI.update(routeId, editForm);
       setEditing(false);
       fetchRoute();
     } catch (err) {
-      alert(err.response?.data?.message || 'Erreur de sauvegarde');
+      setApiError(err.response?.data?.message || 'Erreur de sauvegarde');
     } finally { setSaving(false); }
   };
 
   const handleStatusChange = async (newStatus) => {
     const label = TRANSITION_LABELS[newStatus] || newStatus;
     if (!confirm(`${label} la tournée ?`)) return;
+    setApiError('');
     try {
       await deliveryRoutesAPI.updateStatus(routeId, { status: newStatus });
       fetchRoute();
     } catch (err) {
-      alert(err.response?.data?.message || 'Erreur de mise à jour');
+      setApiError(err.response?.data?.message || 'Erreur de mise à jour');
     }
   };
 
   const handleDelete = async () => {
     if (!confirm('Supprimer cette tournée ?')) return;
+    setApiError('');
     try {
       await deliveryRoutesAPI.delete(routeId);
       onDeleted();
     } catch (err) {
-      alert(err.response?.data?.message || 'Erreur de suppression');
+      setApiError(err.response?.data?.message || 'Erreur de suppression');
     }
   };
 
   const handleAddStop = async (blId) => {
+    setApiError('');
     try {
       await deliveryRoutesAPI.addStop(routeId, { delivery_note_id: blId });
       setShowAddBL(false);
       fetchRoute();
     } catch (err) {
-      alert(err.response?.data?.message || 'Erreur');
+      setApiError(err.response?.data?.message || 'Erreur');
     }
   };
 
   const handleRemoveStop = async (blId) => {
     if (!confirm('Retirer cet arrêt ?')) return;
+    setApiError('');
     try {
       await deliveryRoutesAPI.removeStop(routeId, blId);
       fetchRoute();
     } catch (err) {
-      alert(err.response?.data?.message || 'Erreur');
+      setApiError(err.response?.data?.message || 'Erreur');
     }
   };
 
@@ -356,6 +375,14 @@ function RouteDetail({ routeId, onBack, onDeleted }) {
           )}
         </div>
       </div>
+
+      {apiError && (
+        <div className="flex items-center gap-2 p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">
+          <AlertTriangle size={16} className="shrink-0" />
+          <span>{apiError}</span>
+          <button onClick={() => setApiError('')} className="ml-auto text-red-400 hover:text-red-600"><X size={14} /></button>
+        </div>
+      )}
 
       {/* Workflow buttons */}
       {transitions.length > 0 && !editing && (
@@ -543,6 +570,7 @@ export default function AdminRoutes() {
   const [filters, setFilters] = useState({ status: '', zone: '', driver: '', date_from: '', date_to: '', hide_delivered: false });
   const [mode, setMode] = useState('list'); // list | creating | detail
   const [selectedRouteId, setSelectedRouteId] = useState(null);
+  const [apiError, setApiError] = useState('');
 
   const fetchRoutes = useCallback(async () => {
     setLoading(true);
@@ -570,21 +598,23 @@ export default function AdminRoutes() {
   const handleStatusUpdate = async (id, newStatus) => {
     const label = TRANSITION_LABELS[newStatus] || newStatus;
     if (!confirm(`${label} la tournée ?`)) return;
+    setApiError('');
     try {
       await deliveryRoutesAPI.updateStatus(id, { status: newStatus });
       fetchRoutes();
     } catch (err) {
-      alert(err.response?.data?.message || 'Erreur de mise à jour');
+      setApiError(err.response?.data?.message || 'Erreur de mise à jour');
     }
   };
 
   const handleDelete = async (id) => {
     if (!confirm('Supprimer cette tournée ?')) return;
+    setApiError('');
     try {
       await deliveryRoutesAPI.delete(id);
       fetchRoutes();
     } catch (err) {
-      alert(err.response?.data?.message || 'Erreur de suppression');
+      setApiError(err.response?.data?.message || 'Erreur de suppression');
     }
   };
 
@@ -625,6 +655,14 @@ export default function AdminRoutes() {
         <h1 className="text-2xl font-bold text-gray-900">Tournées</h1>
         <button onClick={() => setMode('creating')} className="btn-primary flex items-center gap-2"><Plus size={16} /> Nouvelle tournée</button>
       </div>
+
+      {apiError && (
+        <div className="flex items-center gap-2 p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">
+          <AlertTriangle size={16} className="shrink-0" />
+          <span>{apiError}</span>
+          <button onClick={() => setApiError('')} className="ml-auto text-red-400 hover:text-red-600"><X size={14} /></button>
+        </div>
+      )}
 
       {/* Filters */}
       <div className="card">

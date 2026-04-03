@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { Shield, Plus, RotateCcw, Banknote, X } from 'lucide-react';
+import { Shield, Plus, RotateCcw, Banknote, X, AlertTriangle } from 'lucide-react';
 import { cautionChecksAPI, ordersAPI, usersAPI } from '../../services/api';
 
 function UserAutocomplete({ value, onChange }) {
@@ -109,16 +109,19 @@ export default function AdminCautionChecks() {
     }
   };
 
+  const [actionError, setActionError] = useState('');
+
   const handleAction = async (id, status) => {
     const data = { status };
     if (status === 'returned') {
       data.returned_date = new Date().toISOString().slice(0, 10);
     }
+    setActionError('');
     try {
       await cautionChecksAPI.update(id, data);
       load();
     } catch (err) {
-      alert(err.response?.data?.message || 'Erreur');
+      setActionError(err.response?.data?.message || 'Erreur');
     }
   };
 
@@ -202,6 +205,14 @@ export default function AdminCautionChecks() {
               </button>
             </div>
           </form>
+        </div>
+      )}
+
+      {actionError && (
+        <div className="flex items-center gap-2 p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">
+          <AlertTriangle size={16} className="shrink-0" />
+          <span>{actionError}</span>
+          <button onClick={() => setActionError('')} className="ml-auto text-red-400 hover:text-red-600"><X size={14} /></button>
         </div>
       )}
 

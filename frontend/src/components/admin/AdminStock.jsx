@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { stockAPI, productsAPI } from '../../services/api';
 import {
-  Package, Plus, ArrowDown, ArrowUp, RotateCcw, AlertTriangle
+  Package, Plus, ArrowDown, ArrowUp, RotateCcw, AlertTriangle, X, Check
 } from 'lucide-react';
 
 const formatEur = (v) => new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR' }).format(v);
@@ -46,6 +46,7 @@ function StockGauge({ value }) {
 function MovementForm({ products, onSubmit, onCancel }) {
   const [form, setForm] = useState(EMPTY_MOVEMENT);
   const [saving, setSaving] = useState(false);
+  const [apiError, setApiError] = useState('');
 
   const handleChange = (field, value) => {
     setForm((f) => ({ ...f, [field]: value }));
@@ -54,6 +55,7 @@ function MovementForm({ products, onSubmit, onCancel }) {
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!form.product_id || !form.qty) return;
+    setApiError('');
     setSaving(true);
     try {
       await onSubmit({
@@ -64,7 +66,7 @@ function MovementForm({ products, onSubmit, onCancel }) {
       });
       setForm(EMPTY_MOVEMENT);
     } catch (err) {
-      alert(err.response?.data?.message || 'Erreur lors de l\'ajout du mouvement');
+      setApiError(err.response?.data?.message || 'Erreur lors de l\'ajout du mouvement');
     } finally {
       setSaving(false);
     }
@@ -75,6 +77,14 @@ function MovementForm({ products, onSubmit, onCancel }) {
       <div className="flex items-center justify-between mb-2">
         <h3 className="font-semibold text-gray-900">Nouveau mouvement de stock</h3>
       </div>
+
+      {apiError && (
+        <div className="flex items-center gap-2 p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">
+          <AlertTriangle size={16} className="shrink-0" />
+          <span>{apiError}</span>
+          <button onClick={() => setApiError('')} className="ml-auto text-red-400 hover:text-red-600"><X size={14} /></button>
+        </div>
+      )}
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         <div>
@@ -157,6 +167,8 @@ export default function AdminStock() {
   const [loading, setLoading] = useState(true);
   const [showMovementForm, setShowMovementForm] = useState(false);
   const [activeTab, setActiveTab] = useState('stock'); // 'stock' | 'returns'
+  const [apiError, setApiError] = useState('');
+  const [successMsg, setSuccessMsg] = useState('');
 
   const fetchStock = useCallback(async () => {
     setLoading(true);
@@ -189,11 +201,14 @@ export default function AdminStock() {
   const handleUpdateReturn = async (id, status) => {
     const action = status === 'approved' ? 'Approuver' : status === 'rejected' ? 'Refuser' : 'Mettre à jour';
     if (!confirm(`${action} ce retour ?`)) return;
+    setApiError('');
+    setSuccessMsg('');
     try {
       await stockAPI.updateReturn(id, { status });
+      setSuccessMsg(`Retour ${status === 'approved' ? 'approuvé' : status === 'rejected' ? 'refusé' : 'mis à jour'} avec succès`);
       fetchStock();
     } catch (err) {
-      alert(err.response?.data?.message || 'Erreur lors de la mise à jour');
+      setApiError(err.response?.data?.message || 'Erreur lors de la mise à jour');
     }
   };
 
@@ -228,6 +243,21 @@ export default function AdminStock() {
           </button>
         </div>
       </div>
+
+      {apiError && (
+        <div className="flex items-center gap-2 p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">
+          <AlertTriangle size={16} className="shrink-0" />
+          <span>{apiError}</span>
+          <button onClick={() => setApiError('')} className="ml-auto text-red-400 hover:text-red-600"><X size={14} /></button>
+        </div>
+      )}
+      {successMsg && (
+        <div className="flex items-center gap-2 p-3 bg-green-50 border border-green-200 rounded-lg text-sm text-green-700">
+          <Check size={16} className="shrink-0" />
+          <span>{successMsg}</span>
+          <button onClick={() => setSuccessMsg('')} className="ml-auto text-green-400 hover:text-green-600"><X size={14} /></button>
+        </div>
+      )}
 
       {/* Movement Form */}
       {showMovementForm && (

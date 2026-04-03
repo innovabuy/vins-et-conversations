@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { campaignTypesAPI } from '../../services/api';
-import { Plus, Pencil, Trash2, X, Save, Tag } from 'lucide-react';
+import { Plus, Pencil, Trash2, X, Save, Tag, AlertTriangle } from 'lucide-react';
 
 function CampTypeFormModal({ type, onSave, onClose }) {
   const isNew = !type || type === 'new';
@@ -14,15 +14,17 @@ function CampTypeFormModal({ type, onSave, onClose }) {
     active: type.active !== false,
   });
   const [saving, setSaving] = useState(false);
+  const [apiError, setApiError] = useState('');
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    setApiError('');
     setSaving(true);
     try {
       await onSave(isNew ? null : type.id, form);
       onClose();
     } catch (err) {
-      alert(err.response?.data?.message || 'Erreur');
+      setApiError(err.response?.data?.message || 'Erreur');
     } finally {
       setSaving(false);
     }
@@ -36,6 +38,13 @@ function CampTypeFormModal({ type, onSave, onClose }) {
           <button onClick={onClose}><X size={20} /></button>
         </div>
         <form onSubmit={handleSubmit} className="space-y-4">
+          {apiError && (
+            <div className="flex items-center gap-2 p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">
+              <AlertTriangle size={16} className="shrink-0" />
+              <span>{apiError}</span>
+              <button onClick={() => setApiError('')} className="ml-auto text-red-400 hover:text-red-600"><X size={14} /></button>
+            </div>
+          )}
           <div>
             <label className="block text-sm font-medium mb-1">Code *</label>
             <input type="text" value={form.code} onChange={(e) => setForm((f) => ({ ...f, code: e.target.value }))} className="w-full border rounded-lg px-3 py-2" required disabled={!isNew} />
@@ -68,6 +77,7 @@ export default function AdminCampaignTypes() {
   const [types, setTypes] = useState([]);
   const [loading, setLoading] = useState(true);
   const [editing, setEditing] = useState(null);
+  const [apiError, setApiError] = useState('');
 
   const fetchData = useCallback(async () => {
     setLoading(true);
@@ -94,11 +104,12 @@ export default function AdminCampaignTypes() {
 
   const handleDelete = async (type) => {
     if (!confirm(`Supprimer le type "${type.label}" ?`)) return;
+    setApiError('');
     try {
       await campaignTypesAPI.delete(type.id);
       fetchData();
     } catch (err) {
-      alert(err.response?.data?.message || 'Erreur de suppression');
+      setApiError(err.response?.data?.message || 'Erreur de suppression');
     }
   };
 
@@ -115,6 +126,14 @@ export default function AdminCampaignTypes() {
           <Plus size={16} /> Nouveau type
         </button>
       </div>
+
+      {apiError && (
+        <div className="flex items-center gap-2 p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">
+          <AlertTriangle size={16} className="shrink-0" />
+          <span>{apiError}</span>
+          <button onClick={() => setApiError('')} className="ml-auto text-red-400 hover:text-red-600"><X size={14} /></button>
+        </div>
+      )}
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         {types.map((t) => (

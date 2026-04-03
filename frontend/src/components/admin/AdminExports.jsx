@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { exportsAPI, campaignsAPI } from '../../services/api';
-import { Download, FileText, FileSpreadsheet, Calendar, Users, BarChart3 } from 'lucide-react';
+import { Download, FileText, FileSpreadsheet, Calendar, Users, BarChart3, AlertTriangle, X } from 'lucide-react';
 
 function downloadBlob(res, filename) {
   const url = window.URL.createObjectURL(new Blob([res.data]));
@@ -19,18 +19,24 @@ export default function AdminExports() {
   const [campaigns, setCampaigns] = useState([]);
   const [includeFree, setIncludeFree] = useState(false);
   const [loading, setLoading] = useState({});
+  const [apiError, setApiError] = useState('');
+  const [validationErrors, setValidationErrors] = useState({});
 
   useEffect(() => {
     campaignsAPI.list().then((res) => setCampaigns(res.data.data || [])).catch(() => {});
   }, []);
 
   const handleExport = async (key, fn, filename) => {
+    setApiError('');
+    setValidationErrors({});
     setLoading((prev) => ({ ...prev, [key]: true }));
     try {
       const res = await fn();
       downloadBlob(res, filename);
     } catch (err) {
-      alert('Erreur export: ' + (err.response?.data?.message || err.message));
+      if (err.message !== 'validation') {
+        setApiError('Erreur export: ' + (err.response?.data?.message || err.message));
+      }
     } finally {
       setLoading((prev) => ({ ...prev, [key]: false }));
     }
@@ -125,7 +131,7 @@ export default function AdminExports() {
       needsCampaign: true,
       hasIncludeFree: true,
       action: () => {
-        if (!campaignId) { alert('Veuillez sélectionner une campagne'); return Promise.reject(new Error('no campaign')); }
+        if (!campaignId) { setValidationErrors({ campaignId: 'Veuillez sélectionner une campagne' }); return Promise.reject(new Error('validation')); }
         return exportsAPI.campaignPivot(campaignId, includeFree);
       },
       filename: 'recap-campagne-pivot.xlsx',
@@ -153,12 +159,13 @@ export default function AdminExports() {
           </div>
           <div className="flex items-center gap-2">
             <label className="text-sm text-gray-600">Campagne</label>
-            <select value={campaignId} onChange={(e) => setCampaignId(e.target.value)} className="input-field">
+            <select value={campaignId} onChange={(e) => { setCampaignId(e.target.value); setValidationErrors((v) => ({ ...v, campaignId: '' })); }} className={`input-field ${validationErrors.campaignId ? 'border-red-300 ring-1 ring-red-300' : ''}`}>
               <option value="">Toutes</option>
               {campaigns.map((c) => (
                 <option key={c.id} value={c.id}>{c.name}</option>
               ))}
             </select>
+            {validationErrors.campaignId && <p className="text-xs text-red-600 mt-1">{validationErrors.campaignId}</p>}
           </div>
           <div className="flex items-center gap-2">
             <label className="text-sm text-gray-600">Type contact</label>
@@ -177,6 +184,14 @@ export default function AdminExports() {
           </label>
         </div>
       </div>
+
+      {apiError && (
+        <div className="flex items-center gap-2 p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700 mb-6">
+          <AlertTriangle size={16} className="shrink-0" />
+          <span>{apiError}</span>
+          <button onClick={() => setApiError('')} className="ml-auto text-red-400 hover:text-red-600"><X size={14} /></button>
+        </div>
+      )}
 
       {/* Export cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">

@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { notificationsAPI } from '../../services/api';
 import {
-  Bell, Check, Settings,
+  Bell, Check, Settings, X,
   ShoppingCart, CreditCard, Trophy, Package, AlertTriangle, Truck, Star,
 } from 'lucide-react';
 
@@ -160,6 +160,7 @@ function NotificationSettings() {
   const [settings, setSettings] = useState(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [apiError, setApiError] = useState('');
 
   useEffect(() => {
     notificationsAPI.getSettings()
@@ -171,13 +172,14 @@ function NotificationSettings() {
   const handleToggle = async (type) => {
     const newSettings = { ...settings, [type]: !settings[type] };
     setSettings(newSettings);
+    setApiError('');
     setSaving(true);
     try {
       await notificationsAPI.updateSettings(newSettings);
     } catch (err) {
       // Revert on error
       setSettings(settings);
-      alert(err.response?.data?.message || 'Erreur de sauvegarde');
+      setApiError(err.response?.data?.message || 'Erreur de sauvegarde');
     } finally {
       setSaving(false);
     }
@@ -200,6 +202,14 @@ function NotificationSettings() {
       <p className="text-sm text-gray-500">
         Activez ou désactivez les notifications par type. Les modifications sont sauvegardées automatiquement.
       </p>
+
+      {apiError && (
+        <div className="flex items-center gap-2 p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">
+          <AlertTriangle size={16} className="shrink-0" />
+          <span>{apiError}</span>
+          <button onClick={() => setApiError('')} className="ml-auto text-red-400 hover:text-red-600"><X size={14} /></button>
+        </div>
+      )}
 
       <div className="space-y-2">
         {Object.entries(TYPE_CONFIG).map(([type, conf]) => {

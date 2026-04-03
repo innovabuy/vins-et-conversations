@@ -6,6 +6,7 @@ import {
   Target, Package, BarChart3, Mail, CreditCard, ExternalLink,
   Copy, Check, Store, FileText, BookOpen, Plus, Trash2, Upload,
   FileDown, Video, Image, Link as LinkIcon, Download, UserPlus, Loader2, X,
+  AlertTriangle,
 } from 'lucide-react';
 import { copyToClipboard } from '../../utils/copyToClipboard';
 import {
@@ -40,6 +41,7 @@ function ResourcesTab({ campaignId }) {
   const [form, setForm] = useState({ title: '', type: 'link', url: '', description: '', category: 'autre', visible_to_roles: ['student', 'bts'] });
   const [file, setFile] = useState(null);
   const [saving, setSaving] = useState(false);
+  const [apiError, setApiError] = useState('');
 
   const loadResources = async () => {
     try {
@@ -53,6 +55,7 @@ function ResourcesTab({ campaignId }) {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    setApiError('');
     setSaving(true);
     try {
       if (file && ['document', 'image', 'pdf'].includes(form.type)) {
@@ -77,22 +80,31 @@ function ResourcesTab({ campaignId }) {
       setFile(null);
       loadResources();
     } catch (err) {
-      alert(err.response?.data?.message || 'Erreur');
+      setApiError(err.response?.data?.message || 'Erreur');
     } finally { setSaving(false); }
   };
 
   const handleDelete = async (id) => {
     if (!confirm('Supprimer cette ressource ?')) return;
+    setApiError('');
     try {
       await campaignResourcesAPI.delete(id);
       loadResources();
-    } catch (err) { alert('Erreur de suppression'); }
+    } catch (err) { setApiError('Erreur de suppression'); }
   };
 
   if (loading) return <div className="flex justify-center py-8"><div className="animate-spin rounded-full h-6 w-6 border-b-2 border-wine-700" /></div>;
 
   return (
     <div className="space-y-4">
+      {apiError && (
+        <div className="flex items-center gap-2 p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">
+          <AlertTriangle size={16} className="shrink-0" />
+          <span>{apiError}</span>
+          <button onClick={() => setApiError('')} className="ml-auto text-red-400 hover:text-red-600"><X size={14} /></button>
+        </div>
+      )}
+
       <div className="flex justify-between items-center">
         <p className="text-sm text-gray-500">{resources.length} ressource(s)</p>
         <button onClick={() => setShowForm(!showForm)} className="btn-primary flex items-center gap-1 text-sm">
@@ -456,22 +468,25 @@ function ParticipantsTab({ participants, campaignId }) {
   const [exporting, setExporting] = useState(null);
   const [blModal, setBlModal] = useState(null); // participant object or null
   const [groups, setGroups] = useState(() => Object.fromEntries(participants.map(p => [p.id, p.class_group || ''])));
+  const [apiError, setApiError] = useState('');
 
   const handleGroupChange = async (e, participant) => {
     e.stopPropagation();
     const val = e.target.value || null;
     setGroups(g => ({ ...g, [participant.id]: val || '' }));
+    setApiError('');
     try {
       await campaignsAPI.updateParticipantGroup(campaignId, participant.id, val);
     } catch (err) {
       setGroups(g => ({ ...g, [participant.id]: participant.class_group || '' }));
-      alert('Erreur: ' + (err.response?.data?.message || err.message));
+      setApiError('Erreur: ' + (err.response?.data?.message || err.message));
     }
   };
 
   const handleExportExcel = async (e, participant) => {
     e.stopPropagation();
     setExporting(participant.id);
+    setApiError('');
     try {
       const res = await campaignsAPI.participantExcel(campaignId, participant.id);
       const url = window.URL.createObjectURL(new Blob([res.data]));
@@ -481,7 +496,7 @@ function ParticipantsTab({ participants, campaignId }) {
       link.click();
       window.URL.revokeObjectURL(url);
     } catch (err) {
-      alert('Erreur export: ' + (err.response?.data?.message || err.message));
+      setApiError('Erreur export: ' + (err.response?.data?.message || err.message));
     } finally {
       setExporting(null);
     }
@@ -494,6 +509,14 @@ function ParticipantsTab({ participants, campaignId }) {
 
   return (
     <div className="space-y-4">
+      {apiError && (
+        <div className="flex items-center gap-2 p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">
+          <AlertTriangle size={16} className="shrink-0" />
+          <span>{apiError}</span>
+          <button onClick={() => setApiError('')} className="ml-auto text-red-400 hover:text-red-600"><X size={14} /></button>
+        </div>
+      )}
+
       <p className="text-sm text-gray-500">{participants.length} participant(s)</p>
 
       {blModal && (
@@ -755,8 +778,11 @@ export default function AdminCampaignDetail() {
   const [showJoinQR, setShowJoinQR] = useState(false);
   const [exportingCampaign, setExportingCampaign] = useState(false);
   const [showBlFilters, setShowBlFilters] = useState(false);
+  const [apiError, setApiError] = useState('');
+  const [successMsg, setSuccessMsg] = useState('');
 
   const handleExportCampaignExcel = async () => {
+    setApiError('');
     setExportingCampaign(true);
     try {
       const { data: blob } = await campaignsAPI.campaignExcel(id);
@@ -767,7 +793,7 @@ export default function AdminCampaignDetail() {
       link.click();
       URL.revokeObjectURL(url);
     } catch (err) {
-      alert(err.response?.data?.message || 'Erreur lors de l\'export');
+      setApiError(err.response?.data?.message || "Erreur lors de l'export");
     } finally {
       setExportingCampaign(false);
     }
@@ -775,12 +801,14 @@ export default function AdminCampaignDetail() {
 
   const handleSendReport = async () => {
     if (!confirm('Envoyer le rapport à tous les participants ?')) return;
+    setApiError('');
+    setSuccessMsg('');
     setSendingReport(true);
     try {
       const { data: result } = await campaignsAPI.sendReport(id);
-      alert(`${result.sent} rapport(s) envoyé(s)`);
+      setSuccessMsg(`${result.sent} rapport(s) envoyé(s)`);
     } catch (err) {
-      alert(err.response?.data?.message || 'Erreur lors de l\'envoi');
+      setApiError(err.response?.data?.message || "Erreur lors de l'envoi");
     } finally {
       setSendingReport(false);
     }
@@ -860,6 +888,21 @@ export default function AdminCampaignDetail() {
           </div>
         )}
       </div>
+
+      {apiError && (
+        <div className="flex items-center gap-2 p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">
+          <AlertTriangle size={16} className="shrink-0" />
+          <span>{apiError}</span>
+          <button onClick={() => setApiError('')} className="ml-auto text-red-400 hover:text-red-600"><X size={14} /></button>
+        </div>
+      )}
+      {successMsg && (
+        <div className="flex items-center gap-2 p-3 bg-green-50 border border-green-200 rounded-lg text-sm text-green-700">
+          <Check size={16} className="shrink-0" />
+          <span>{successMsg}</span>
+          <button onClick={() => setSuccessMsg('')} className="ml-auto text-green-400 hover:text-green-600"><X size={14} /></button>
+        </div>
+      )}
 
       {/* Quick actions */}
       <div className="flex flex-wrap gap-2">

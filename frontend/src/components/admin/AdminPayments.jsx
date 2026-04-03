@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { paymentsAPI } from '../../services/api';
-import { CreditCard, Banknote, Check, Filter, X, Mail, Clock, ExternalLink } from 'lucide-react';
+import { CreditCard, Banknote, Check, Filter, X, Mail, Clock, ExternalLink, AlertTriangle } from 'lucide-react';
 
 const formatEur = (v) => new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR' }).format(v);
 const formatDate = (d) => d ? new Date(d).toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '—';
@@ -28,6 +28,7 @@ function CashDepositForm({ onSubmit, onCancel }) {
   const [form, setForm] = useState({ date: '', amount: '', depositor: '', reference: '', order_id: '' });
   const [saving, setSaving] = useState(false);
   const [errors, setErrors] = useState({});
+  const [apiError, setApiError] = useState('');
 
   const validate = () => {
     const errs = {};
@@ -42,6 +43,7 @@ function CashDepositForm({ onSubmit, onCancel }) {
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!validate()) return;
+    setApiError('');
     setSaving(true);
     try {
       await onSubmit({
@@ -52,7 +54,7 @@ function CashDepositForm({ onSubmit, onCancel }) {
       setForm({ date: '', amount: '', depositor: '', reference: '', order_id: '' });
       setErrors({});
     } catch (err) {
-      alert(err.response?.data?.message || 'Erreur lors de l’enregistrement');
+      setApiError(err.response?.data?.message || "Erreur lors de l'enregistrement");
     } finally {
       setSaving(false);
     }
@@ -61,11 +63,19 @@ function CashDepositForm({ onSubmit, onCancel }) {
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
       <div className="flex items-center justify-between mb-2">
-        <h2 className="text-lg font-bold">Dépôt d’espèces</h2>
+        <h2 className="text-lg font-bold">Dépôt d'espèces</h2>
         <button type="button" onClick={onCancel} className="text-gray-400 hover:text-gray-600">
           <X size={20} />
         </button>
       </div>
+
+      {apiError && (
+        <div className="flex items-center gap-2 p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">
+          <AlertTriangle size={16} className="shrink-0" />
+          <span>{apiError}</span>
+          <button onClick={() => setApiError('')} className="ml-auto text-red-400 hover:text-red-600"><X size={14} /></button>
+        </div>
+      )}
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div>
@@ -161,6 +171,8 @@ export default function AdminPayments() {
   const [showCashForm, setShowCashForm] = useState(false);
   const [reconcilingId, setReconcilingId] = useState(null);
   const [reconcileRef, setReconcileRef] = useState('');
+  const [apiError, setApiError] = useState('');
+  const [reconcileError, setReconcileError] = useState('');
 
   const fetchPayments = useCallback(async () => {
     setLoading(true);
@@ -183,16 +195,18 @@ export default function AdminPayments() {
 
   const handleReconcile = async (id) => {
     if (!reconcileRef.trim()) {
-      alert('Veuillez saisir une référence de rapprochement');
+      setReconcileError('Veuillez saisir une référence de rapprochement');
       return;
     }
+    setReconcileError('');
+    setApiError('');
     try {
       await paymentsAPI.reconcile(id, { reference: reconcileRef });
       setReconcilingId(null);
       setReconcileRef('');
       fetchPayments();
     } catch (err) {
-      alert(err.response?.data?.message || 'Erreur de rapprochement');
+      setApiError(err.response?.data?.message || 'Erreur de rapprochement');
     }
   };
 
@@ -262,6 +276,14 @@ export default function AdminPayments() {
         </div>
       </div>
 
+      {apiError && (
+        <div className="flex items-center gap-2 p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">
+          <AlertTriangle size={16} className="shrink-0" />
+          <span>{apiError}</span>
+          <button onClick={() => setApiError('')} className="ml-auto text-red-400 hover:text-red-600"><X size={14} /></button>
+        </div>
+      )}
+
       {/* Payments Table */}
       <div className="card overflow-x-auto">
         {loading ? (
@@ -296,10 +318,13 @@ export default function AdminPayments() {
                   {p.method === 'Virement' && p.status !== 'reconciled' && (
                     <div className="pt-1">
                       {reconcilingId === p.id ? (
-                        <div className="flex items-center gap-2">
-                          <input type="text" value={reconcileRef} onChange={(e) => setReconcileRef(e.target.value)} placeholder="Réf. bancaire" className="border rounded-lg px-2 py-1 text-xs flex-1" autoFocus />
-                          <button onClick={() => handleReconcile(p.id)} className="p-1.5 rounded-lg hover:bg-green-50 text-green-600"><Check size={16} /></button>
-                          <button onClick={() => { setReconcilingId(null); setReconcileRef(''); }} className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-400"><X size={16} /></button>
+                        <div className="space-y-1">
+                          <div className="flex items-center gap-2">
+                            <input type="text" value={reconcileRef} onChange={(e) => { setReconcileRef(e.target.value); setReconcileError(''); }} placeholder="Réf. bancaire" className={`border rounded-lg px-2 py-1 text-xs flex-1 ${reconcileError ? 'border-red-400' : ''}`} autoFocus />
+                            <button onClick={() => handleReconcile(p.id)} className="p-1.5 rounded-lg hover:bg-green-50 text-green-600"><Check size={16} /></button>
+                            <button onClick={() => { setReconcilingId(null); setReconcileRef(''); setReconcileError(''); }} className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-400"><X size={16} /></button>
+                          </div>
+                          {reconcileError && <p className="text-xs text-red-500">{reconcileError}</p>}
                         </div>
                       ) : (
                         <button onClick={() => setReconcilingId(p.id)} className="text-xs px-3 py-1.5 rounded-lg border border-wine-200 text-wine-700 hover:bg-wine-50">Rapprocher</button>
@@ -356,7 +381,7 @@ export default function AdminPayments() {
                     <td className="py-3 text-right">
                       {p.status === 'unpaid' && (
                         <button
-                          onClick={() => { if (p.user_email) window.location.href = `mailto:${p.user_email}?subject=Relance paiement ${p.order_ref || ''}&body=Bonjour, nous vous contactons concernant un paiement en attente.`; else alert('Email du client non disponible'); }}
+                          onClick={() => { if (p.user_email) window.location.href = `mailto:${p.user_email}?subject=Relance paiement ${p.order_ref || ''}&body=Bonjour, nous vous contactons concernant un paiement en attente.`; else setApiError('Email du client non disponible'); }}
                           className="text-xs px-3 py-1.5 rounded-lg border border-red-200 text-red-700 hover:bg-red-50 mr-2 inline-flex items-center gap-1"
                         >
                           <Mail size={12} /> Relancer
@@ -365,29 +390,32 @@ export default function AdminPayments() {
                       {p.method === 'Virement' && p.status !== 'reconciled' && (
                         <>
                           {reconcilingId === p.id ? (
-                            <div className="flex items-center gap-2 justify-end">
-                              <input
-                                type="text"
-                                value={reconcileRef}
-                                onChange={(e) => setReconcileRef(e.target.value)}
-                                placeholder="Réf. bancaire"
-                                className="border rounded-lg px-2 py-1 text-xs w-32"
-                                autoFocus
-                              />
-                              <button
-                                onClick={() => handleReconcile(p.id)}
-                                className="p-1.5 rounded-lg hover:bg-green-50 text-green-600"
-                                title="Confirmer"
-                              >
-                                <Check size={16} />
-                              </button>
-                              <button
-                                onClick={() => { setReconcilingId(null); setReconcileRef(''); }}
-                                className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-400"
-                                title="Annuler"
-                              >
-                                <X size={16} />
-                              </button>
+                            <div className="space-y-1">
+                              <div className="flex items-center gap-2 justify-end">
+                                <input
+                                  type="text"
+                                  value={reconcileRef}
+                                  onChange={(e) => { setReconcileRef(e.target.value); setReconcileError(''); }}
+                                  placeholder="Réf. bancaire"
+                                  className={`border rounded-lg px-2 py-1 text-xs w-32 ${reconcileError ? 'border-red-400' : ''}`}
+                                  autoFocus
+                                />
+                                <button
+                                  onClick={() => handleReconcile(p.id)}
+                                  className="p-1.5 rounded-lg hover:bg-green-50 text-green-600"
+                                  title="Confirmer"
+                                >
+                                  <Check size={16} />
+                                </button>
+                                <button
+                                  onClick={() => { setReconcilingId(null); setReconcileRef(''); setReconcileError(''); }}
+                                  className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-400"
+                                  title="Annuler"
+                                >
+                                  <X size={16} />
+                                </button>
+                              </div>
+                              {reconcileError && <p className="text-xs text-red-500 text-right">{reconcileError}</p>}
                             </div>
                           ) : (
                             <button

@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { siteImagesAPI } from '../../services/api';
-import { Image, Upload, Save, Check, Eye, EyeOff, RefreshCw } from 'lucide-react';
+import { Image, Upload, Save, Check, Eye, EyeOff, RefreshCw, AlertTriangle, X } from 'lucide-react';
 
 const PAGE_LABELS = {
   accueil: 'Page d\'accueil',
@@ -27,6 +27,7 @@ export default function SiteImages() {
   const [editingAlt, setEditingAlt] = useState({});
   const [savingAlt, setSavingAlt] = useState(null);
   const [savedAlt, setSavedAlt] = useState(null);
+  const [apiError, setApiError] = useState('');
 
   useEffect(() => { load(); }, []);
 
@@ -43,6 +44,7 @@ export default function SiteImages() {
 
   const handleUpload = async (img, file) => {
     setUploading(img.id);
+    setApiError('');
     try {
       const { data } = await siteImagesAPI.upload(img.id, file);
       // Update in state
@@ -54,7 +56,7 @@ export default function SiteImages() {
         return next;
       });
     } catch (err) {
-      alert('Erreur upload: ' + (err.response?.data?.message || err.message));
+      setApiError('Erreur upload: ' + (err.response?.data?.message || err.message));
     } finally {
       setUploading(null);
     }
@@ -62,6 +64,7 @@ export default function SiteImages() {
 
   const handleAltSave = async (img) => {
     setSavingAlt(img.id);
+    setApiError('');
     try {
       await siteImagesAPI.update(img.id, { alt_text: editingAlt[img.id] ?? img.alt_text });
       setGrouped(prev => {
@@ -74,13 +77,14 @@ export default function SiteImages() {
       setSavedAlt(img.id);
       setTimeout(() => setSavedAlt(null), 2000);
     } catch (err) {
-      alert('Erreur: ' + (err.response?.data?.message || err.message));
+      setApiError('Erreur: ' + (err.response?.data?.message || err.message));
     } finally {
       setSavingAlt(null);
     }
   };
 
   const handleToggleActive = async (img) => {
+    setApiError('');
     try {
       const { data } = await siteImagesAPI.update(img.id, { active: !img.active });
       setGrouped(prev => {
@@ -91,7 +95,7 @@ export default function SiteImages() {
         return next;
       });
     } catch (err) {
-      alert('Erreur: ' + (err.response?.data?.message || err.message));
+      setApiError('Erreur: ' + (err.response?.data?.message || err.message));
     }
   };
 
@@ -120,6 +124,14 @@ export default function SiteImages() {
           <RefreshCw size={16} /> Actualiser
         </button>
       </div>
+
+      {apiError && (
+        <div className="flex items-center gap-2 p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">
+          <AlertTriangle size={16} className="shrink-0" />
+          <span>{apiError}</span>
+          <button onClick={() => setApiError('')} className="ml-auto text-red-400 hover:text-red-600"><X size={14} /></button>
+        </div>
+      )}
 
       {pages.map(page => (
         <div key={page} className="bg-white rounded-xl shadow-sm border border-gray-200">

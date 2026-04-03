@@ -116,6 +116,7 @@ export default function AdminSuppliers() {
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [editSupplier, setEditSupplier] = useState(null);
+  const [apiError, setApiError] = useState('');
 
   const fetchSuppliers = useCallback(async () => {
     setLoading(true);
@@ -136,21 +137,23 @@ export default function AdminSuppliers() {
   }, [fetchSuppliers]);
 
   const handleToggle = async (id) => {
+    setApiError('');
     try {
       await suppliersAPI.toggle(id);
       fetchSuppliers();
     } catch (err) {
-      alert(err.response?.data?.message || 'Erreur');
+      setApiError(err.response?.data?.message || 'Erreur');
     }
   };
 
   const handleDelete = async (supplier) => {
     if (!confirm(`Désactiver le fournisseur "${supplier.name}" ?`)) return;
+    setApiError('');
     try {
       await suppliersAPI.remove(supplier.id);
       fetchSuppliers();
     } catch (err) {
-      alert(err.response?.data?.message || 'Erreur');
+      setApiError(err.response?.data?.message || 'Erreur');
     }
   };
 
@@ -167,6 +170,14 @@ export default function AdminSuppliers() {
           Nouveau fournisseur
         </button>
       </div>
+
+      {apiError && (
+        <div className="flex items-center gap-2 p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">
+          <AlertTriangle size={16} className="shrink-0" />
+          <span>{apiError}</span>
+          <button onClick={() => setApiError('')} className="ml-auto text-red-400 hover:text-red-600"><X size={14} /></button>
+        </div>
+      )}
 
       {restockAlerts.length > 0 && (
         <div className="card border-l-4 border-l-orange-500 bg-orange-50">

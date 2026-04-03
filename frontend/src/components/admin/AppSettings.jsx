@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { appSettingsAPI } from '../../services/api';
-import { Settings, Palette, Save, Image, Type, Check, CreditCard, AlertTriangle, Wifi, WifiOff, Eye, EyeOff, Mail, Send, Upload, Database, Download } from 'lucide-react';
+import { Settings, Palette, Save, Image, Type, Check, CreditCard, AlertTriangle, Wifi, WifiOff, Eye, EyeOff, Mail, Send, Upload, Database, Download, X } from 'lucide-react';
 
 export default function AppSettings() {
   const [settings, setSettings] = useState({
@@ -32,6 +32,7 @@ export default function AppSettings() {
   const [uploadingLogo, setUploadingLogo] = useState(false);
   const [backupLoading, setBackupLoading] = useState(false);
   const [lastBackup, setLastBackup] = useState(null);
+  const [apiError, setApiError] = useState('');
 
   useEffect(() => {
     appSettingsAPI.getAdmin()
@@ -43,13 +44,14 @@ export default function AppSettings() {
   const handleSave = async () => {
     setSaving(true);
     setSaved(false);
+    setApiError('');
     try {
       const res = await appSettingsAPI.update(settings);
       setSettings((prev) => ({ ...prev, ...res.data }));
       setSaved(true);
       setTimeout(() => setSaved(false), 3000);
     } catch (err) {
-      alert(err.response?.data?.message || 'Erreur');
+      setApiError(err.response?.data?.message || 'Erreur');
     } finally {
       setSaving(false);
     }
@@ -76,11 +78,12 @@ export default function AppSettings() {
     const file = e.target.files?.[0];
     if (!file) return;
     setUploadingLogo(true);
+    setApiError('');
     try {
       const { data } = await appSettingsAPI.uploadLogo(file);
       setSettings((prev) => ({ ...prev, app_logo_url: data.logo_url }));
     } catch (err) {
-      alert(err.response?.data?.message || 'Erreur upload logo');
+      setApiError(err.response?.data?.message || 'Erreur upload logo');
     } finally {
       setUploadingLogo(false);
     }
@@ -88,13 +91,14 @@ export default function AppSettings() {
 
   const handleBackup = async () => {
     setBackupLoading(true);
+    setApiError('');
     try {
       const token = localStorage.getItem('accessToken');
       const res = await fetch(`${import.meta.env.VITE_API_URL || '/api/v1'}/admin/backup/database`, {
         headers: { Authorization: `Bearer ${token}` },
       });
       if (!res.ok) {
-        alert('Erreur lors de la sauvegarde');
+        setApiError('Erreur lors de la sauvegarde');
         return;
       }
       const blob = await res.blob();
@@ -106,7 +110,7 @@ export default function AppSettings() {
       URL.revokeObjectURL(url);
       setLastBackup(new Date().toLocaleString('fr-FR'));
     } catch (err) {
-      alert('Erreur lors de la sauvegarde');
+      setApiError('Erreur lors de la sauvegarde');
     } finally {
       setBackupLoading(false);
     }
@@ -147,6 +151,14 @@ export default function AppSettings() {
           {saving ? 'Enregistrement...' : saved ? 'Enregistre' : 'Enregistrer'}
         </button>
       </div>
+
+      {apiError && (
+        <div className="flex items-center gap-2 p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">
+          <AlertTriangle size={16} className="shrink-0" />
+          <span>{apiError}</span>
+          <button onClick={() => setApiError('')} className="ml-auto text-red-400 hover:text-red-600"><X size={14} /></button>
+        </div>
+      )}
 
       {/* Branding section */}
       <div className="card">

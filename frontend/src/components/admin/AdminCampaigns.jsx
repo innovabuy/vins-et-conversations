@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { campaignsAPI } from '../../services/api';
-import { BookOpen, Copy, Users, ShoppingCart, Calendar, TrendingUp, ChevronRight, Plus, Pencil, Trash2, X, Archive, AlertTriangle } from 'lucide-react';
+import { BookOpen, Copy, Users, ShoppingCart, Calendar, TrendingUp, ChevronRight, Plus, Pencil, Trash2, X, Archive, AlertTriangle, Check } from 'lucide-react';
 
 const formatEur = (v) => new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR' }).format(v);
 
@@ -40,6 +40,7 @@ function DeleteModal({ campaign, onClose, onDeleted }) {
   const [deps, setDeps] = useState(null);
   const [loading, setLoading] = useState(true);
   const [deleting, setDeleting] = useState(false);
+  const [apiError, setApiError] = useState('');
 
   useEffect(() => {
     campaignsAPI.dependencies(campaign.id)
@@ -49,12 +50,13 @@ function DeleteModal({ campaign, onClose, onDeleted }) {
   }, [campaign.id]);
 
   const handleConfirm = async () => {
+    setApiError('');
     setDeleting(true);
     try {
       await campaignsAPI.delete(campaign.id);
       onDeleted();
     } catch (err) {
-      alert(err.response?.data?.message || 'Erreur lors de la suppression');
+      setApiError(err.response?.data?.message || 'Erreur lors de la suppression');
     } finally {
       setDeleting(false);
     }
@@ -99,6 +101,14 @@ function DeleteModal({ campaign, onClose, onDeleted }) {
           </div>
         )}
 
+        {apiError && (
+          <div className="flex items-center gap-2 p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">
+            <AlertTriangle size={16} className="shrink-0" />
+            <span>{apiError}</span>
+            <button onClick={() => setApiError('')} className="ml-auto text-red-400 hover:text-red-600"><X size={14} /></button>
+          </div>
+        )}
+
         <div className="flex justify-end gap-3 pt-2">
           <button onClick={onClose} className="px-4 py-2 border rounded-lg text-sm hover:bg-gray-50">Annuler</button>
           <button
@@ -120,6 +130,8 @@ export default function AdminCampaigns() {
   const [loading, setLoading] = useState(true);
   const [showArchived, setShowArchived] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState(null);
+  const [apiError, setApiError] = useState('');
+  const [successMsg, setSuccessMsg] = useState('');
 
   const fetchCampaigns = async () => {
     setLoading(true);
@@ -138,11 +150,14 @@ export default function AdminCampaigns() {
 
   const handleDuplicate = async (id, name) => {
     if (!confirm(`Dupliquer la campagne "${name}" ?`)) return;
+    setApiError('');
+    setSuccessMsg('');
     try {
       await campaignsAPI.duplicate(id);
+      setSuccessMsg(`Campagne "${name}" dupliquée avec succès`);
       fetchCampaigns();
     } catch (err) {
-      alert(err.response?.data?.message || 'Erreur lors de la duplication');
+      setApiError(err.response?.data?.message || 'Erreur lors de la duplication');
     }
   };
 
@@ -166,6 +181,21 @@ export default function AdminCampaigns() {
           <Link to="/admin/campaigns/new" className="btn-primary flex items-center gap-2 text-sm"><Plus size={16} /> Nouvelle campagne</Link>
         </div>
       </div>
+
+      {apiError && (
+        <div className="flex items-center gap-2 p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">
+          <AlertTriangle size={16} className="shrink-0" />
+          <span>{apiError}</span>
+          <button onClick={() => setApiError('')} className="ml-auto text-red-400 hover:text-red-600"><X size={14} /></button>
+        </div>
+      )}
+      {successMsg && (
+        <div className="flex items-center gap-2 p-3 bg-green-50 border border-green-200 rounded-lg text-sm text-green-700">
+          <Check size={16} className="shrink-0" />
+          <span>{successMsg}</span>
+          <button onClick={() => setSuccessMsg('')} className="ml-auto text-green-400 hover:text-green-600"><X size={14} /></button>
+        </div>
+      )}
 
       {campaigns.length === 0 ? (
         <div className="card text-center py-12 text-gray-400">

@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Plus, Pencil, Trash2, Search, Tag, Percent, Euro, ToggleLeft, ToggleRight } from 'lucide-react';
+import { Plus, Pencil, Trash2, Search, Tag, Percent, Euro, ToggleLeft, ToggleRight, AlertTriangle, X } from 'lucide-react';
 import { promoCodesAPI } from '../../services/api';
 
 const formatEur = (v) => new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR' }).format(v);
@@ -14,6 +14,7 @@ export default function AdminPromoCodes() {
   const [form, setForm] = useState({ code: '', type: 'percentage', value: '', max_uses: '', min_order_ttc: '', valid_from: '', valid_until: '' });
   const [formError, setFormError] = useState('');
   const [saving, setSaving] = useState(false);
+  const [apiError, setApiError] = useState('');
 
   const loadData = async () => {
     setLoading(true);
@@ -94,11 +95,12 @@ export default function AdminPromoCodes() {
 
   const handleDelete = async (code) => {
     if (!window.confirm(`Supprimer le code ${code.code} ?`)) return;
+    setApiError('');
     try {
       await promoCodesAPI.delete(code.id);
       await loadData();
     } catch (err) {
-      alert(err.response?.data?.message || 'Erreur');
+      setApiError(err.response?.data?.message || 'Erreur lors de la suppression');
     }
   };
 
@@ -134,6 +136,14 @@ export default function AdminPromoCodes() {
           className="w-full sm:w-64 pl-9 pr-3 py-2 border rounded-lg text-sm outline-none focus:ring-2 focus:ring-wine-200"
         />
       </div>
+
+      {apiError && (
+        <div className="flex items-center gap-2 p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700 mb-4">
+          <AlertTriangle size={16} className="shrink-0" />
+          <span>{apiError}</span>
+          <button onClick={() => setApiError('')} className="ml-auto text-red-400 hover:text-red-600"><X size={14} /></button>
+        </div>
+      )}
 
       {/* Table */}
       <div className="card overflow-x-auto">

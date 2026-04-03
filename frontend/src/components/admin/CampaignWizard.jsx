@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { campaignsAPI, clientTypesAPI } from '../../services/api';
-import { ChevronLeft, ChevronRight, Check, Building2, Users, Wine, Settings, FileText, Rocket, Image, PiggyBank, Upload, Plus, X } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Check, Building2, Users, Wine, Settings, FileText, Rocket, Image, PiggyBank, Upload, Plus, X, AlertTriangle } from 'lucide-react';
 import { organizationsAPI } from '../../services/api';
 import { useAppSettings } from '../../contexts/AppSettingsContext';
 import { formatEur } from '../../utils/chartTheme';
@@ -179,6 +179,7 @@ export default function CampaignWizard() {
   const [saving, setSaving] = useState(false);
   const [uploadingPartnerLogo, setUploadingPartnerLogo] = useState(false);
   const [showNewClientType, setShowNewClientType] = useState(false);
+  const [apiError, setApiError] = useState('');
 
   const [form, setForm] = useState({
     client_type_id: '',
@@ -255,6 +256,7 @@ export default function CampaignWizard() {
 
   const handleSave = async () => {
     setSaving(true);
+    setApiError('');
     try {
       // Save partner logo to organization if provided
       if (form.partner_logo_url && form.org_id) {
@@ -282,7 +284,7 @@ export default function CampaignWizard() {
         navigate(`/admin/campaigns/${data.id}`);
       }
     } catch (err) {
-      alert(err.response?.data?.message || `Erreur ${isEdit ? 'de modification' : 'de création'}`);
+      setApiError(err.response?.data?.message || `Erreur ${isEdit ? 'de modification' : 'de création'}`);
     } finally {
       setSaving(false);
     }
@@ -336,6 +338,14 @@ export default function CampaignWizard() {
           </button>
         ))}
       </div>
+
+      {apiError && (
+        <div className="flex items-center gap-2 p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">
+          <AlertTriangle size={16} className="shrink-0" />
+          <span>{apiError}</span>
+          <button onClick={() => setApiError('')} className="ml-auto text-red-400 hover:text-red-600"><X size={14} /></button>
+        </div>
+      )}
 
       {/* Step content */}
       <div className="card min-h-[300px]">
@@ -463,11 +473,12 @@ export default function CampaignWizard() {
                         const file = e.target.files?.[0];
                         if (!file) return;
                         setUploadingPartnerLogo(true);
+                        setApiError('');
                         try {
                           const { data } = await organizationsAPI.uploadLogo(form.org_id, file);
                           updateForm('partner_logo_url', data.logo_url);
                         } catch (err) {
-                          alert(err.response?.data?.message || 'Erreur upload logo');
+                          setApiError(err.response?.data?.message || 'Erreur upload logo');
                         } finally { setUploadingPartnerLogo(false); }
                       }} />
                     </label>

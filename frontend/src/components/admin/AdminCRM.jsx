@@ -4,7 +4,7 @@ import { contactsAPI, campaignsAPI, ambassadorAPI } from '../../services/api';
 import {
   Users, Plus, Search, Pencil, X, Phone, Mail, MapPin,
   ChevronLeft, ChevronRight, UserPlus, GraduationCap, Building2, Award,
-  ShoppingCart, ExternalLink, TrendingUp, Upload, Eye, EyeOff,
+  ShoppingCart, ExternalLink, TrendingUp, Upload, Eye, EyeOff, Check,
 } from 'lucide-react';
 
 const formatEur = (v) => new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR' }).format(v);
@@ -43,6 +43,7 @@ function ContactPanel({ contact, onClose }) {
   const [loading, setLoading] = useState(true);
   const [inviting, setInviting] = useState(false);
   const [selectedCampaign, setSelectedCampaign] = useState('');
+  const [inviteMsg, setInviteMsg] = useState('');
 
   useEffect(() => {
     Promise.all([
@@ -59,7 +60,7 @@ function ContactPanel({ contact, onClose }) {
 
   const handleInvite = async () => {
     if (!selectedCampaign) return;
-    alert(`Invitation préparée pour ${contact.name} à la campagne sélectionnée. (Fonctionnalité d'envoi à configurer)`);
+    setInviteMsg(`Invitation préparée pour ${contact.name} à la campagne sélectionnée. (Fonctionnalité d'envoi à configurer)`);
     setInviting(false);
     setSelectedCampaign('');
   };
@@ -171,6 +172,13 @@ function ContactPanel({ contact, onClose }) {
                   {allCampaigns.filter(c => c.status === 'active').map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
                 </select>
                 <button onClick={handleInvite} disabled={!selectedCampaign} className="px-3 py-1.5 text-xs bg-wine-700 text-white rounded-lg hover:bg-wine-800 disabled:opacity-50">Inviter</button>
+              </div>
+            )}
+            {inviteMsg && (
+              <div className="flex items-center gap-2 p-3 mb-3 bg-green-50 border border-green-200 rounded-lg text-sm text-green-700">
+                <Check size={16} className="shrink-0" />
+                <span>{inviteMsg}</span>
+                <button onClick={() => setInviteMsg('')} className="ml-auto text-green-400 hover:text-green-600"><X size={14} /></button>
               </div>
             )}
             {orders.length > 0 ? (

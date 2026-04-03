@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { deliveryNotesAPI, ordersAPI } from '../../services/api';
-import { Truck, FileText, Check, Eye, EyeOff, X, ChevronRight, Printer, Mail, Trash2, Pencil, Save, ExternalLink, PenTool, Link2, Copy, MessageCircle, Send } from 'lucide-react';
+import { Truck, FileText, Check, Eye, EyeOff, X, ChevronRight, Printer, Mail, Trash2, Pencil, Save, ExternalLink, PenTool, Link2, Copy, MessageCircle, Send, AlertTriangle } from 'lucide-react';
 import SignaturePad from '../shared/SignaturePad';
 import { copyToClipboard } from '../../utils/copyToClipboard';
 
@@ -25,6 +25,7 @@ function GenerateBLModal({ onClose, onCreated }) {
   const [selected, setSelected] = useState(null);
   const [form, setForm] = useState({ recipient_name: '', delivery_address: '', planned_date: '' });
   const [creating, setCreating] = useState(false);
+  const [apiError, setApiError] = useState('');
 
   useEffect(() => {
     ordersAPI.list({ status: 'validated' })
@@ -41,12 +42,13 @@ function GenerateBLModal({ onClose, onCreated }) {
   const handleCreate = async (e) => {
     e.preventDefault();
     if (!selected) return;
+    setApiError('');
     setCreating(true);
     try {
       await deliveryNotesAPI.create({ order_id: selected.id, ...form, planned_date: form.planned_date || null });
       onCreated();
     } catch (err) {
-      alert(err.response?.data?.message || 'Erreur lors de la création du BL');
+      setApiError(err.response?.data?.message || 'Erreur lors de la création du BL');
     } finally { setCreating(false); }
   };
 
@@ -58,6 +60,13 @@ function GenerateBLModal({ onClose, onCreated }) {
           <button onClick={onClose} className="text-gray-400 hover:text-gray-600"><X size={20} /></button>
         </div>
         <div className="p-4 space-y-4">
+          {apiError && (
+            <div className="flex items-center gap-2 p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">
+              <AlertTriangle size={16} className="shrink-0" />
+              <span>{apiError}</span>
+              <button onClick={() => setApiError('')} className="ml-auto text-red-400 hover:text-red-600"><X size={14} /></button>
+            </div>
+          )}
           {loading ? (
             <div className="flex justify-center py-8"><div className="animate-spin rounded-full h-6 w-6 border-b-2 border-wine-700" /></div>
           ) : orders.length === 0 ? (
@@ -107,6 +116,8 @@ function DeliveryNoteDetail({ noteId, onClose, onUpdated }) {
   const [linkCopied, setLinkCopied] = useState(false);
   const [showViewSignature, setShowViewSignature] = useState(false);
   const [signatureData, setSignatureData] = useState(null);
+  const [apiError, setApiError] = useState('');
+  const [successMsg, setSuccessMsg] = useState('');
 
   const fetchNote = useCallback(async () => {
     setLoading(true);
@@ -125,27 +136,30 @@ function DeliveryNoteDetail({ noteId, onClose, onUpdated }) {
       return;
     }
     if (!confirm(`${WORKFLOW_LABELS[note.status]} ?`)) return;
+    setApiError('');
     setUpdating(true);
     try {
       await deliveryNotesAPI.update(note.id, { status: nextStatus });
       await fetchNote();
       if (onUpdated) onUpdated();
-    } catch (err) { alert(err.response?.data?.message || 'Erreur'); } finally { setUpdating(false); }
+    } catch (err) { setApiError(err.response?.data?.message || 'Erreur'); } finally { setUpdating(false); }
   };
 
   const handleSignatureConfirm = async (signatureDataUrl) => {
     setShowSignaturePad(false);
+    setApiError('');
     setUpdating(true);
     try {
       await deliveryNotesAPI.sign(note.id, { signature_url: signatureDataUrl });
       await fetchNote();
       if (onUpdated) onUpdated();
-    } catch (err) { alert(err.response?.data?.message || 'Erreur'); } finally { setUpdating(false); }
+    } catch (err) { setApiError(err.response?.data?.message || 'Erreur'); } finally { setUpdating(false); }
   };
 
   const handleDelete = async () => {
     if (!confirm('Supprimer ce bon de livraison ?')) return;
-    try { await deliveryNotesAPI.remove(note.id); if (onUpdated) onUpdated(); onClose(); } catch (err) { alert(err.response?.data?.message || 'Erreur'); }
+    setApiError('');
+    try { await deliveryNotesAPI.remove(note.id); if (onUpdated) onUpdated(); onClose(); } catch (err) { setApiError(err.response?.data?.message || 'Erreur'); }
   };
 
   const handlePrint = () => {
@@ -156,7 +170,9 @@ function DeliveryNoteDetail({ noteId, onClose, onUpdated }) {
 
   const handleEmail = async () => {
     if (!confirm('Envoyer ce BL par email ?')) return;
-    try { const res = await deliveryNotesAPI.sendEmail(noteId); alert(`Email préparé pour ${res.data.to}`); } catch (err) { alert(err.response?.data?.message || 'Erreur'); }
+    setApiError('');
+    setSuccessMsg('');
+    try { const res = await deliveryNotesAPI.sendEmail(noteId); setSuccessMsg(`Email préparé pour ${res.data.to}`); } catch (err) { setApiError(err.response?.data?.message || 'Erreur'); }
   };
 
   const startEdit = () => {
@@ -165,16 +181,18 @@ function DeliveryNoteDetail({ noteId, onClose, onUpdated }) {
   };
 
   const saveEdit = async () => {
-    try { await deliveryNotesAPI.update(note.id, editForm); setEditing(false); await fetchNote(); if (onUpdated) onUpdated(); } catch (err) { alert(err.response?.data?.message || 'Erreur'); }
+    setApiError('');
+    try { await deliveryNotesAPI.update(note.id, editForm); setEditing(false); await fetchNote(); if (onUpdated) onUpdated(); } catch (err) { setApiError(err.response?.data?.message || 'Erreur'); }
   };
 
   const handleGenerateLink = async () => {
+    setApiError('');
     setGeneratingLink(true);
     try {
       const res = await deliveryNotesAPI.generateSignatureLink(noteId, sigLinkForm);
       setGeneratedLink(res.data.signature_url);
     } catch (err) {
-      alert(err.response?.data?.message || 'Erreur');
+      setApiError(err.response?.data?.message || 'Erreur');
     } finally { setGeneratingLink(false); }
   };
 
@@ -186,12 +204,13 @@ function DeliveryNoteDetail({ noteId, onClose, onUpdated }) {
   };
 
   const handleViewSignature = async () => {
+    setApiError('');
     try {
       const res = await deliveryNotesAPI.getSignature(noteId);
       setSignatureData(res.data);
       setShowViewSignature(true);
     } catch (err) {
-      alert(err.response?.data?.message || 'Aucune signature');
+      setApiError(err.response?.data?.message || 'Aucune signature');
     }
   };
 
@@ -233,6 +252,21 @@ function DeliveryNoteDetail({ noteId, onClose, onUpdated }) {
           );
         })}
       </div>
+
+      {apiError && (
+        <div className="flex items-center gap-2 p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">
+          <AlertTriangle size={16} className="shrink-0" />
+          <span>{apiError}</span>
+          <button onClick={() => setApiError('')} className="ml-auto text-red-400 hover:text-red-600"><X size={14} /></button>
+        </div>
+      )}
+      {successMsg && (
+        <div className="flex items-center gap-2 p-3 bg-green-50 border border-green-200 rounded-lg text-sm text-green-700">
+          <Check size={16} className="shrink-0" />
+          <span>{successMsg}</span>
+          <button onClick={() => setSuccessMsg('')} className="ml-auto text-green-400 hover:text-green-600"><X size={14} /></button>
+        </div>
+      )}
 
       {/* Action buttons */}
       <div className="flex flex-wrap gap-2">

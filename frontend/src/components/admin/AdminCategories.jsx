@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { categoriesAPI } from '../../services/api';
-import { Plus, Pencil, Trash2, ArrowUp, ArrowDown, X, Save, GripVertical } from 'lucide-react';
+import { Plus, Pencil, Trash2, ArrowUp, ArrowDown, X, Save, GripVertical, AlertTriangle } from 'lucide-react';
 
 export default function AdminCategories() {
   const [categories, setCategories] = useState([]);
@@ -9,6 +9,7 @@ export default function AdminCategories() {
   const [form, setForm] = useState({ name: '', description: '', icon: '', icon_emoji: '', color: '#7a1c3b', sort_order: 0, type: 'wine', product_type: 'wine', is_alcohol: true, has_tasting_profile: true, tasting_axes: [] });
   const [saving, setSaving] = useState(false);
   const [axeInput, setAxeInput] = useState('');
+  const [apiError, setApiError] = useState('');
 
   const fetchCategories = useCallback(async () => {
     setLoading(true);
@@ -51,6 +52,7 @@ export default function AdminCategories() {
   };
 
   const handleSave = async () => {
+    setApiError('');
     setSaving(true);
     try {
       if (editing === 'new') {
@@ -61,25 +63,27 @@ export default function AdminCategories() {
       setEditing(null);
       fetchCategories();
     } catch (err) {
-      alert(err.response?.data?.message || 'Erreur');
+      setApiError(err.response?.data?.message || 'Erreur');
     } finally { setSaving(false); }
   };
 
   const handleDelete = async (id) => {
     if (!confirm('Supprimer cette catégorie ?')) return;
+    setApiError('');
     try {
       await categoriesAPI.delete(id);
       fetchCategories();
     } catch (err) {
-      alert(err.response?.data?.message || 'Erreur');
+      setApiError(err.response?.data?.message || 'Erreur');
     }
   };
 
   const handleToggle = async (cat) => {
+    setApiError('');
     try {
       await categoriesAPI.update(cat.id, { name: cat.name, active: !cat.active });
       fetchCategories();
-    } catch (err) { alert(err.response?.data?.message || 'Erreur'); }
+    } catch (err) { setApiError(err.response?.data?.message || 'Erreur'); }
   };
 
   const moveCategory = async (idx, dir) => {
@@ -100,6 +104,14 @@ export default function AdminCategories() {
         <h1 className="text-2xl font-bold text-gray-900">Catégories</h1>
         <button onClick={openNew} className="btn-primary flex items-center gap-2"><Plus size={16} /> Nouvelle catégorie</button>
       </div>
+
+      {apiError && (
+        <div className="flex items-center gap-2 p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">
+          <AlertTriangle size={16} className="shrink-0" />
+          <span>{apiError}</span>
+          <button onClick={() => setApiError('')} className="ml-auto text-red-400 hover:text-red-600"><X size={14} /></button>
+        </div>
+      )}
 
       {/* Edit/Create Modal */}
       {editing && (

@@ -50,12 +50,36 @@ function NewOrderForm({ onClose, onCreated }) {
   const [promoResult, setPromoResult] = useState(null);
   const [promoError, setPromoError] = useState('');
   const [promoLoading, setPromoLoading] = useState(false);
+  const [errors, setErrors] = useState({});
+  const [apiError, setApiError] = useState('');
   const debounceRef = useRef(null);
+
+  const API_ERROR_MESSAGES = {
+    INVALID_PRODUCTS: "Produit(s) non disponible(s) dans cette campagne",
+    INVALID_CAMPAIGN: "Campagne introuvable ou inactive",
+    MISSING_FIELDS: "Veuillez remplir tous les champs obligatoires",
+    MAX_UNPAID_ORDERS: "Ce client a trop de commandes impayées en attente",
+  };
+
+  const validate = () => {
+    const newErrors = {};
+    if (!form.campaign_id) newErrors.campaign_id = "Sélectionnez une campagne";
+    if (!form.items.length) newErrors.items = "Ajoutez au moins un produit";
+    else if (form.items.some(i => !i.qty || i.qty <= 0)) newErrors.items = "La quantité doit être supérieure à 0";
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
 
   useEffect(() => {
     campaignsAPI.list().then(res => setCampaigns(res.data.data || [])).catch(console.error);
-    productsAPI.list().then(res => setProducts(res.data.data || res.data || [])).catch(console.error);
   }, []);
+
+  useEffect(() => {
+    if (!form.campaign_id) { setProducts([]); return; }
+    productsAPI.byCampaign(form.campaign_id)
+      .then(res => setProducts(res.data.data || res.data || []))
+      .catch(() => setProducts([]));
+  }, [form.campaign_id]);
 
   const searchContacts = (q) => {
     setContactSearch(q);
@@ -70,6 +94,7 @@ function NewOrderForm({ onClose, onCreated }) {
   };
 
   const addItem = (product) => {
+    setErrors(prev => { const { items, ...rest } = prev; return rest; });
     setForm(f => {
       const existing = f.items.find(i => i.productId === product.id);
       if (existing) return { ...f, items: f.items.map(i => i.productId === product.id ? { ...i, qty: i.qty + 1 } : i) };
@@ -113,7 +138,8 @@ function NewOrderForm({ onClose, onCreated }) {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!form.campaign_id || form.items.length === 0) { alert('Sélectionnez une campagne et au moins un produit'); return; }
+    setApiError('');
+    if (!validate()) return;
     setSaving(true);
     try {
       await ordersAPI.adminCreate({
@@ -126,7 +152,17 @@ function NewOrderForm({ onClose, onCreated }) {
       });
       onCreated();
     } catch (err) {
-      alert(err.response?.data?.message || 'Erreur lors de la création');
+      const code = err.response?.data?.error;
+      const status = err.response?.status;
+      if (API_ERROR_MESSAGES[code]) {
+        setApiError(API_ERROR_MESSAGES[code]);
+      } else if (status === 403) {
+        setApiError("Vous n'avez pas les droits pour cette action");
+      } else if (status >= 500) {
+        setApiError("Erreur serveur — réessayez ou contactez le support");
+      } else {
+        setApiError(err.response?.data?.message || 'Erreur lors de la création');
+      }
     } finally {
       setSaving(false);
     }
@@ -146,10 +182,11 @@ function NewOrderForm({ onClose, onCreated }) {
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label className="block text-xs font-medium text-gray-500 mb-1">Campagne *</label>
-              <select value={form.campaign_id} onChange={e => setForm(f => ({ ...f, campaign_id: e.target.value }))} className="w-full border rounded-lg px-3 py-2 text-sm" required>
+              <select value={form.campaign_id} onChange={e => { setForm(f => ({ ...f, campaign_id: e.target.value, items: [] })); setErrors(prev => { const { campaign_id, ...rest } = prev; return rest; }); setApiError(''); }} onBlur={() => { if (!form.campaign_id) setErrors(prev => ({ ...prev, campaign_id: "Sélectionnez une campagne" })); }} className={`w-full border rounded-lg px-3 py-2 text-sm ${errors.campaign_id ? 'border-red-400' : ''}`} required>
                 <option value="">Sélectionner...</option>
                 {campaigns.filter(c => c.status === 'active').map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
               </select>
+              {errors.campaign_id && <p className="text-red-500 text-sm mt-1">{errors.campaign_id}</p>}
             </div>
             <div>
               <label className="block text-xs font-medium text-gray-500 mb-1">Pour le compte de (optionnel)</label>
@@ -204,7 +241,7 @@ function NewOrderForm({ onClose, onCreated }) {
 
           <div>
             <label className="block text-xs font-medium text-gray-500 mb-1">Produits</label>
-            <div className="border rounded-lg p-3 max-h-40 overflow-y-auto space-y-1">
+            <div className={`border rounded-lg p-3 max-h-40 overflow-y-auto space-y-1 ${errors.items ? 'border-red-400' : ''}`}>
               {products.map(p => (
                 <button key={p.id} type="button" onClick={() => addItem(p)} className="w-full text-left flex items-center justify-between px-2 py-1 hover:bg-gray-50 rounded text-sm">
                   <span>{p.name}</span>
@@ -212,6 +249,7 @@ function NewOrderForm({ onClose, onCreated }) {
                 </button>
               ))}
             </div>
+            {errors.items && <p className="text-red-500 text-sm mt-1">{errors.items}</p>}
           </div>
 
           {form.items.length > 0 && (
@@ -275,9 +313,17 @@ function NewOrderForm({ onClose, onCreated }) {
             {promoError && <p className="text-xs text-red-500 mt-1">{promoError}</p>}
           </div>
 
+          {apiError && (
+            <div className="flex items-center gap-2 p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">
+              <AlertTriangle size={16} className="shrink-0" />
+              <span>{apiError}</span>
+              <button type="button" onClick={() => setApiError('')} className="ml-auto text-red-400 hover:text-red-600"><X size={14} /></button>
+            </div>
+          )}
+
           <div className="flex justify-end gap-3 pt-2">
             <button type="button" onClick={onClose} className="px-4 py-2 text-sm text-gray-600 hover:bg-gray-100 rounded-lg">Annuler</button>
-            <button type="submit" disabled={saving} className="btn-primary flex items-center gap-2">
+            <button type="submit" disabled={saving || Object.keys(errors).length > 0} className="btn-primary flex items-center gap-2">
               <Save size={16} />{saving ? 'Création...' : 'Créer la commande'}
             </button>
           </div>
@@ -296,6 +342,8 @@ function OrderDetail({ orderId, onClose, onUpdated }) {
   const [showMarkPaid, setShowMarkPaid] = useState(false);
   const [markPaidMethod, setMarkPaidMethod] = useState('card');
   const [markPaidNotes, setMarkPaidNotes] = useState('');
+  const [detailError, setDetailError] = useState('');
+  const [detailSuccess, setDetailSuccess] = useState('');
 
   useEffect(() => {
     ordersAPI.get(orderId)
@@ -306,15 +354,15 @@ function OrderDetail({ orderId, onClose, onUpdated }) {
 
   const handleCreateBL = async () => {
     setCreatingBL(true);
+    setDetailError('');
     try {
       await deliveryNotesAPI.create({
         order_id: orderId,
         recipient_name: order.user_name || '',
       });
-      alert('Bon de livraison créé !');
       navigate('/admin/delivery');
     } catch (err) {
-      alert(err.response?.data?.message || 'Erreur lors de la création du BL');
+      setDetailError(err.response?.data?.message || 'Erreur lors de la création du BL');
     } finally {
       setCreatingBL(false);
     }
@@ -322,12 +370,14 @@ function OrderDetail({ orderId, onClose, onUpdated }) {
 
   const handleValidate = async () => {
     if (!confirm('Valider cette commande ?')) return;
-    try { await ordersAPI.validate(orderId); onUpdated(); } catch (err) { alert(err.response?.data?.message || 'Erreur'); }
+    setDetailError('');
+    try { await ordersAPI.validate(orderId); onUpdated(); } catch (err) { setDetailError(err.response?.data?.message || 'Erreur'); }
   };
 
   const handleCancel = async () => {
     if (!confirm('Annuler cette commande ? Cette action créera un événement financier de correction.')) return;
-    try { await ordersAPI.cancel(orderId); onUpdated(); } catch (err) { alert(err.response?.data?.message || 'Erreur'); }
+    setDetailError('');
+    try { await ordersAPI.cancel(orderId); onUpdated(); } catch (err) { setDetailError(err.response?.data?.message || 'Erreur'); }
   };
 
   const handlePrint = () => {
@@ -338,10 +388,11 @@ function OrderDetail({ orderId, onClose, onUpdated }) {
 
   const handleEmail = async () => {
     if (!confirm('Préparer l\'envoi de cette commande par email ?')) return;
+    setDetailError(''); setDetailSuccess('');
     try {
       const res = await ordersAPI.sendEmail(orderId);
-      alert(`Email préparé pour ${res.data.to}`);
-    } catch (err) { alert(err.response?.data?.message || 'Erreur'); }
+      setDetailSuccess(`Email préparé pour ${res.data.to}`);
+    } catch (err) { setDetailError(err.response?.data?.message || 'Erreur'); }
   };
 
   if (loading) return <div className="flex justify-center py-12"><div className="animate-spin rounded-full h-6 w-6 border-b-2 border-wine-700" /></div>;
@@ -398,6 +449,21 @@ function OrderDetail({ orderId, onClose, onUpdated }) {
         </button>
       </div>
 
+      {detailError && (
+        <div className="flex items-center gap-2 p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">
+          <AlertTriangle size={16} className="shrink-0" />
+          <span>{detailError}</span>
+          <button onClick={() => setDetailError('')} className="ml-auto text-red-400 hover:text-red-600"><X size={14} /></button>
+        </div>
+      )}
+      {detailSuccess && (
+        <div className="flex items-center gap-2 p-3 bg-green-50 border border-green-200 rounded-lg text-sm text-green-700">
+          <Check size={16} className="shrink-0" />
+          <span>{detailSuccess}</span>
+          <button onClick={() => setDetailSuccess('')} className="ml-auto text-green-400 hover:text-green-600"><X size={14} /></button>
+        </div>
+      )}
+
       {/* Mark-paid modal */}
       {showMarkPaid && (
         <div className="border border-emerald-200 rounded-lg p-4 bg-emerald-50 space-y-3">
@@ -422,7 +488,7 @@ function OrderDetail({ orderId, onClose, onUpdated }) {
                   await ordersAPI.markPaid(orderId, { payment_method: markPaidMethod, notes: markPaidNotes || undefined });
                   setShowMarkPaid(false);
                   onUpdated();
-                } catch (e) { alert(e.response?.data?.message || 'Erreur'); }
+                } catch (e) { setDetailError(e.response?.data?.message || 'Erreur'); }
               }}
               className="px-3 py-1.5 text-sm rounded-lg bg-emerald-600 text-white hover:bg-emerald-700"
             >Confirmer</button>
@@ -468,7 +534,7 @@ function OrderDetail({ orderId, onClose, onUpdated }) {
             <button
               onClick={async () => {
                 const ids = order.order_items.filter((i) => i.is_deferred && i.deferred_status === 'pending').map((i) => i.id);
-                try { await ordersAPI.deferredItems(orderId, { action: 'validate', item_ids: ids }); onUpdated(); } catch (e) { alert(e.response?.data?.message || 'Erreur'); }
+                try { await ordersAPI.deferredItems(orderId, { action: 'validate', item_ids: ids }); onUpdated(); } catch (e) { setDetailError(e.response?.data?.message || 'Erreur'); }
               }}
               className="flex items-center gap-1.5 px-3 py-1.5 text-sm rounded-lg bg-green-600 text-white hover:bg-green-700"
             >
@@ -478,7 +544,7 @@ function OrderDetail({ orderId, onClose, onUpdated }) {
               onClick={async () => {
                 if (!confirm('Refuser les lignes differees ? Un email sera envoye au client.')) return;
                 const ids = order.order_items.filter((i) => i.is_deferred && i.deferred_status === 'pending').map((i) => i.id);
-                try { await ordersAPI.deferredItems(orderId, { action: 'refuse', item_ids: ids }); onUpdated(); } catch (e) { alert(e.response?.data?.message || 'Erreur'); }
+                try { await ordersAPI.deferredItems(orderId, { action: 'refuse', item_ids: ids }); onUpdated(); } catch (e) { setDetailError(e.response?.data?.message || 'Erreur'); }
               }}
               className="flex items-center gap-1.5 px-3 py-1.5 text-sm rounded-lg bg-red-600 text-white hover:bg-red-700"
             >
@@ -530,6 +596,7 @@ function AssignModal({ orderId, orderRef, onClose, onAssigned }) {
   const [searching, setSearching] = useState(false);
   const [selected, setSelected] = useState(null);
   const [assigning, setAssigning] = useState(false);
+  const [assignError, setAssignError] = useState('');
   const debounceRef = useRef(null);
 
   const handleSearch = (q) => {
@@ -558,7 +625,7 @@ function AssignModal({ orderId, orderRef, onClose, onAssigned }) {
       await ordersAPI.assign(orderId, { user_id: selected.id });
       onAssigned();
     } catch (err) {
-      alert(err.response?.data?.message || 'Erreur lors du rattachement');
+      setAssignError(err.response?.data?.message || 'Erreur lors du rattachement');
     } finally { setAssigning(false); }
   };
 
@@ -599,6 +666,13 @@ function AssignModal({ orderId, orderRef, onClose, onAssigned }) {
             <p className="text-xs text-green-600">{selected.email}</p>
           </div>
         )}
+        {assignError && (
+          <div className="flex items-center gap-2 p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">
+            <AlertTriangle size={16} className="shrink-0" />
+            <span>{assignError}</span>
+            <button onClick={() => setAssignError('')} className="ml-auto text-red-400 hover:text-red-600"><X size={14} /></button>
+          </div>
+        )}
         <div className="flex justify-end gap-2 pt-2">
           <button onClick={onClose} className="px-4 py-2 text-sm rounded-lg border hover:bg-gray-50">Annuler</button>
           <button onClick={handleAssign} disabled={!selected || assigning}
@@ -630,6 +704,7 @@ export default function AdminOrders() {
   const [selectedOrder, setSelectedOrder] = useState(searchParams.get('selected') || null);
   const [showNewForm, setShowNewForm] = useState(false);
   const [assignOrder, setAssignOrder] = useState(null);
+  const [listError, setListError] = useState('');
 
   const fetchOrders = useCallback(async () => {
     setLoading(true);
@@ -656,7 +731,8 @@ export default function AdminOrders() {
 
   const handleValidate = async (id) => {
     if (!confirm('Valider cette commande ?')) return;
-    try { await ordersAPI.validate(id); fetchOrders(); } catch (err) { alert(err.response?.data?.message || 'Erreur'); }
+    setListError('');
+    try { await ordersAPI.validate(id); fetchOrders(); } catch (err) { setListError(err.response?.data?.message || 'Erreur'); }
   };
 
   const handleCreated = () => { setShowNewForm(false); fetchOrders(); };
@@ -684,6 +760,14 @@ export default function AdminOrders() {
           </button>
         </div>
       </div>
+
+      {listError && (
+        <div className="flex items-center gap-2 p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">
+          <AlertTriangle size={16} className="shrink-0" />
+          <span>{listError}</span>
+          <button onClick={() => setListError('')} className="ml-auto text-red-400 hover:text-red-600"><X size={14} /></button>
+        </div>
+      )}
 
       <div className="card">
         <div className="flex flex-wrap gap-3 items-end">
