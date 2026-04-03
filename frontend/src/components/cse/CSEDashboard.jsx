@@ -20,7 +20,10 @@ export default function CSEDashboard() {
   const campaignId = user?.campaigns?.[0]?.campaign_id;
 
   useEffect(() => {
-    if (!campaignId) return;
+    if (!campaignId) {
+      setLoading(false);
+      return;
+    }
     loadDashboard();
   }, [campaignId]);
 

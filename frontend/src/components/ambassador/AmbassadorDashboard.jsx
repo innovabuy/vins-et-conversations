@@ -374,27 +374,7 @@ export default function AmbassadorDashboard() {
           );
         })()}
 
-        {commission && commission.rate > 0 && (
-          <div className="bg-wine-50 border border-wine-200 rounded-lg p-4 mb-3">
-            <div className="flex items-center gap-2 mb-3">
-              <Wallet size={18} className="text-wine-700" />
-              <h3 className="font-semibold text-wine-800">Ma Commission</h3>
-              <span className="text-xs bg-wine-100 text-wine-700 px-2 py-0.5 rounded-full ml-auto">{commission.rate}%</span>
-            </div>
-            <div className="grid grid-cols-2 gap-3">
-              <div className="bg-white rounded-lg p-3 text-center">
-                <p className="text-xl font-bold text-wine-700">{fmtEur(commission.amount)} EUR</p>
-                <p className="text-xs text-gray-500">Commission totale</p>
-                <p className="text-xs text-gray-400">sur {fmtEur(commission.total_ht, 0)} EUR HT</p>
-              </div>
-              <div className="bg-white rounded-lg p-3 text-center">
-                <p className="text-xl font-bold text-orange-700">{fmtEur(commission.monthly_amount)} EUR</p>
-                <p className="text-xs text-gray-500">Ce mois</p>
-                <p className="text-xs text-gray-400">sur {fmtEur(commission.monthly_ht, 0)} EUR HT</p>
-              </div>
-            </div>
-          </div>
-        )}
+        {/* Section "Ma Commission" (fund_individual) masquée — remplacée par commission_tiers progressifs ci-dessous */}
 
         {commission_tiers && commission_tiers.rate > 0 && (
           <div className="bg-indigo-50 border border-indigo-200 rounded-lg p-4 mb-3">
