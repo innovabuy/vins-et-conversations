@@ -1,6 +1,8 @@
 const express = require('express');
 const Joi = require('joi');
 const PDFDocument = require('pdfkit');
+const fs = require('fs');
+const path = require('path');
 const db = require('../config/database');
 const emailService = require('../services/emailService');
 const notificationService = require('../services/notificationService');
@@ -278,12 +280,27 @@ router.get('/catalog/:id/pdf', async (req, res) => {
     doc.moveTo(50, doc.y).lineTo(545, doc.y).lineWidth(0.5).stroke('#e5e7eb');
     doc.moveDown(0.5);
 
-    // Photo placeholder (left)
+    // Photo (left) — real image or placeholder
     const photoY = doc.y;
-    doc.save();
-    doc.rect(50, photoY, 210, 160).lineWidth(1).stroke('#e5e7eb');
-    doc.fontSize(10).fillColor('#d1d5db').text('Photo', 120, photoY + 70, { width: 70, align: 'center' });
-    doc.restore();
+    let imageInserted = false;
+    if (product.image_url) {
+      try {
+        // Local file: /uploads/products/xxx → backend/uploads/products/xxx
+        const localPath = path.join(__dirname, '..', '..', product.image_url);
+        if (fs.existsSync(localPath)) {
+          doc.image(localPath, 50, photoY, { fit: [210, 160] });
+          imageInserted = true;
+        }
+      } catch (imgErr) {
+        logger.warn(`PDF image insert failed for ${product.image_url}: ${imgErr.message}`);
+      }
+    }
+    if (!imageInserted) {
+      doc.save();
+      doc.rect(50, photoY, 210, 160).lineWidth(1).stroke('#e5e7eb');
+      doc.fontSize(10).fillColor('#d1d5db').text('Photo', 120, photoY + 70, { width: 70, align: 'center' });
+      doc.restore();
+    }
 
     // Radar chart (right)
     const notes = parseNotes(product.tasting_notes);
