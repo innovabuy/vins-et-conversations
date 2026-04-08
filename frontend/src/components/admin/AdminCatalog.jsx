@@ -266,8 +266,9 @@ const ComponentsSection = React.forwardRef(function ComponentsSection({ productI
   const formatEur = (v) => new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR' }).format(v);
 
   return (
-    <fieldset className="border rounded-lg p-4 space-y-3">
+    <fieldset id="composition-section" className="border rounded-lg p-4 space-y-3">
       <legend className="text-sm font-semibold text-gray-700 px-2">Composition (ventilation TVA coffret)</legend>
+      <p className="text-xs text-gray-500 italic">Remplissez les champs puis cliquez "Ajouter le composant" pour chaque ligne. Enregistrez le produit ensuite.</p>
       {validationError && (
         <div className="text-sm text-red-700 bg-red-50 px-3 py-2 rounded">{validationError}</div>
       )}
@@ -305,7 +306,7 @@ const ComponentsSection = React.forwardRef(function ComponentsSection({ productI
               <option value="5.50">5,5%</option>
             </select>
           </div>
-          <button type="button" onClick={handleAdd} className="px-3 py-1.5 bg-wine-700 text-white text-sm rounded-lg">Ajouter</button>
+          <button type="button" onClick={handleAdd} className="px-3 py-1.5 bg-wine-700 text-white text-sm rounded-lg font-medium">Ajouter le composant</button>
           <button type="button" onClick={() => { setAdding(false); setValidationError(''); setNewComp({ component_name: '', amount_ht: '', vat_rate: '20.00' }); }} className="px-3 py-1.5 text-sm text-gray-600">Annuler</button>
         </div>
       ) : (
@@ -424,7 +425,11 @@ function ProductForm({ product, onSave, onCancel, allProducts = [], categoriesLi
     // Auto-save or block pending component before product save
     if (componentsRef.current) {
       const ok = await componentsRef.current.validateAndSave();
-      if (!ok) return;
+      if (!ok) {
+        onToast?.("Un composant est en cours de saisie. Completez ou supprimez-le avant d'enregistrer.", 'error');
+        document.getElementById('composition-section')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        return;
+      }
     }
     // Validation champs obligatoires
     const missing = [];
