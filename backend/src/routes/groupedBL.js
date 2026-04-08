@@ -54,6 +54,7 @@ function parseGroupedFilters(query) {
 async function fetchGroupedData(campaignId, userId, orderIds, opts = {}) {
   let query = db('orders')
     .leftJoin('users', 'orders.user_id', 'users.id')
+    .leftJoin('users as referrer', 'referrer.id', 'orders.referred_by')
     .join('order_items', 'order_items.order_id', 'orders.id')
     .join('products', 'products.id', 'order_items.product_id')
     .where('orders.campaign_id', campaignId)
@@ -74,10 +75,13 @@ async function fetchGroupedData(campaignId, userId, orderIds, opts = {}) {
       'orders.ref as order_ref',
       'orders.created_at as order_date',
       'orders.total_ttc as order_total_ttc',
+      'orders.referred_by',
+      'referrer.name as referrer_name',
+      'referrer.email as referrer_email',
       'products.name as product_name',
       'order_items.qty',
       'order_items.unit_price_ttc',
-      db.raw("CASE WHEN orders.referred_by IS NOT NULL AND orders.source = 'student_referral' THEN true ELSE false END as is_referral"),
+      db.raw("CASE WHEN orders.referred_by IS NOT NULL AND orders.source = 'student_referral' AND (orders.user_id IS NULL OR orders.user_id != orders.referred_by) THEN true ELSE false END as is_referral"),
     )
     .orderBy(['users.name', 'orders.created_at', 'products.name']);
 
@@ -113,10 +117,16 @@ async function fetchGroupedData(campaignId, userId, orderIds, opts = {}) {
 function groupByUser(rows, targetUserId) {
   const users = new Map();
   for (const row of rows) {
-    // For referral orders, group under the target user (the referrer), not the buyer
-    const effectiveUserId = targetUserId && row.is_referral ? targetUserId : row.user_id;
-    const effectiveName = targetUserId && row.is_referral ? null : row.user_name;
-    const effectiveEmail = targetUserId && row.is_referral ? null : row.user_email;
+    // For referral orders, group under the referrer (targetUserId if single-student, else referred_by)
+    const effectiveUserId = row.is_referral
+      ? (targetUserId || row.referred_by)
+      : row.user_id;
+    const effectiveName = row.is_referral
+      ? (row.referrer_name || row.user_name)
+      : row.user_name;
+    const effectiveEmail = row.is_referral
+      ? (row.referrer_email || row.user_email)
+      : row.user_email;
 
     if (!users.has(effectiveUserId)) {
       users.set(effectiveUserId, {
