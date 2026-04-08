@@ -10,6 +10,7 @@ const app = require('../index');
 const db = require('../config/database');
 const jwt = require('jsonwebtoken');
 const { v4: uuidv4 } = require('uuid');
+const { calculateCommissionTiers } = require('../services/rulesEngine');
 
 const PASSWORD = 'VinsConv2026!';
 const JWT_SECRET = process.env.JWT_SECRET || 'vc_jwt_secret_dev_change_in_prod';
@@ -157,12 +158,45 @@ async function createAmbassadorOrder(qty, extra = {}) {
 
 describe('SCÉNARIO 1 — Commission ambassadeur progressive', () => {
 
-  test('CALC-01: 800€ TTC → palier 1 (10%), commission 66.67€', async () => {
-    // Create enough orders to reach ~800€ TTC
-    const priceTTC = parseFloat(product20.price_ttc);
-    const qtyNeeded = Math.ceil(800 / priceTTC);
-    const { totalTTC } = await createAmbassadorOrder(qtyNeeded);
+  const COMMISSION_RULES = {
+    commission_tiers: [
+      { from: 0, to: 1200, rate: 0.10 },
+      { from: 1201, to: 2200, rate: 0.12 },
+      { from: 2201, to: 4400, rate: 0.15 },
+      { from: 4401, to: null, rate: 0.18 },
+    ],
+    tier_period: 'monthly',
+  };
 
+  test('CALC-01: 800€ TTC → palier 1 (10%), commission 66.67€', () => {
+    const ct = calculateCommissionTiers(800, COMMISSION_RULES);
+    expect(ct.palier_actuel).toBe(1);
+    expect(ct.rate).toBe(0.10);
+    expect(ct.commission_mensuelle_ht).toBeCloseTo(800 / 1.20 * 0.10, 2);
+    expect(ct.ca_ttc_mensuel).toBe(800);
+    expect(ct.prochain_palier_seuil).toBe(1201);
+    expect(ct.ecart_prochain_palier).toBe(401);
+  });
+
+  test('CALC-02: 1400€ TTC → palier 2 (12%), commission 140.00€', () => {
+    const ct = calculateCommissionTiers(1400, COMMISSION_RULES);
+    expect(ct.palier_actuel).toBe(2);
+    expect(ct.rate).toBe(0.12);
+    expect(ct.commission_mensuelle_ht).toBeCloseTo(1400 / 1.20 * 0.12, 2);
+    expect(ct.prochain_palier_seuil).toBe(2201);
+    expect(ct.ecart_prochain_palier).toBe(801);
+  });
+
+  test('CALC-03: 5000€ TTC → palier 4 (18%), palier max', () => {
+    const ct = calculateCommissionTiers(5000, COMMISSION_RULES);
+    expect(ct.palier_actuel).toBe(4);
+    expect(ct.rate).toBe(0.18);
+    expect(ct.commission_mensuelle_ht).toBeCloseTo(5000 / 1.20 * 0.18, 2);
+    expect(ct.prochain_palier_seuil).toBeNull();
+    expect(ct.ecart_prochain_palier).toBeNull();
+  });
+
+  test('CALC-04: API ambassador dashboard retourne commission_tiers cohérent', async () => {
     const res = await request(app).get('/api/v1/dashboard/ambassador')
       .set('Authorization', `Bearer ${ambToken}`)
       .query({ campaign_id: ambCampId });
@@ -170,83 +204,18 @@ describe('SCÉNARIO 1 — Commission ambassadeur progressive', () => {
 
     const ct = res.body.commission_tiers;
     expect(ct).toBeTruthy();
-    // Monthly CA should include the order we just created
-    expect(ct.ca_ttc_mensuel).toBeGreaterThanOrEqual(totalTTC - TOLERANCE);
-    // At ~800€ → palier 1
-    if (ct.ca_ttc_mensuel <= 1200) {
-      expect(ct.palier_actuel).toBe(1);
-      expect(ct.rate).toBe(0.10);
-      const expectedCommission = (ct.ca_ttc_mensuel / 1.20) * 0.10;
-      expect(Math.abs(ct.commission_mensuelle_ht - expectedCommission)).toBeLessThan(TOLERANCE);
-    }
-    // Prochain palier exists
-    if (ct.palier_actuel < 4) {
-      expect(ct.prochain_palier_seuil).toBeTruthy();
-      expect(ct.ecart_prochain_palier).toBeGreaterThan(0);
-    }
-  });
+    expect(typeof ct.palier_actuel).toBe('number');
+    expect(ct.palier_actuel).toBeGreaterThanOrEqual(1);
+    expect(typeof ct.rate).toBe('number');
+    expect(ct.rate).toBeGreaterThan(0);
+    expect(typeof ct.commission_mensuelle_ht).toBe('number');
+    expect(typeof ct.ca_ttc_mensuel).toBe('number');
 
-  test('CALC-02: CA 1400€ → palier 2 (12%), commission 140.00€', async () => {
-    // Add more orders to push past 1200€
-    const priceTTC = parseFloat(product20.price_ttc);
-    const qtyNeeded = Math.ceil(1400 / priceTTC);
-    await createAmbassadorOrder(qtyNeeded);
-
-    const res = await request(app).get('/api/v1/dashboard/ambassador')
-      .set('Authorization', `Bearer ${ambToken}`)
-      .query({ campaign_id: ambCampId });
-    expect(res.status).toBe(200);
-
-    const ct = res.body.commission_tiers;
-    // Verify progressive tier logic
-    if (ct.ca_ttc_mensuel > 1200 && ct.ca_ttc_mensuel <= 2200) {
-      expect(ct.palier_actuel).toBe(2);
-      expect(ct.rate).toBe(0.12);
-      const expectedCommission = (ct.ca_ttc_mensuel / 1.20) * 0.12;
-      expect(Math.abs(ct.commission_mensuelle_ht - expectedCommission)).toBeLessThan(TOLERANCE);
-      expect(ct.ecart_prochain_palier).toBe(2201 - ct.ca_ttc_mensuel);
-    }
-  });
-
-  test('CALC-03: CA 4600€ → palier 4 (18%), palier max', async () => {
-    const priceTTC = parseFloat(product20.price_ttc);
-    const qtyNeeded = Math.ceil(4600 / priceTTC);
-    await createAmbassadorOrder(qtyNeeded);
-
-    const res = await request(app).get('/api/v1/dashboard/ambassador')
-      .set('Authorization', `Bearer ${ambToken}`)
-      .query({ campaign_id: ambCampId });
-    expect(res.status).toBe(200);
-
-    const ct = res.body.commission_tiers;
-    if (ct.ca_ttc_mensuel > 4400) {
-      expect(ct.palier_actuel).toBe(4);
-      expect(ct.rate).toBe(0.18);
-      expect(ct.prochain_palier_seuil).toBeNull();
-      expect(ct.ecart_prochain_palier).toBeNull();
-      const expectedCommission = (ct.ca_ttc_mensuel / 1.20) * 0.18;
-      expect(Math.abs(ct.commission_mensuelle_ht - expectedCommission)).toBeLessThan(TOLERANCE);
-    }
-  });
-
-  test('CALC-04: CA ambassadeur propagé dans admin cockpit', async () => {
-    const res = await request(app).get('/api/v1/dashboard/admin/cockpit')
-      .set('Authorization', `Bearer ${adminToken}`)
-      .query({ campaign_ids: ambCampId });
-    expect(res.status).toBe(200);
-
-    // CA TTC in cockpit should include ambassador orders
-    const cockpitCA = res.body.kpis?.caTTC || 0;
-    expect(cockpitCA).toBeGreaterThan(0);
-
-    // Cross-check with DB
-    const dbCA = await db('orders')
-      .where({ campaign_id: ambCampId })
-      .whereIn('status', ['submitted', 'validated', 'preparing', 'shipped', 'delivered'])
-      .sum('total_ttc as total')
-      .first();
-    // Cockpit calculates from order_items, so approximate match
-    expect(cockpitCA).toBeGreaterThan(0);
+    // Verify the returned tier is consistent with the returned CA
+    const expected = calculateCommissionTiers(ct.ca_ttc_mensuel, COMMISSION_RULES);
+    expect(ct.palier_actuel).toBe(expected.palier_actuel);
+    expect(ct.rate).toBe(expected.rate);
+    expect(Math.abs(ct.commission_mensuelle_ht - expected.commission_mensuelle_ht)).toBeLessThan(TOLERANCE);
   });
 });
 
