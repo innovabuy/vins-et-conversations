@@ -1,7 +1,9 @@
 const express = require('express');
 const Joi = require('joi');
 const path = require('path');
+const fs = require('fs');
 const multer = require('multer');
+const sharp = require('sharp');
 const db = require('../config/database');
 const { authenticate, requireRole, requireCampaignAccess } = require('../middleware/auth');
 const { validate } = require('../middleware/validate');
@@ -9,17 +11,9 @@ const { auditAction } = require('../middleware/audit');
 const { cacheMiddleware, invalidateCache } = require('../middleware/cache');
 const { addCapNumerikFooter } = require('../utils/pdfFooter');
 
-// Multer config for product images
-const storage = multer.diskStorage({
-  destination: path.join(__dirname, '../../uploads/products'),
-  filename: (req, file, cb) => {
-    const ext = path.extname(file.originalname).toLowerCase() || '.jpg';
-    const slug = Date.now() + '-' + Math.round(Math.random() * 1e6);
-    cb(null, slug + ext);
-  },
-});
+// Multer config — memory storage for sharp post-processing
 const upload = multer({
-  storage,
+  storage: multer.memoryStorage(),
   limits: { fileSize: 5 * 1024 * 1024 }, // 5 MB
   fileFilter: (req, file, cb) => {
     const allowed = ['.jpg', '.jpeg', '.png', '.webp'];
@@ -28,6 +22,8 @@ const upload = multer({
     cb(new Error('Format non supporté. Utilisez JPG, PNG ou WebP.'));
   },
 });
+
+const UPLOADS_DIR = path.join(__dirname, '../../uploads/products');
 
 const router = express.Router();
 const adminRouter = express.Router();
@@ -459,7 +455,22 @@ adminRouter.post(
       if (!product) return res.status(404).json({ error: 'NOT_FOUND' });
       if (!req.file) return res.status(400).json({ error: 'NO_FILE', message: 'Aucun fichier envoyé' });
 
-      const image_url = `/uploads/products/${req.file.filename}`;
+      // Compress with sharp → JPEG 800×800 q82
+      const slug = Date.now() + '-' + Math.round(Math.random() * 1e6);
+      const filename = `${slug}.jpg`;
+      const outputPath = path.join(UPLOADS_DIR, filename);
+      await sharp(req.file.buffer)
+        .resize(800, 800, { fit: 'inside', withoutEnlargement: true })
+        .jpeg({ quality: 82 })
+        .toFile(outputPath);
+
+      // Delete old image if it exists
+      if (product.image_url) {
+        const oldPath = path.join(__dirname, '../..', product.image_url);
+        if (fs.existsSync(oldPath)) fs.unlinkSync(oldPath);
+      }
+
+      const image_url = `/uploads/products/${filename}`;
       const [updated] = await db('products')
         .where({ id: req.params.id })
         .update({ image_url, updated_at: new Date() })

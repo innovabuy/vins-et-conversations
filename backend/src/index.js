@@ -92,7 +92,11 @@ app.use('/api/docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec, {
 }));
 
 // ─── Static files (uploaded images) ───────────────────
-app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
+app.use('/uploads', express.static(path.join(__dirname, '../uploads'), {
+  maxAge: '7d',
+  etag: true,
+  lastModified: true,
+}));
 
 // ─── Routes ───────────────────────────────────────────
 app.use('/api/v1/auth', require('./routes/auth'));
