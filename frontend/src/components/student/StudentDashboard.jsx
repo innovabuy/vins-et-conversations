@@ -993,7 +993,10 @@ function ProfileOrders({ campaignId }) {
         {orders.map((o) => (
           <div key={o.id} className="flex items-center justify-between p-2.5 bg-gray-50 rounded-lg text-sm">
             <div>
-              <p className="font-mono text-xs text-gray-500">{o.ref}</p>
+              <p className="font-mono text-xs text-gray-500">
+                {o.ref}
+                {o.order_type === 'parrainage' && <span className="text-xs bg-pink-100 text-pink-700 px-2 py-0.5 rounded-full ml-2 font-sans">Parrainage</span>}
+              </p>
               {o.customer_name && <p className="text-xs text-gray-600 font-medium">{o.customer_name}</p>}
               <p className="text-xs text-gray-400">{formatDate(o.created_at)} · {o.total_items} art.</p>
             </div>
