@@ -534,16 +534,17 @@ router.put(
 router.get('/:id/invoice', authenticate, async (req, res) => {
   try {
     const order = await db('orders')
-      .join('users', 'orders.user_id', 'users.id')
+      .leftJoin('users', 'orders.user_id', 'users.id')
+      .leftJoin('contacts', 'orders.customer_id', 'contacts.id')
       .where('orders.id', req.params.id)
-      .select('orders.*', 'users.name as user_name', 'users.email as user_email')
+      .select('orders.*', db.raw("COALESCE(users.name, contacts.name, 'Client') as user_name"), 'users.email as user_email')
       .first();
 
     if (!order) return res.status(404).json({ error: 'NOT_FOUND' });
 
-    // Access control
+    // Access control: owner OR referred_by student can access invoice
     if (!['super_admin', 'commercial', 'comptable'].includes(req.user.role)) {
-      if (order.user_id !== req.user.userId) {
+      if (order.user_id !== req.user.userId && order.referred_by !== req.user.userId) {
         return res.status(403).json({ error: 'FORBIDDEN' });
       }
     }

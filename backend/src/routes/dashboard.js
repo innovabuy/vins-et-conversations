@@ -97,11 +97,22 @@ router.get(
       const campaignId = req.query.campaign_id || req.user.campaign_ids[0];
       if (!campaignId) return res.status(400).json({ error: 'CAMPAIGN_REQUIRED' });
 
+      const userId = req.user.userId;
       const orders = await db('orders')
         .leftJoin('contacts', 'orders.customer_id', 'contacts.id')
-        .where({ 'orders.user_id': req.user.userId, 'orders.campaign_id': campaignId })
+        .where(function () {
+          this.where({ 'orders.user_id': userId, 'orders.campaign_id': campaignId })
+            .orWhere(function () {
+              this.where({ 'orders.referred_by': userId, 'orders.source': 'student_referral', 'orders.campaign_id': campaignId })
+                .whereRaw('(orders.user_id IS NULL OR orders.user_id != orders.referred_by)');
+            });
+        })
         .orderBy('orders.created_at', 'desc')
-        .select('orders.id', 'orders.ref', 'orders.status', 'orders.total_ttc', 'orders.total_items', 'orders.created_at', 'orders.payment_method', 'contacts.name as customer_name');
+        .select(
+          'orders.id', 'orders.ref', 'orders.status', 'orders.total_ttc', 'orders.total_items',
+          'orders.created_at', 'orders.payment_method', 'contacts.name as customer_name',
+          db.raw(`CASE WHEN orders.user_id = ? THEN 'directe' ELSE 'parrainage' END AS order_type`, [userId])
+        );
 
       res.json({ data: orders });
     } catch (err) {
