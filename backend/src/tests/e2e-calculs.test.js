@@ -205,11 +205,17 @@ describe('SCÉNARIO 1 — Commission ambassadeur progressive', () => {
     const ct = res.body.commission_tiers;
     expect(ct).toBeTruthy();
     expect(typeof ct.palier_actuel).toBe('number');
-    expect(ct.palier_actuel).toBeGreaterThanOrEqual(1);
+    expect(ct.palier_actuel).toBeGreaterThanOrEqual(0);
     expect(typeof ct.rate).toBe('number');
-    expect(ct.rate).toBeGreaterThan(0);
+    expect(ct.rate).toBeGreaterThanOrEqual(0);
     expect(typeof ct.commission_mensuelle_ht).toBe('number');
     expect(typeof ct.ca_ttc_mensuel).toBe('number');
+
+    // Si CA > 0, le palier doit être au moins 1
+    if (ct.ca_ttc_mensuel > 0) {
+      expect(ct.palier_actuel).toBeGreaterThanOrEqual(1);
+      expect(ct.rate).toBeGreaterThan(0);
+    }
 
     // Verify the returned tier is consistent with the returned CA
     const expected = calculateCommissionTiers(ct.ca_ttc_mensuel, COMMISSION_RULES);
