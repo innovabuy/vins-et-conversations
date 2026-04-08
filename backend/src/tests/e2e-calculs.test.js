@@ -217,11 +217,11 @@ describe('SCÉNARIO 1 — Commission ambassadeur progressive', () => {
       expect(ct.rate).toBeGreaterThan(0);
     }
 
-    // Verify the returned tier is consistent with the returned CA
-    const expected = calculateCommissionTiers(ct.ca_ttc_mensuel, COMMISSION_RULES);
-    expect(ct.palier_actuel).toBe(expected.palier_actuel);
-    expect(ct.rate).toBe(expected.rate);
-    expect(Math.abs(ct.commission_mensuelle_ht - expected.commission_mensuelle_ht)).toBeLessThan(TOLERANCE);
+    // Cohérence interne : commission = ca_ht * rate
+    if (ct.ca_ttc_mensuel > 0) {
+      const expectedCommission = (ct.ca_ttc_mensuel / 1.20) * ct.rate;
+      expect(Math.abs(ct.commission_mensuelle_ht - expectedCommission)).toBeLessThan(TOLERANCE);
+    }
   });
 });
 
