@@ -215,8 +215,7 @@ function calculateCommissionTiers(caTTCMensuel, commissionRules) {
 
   const current = sorted[currentIndex];
   const rate = current.rate;
-  const caHTMensuel = caTTCMensuel / 1.20;
-  const commissionHT = parseFloat((caHTMensuel * rate).toFixed(2));
+  const commissionTTC = parseFloat((caTTCMensuel * rate).toFixed(2));
 
   // Next tier
   const nextTier = currentIndex < sorted.length - 1 ? sorted[currentIndex + 1] : null;
@@ -224,7 +223,7 @@ function calculateCommissionTiers(caTTCMensuel, commissionRules) {
   return {
     palier_actuel: currentIndex + 1,
     rate,
-    commission_mensuelle_ht: commissionHT,
+    commission_mensuelle_ht: commissionTTC,
     ca_ttc_mensuel: caTTCMensuel,
     prochain_palier_seuil: nextTier ? nextTier.from : null,
     ecart_prochain_palier: nextTier ? Math.max(0, nextTier.from - caTTCMensuel) : null,

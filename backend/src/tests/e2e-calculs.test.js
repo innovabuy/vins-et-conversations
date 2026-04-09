@@ -172,7 +172,7 @@ describe('SCÉNARIO 1 — Commission ambassadeur progressive', () => {
     const ct = calculateCommissionTiers(800, COMMISSION_RULES);
     expect(ct.palier_actuel).toBe(1);
     expect(ct.rate).toBe(0.10);
-    expect(ct.commission_mensuelle_ht).toBeCloseTo(800 / 1.20 * 0.10, 2);
+    expect(ct.commission_mensuelle_ht).toBeCloseTo(800 * 0.10, 2);
     expect(ct.ca_ttc_mensuel).toBe(800);
     expect(ct.prochain_palier_seuil).toBe(1201);
     expect(ct.ecart_prochain_palier).toBe(401);
@@ -182,7 +182,7 @@ describe('SCÉNARIO 1 — Commission ambassadeur progressive', () => {
     const ct = calculateCommissionTiers(1400, COMMISSION_RULES);
     expect(ct.palier_actuel).toBe(2);
     expect(ct.rate).toBe(0.12);
-    expect(ct.commission_mensuelle_ht).toBeCloseTo(1400 / 1.20 * 0.12, 2);
+    expect(ct.commission_mensuelle_ht).toBeCloseTo(1400 * 0.12, 2);
     expect(ct.prochain_palier_seuil).toBe(2201);
     expect(ct.ecart_prochain_palier).toBe(801);
   });
@@ -191,7 +191,7 @@ describe('SCÉNARIO 1 — Commission ambassadeur progressive', () => {
     const ct = calculateCommissionTiers(5000, COMMISSION_RULES);
     expect(ct.palier_actuel).toBe(4);
     expect(ct.rate).toBe(0.18);
-    expect(ct.commission_mensuelle_ht).toBeCloseTo(5000 / 1.20 * 0.18, 2);
+    expect(ct.commission_mensuelle_ht).toBeCloseTo(5000 * 0.18, 2);
     expect(ct.prochain_palier_seuil).toBeNull();
     expect(ct.ecart_prochain_palier).toBeNull();
   });
@@ -217,9 +217,9 @@ describe('SCÉNARIO 1 — Commission ambassadeur progressive', () => {
       expect(ct.rate).toBeGreaterThan(0);
     }
 
-    // Cohérence interne : commission = ca_ht * rate
+    // Cohérence interne : commission = ca_ttc * rate
     if (ct.ca_ttc_mensuel > 0) {
-      const expectedCommission = (ct.ca_ttc_mensuel / 1.20) * ct.rate;
+      const expectedCommission = ct.ca_ttc_mensuel * ct.rate;
       expect(Math.abs(ct.commission_mensuelle_ht - expectedCommission)).toBeLessThan(TOLERANCE);
     }
   });

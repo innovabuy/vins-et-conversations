@@ -50,56 +50,56 @@ describe('Commission Tiers — calculateCommissionTiers()', () => {
     const result = calculateCommissionTiers(800, COMMISSION_RULES);
     expect(result.palier_actuel).toBe(1);
     expect(result.rate).toBe(0.10);
-    expect(result.commission_mensuelle_ht).toBeCloseTo(800 / 1.20 * 0.10, 2);
+    expect(result.commission_mensuelle_ht).toBeCloseTo(800 * 0.10, 2);
   });
 
   test('COM3: CA 1200€ TTC → palier 1, rate 10% (borne incluse)', () => {
     const result = calculateCommissionTiers(1200, COMMISSION_RULES);
     expect(result.palier_actuel).toBe(1);
     expect(result.rate).toBe(0.10);
-    expect(result.commission_mensuelle_ht).toBeCloseTo(1200 / 1.20 * 0.10, 2);
+    expect(result.commission_mensuelle_ht).toBeCloseTo(1200 * 0.10, 2);
   });
 
   test('COM4: CA 1201€ TTC → palier 2, rate 12%', () => {
     const result = calculateCommissionTiers(1201, COMMISSION_RULES);
     expect(result.palier_actuel).toBe(2);
     expect(result.rate).toBe(0.12);
-    expect(result.commission_mensuelle_ht).toBeCloseTo(1201 / 1.20 * 0.12, 2);
+    expect(result.commission_mensuelle_ht).toBeCloseTo(1201 * 0.12, 2);
   });
 
   test('COM5: CA 2200€ TTC → palier 2, rate 12%', () => {
     const result = calculateCommissionTiers(2200, COMMISSION_RULES);
     expect(result.palier_actuel).toBe(2);
     expect(result.rate).toBe(0.12);
-    expect(result.commission_mensuelle_ht).toBeCloseTo(2200 / 1.20 * 0.12, 2);
+    expect(result.commission_mensuelle_ht).toBeCloseTo(2200 * 0.12, 2);
   });
 
   test('COM6: CA 2201€ TTC → palier 3, rate 15%', () => {
     const result = calculateCommissionTiers(2201, COMMISSION_RULES);
     expect(result.palier_actuel).toBe(3);
     expect(result.rate).toBe(0.15);
-    expect(result.commission_mensuelle_ht).toBeCloseTo(2201 / 1.20 * 0.15, 2);
+    expect(result.commission_mensuelle_ht).toBeCloseTo(2201 * 0.15, 2);
   });
 
   test('COM7: CA 4400€ TTC → palier 3, rate 15%', () => {
     const result = calculateCommissionTiers(4400, COMMISSION_RULES);
     expect(result.palier_actuel).toBe(3);
     expect(result.rate).toBe(0.15);
-    expect(result.commission_mensuelle_ht).toBeCloseTo(4400 / 1.20 * 0.15, 2);
+    expect(result.commission_mensuelle_ht).toBeCloseTo(4400 * 0.15, 2);
   });
 
   test('COM8: CA 4401€ TTC → palier 4, rate 18%', () => {
     const result = calculateCommissionTiers(4401, COMMISSION_RULES);
     expect(result.palier_actuel).toBe(4);
     expect(result.rate).toBe(0.18);
-    expect(result.commission_mensuelle_ht).toBeCloseTo(4401 / 1.20 * 0.18, 2);
+    expect(result.commission_mensuelle_ht).toBeCloseTo(4401 * 0.18, 2);
   });
 
   test('COM9: CA 10000€ TTC → palier 4, rate 18%', () => {
     const result = calculateCommissionTiers(10000, COMMISSION_RULES);
     expect(result.palier_actuel).toBe(4);
     expect(result.rate).toBe(0.18);
-    expect(result.commission_mensuelle_ht).toBeCloseTo(10000 / 1.20 * 0.18, 2);
+    expect(result.commission_mensuelle_ht).toBeCloseTo(10000 * 0.18, 2);
   });
 
   test('COM10: commission_tiers absent → fallback 0%, pas d\'erreur', () => {
