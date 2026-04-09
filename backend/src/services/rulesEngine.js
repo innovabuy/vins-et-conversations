@@ -239,7 +239,7 @@ function calculateCommissionTiers(caTTCMensuel, commissionRules) {
  * @param {Object} freeBottleRules - Rules JSONB
  * @returns {Object} { earned, used, available, totalSold, threshold, nextIn }
  */
-async function calculateFreeBottles(userId, campaignId, freeBottleRules) {
+async function calculateFreeBottles(userId, campaignId, freeBottleRules, options = {}) {
   // Check per-participant free_bottle_enabled flag first (V4.3)
   const participation = await db('participations')
     .where({ user_id: userId, campaign_id: campaignId })
@@ -261,7 +261,13 @@ async function calculateFreeBottles(userId, campaignId, freeBottleRules) {
   let soldQuery = db('order_items')
     .join('orders', 'order_items.order_id', 'orders.id')
     .join('products', 'order_items.product_id', 'products.id')
-    .where({ 'orders.user_id': userId, 'orders.campaign_id': campaignId })
+    .where('orders.campaign_id', campaignId)
+    .where(function () {
+      this.where('orders.user_id', userId);
+      if (options.includeReferredBy) {
+        this.orWhere('orders.referred_by', userId);
+      }
+    })
     .whereIn('orders.status', ['validated', 'preparing', 'shipped', 'delivered'])
     .where('order_items.type', 'product');
 
@@ -320,11 +326,17 @@ async function calculateFreeBottles(userId, campaignId, freeBottleRules) {
     ? Math.min(...details.map(d => d.nextIn))
     : n - (totalSold % n);
 
-  // V4.2: cost_per_bottle = cheapest purchase_price among alcohol items in student's orders
+  // V4.2: cost_per_bottle = cheapest purchase_price among items in user's orders
   let costQuery = db('order_items')
     .join('orders', 'order_items.order_id', 'orders.id')
     .join('products', 'order_items.product_id', 'products.id')
-    .where({ 'orders.user_id': userId, 'orders.campaign_id': campaignId })
+    .where('orders.campaign_id', campaignId)
+    .where(function () {
+      this.where('orders.user_id', userId);
+      if (options.includeReferredBy) {
+        this.orWhere('orders.referred_by', userId);
+      }
+    })
     .whereIn('orders.status', ['validated', 'preparing', 'shipped', 'delivered'])
     .where('order_items.type', 'product');
 

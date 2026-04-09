@@ -533,7 +533,8 @@ router.get(
       const campaignData = await db('campaigns').where({ id: campaignId }).select('alcohol_free').first();
 
       // Free bottles (12+1) — respects per-ambassador free_bottle_enabled flag
-      const freeBottles = await rulesEngine.calculateFreeBottles(req.user.userId, campaignId, rules.freeBottle);
+      // includeReferredBy: ambassador's referral orders count toward 12+1
+      const freeBottles = await rulesEngine.calculateFreeBottles(req.user.userId, campaignId, rules.freeBottle, { includeReferredBy: true });
 
       // Ambassador commission (cagnotte) — total + monthly
       const ambCommissionOpts = { referralSources: ['ambassador_referral'] };

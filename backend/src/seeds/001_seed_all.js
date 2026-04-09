@@ -348,7 +348,14 @@ exports.seed = async function (knex) {
         fund_collective: { type: 'percentage', value: 5, base: 'ca_ht_global', label: 'Commission association' },
         fund_individual: { type: 'percentage', value: 3, base: 'ca_ht_student', label: 'Commission ambassadeur' },
       }),
-      free_bottle_rules: JSON.stringify({}),
+      free_bottle_rules: JSON.stringify({
+        trigger: 'every_n_sold',
+        n: 12,
+        reward: 'free_bottle',
+        choice: 'cheapest',
+        from_catalog: true,
+        applies_to_alcohol_only: false,
+      }),
       tier_rules: JSON.stringify({
         tiers: [
           { label: 'Bronze', threshold: 500, reward: 'Carte cadeau 25€', color: '#CD7F32' },

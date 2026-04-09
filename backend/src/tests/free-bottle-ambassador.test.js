@@ -243,4 +243,37 @@ describe('Free Bottle Ambassador Flag', () => {
         enabled: true,
       });
   });
+
+  test('AMB3-1: free_bottle_rules ambassadeur non vide après migration', async () => {
+    const ct = await db('client_types').where({ name: 'ambassadeur' }).first();
+    const rules = typeof ct.free_bottle_rules === 'string'
+      ? JSON.parse(ct.free_bottle_rules)
+      : ct.free_bottle_rules;
+
+    expect(rules.trigger).toBe('every_n_sold');
+    expect(rules.n).toBe(12);
+    expect(rules.choice).toBe('cheapest');
+    expect(rules.applies_to_alcohol_only).toBe(false);
+  });
+
+  test('AMB3-2: calculateFreeBottles retourne totalSold > 0 pour ambassadeur avec includeReferredBy', async () => {
+    if (!ambassadorUserId || !ambassadorCampaignId) return;
+
+    // Restore free_bottle_enabled
+    await db('participations')
+      .where({ user_id: ambassadorUserId, campaign_id: ambassadorCampaignId })
+      .update({ config: JSON.stringify({ free_bottle_enabled: true }) });
+
+    const rules = await rulesEngine.loadRulesForCampaign(ambassadorCampaignId);
+    const result = await rulesEngine.calculateFreeBottles(
+      ambassadorUserId, ambassadorCampaignId, rules.freeBottle, { includeReferredBy: true }
+    );
+
+    expect(result.threshold).toBe(12);
+    expect(typeof result.totalSold).toBe('number');
+    expect(typeof result.earned).toBe('number');
+    expect(typeof result.available).toBe('number');
+    // Ambassador has sales → totalSold should reflect them
+    expect(result.earned).toBe(Math.floor(result.totalSold / 12));
+  });
 });

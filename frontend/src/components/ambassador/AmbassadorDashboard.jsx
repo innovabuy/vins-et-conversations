@@ -67,7 +67,7 @@ export default function AmbassadorDashboard() {
 
   if (!data) return <p className="text-center text-gray-500 py-12">Impossible de charger le tableau de bord.</p>;
 
-  const { tier, sales, recentOrders, referralClicks, gains, commission, commission_tiers, monthly, monthlyTier, monthlyHistory } = data;
+  const { tier, sales, recentOrders, referralClicks, gains, commission, commission_tiers, monthly, monthlyTier, monthlyHistory, free_bottles } = data;
   const tierStyle = TIER_COLORS[tier.current?.label] || TIER_COLORS.Bronze;
   const monthlyTierStyle = TIER_COLORS[monthlyTier?.current?.label] || TIER_COLORS.Bronze;
 
@@ -168,6 +168,47 @@ export default function AmbassadorDashboard() {
           </div>
         )}
       </div>
+
+      {/* Section 12+1 — Bouteilles gratuites */}
+      {free_bottles && !free_bottles.disabled && free_bottles.threshold > 0 && (
+        <div className="card">
+          <div className="flex items-center gap-2 mb-4">
+            <Gift size={20} className="text-green-600" />
+            <h2 className="font-semibold text-lg">12+1 — Bouteilles offertes</h2>
+          </div>
+
+          <div className="grid grid-cols-3 gap-3 mb-4">
+            <div className="bg-green-50 rounded-lg p-3 text-center">
+              <p className="text-xl font-bold text-green-700">{free_bottles.totalSold}</p>
+              <p className="text-xs text-gray-500">Bouteilles vendues</p>
+            </div>
+            <div className="bg-emerald-50 rounded-lg p-3 text-center">
+              <p className="text-xl font-bold text-emerald-700">{free_bottles.earned}</p>
+              <p className="text-xs text-gray-500">Gratuites gagnées</p>
+            </div>
+            <div className="bg-teal-50 rounded-lg p-3 text-center">
+              <p className="text-xl font-bold text-teal-700">{free_bottles.available}</p>
+              <p className="text-xs text-gray-500">A récupérer</p>
+            </div>
+          </div>
+
+          <div>
+            <div className="flex justify-between text-xs text-gray-500 mb-1">
+              <span>{free_bottles.totalSold % free_bottles.threshold} / {free_bottles.threshold} vers la prochaine</span>
+              <span>{Math.round((free_bottles.totalSold % free_bottles.threshold) / free_bottles.threshold * 100)}%</span>
+            </div>
+            <div className="w-full bg-green-100 rounded-full h-3">
+              <div
+                className="h-3 rounded-full bg-green-500 transition-all"
+                style={{ width: `${(free_bottles.totalSold % free_bottles.threshold) / free_bottles.threshold * 100}%` }}
+              />
+            </div>
+            <p className="text-xs text-gray-400 mt-1">
+              Encore {free_bottles.nextIn} bouteille{free_bottles.nextIn > 1 ? 's' : ''} pour la prochaine gratuite
+            </p>
+          </div>
+        </div>
+      )}
 
       {/* Section 1 — Progression / Tiers */}
       <div className="card">
