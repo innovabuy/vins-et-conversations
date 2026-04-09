@@ -84,6 +84,91 @@ export default function AmbassadorDashboard() {
         Passer commande sur la boutique
       </a>
 
+      {/* Section 5 — Gains (affiché en premier) */}
+      <div className="card">
+        <div className="flex items-center gap-2 mb-4">
+          <Gift size={20} className="text-wine-700" />
+          <h2 className="font-semibold text-lg">Mes Gains</h2>
+        </div>
+
+        {/* Commission breakdown — direct vs referred (V4.2 BLOC 1.3) */}
+        {(() => {
+          const referredCA = referralData?.referredOrders?.reduce?.((s, o) => s + parseFloat(o.total_ttc || 0), 0) || 0;
+          const directCA = Math.max(0, sales.caTTC - referredCA);
+          return (
+            <div className="grid grid-cols-2 gap-3 mb-4">
+              <div className="bg-blue-50 rounded-lg p-3 text-center">
+                <p className="text-lg font-bold text-blue-700">{fmtEur(directCA, 0)} EUR</p>
+                <p className="text-xs text-gray-500">Ventes directes</p>
+              </div>
+              <div className="bg-indigo-50 rounded-lg p-3 text-center">
+                <p className="text-lg font-bold text-indigo-700">{fmtEur(referredCA, 0)} EUR</p>
+                <p className="text-xs text-gray-500">Via parrainage</p>
+              </div>
+            </div>
+          );
+        })()}
+
+        {/* Section "Ma Commission" (fund_individual) masquée — remplacée par commission_tiers progressifs ci-dessous */}
+
+        {commission_tiers && commission_tiers.rate > 0 && (
+          <div className="bg-indigo-50 border border-indigo-200 rounded-lg p-4 mb-3">
+            <div className="flex items-center gap-2 mb-3">
+              <Calendar size={18} className="text-indigo-700" />
+              <h3 className="font-semibold text-indigo-800">Mes commissions du mois</h3>
+              <span className="text-xs bg-indigo-100 text-indigo-700 px-2 py-0.5 rounded-full ml-auto">
+                Palier {commission_tiers.palier_actuel} — {(commission_tiers.rate * 100).toFixed(0)}%
+              </span>
+            </div>
+            <div className="grid grid-cols-2 gap-3 mb-3">
+              <div className="bg-white rounded-lg p-3 text-center">
+                <p className="text-xl font-bold text-indigo-700">{fmtEur(commission_tiers.commission_mensuelle_ht)} EUR</p>
+                <p className="text-xs text-gray-500">Commission du mois</p>
+              </div>
+              <div className="bg-white rounded-lg p-3 text-center">
+                <p className="text-xl font-bold text-gray-700">{fmtEur(commission_tiers.ca_ttc_mensuel, 0)} EUR</p>
+                <p className="text-xs text-gray-500">CA TTC mensuel</p>
+              </div>
+            </div>
+            {commission_tiers.prochain_palier_seuil && (
+              <div>
+                <div className="flex justify-between text-xs text-gray-500 mb-1">
+                  <span>Prochain palier : {fmtEur(commission_tiers.prochain_palier_seuil, 0)} EUR</span>
+                  <span>{Math.max(0, 100 - (commission_tiers.ecart_prochain_palier / commission_tiers.prochain_palier_seuil * 100)).toFixed(0)}%</span>
+                </div>
+                <div className="w-full bg-indigo-100 rounded-full h-3">
+                  <div
+                    className="h-3 rounded-full bg-indigo-500 transition-all"
+                    style={{ width: `${Math.min(100, (commission_tiers.ca_ttc_mensuel / commission_tiers.prochain_palier_seuil * 100)).toFixed(0)}%` }}
+                  />
+                </div>
+                <p className="text-xs text-gray-400 mt-1">Encore {fmtEur(commission_tiers.ecart_prochain_palier, 0)} EUR pour le palier suivant</p>
+              </div>
+            )}
+            {!commission_tiers.prochain_palier_seuil && (
+              <p className="text-xs text-indigo-600 font-medium">Palier maximum atteint !</p>
+            )}
+          </div>
+        )}
+
+        {gains.currentReward ? (
+          <div className="bg-green-50 border border-green-200 rounded-lg p-4 mb-3">
+            <p className="text-sm text-green-700 font-medium">Palier {gains.currentTierLabel} atteint</p>
+            <p className="text-lg font-bold text-green-800">{gains.currentReward}</p>
+          </div>
+        ) : (
+          <p className="text-gray-500 text-sm mb-3">Aucune récompense pour le moment. Continuez vos ventes !</p>
+        )}
+
+        {gains.nextReward && (
+          <div className="bg-gray-50 rounded-lg p-3">
+            <p className="text-xs text-gray-500">Prochaine récompense ({gains.nextTierLabel})</p>
+            <p className="font-medium text-gray-700">{gains.nextReward}</p>
+            <p className="text-xs text-gray-400 mt-1">Encore {fmtEur(gains.amountToNext, 0)} EUR de CA</p>
+          </div>
+        )}
+      </div>
+
       {/* Section 1 — Progression / Tiers */}
       <div className="card">
         <div className="flex items-center gap-2 mb-4">
@@ -348,91 +433,6 @@ export default function AmbassadorDashboard() {
           </div>
         </div>
       )}
-
-      {/* Section 5 — Gains */}
-      <div className="card">
-        <div className="flex items-center gap-2 mb-4">
-          <Gift size={20} className="text-wine-700" />
-          <h2 className="font-semibold text-lg">Mes Gains</h2>
-        </div>
-
-        {/* Commission breakdown — direct vs referred (V4.2 BLOC 1.3) */}
-        {(() => {
-          const referredCA = referralData?.referredOrders?.reduce?.((s, o) => s + parseFloat(o.total_ttc || 0), 0) || 0;
-          const directCA = Math.max(0, sales.caTTC - referredCA);
-          return (
-            <div className="grid grid-cols-2 gap-3 mb-4">
-              <div className="bg-blue-50 rounded-lg p-3 text-center">
-                <p className="text-lg font-bold text-blue-700">{fmtEur(directCA, 0)} EUR</p>
-                <p className="text-xs text-gray-500">Ventes directes</p>
-              </div>
-              <div className="bg-indigo-50 rounded-lg p-3 text-center">
-                <p className="text-lg font-bold text-indigo-700">{fmtEur(referredCA, 0)} EUR</p>
-                <p className="text-xs text-gray-500">Via parrainage</p>
-              </div>
-            </div>
-          );
-        })()}
-
-        {/* Section "Ma Commission" (fund_individual) masquée — remplacée par commission_tiers progressifs ci-dessous */}
-
-        {commission_tiers && commission_tiers.rate > 0 && (
-          <div className="bg-indigo-50 border border-indigo-200 rounded-lg p-4 mb-3">
-            <div className="flex items-center gap-2 mb-3">
-              <Calendar size={18} className="text-indigo-700" />
-              <h3 className="font-semibold text-indigo-800">Mes commissions du mois</h3>
-              <span className="text-xs bg-indigo-100 text-indigo-700 px-2 py-0.5 rounded-full ml-auto">
-                Palier {commission_tiers.palier_actuel} — {(commission_tiers.rate * 100).toFixed(0)}%
-              </span>
-            </div>
-            <div className="grid grid-cols-2 gap-3 mb-3">
-              <div className="bg-white rounded-lg p-3 text-center">
-                <p className="text-xl font-bold text-indigo-700">{fmtEur(commission_tiers.commission_mensuelle_ht)} EUR</p>
-                <p className="text-xs text-gray-500">Commission du mois</p>
-              </div>
-              <div className="bg-white rounded-lg p-3 text-center">
-                <p className="text-xl font-bold text-gray-700">{fmtEur(commission_tiers.ca_ttc_mensuel, 0)} EUR</p>
-                <p className="text-xs text-gray-500">CA TTC mensuel</p>
-              </div>
-            </div>
-            {commission_tiers.prochain_palier_seuil && (
-              <div>
-                <div className="flex justify-between text-xs text-gray-500 mb-1">
-                  <span>Prochain palier : {fmtEur(commission_tiers.prochain_palier_seuil, 0)} EUR</span>
-                  <span>{Math.max(0, 100 - (commission_tiers.ecart_prochain_palier / commission_tiers.prochain_palier_seuil * 100)).toFixed(0)}%</span>
-                </div>
-                <div className="w-full bg-indigo-100 rounded-full h-3">
-                  <div
-                    className="h-3 rounded-full bg-indigo-500 transition-all"
-                    style={{ width: `${Math.min(100, (commission_tiers.ca_ttc_mensuel / commission_tiers.prochain_palier_seuil * 100)).toFixed(0)}%` }}
-                  />
-                </div>
-                <p className="text-xs text-gray-400 mt-1">Encore {fmtEur(commission_tiers.ecart_prochain_palier, 0)} EUR pour le palier suivant</p>
-              </div>
-            )}
-            {!commission_tiers.prochain_palier_seuil && (
-              <p className="text-xs text-indigo-600 font-medium">Palier maximum atteint !</p>
-            )}
-          </div>
-        )}
-
-        {gains.currentReward ? (
-          <div className="bg-green-50 border border-green-200 rounded-lg p-4 mb-3">
-            <p className="text-sm text-green-700 font-medium">Palier {gains.currentTierLabel} atteint</p>
-            <p className="text-lg font-bold text-green-800">{gains.currentReward}</p>
-          </div>
-        ) : (
-          <p className="text-gray-500 text-sm mb-3">Aucune récompense pour le moment. Continuez vos ventes !</p>
-        )}
-
-        {gains.nextReward && (
-          <div className="bg-gray-50 rounded-lg p-3">
-            <p className="text-xs text-gray-500">Prochaine récompense ({gains.nextTierLabel})</p>
-            <p className="font-medium text-gray-700">{gains.nextReward}</p>
-            <p className="text-xs text-gray-400 mt-1">Encore {fmtEur(gains.amountToNext, 0)} EUR de CA</p>
-          </div>
-        )}
-      </div>
 
       {/* Section 6 — Mon Profil */}
       <ProfileSection profile={profile} setProfile={setProfile} regions={regions} />
