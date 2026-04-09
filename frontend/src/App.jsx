@@ -33,7 +33,7 @@ import AdminPromoCodes from './components/admin/AdminPromoCodes';
 import StudentDashboard from './components/student/StudentDashboard';
 import CSELayout from './components/layout/CSELayout';
 import CSEDashboard from './components/cse/CSEDashboard';
-import CollaboratorCSEDashboard from './components/cse/CollaboratorCSEDashboard';
+
 import AmbassadorLayout from './components/layout/AmbassadorLayout';
 import AmbassadorDashboard from './components/ambassador/AmbassadorDashboard';
 import BTSLayout from './components/layout/BTSLayout';
@@ -84,8 +84,6 @@ function ProtectedRoute({ children, roles }) {
 }
 
 function CSERouteSwitch() {
-  const { user } = useAuth();
-  if (user?.cse_role === 'member') return <CollaboratorCSEDashboard />;
   return <CSEDashboard />;
 }
 
