@@ -8,7 +8,7 @@ const formatEur = (v) => new Intl.NumberFormat('fr-FR', { style: 'currency', cur
 
 export default function SignaturePage() {
   const { token } = useParams();
-  const { settings } = useAppSettings();
+  const { app_name, app_logo_url } = useAppSettings();
   const canvasRef = useRef(null);
   const [blData, setBlData] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -102,8 +102,8 @@ export default function SignaturePage() {
     }
   };
 
-  const appName = settings?.app_name || 'Vins & Conversations';
-  const logoUrl = settings?.app_logo_url;
+  const appName = app_name || 'Vins & Conversations';
+  const logoUrl = app_logo_url;
 
   if (loading) {
     return (

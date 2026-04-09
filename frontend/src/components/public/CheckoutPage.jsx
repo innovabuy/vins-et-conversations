@@ -88,10 +88,10 @@ export default function CheckoutPage() {
     name: '', email: '', phone: '', address: '', city: '', postal_code: '',
   });
   const [deliveryType, setDeliveryType] = useState('home_delivery');
-  const { settings } = useAppSettings();
-  const pickupEnabled = settings?.pickup_enabled === 'true';
-  const pickupAddress = settings?.pickup_address || "Saint-Sylvain-d'Anjou — Maine-et-Loire (49)";
-  const pickupDetails = settings?.pickup_details || 'Sur rendez-vous, du lundi au vendredi de 9h a 18h';
+  const { pickup_enabled, pickup_address, pickup_details } = useAppSettings();
+  const pickupEnabled = pickup_enabled === 'true';
+  const pickupAddress = pickup_address || "Saint-Sylvain-d'Anjou — Maine-et-Loire (49)";
+  const pickupDetails = pickup_details || 'Retrait sur rendez-vous. Contactez-nous pour convenir d\'un créneau.';
   const [loginForm, setLoginForm] = useState({ email: '', password: '' });
   const [registerForm, setRegisterForm] = useState({ name: '', email: '', password: '', phone: '', age_verified: false, cgv_accepted: false });
   const [errors, setErrors] = useState({});
