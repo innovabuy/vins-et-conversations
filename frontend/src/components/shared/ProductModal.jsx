@@ -7,12 +7,14 @@ import { useCart } from '../../contexts/CartContext';
 
 const formatEur = (v) => new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR' }).format(v);
 
-export default function ProductModal({ product, onClose, onPrev, onNext, hasPrev, hasNext }) {
+export default function ProductModal({ product, onClose, onPrev, onNext, hasPrev, hasNext, onAddToCart, csePriceTtc }) {
   const [detail, setDetail] = useState(null);
   const [loading, setLoading] = useState(true);
   const [qty, setQty] = useState(1);
   const [added, setAdded] = useState(false);
-  const { addToCart } = useCart();
+  let cartAddToCart = null;
+  try { cartAddToCart = useCart().addToCart; } catch (e) { /* no CartProvider — OK for CSE/admin contexts */ }
+  const addToCart = onAddToCart || cartAddToCart;
 
   // Fetch full product detail
   useEffect(() => {
@@ -59,8 +61,11 @@ export default function ProductModal({ product, onClose, onPrev, onNext, hasPrev
   const foodPairing = p.food_pairing || [];
   const awards = p.awards || [];
 
+  const displayPrice = csePriceTtc || p.price_ttc;
+
   const handleAdd = () => {
-    addToCart({ id: p.id, name: p.name, price_ttc: p.price_ttc }, qty);
+    if (!addToCart) return;
+    addToCart({ ...p, price_ttc: displayPrice }, qty);
     setAdded(true);
     setTimeout(() => setAdded(false), 2000);
   };
@@ -144,7 +149,7 @@ export default function ProductModal({ product, onClose, onPrev, onNext, hasPrev
                 </div>
 
                 <div className="flex items-center gap-3">
-                  <span className="text-2xl font-bold text-wine-700">{formatEur(p.price_ttc)}</span>
+                  <span className="text-2xl font-bold text-wine-700">{formatEur(displayPrice)}</span>
                   {p.id && (
                     <a
                       href={`${api.defaults.baseURL}/public/catalog/${p.id}/pdf`}

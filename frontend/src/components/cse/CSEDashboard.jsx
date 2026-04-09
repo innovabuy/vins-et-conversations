@@ -438,6 +438,8 @@ export default function CSEDashboard() {
         <ProductModal
           product={selectedProduct}
           onClose={() => setSelectedProduct(null)}
+          onAddToCart={(item, qty) => addToCart(selectedProduct, qty)}
+          csePriceTtc={selectedProduct?.cse_price_ttc}
         />
       )}
     </div>
