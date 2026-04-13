@@ -23,6 +23,7 @@ export default function AmbassadorDashboard() {
   const [profileSaved, setProfileSaved] = useState(false);
   const [showQR, setShowQR] = useState(false);
   const [selectedOrder, setSelectedOrder] = useState(null);
+  const [showAllOrders, setShowAllOrders] = useState(false);
 
   useEffect(() => {
     loadDashboard();
@@ -67,7 +68,8 @@ export default function AmbassadorDashboard() {
 
   if (!data) return <p className="text-center text-gray-500 py-12">Impossible de charger le tableau de bord.</p>;
 
-  const { tier, sales, recentOrders, referralClicks, gains, commission, commission_tiers, monthly, monthlyTier, monthlyHistory, free_bottles } = data;
+  const { tier, sales, referralClicks, gains, commission, commission_tiers, monthly, monthlyTier, monthlyHistory, free_bottles } = data;
+  const orders = data.orders || data.recentOrders || [];
   const tierStyle = TIER_COLORS[tier.current?.label] || TIER_COLORS.Bronze;
   const monthlyTierStyle = TIER_COLORS[monthlyTier?.current?.label] || TIER_COLORS.Bronze;
 
@@ -372,11 +374,11 @@ export default function AmbassadorDashboard() {
           </div>
         )}
 
-        {recentOrders.length > 0 && (
+        {orders.length > 0 && (
           <div>
-            <h3 className="text-sm font-medium text-gray-700 mb-2">Dernières commandes</h3>
+            <h3 className="text-sm font-medium text-gray-700 mb-2">Mes commandes</h3>
             <div className="space-y-2">
-              {recentOrders.slice(0, 5).map((o) => (
+              {(showAllOrders ? orders : orders.slice(0, 10)).map((o) => (
                 <div key={o.id} onClick={() => setSelectedOrder(o.id)} className="flex items-center justify-between text-sm bg-gray-50 rounded p-2 cursor-pointer hover:bg-gray-100 transition-colors">
                   <div>
                     <span className="font-medium">{o.ref}</span>
@@ -397,6 +399,14 @@ export default function AmbassadorDashboard() {
                 </div>
               ))}
             </div>
+            {orders.length > 10 && (
+              <button
+                onClick={() => setShowAllOrders(!showAllOrders)}
+                className="mt-2 text-sm text-wine-700 hover:text-wine-900 font-medium"
+              >
+                {showAllOrders ? 'Voir moins' : `Voir tout (${orders.length})`}
+              </button>
+            )}
           </div>
         )}
       </div>

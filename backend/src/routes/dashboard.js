@@ -476,8 +476,8 @@ router.get(
       const bottles = parseInt(salesResult?.bottles || 0, 10);
       const orderCount = parseInt(salesResult?.order_count || 0, 10);
 
-      // Recent orders (direct + referred) — with customer info for ambassador
-      const recentOrders = await db('orders')
+      // All orders (direct + referred) — with customer info for ambassador
+      const ambassadorOrders = await db('orders')
         .leftJoin('contacts', 'contacts.id', 'orders.customer_id')
         .where(function () {
           this.where({ 'orders.user_id': req.user.userId, 'orders.campaign_id': campaignId })
@@ -485,7 +485,6 @@ router.get(
         })
         .whereIn('orders.status', ['submitted', 'validated', 'preparing', 'shipped', 'delivered'])
         .orderBy('orders.created_at', 'desc')
-        .limit(10)
         .select(
           'orders.id', 'orders.ref', 'orders.status',
           'orders.total_ttc', 'orders.total_items', 'orders.created_at',
@@ -634,7 +633,8 @@ router.get(
         tier,
         tiers: rules.tier?.tiers || [],
         sales: { caTTC, caHT, bottles, orderCount },
-        recentOrders,
+        recentOrders: ambassadorOrders,
+        orders: ambassadorOrders,
         referralCode,
         referralClicks: parseInt(referralClicks?.count || 0, 10),
         referralStats: {
