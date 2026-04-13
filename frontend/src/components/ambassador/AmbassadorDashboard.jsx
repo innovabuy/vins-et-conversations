@@ -217,43 +217,43 @@ export default function AmbassadorDashboard() {
           <h2 className="font-semibold text-lg">Ma Progression</h2>
         </div>
 
-        {tier.current ? (
-          <div className={`p-3 rounded-lg border ${tierStyle.bg} ${tierStyle.border} mb-4`}>
+        {monthlyTier?.current ? (
+          <div className={`p-3 rounded-lg border ${monthlyTierStyle.bg} ${monthlyTierStyle.border} mb-4`}>
             <div className="flex items-center justify-between">
-              <span className={`font-bold text-lg ${tierStyle.text}`}>{tier.current.label}</span>
-              <span className="text-sm text-gray-600">{fmtEur(tier.ca, 0)} EUR de CA</span>
+              <span className={`font-bold text-lg ${monthlyTierStyle.text}`}>{monthlyTier.current.label}</span>
+              <span className="text-sm text-gray-600">{fmtEur(monthlyTier.ca, 0)} EUR de CA ce mois</span>
             </div>
           </div>
         ) : (
           <p className="text-gray-500 mb-4">Aucun palier atteint pour le moment.</p>
         )}
 
-        {tier.next && (
+        {monthlyTier?.next && (
           <div>
             <div className="flex justify-between text-sm text-gray-600 mb-1">
-              <span>Prochain : {tier.next.label}</span>
-              <span>{tier.progress}%</span>
+              <span>Prochain : {monthlyTier.next.label}</span>
+              <span>{monthlyTier.progress}%</span>
             </div>
             <div className="w-full bg-gray-200 rounded-full h-3">
               <div
-                className={`h-3 rounded-full transition-all ${tierStyle.bar}`}
-                style={{ width: `${tier.progress}%` }}
+                className={`h-3 rounded-full transition-all ${monthlyTierStyle.bar}`}
+                style={{ width: `${monthlyTier.progress}%` }}
               />
             </div>
             <p className="text-xs text-gray-500 mt-1">
-              Plus que {fmtEur(gains.amountToNext, 0)} EUR pour atteindre {tier.next.label}
+              Plus que {fmtEur(gains.amountToNext, 0)} EUR pour atteindre {monthlyTier.next.label}
             </p>
           </div>
         )}
 
-        {!tier.next && tier.current && (
+        {!monthlyTier?.next && monthlyTier?.current && (
           <p className="text-sm text-green-600 font-medium">Palier maximum atteint !</p>
         )}
 
         {/* All tiers display — loaded from API (CDC §2.2 — zero hardcoded) */}
         <div className="mt-4 grid grid-cols-4 gap-2">
           {(data.tiers || []).map((t) => {
-            const reached = tier.ca >= t.threshold;
+            const reached = monthlyTier?.ca >= t.threshold;
             const style = TIER_COLORS[t.label];
             return (
               <div key={t.label} className={`text-center p-2 rounded-lg text-xs ${reached ? `${style.bg} ${style.text} font-medium` : 'bg-gray-100 text-gray-400'}`}>

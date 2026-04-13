@@ -520,16 +520,6 @@ router.get(
         )
         .first();
 
-      // Gains (rewards from tiers)
-      const currentTier = tier.current;
-      const gains = {
-        currentReward: currentTier?.reward || null,
-        currentTierLabel: currentTier?.label || null,
-        nextReward: tier.next?.reward || null,
-        nextTierLabel: tier.next?.label || null,
-        amountToNext: tier.next ? Math.max(0, tier.next.threshold - tier.ca) : 0,
-      };
-
       // Alcohol-free flag
       const campaignData = await db('campaigns').where({ id: campaignId }).select('alcohol_free').first();
 
@@ -569,6 +559,16 @@ router.get(
         dateFrom: monthStart,
         dateTo: now.toISOString(),
       });
+
+      // Gains (rewards from tiers — based on monthly CA for progression)
+      const currentTier = monthlyTier.current || tier.current;
+      const gains = {
+        currentReward: currentTier?.reward || null,
+        currentTierLabel: currentTier?.label || null,
+        nextReward: (monthlyTier.next || tier.next)?.reward || null,
+        nextTierLabel: (monthlyTier.next || tier.next)?.label || null,
+        amountToNext: monthlyTier.next ? Math.max(0, monthlyTier.next.threshold - monthlyTier.ca) : 0,
+      };
 
       // Monthly commission
       const fundsMonthly = await rulesEngine.calculateFunds(campaignId, req.user.userId, rules.commission, {
