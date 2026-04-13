@@ -52,7 +52,7 @@ router.post('/record', authenticate, requireRole('super_admin', 'commercial'), a
       return res.status(400).json({ error: 'ALCOHOL_ONLY', message: 'Seuls les produits avec alcool sont eligibles au 12+1' });
     }
 
-    const balance = await rulesEngine.calculateFreeBottles(user_id, campaign_id, freeBottleRules);
+    const balance = await rulesEngine.calculateFreeBottles(user_id, campaign_id, freeBottleRules, { includeReferredBy: true });
     if (balance.available <= 0) {
       return res.status(400).json({
         error: 'NO_FREE_BOTTLES',
@@ -86,7 +86,7 @@ router.post('/record', authenticate, requireRole('super_admin', 'commercial'), a
     const events = await db('financial_events').insert(rows).returning('*');
 
     // Recalculate balance
-    const newBalance = await rulesEngine.calculateFreeBottles(user_id, campaign_id, freeBottleRules);
+    const newBalance = await rulesEngine.calculateFreeBottles(user_id, campaign_id, freeBottleRules, { includeReferredBy: true });
 
     res.status(201).json({
       success: true,
@@ -125,7 +125,7 @@ router.get('/pending', authenticate, requireRole('super_admin', 'commercial'), a
 
     const results = [];
     for (const user of participants) {
-      const balance = await rulesEngine.calculateFreeBottles(user.id, campaign_id, freeBottleRules);
+      const balance = await rulesEngine.calculateFreeBottles(user.id, campaign_id, freeBottleRules, { includeReferredBy: true });
       if (balance.available > 0) {
         results.push({
           user_id: user.id,

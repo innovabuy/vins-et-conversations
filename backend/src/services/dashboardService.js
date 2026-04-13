@@ -93,7 +93,7 @@ async function getStudentDashboard(userId, campaignId) {
 
   // Règles bouteilles gratuites + parts des anges (V4.1)
   const rules = await rulesEngine.loadRulesForCampaign(campaignId);
-  const freeBottles = await rulesEngine.calculateFreeBottles(userId, campaignId, rules.freeBottle);
+  const freeBottles = await rulesEngine.calculateFreeBottles(userId, campaignId, rules.freeBottle, { includeReferredBy: true });
   const funds = await rulesEngine.calculateFunds(campaignId, userId, rules.commission);
 
   // Historique des gratuités déjà remises (financial_events type='free_bottle')
