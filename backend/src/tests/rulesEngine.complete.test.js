@@ -9,6 +9,7 @@ const {
   calculateFreeBottles,
   calculateTier,
   loadRulesForCampaign,
+  roundToNearest5Cents,
 } = require('../services/rulesEngine');
 
 let campaignId, cseCampaignId, ambassadorCampaignId;
@@ -48,14 +49,16 @@ describe('Pricing Rules', () => {
     expect(result.discount_applied).toBe(0);
   });
 
-  test('Client CSE → prix - 10%', () => {
+  test('Client CSE → prix - 10% arrondi au multiple de 0,05', () => {
     const result = applyPricingRules(
       sampleProduct,
       { type: 'percentage_discount', value: 10, min_order: 200 },
       300 // orderTotal above min_order
     );
-    expect(result.price_ht).toBeCloseTo(9.38, 2);
-    expect(result.price_ttc).toBeCloseTo(11.25, 2);
+    // 10.42 * 0.90 = 9.378 → arrondi 0,05 → 9.40
+    expect(result.price_ht).toBe(9.40);
+    // 12.50 * 0.90 = 11.25 → déjà multiple de 0,05
+    expect(result.price_ttc).toBe(11.25);
     expect(result.discount_applied).toBe(10);
   });
 
@@ -79,6 +82,27 @@ describe('Pricing Rules', () => {
     expect(result.discount_applied).toBe(0);
     expect(result.price_ht).toBe(10.42);
     expect(result.warning).toContain('500');
+  });
+
+  test('N4: prix CSE toujours multiple de 0,05 (roundToNearest5Cents)', () => {
+    // 12,90 × 0,90 = 11,61 → 11,60
+    expect(roundToNearest5Cents(12.90 * 0.90)).toBe(11.60);
+    // 8,50 × 0,90 = 7,65 → 7,65 (déjà ok)
+    expect(roundToNearest5Cents(8.50 * 0.90)).toBe(7.65);
+    // 3,50 × 0,90 = 3,15 → 3,15 (déjà ok)
+    expect(roundToNearest5Cents(3.50 * 0.90)).toBe(3.15);
+    // 6,50 × 0,90 = 5,85 → 5,85 (déjà ok)
+    expect(roundToNearest5Cents(6.50 * 0.90)).toBe(5.85);
+    // 13,50 × 0,90 = 12,15 → 12,15 (déjà ok)
+    expect(roundToNearest5Cents(13.50 * 0.90)).toBe(12.15);
+    // Vérifier qu'applyPricingRules produit aussi un multiple de 0,05
+    const result = applyPricingRules(
+      { price_ht: 10.75, price_ttc: 12.90 },
+      { type: 'percentage_discount', value: 10 }
+    );
+    expect(result.price_ttc).toBe(11.60);
+    expect((result.price_ttc * 20) % 1).toBeCloseTo(0, 10);
+    expect((result.price_ht * 20) % 1).toBeCloseTo(0, 10);
   });
 
   test('Prix fixe → price_ht et price_ttc fixés', () => {
@@ -360,7 +384,7 @@ describe('Types client_types — entreprise et particulier', () => {
     const result = applyPricingRules(product, pricing, 150);
     expect(result.discount_applied).toBe(5);
     expect(result.price_ht).toBeCloseTo(9.90, 2);
-    expect(result.price_ttc).toBeCloseTo(11.88, 2);
+    expect(result.price_ttc).toBeCloseTo(11.90, 2); // 11.875 → arrondi 0,05 → 11.90
 
     // Commande 50€ (< min_order 100) → pas de remise
     const resultLow = applyPricingRules(product, pricing, 50);

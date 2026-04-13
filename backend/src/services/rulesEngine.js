@@ -8,6 +8,11 @@ const logger = require('../utils/logger');
  * AUCUNE règle n'est codée en dur. Tout vient de la base.
  */
 
+/** Arrondit au multiple de 0,05€ le plus proche (ex: 11,61 → 11,60) */
+function roundToNearest5Cents(price) {
+  return Math.round(price * 20) / 20;
+}
+
 // ─── §3.1 Tarification ───────────────────────────────
 
 /**
@@ -40,8 +45,8 @@ function applyPricingRules(product, pricingRules, orderTotal = 0) {
 
     const discount = pricingRules.value / 100;
     return {
-      price_ht: parseFloat((product.price_ht * (1 - discount)).toFixed(2)),
-      price_ttc: parseFloat((product.price_ttc * (1 - discount)).toFixed(2)),
+      price_ht: roundToNearest5Cents(product.price_ht * (1 - discount)),
+      price_ttc: roundToNearest5Cents(product.price_ttc * (1 - discount)),
       discount_applied: pricingRules.value,
     };
   }
@@ -523,4 +528,5 @@ module.exports = {
   calculateFreeBottleCost,
   calculateTier,
   loadRulesForCampaign,
+  roundToNearest5Cents,
 };

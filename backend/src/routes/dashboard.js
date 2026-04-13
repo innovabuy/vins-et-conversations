@@ -214,9 +214,9 @@ router.get(
           label: p.label,
           image_url: p.image_url,
           original_price_ttc: originalTTC,
-          cse_price_ttc: parseFloat((originalTTC * (1 - discount)).toFixed(2)),
+          cse_price_ttc: Math.round(originalTTC * (1 - discount) * 20) / 20,
           original_price_ht: parseFloat(originalHT.toFixed(2)),
-          cse_price_ht: parseFloat((originalHT * (1 - discount)).toFixed(2)),
+          cse_price_ht: Math.round(originalHT * (1 - discount) * 20) / 20,
           tva_rate: parseFloat(p.tva_rate),
         };
       });

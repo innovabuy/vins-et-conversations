@@ -320,7 +320,8 @@ describe('SCÉNARIO 3 — Prix CSE et commissions', () => {
     // Verify each product's price is correctly discounted
     const products = dash.body.products || [];
     for (const p of products.slice(0, 3)) {
-      const expectedCSE = parseFloat((p.original_price_ttc * (1 - discountPct / 100)).toFixed(2));
+      const rawCSE = p.original_price_ttc * (1 - discountPct / 100);
+      const expectedCSE = Math.round(rawCSE * 20) / 20; // arrondi 0,05
       expect(Math.abs(p.cse_price_ttc - expectedCSE)).toBeLessThan(TOLERANCE);
     }
   });

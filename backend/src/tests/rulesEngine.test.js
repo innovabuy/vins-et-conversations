@@ -14,7 +14,7 @@ describe('Moteur de règles — CDC §3', () => {
     test('Remise CSE -10%', () => {
       const result = applyPricingRules(product, { type: 'percentage_discount', value: 10 }, 300);
       expect(result.price_ttc).toBe(11.25);
-      expect(result.price_ht).toBe(9.38);
+      expect(result.price_ht).toBe(9.40);
       expect(result.discount_applied).toBe(10);
     });
 
