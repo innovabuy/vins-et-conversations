@@ -66,6 +66,8 @@ async function getStudentDashboard(userId, campaignId) {
       db.raw('SUM(CASE WHEN user_id = ? AND campaign_id = ? THEN total_items ELSE 0 END) as direct_bottles', [userId, campaignId]),
       db.raw('SUM(CASE WHEN referred_by = ? AND source = \'student_referral\' AND campaign_id = ? AND (user_id IS NULL OR user_id != referred_by) THEN total_ttc ELSE 0 END) as referred_ca', [userId, campaignId]),
       db.raw('SUM(CASE WHEN referred_by = ? AND source = \'student_referral\' AND campaign_id = ? AND (user_id IS NULL OR user_id != referred_by) THEN total_items ELSE 0 END) as referred_bottles', [userId, campaignId]),
+      db.raw('COUNT(CASE WHEN referred_by = ? AND source = \'student_referral\' AND campaign_id = ? AND (user_id IS NULL OR user_id != referred_by) THEN 1 END) as referred_orders_count', [userId, campaignId]),
+      db.raw('COUNT(DISTINCT CASE WHEN referred_by = ? AND source = \'student_referral\' AND campaign_id = ? AND (user_id IS NULL OR user_id != referred_by) THEN user_id END) as referred_clients_count', [userId, campaignId]),
     )
     .first();
 
@@ -73,6 +75,8 @@ async function getStudentDashboard(userId, campaignId) {
   const orderCount = parseInt(userStats?.order_count || 0, 10);
   const caReferred = parseFloat(userStats?.referred_ca || 0);
   const bottlesReferred = parseInt(userStats?.referred_bottles || 0, 10);
+  const referredOrdersCount = parseInt(userStats?.referred_orders_count || 0, 10);
+  const referredClientsCount = parseInt(userStats?.referred_clients_count || 0, 10);
   const caTotal = parseFloat((ca + caReferred).toFixed(2));
   const bottlesSold = parseInt(userStats?.direct_bottles || 0, 10) + bottlesReferred;
 
@@ -248,6 +252,11 @@ async function getStudentDashboard(userId, campaignId) {
     ca,
     ca_referred: caReferred,
     ca_total: caTotal,
+    referral_stats: {
+      orders_count: referredOrdersCount,
+      ca_ttc: caReferred,
+      clients_count: referredClientsCount,
+    },
     orderCount,
     bottlesSold,
     position,

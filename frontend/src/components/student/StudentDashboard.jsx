@@ -664,6 +664,29 @@ export default function StudentDashboard() {
             {/* Referral section — hidden for alcohol-free campaigns */}
             {!campaign?.alcohol_free && <ReferralSection campaignId={campaignId} brandName={brandName} caReferred={data.ca_referred || 0} />}
 
+            {/* Mes ventes par partage — visible si au moins 1 commande referral */}
+            {data.referral_stats?.orders_count > 0 && (
+              <div className="card">
+                <h3 className="font-semibold text-sm mb-3 flex items-center gap-2">
+                  <TrendingUp size={16} className="text-wine-700" /> Mes ventes par partage
+                </h3>
+                <div className="grid grid-cols-3 gap-3">
+                  <div className="bg-wine-50 rounded-lg p-3 text-center">
+                    <p className="text-xl font-bold text-wine-700">{data.referral_stats.orders_count}</p>
+                    <p className="text-[10px] text-gray-500">Commandes</p>
+                  </div>
+                  <div className="bg-wine-50 rounded-lg p-3 text-center">
+                    <p className="text-xl font-bold text-wine-700">{formatEur(data.referral_stats.ca_ttc)}</p>
+                    <p className="text-[10px] text-gray-500">CA référé</p>
+                  </div>
+                  <div className="bg-wine-50 rounded-lg p-3 text-center">
+                    <p className="text-xl font-bold text-wine-700">{data.referral_stats.clients_count}</p>
+                    <p className="text-[10px] text-gray-500">Clients</p>
+                  </div>
+                </div>
+              </div>
+            )}
+
             {/* Campaign collective stats */}
             {campaign && (
               <div className="card">
