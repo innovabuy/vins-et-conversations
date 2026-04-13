@@ -200,6 +200,7 @@ export default function CSEDashboard() {
             <Award size={18} className="text-wine-600" />
             <h3 className="font-semibold text-gray-800">Palier fidélité</h3>
           </div>
+
           {data.current_tier ? (
             <div className="flex items-center gap-3 mb-2">
               <span
@@ -209,10 +210,12 @@ export default function CSEDashboard() {
                 {data.current_tier.label}
               </span>
               <span className="text-sm text-gray-600">{data.current_tier.reward}</span>
+              <span className="text-sm text-gray-500 ml-auto">{fmtEur(data.tier_ca || 0, 0)} EUR de CA</span>
             </div>
           ) : (
             <p className="text-sm text-gray-500 mb-2">Aucun palier atteint pour le moment</p>
           )}
+
           {data.next_tier && (
             <>
               <div className="flex items-baseline justify-between text-xs text-gray-500 mb-1">
@@ -229,12 +232,40 @@ export default function CSEDashboard() {
                 />
               </div>
               <p className="text-xs text-gray-400 mt-1">
-                Récompense : {data.next_tier.reward}
+                Plus que {fmtEur(data.tier_amount_to_next || 0, 0)} EUR pour atteindre {data.next_tier.label} — Récompense : {data.next_tier.reward}
               </p>
             </>
           )}
+
           {!data.next_tier && data.current_tier && (
             <p className="text-xs text-green-600 font-medium">Palier maximum atteint !</p>
+          )}
+
+          {/* Grille de tous les paliers */}
+          {data.tiers?.length > 0 && (
+            <div className="mt-4 grid grid-cols-5 gap-2">
+              {data.tiers.map((t) => {
+                const reached = (data.tier_ca || 0) >= t.threshold;
+                const isCurrent = data.current_tier?.label === t.label;
+                return (
+                  <div
+                    key={t.label}
+                    className={`text-center p-2 rounded-lg text-xs border ${
+                      isCurrent
+                        ? 'border-2 font-bold'
+                        : reached
+                          ? 'font-medium'
+                          : 'bg-gray-50 text-gray-400 border-transparent'
+                    }`}
+                    style={reached ? { backgroundColor: t.color + '20', color: t.color, borderColor: t.color } : {}}
+                  >
+                    <div>{reached ? '✓ ' : ''}{t.label}</div>
+                    <div>{fmtEur(t.threshold, 0)} EUR</div>
+                    <div className="text-[10px] mt-0.5 opacity-75">{t.reward}</div>
+                  </div>
+                );
+              })}
+            </div>
           )}
         </div>
       )}
