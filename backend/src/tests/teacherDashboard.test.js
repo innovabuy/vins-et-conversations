@@ -146,15 +146,18 @@ describe('Teacher Dashboard Financials', () => {
     expect(dashData.campaign_financials.ca_ttc).toBeGreaterThan(dashData.campaign_financials.ca_ht);
   });
 
-  test('TEACH-02: vat_breakdown correct — somme montants HT par taux = ca_ht global', () => {
+  test('TEACH-02: SUM(vat_breakdown HT) === ca_ht global (N3 fix)', () => {
     const vat = dashData.campaign_financials.vat_breakdown;
     expect(vat).toBeDefined();
     expect(vat.length).toBeGreaterThanOrEqual(1);
-    // Sum of all HT breakdown should approximate ca_ht (may differ slightly due to rounding or promo)
-    const sumHT = vat.reduce((s, v) => s + v.amount_ht, 0);
-    // The vat_breakdown HT is computed from order_items, ca_ht from orders.total_ht
-    // They can differ slightly if promos were applied at order level
-    expect(sumHT).toBeGreaterThan(0);
+    const sumHT = parseFloat(vat.reduce((s, v) => s + v.amount_ht, 0).toFixed(2));
+    expect(sumHT).toBe(dashData.campaign_financials.ca_ht);
+  });
+
+  test('TEACH-08: SUM(vat_breakdown TTC) === ca_ttc global (N3 fix)', () => {
+    const vat = dashData.campaign_financials.vat_breakdown;
+    const sumTTC = parseFloat(vat.reduce((s, v) => s + v.amount_ttc, 0).toFixed(2));
+    expect(sumTTC).toBe(dashData.campaign_financials.ca_ttc);
   });
 
   test('TEACH-03: association_remuneration.amount_ht = ca_ht * taux_commission', () => {

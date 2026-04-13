@@ -1,5 +1,5 @@
 /**
- * CSE Collaborator Dashboard — Tests CSE-C-01 to CSE-C-06
+ * CSE Collaborator Dashboard — Tests CSE-C-01 to CSE-C-07
  */
 const request = require('supertest');
 const bcrypt = require('bcryptjs');
@@ -281,5 +281,17 @@ describe('CSE Collaborator Dashboard', () => {
     // Order without BL should have null
     const orderNoBL = res.body.orders.find((o) => o.reference === 'VC-CSE-T01');
     expect(orderNoBL.delivery_note).toBeNull();
+  });
+
+  test('CSE-C-07: SUM(vat_breakdown) === total_ht/total_ttc (N3 fix)', async () => {
+    const res = await request(app)
+      .get(`/api/v1/dashboard/cse/collaborator?campaign_id=${campaignId}`)
+      .set('Authorization', `Bearer ${collabToken}`);
+    expect(res.status).toBe(200);
+    const vat = res.body.stats.vat_breakdown;
+    const sumHT = parseFloat(vat.reduce((s, v) => s + v.amount_ht, 0).toFixed(2));
+    const sumTTC = parseFloat(vat.reduce((s, v) => s + v.amount_ttc, 0).toFixed(2));
+    expect(sumHT).toBe(res.body.stats.total_ht);
+    expect(sumTTC).toBe(res.body.stats.total_ttc);
   });
 });

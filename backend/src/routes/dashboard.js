@@ -377,12 +377,10 @@ router.get(
 
       // Stats from validated+ orders
       const statsOrders = orders.filter((o) => validStatuses.includes(o.status));
-      const totalTTC = statsOrders.reduce((s, o) => s + parseFloat(o.total_ttc), 0);
-      const totalHT = statsOrders.reduce((s, o) => s + parseFloat(o.total_ht), 0);
       const pendingOrders = orders.filter((o) => o.status === 'submitted').length;
       const lastOrderDate = statsOrders.length > 0 ? statsOrders[0].created_at : null;
 
-      // VAT breakdown from order_items.vat_rate
+      // VAT breakdown from order_items — CA totals derived from these lines to guarantee consistency
       const statsOrderIds = statsOrders.map((o) => o.id);
       const vatRows = statsOrderIds.length > 0
         ? await db('order_items')
@@ -401,6 +399,9 @@ router.get(
         amount_ht: parseFloat(parseFloat(r.amount_ht).toFixed(2)),
         amount_ttc: parseFloat(parseFloat(r.amount_ttc).toFixed(2)),
       }));
+
+      const totalHT = vatBreakdown.reduce((s, v) => s + v.amount_ht, 0);
+      const totalTTC = vatBreakdown.reduce((s, v) => s + v.amount_ttc, 0);
 
       // Payments
       const payments = orderIds.length > 0

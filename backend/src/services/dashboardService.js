@@ -551,17 +551,8 @@ async function getTeacherDashboard(userId, campaignId) {
     };
   }
 
-  // Global campaign CA (from studentOrdersCombinedSQL to include referral)
-  const globalCaResult = await db.raw(`
-    SELECT COALESCE(SUM(so.total_ttc), 0) as ca_ttc,
-           COALESCE(SUM(so.total_ht), 0) as ca_ht
-    FROM ${caStudentSQL} so
-  `, caStudentParams);
-  const globalCa = (globalCaResult.rows || globalCaResult)[0];
-  const campCaTTC = parseFloat(parseFloat(globalCa?.ca_ttc || 0).toFixed(2));
-  const campCaHT = parseFloat(parseFloat(globalCa?.ca_ht || 0).toFixed(2));
-
   // Global VAT breakdown from order_items.vat_rate
+  // CA totals are derived from VAT breakdown lines to guarantee consistency
   const globalOrderIds = await db('orders')
     .where({ campaign_id: campaignId })
     .whereIn('status', ACTIVE_STATUSES)
@@ -588,6 +579,10 @@ async function getTeacherDashboard(userId, campaignId) {
     amount_ht: parseFloat(parseFloat(r.amount_ht).toFixed(2)),
     amount_ttc: parseFloat(parseFloat(r.amount_ttc).toFixed(2)),
   }));
+
+  // Derive CA totals from VAT breakdown to guarantee SUM(lines) === displayed total
+  const campCaHT = parseFloat(globalVatBreakdown.reduce((s, v) => s + v.amount_ht, 0).toFixed(2));
+  const campCaTTC = parseFloat(globalVatBreakdown.reduce((s, v) => s + v.amount_ttc, 0).toFixed(2));
 
   // Per-student VAT breakdown
   const studentVatResult = gIds.length > 0
