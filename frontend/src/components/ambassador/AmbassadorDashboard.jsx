@@ -85,8 +85,8 @@ export default function AmbassadorDashboard() {
 
         {/* Commission breakdown — direct vs referred (V4.2 BLOC 1.3) */}
         {(() => {
-          const referredCA = referralData?.referredOrders?.reduce?.((s, o) => s + parseFloat(o.total_ttc || 0), 0) || 0;
-          const directCA = Math.max(0, sales.caTTC - referredCA);
+          const directCA = data.direct_ca_ttc || 0;
+          const referredCA = data.referred_ca_ttc || 0;
           return (
             <div className="grid grid-cols-2 gap-3 mb-4">
               <div className="bg-blue-50 rounded-lg p-3 text-center">

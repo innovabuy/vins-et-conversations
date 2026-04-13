@@ -479,6 +479,25 @@ router.get(
       const bottles = parseInt(salesResult?.bottles || 0, 10);
       const orderCount = parseInt(salesResult?.order_count || 0, 10);
 
+      // Direct sales = ambassador's own orders (source ambassador_order OR campaign)
+      const ACTIVE_STATUSES = ['submitted', 'validated', 'preparing', 'shipped', 'delivered'];
+      const directSales = await db('orders')
+        .where({ user_id: req.user.userId, campaign_id: campaignId })
+        .whereIn('source', ['ambassador_order', 'campaign'])
+        .whereIn('status', ACTIVE_STATUSES)
+        .sum('total_ttc as total')
+        .first();
+
+      // Referred sales = all orders via referral link (source ambassador_referral)
+      const referredSales = await db('orders')
+        .where({ referred_by: req.user.userId, campaign_id: campaignId, source: 'ambassador_referral' })
+        .whereIn('status', ACTIVE_STATUSES)
+        .sum('total_ttc as total')
+        .first();
+
+      const directCaTTC = parseFloat(directSales?.total || 0);
+      const referredCaTTC = parseFloat(referredSales?.total || 0);
+
       // All orders (direct + referred) — with customer info for ambassador
       const ambassadorOrders = await db('orders')
         .leftJoin('contacts', 'contacts.id', 'orders.customer_id')
@@ -635,6 +654,8 @@ router.get(
         alcohol_free: campaignData?.alcohol_free || false,
         tier,
         tiers: rules.tier?.tiers || [],
+        direct_ca_ttc: directCaTTC,
+        referred_ca_ttc: referredCaTTC,
         sales: { caTTC, caHT, bottles, orderCount },
         recentOrders: ambassadorOrders,
         orders: ambassadorOrders,
