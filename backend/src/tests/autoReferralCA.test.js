@@ -154,11 +154,9 @@ describe('B1/B2 — Auto-referral CA fix', () => {
     // The true referral (user_id = referrer, NOT student) is NOT counted → correct
     expect(res.body.freeBottles).toBeDefined();
     expect(res.body.freeBottles.totalSold).toBeGreaterThanOrEqual(0);
-    // Key assertion: totalSold should include auto-referral items (user_id = student)
-    // but NOT true-referral items (user_id = referrer)
-    // If product is alcohol: totalSold = 7; if not: totalSold = 0
+    // totalSold inclut commandes directes + referrals (includeReferredBy: true depuis N2)
     if (res.body.freeBottles.totalSold > 0) {
-      expect(res.body.freeBottles.totalSold).toBe(7);
+      expect(res.body.freeBottles.totalSold).toBe(10);
     }
   });
 
