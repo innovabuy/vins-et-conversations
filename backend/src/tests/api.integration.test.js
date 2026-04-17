@@ -2759,11 +2759,9 @@ describe('API Integration Tests', () => {
     });
 
     test('Migration mapped all seeded products to category_id', async () => {
-      // Verify active products have category_id mapped (works for both seed and Wix)
-      const productsToCheck = await db('products').where('active', true).select('name', 'category', 'category_id').limit(10);
-      for (const p of productsToCheck) {
-        expect(p.category_id).toBeTruthy();
-      }
+      const allActive = await db('products').where('active', true).select('id', 'name', 'category', 'category_id');
+      const missing = allActive.filter(p => !p.category_id);
+      expect(missing).toEqual([]);
     });
 
     test('Admin creates category with type + tasting_axes', async () => {

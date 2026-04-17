@@ -350,19 +350,21 @@ describe('Types client_types — entreprise et particulier', () => {
     entrepriseType = await db('client_types').where('name', 'entreprise').first();
     particulierType = await db('client_types').where('name', 'particulier').first();
 
-    // Load active alcohol products dynamically (works for both seed and Wix)
+    // Load actual wine bottles (not coffret bundles) — 12+1 cost_method operates on bottles
     wines = await db('products')
       .join('product_categories', 'products.category_id', 'product_categories.id')
       .where('product_categories.is_alcohol', true)
+      .whereIn('product_categories.product_type', ['wine', 'sparkling'])
       .where('products.active', true)
       .select('products.*')
       .orderBy('products.purchase_price', 'asc')
       .limit(3);
 
-    // Load active non-alcohol product (Jus)
+    // Load actual non-alcohol drink (Jus) — skip service/gift-card categories
     juice = await db('products')
       .join('product_categories', 'products.category_id', 'product_categories.id')
       .where('product_categories.is_alcohol', false)
+      .whereIn('product_categories.product_type', ['beverage', 'food'])
       .where('products.active', true)
       .select('products.*')
       .orderBy('products.purchase_price', 'asc')
