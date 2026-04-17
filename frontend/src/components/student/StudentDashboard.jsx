@@ -576,6 +576,45 @@ export default function StudentDashboard() {
         {/* ===== HOME TAB ===== */}
         {tab === 'home' && data && (
           <div className="space-y-4">
+            {/* New order button */}
+            <button onClick={() => setTab('order')} className="btn-primary w-full flex items-center justify-center gap-2">
+              <ShoppingCart size={18} /> Nouvelle commande
+            </button>
+
+            {/* Referral section — hidden for alcohol-free campaigns */}
+            {!campaign?.alcohol_free && <ReferralSection campaignId={campaignId} brandName={brandName} caReferred={data.ca_referred || 0} />}
+
+            {/* Barriques — Part des anges (V4.1) */}
+            {(data.fund_collective || data.fund_individual) && (
+              <div className="card">
+                <h3 className="font-semibold text-sm mb-3 flex items-center gap-2">
+                  <Wine size={16} className="text-wine-700" /> Mes parts des anges
+                </h3>
+                <div className={`grid gap-4 ${data.fund_collective && data.fund_individual ? 'grid-cols-2' : 'grid-cols-1'}`}>
+                  {data.fund_collective && (
+                    <WineBarrel
+                      amount={data.fund_collective.amount}
+                      label={data.fund_collective.label}
+                      fillPct={campaign?.goal > 0 ? Math.min(95, (data.fund_collective.base_amount / campaign.goal) * 100) : 50}
+                      color="#722F37"
+                    />
+                  )}
+                  {data.fund_individual && (
+                    <WineBarrel
+                      amount={data.fund_individual.amount}
+                      label={data.fund_individual.label}
+                      fillPct={data.fund_individual.base_amount > 0 ? Math.min(95, (data.ca / (campaign?.avg_ca_per_student || data.ca)) * 50 + 20) : 10}
+                      color="#8B5E3C"
+                    />
+                  )}
+                </div>
+                <div className="mt-2 text-center">
+                  {data.fund_collective && <p className="text-[10px] text-gray-400">{data.fund_collective.rate}% du CA HT collectif</p>}
+                  {data.fund_individual && <p className="text-[10px] text-gray-400">{data.fund_individual.rate}% de ton CA HT perso</p>}
+                </div>
+              </div>
+            )}
+
             {/* 12+1 Bouteilles offertes — format ambassadeur */}
             {data.freeBottles && !data.freeBottles.disabled && data.freeBottles.threshold > 0 && (
               <div className="card">
@@ -655,40 +694,6 @@ export default function StudentDashboard() {
                 )}
               </div>
             )}
-
-            {/* Barriques — Part des anges (V4.1) */}
-            {(data.fund_collective || data.fund_individual) && (
-              <div className="card">
-                <h3 className="font-semibold text-sm mb-3 flex items-center gap-2">
-                  <Wine size={16} className="text-wine-700" /> Mes parts des anges
-                </h3>
-                <div className={`grid gap-4 ${data.fund_collective && data.fund_individual ? 'grid-cols-2' : 'grid-cols-1'}`}>
-                  {data.fund_collective && (
-                    <WineBarrel
-                      amount={data.fund_collective.amount}
-                      label={data.fund_collective.label}
-                      fillPct={campaign?.goal > 0 ? Math.min(95, (data.fund_collective.base_amount / campaign.goal) * 100) : 50}
-                      color="#722F37"
-                    />
-                  )}
-                  {data.fund_individual && (
-                    <WineBarrel
-                      amount={data.fund_individual.amount}
-                      label={data.fund_individual.label}
-                      fillPct={data.fund_individual.base_amount > 0 ? Math.min(95, (data.ca / (campaign?.avg_ca_per_student || data.ca)) * 50 + 20) : 10}
-                      color="#8B5E3C"
-                    />
-                  )}
-                </div>
-                <div className="mt-2 text-center">
-                  {data.fund_collective && <p className="text-[10px] text-gray-400">{data.fund_collective.rate}% du CA HT collectif</p>}
-                  {data.fund_individual && <p className="text-[10px] text-gray-400">{data.fund_individual.rate}% de ton CA HT perso</p>}
-                </div>
-              </div>
-            )}
-
-            {/* Referral section — hidden for alcohol-free campaigns */}
-            {!campaign?.alcohol_free && <ReferralSection campaignId={campaignId} brandName={brandName} caReferred={data.ca_referred || 0} />}
 
             {/* Mes ventes par partage — visible si au moins 1 commande referral */}
             {data.referral_stats?.orders_count > 0 && (
@@ -842,11 +847,6 @@ export default function StudentDashboard() {
                 ))}
               </div>
             )}
-
-            {/* New order button */}
-            <button onClick={() => setTab('order')} className="btn-primary w-full flex items-center justify-center gap-2">
-              <ShoppingCart size={18} /> Nouvelle commande
-            </button>
           </div>
         )}
 
