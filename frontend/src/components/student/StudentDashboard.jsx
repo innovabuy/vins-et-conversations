@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { dashboardAPI, productsAPI, ordersAPI, campaignResourcesAPI, invoicesAPI } from '../../services/api';
 import { useAuth } from '../../contexts/AuthContext';
-import { Flame, Trophy, ShoppingCart, User, ChevronUp, ChevronDown, Wine, Package, Clock, Award, Zap, Heart, Target, DollarSign, ArrowLeft, ArrowRight, Check, Phone, Mail, FileText, CreditCard, Banknote, Building, HelpCircle, Users, TrendingUp, TrendingDown, Minus, BarChart3, BookOpen, ExternalLink, Video, Image, FileDown, LogOut } from 'lucide-react';
+import { Flame, Trophy, ShoppingCart, User, ChevronUp, ChevronDown, Wine, Package, Clock, Award, Zap, Heart, Target, DollarSign, ArrowLeft, ArrowRight, Check, Phone, Mail, FileText, CreditCard, Banknote, Building, HelpCircle, Users, TrendingUp, TrendingDown, Minus, BarChart3, BookOpen, ExternalLink, Video, Image, FileDown, LogOut, Gift } from 'lucide-react';
 import WineBarrel from '../shared/WineBarrel';
 import CapNumerikCredit from '../shared/CapNumerikCredit';
 import ReferralSection from './ReferralSection';
@@ -576,59 +576,85 @@ export default function StudentDashboard() {
         {/* ===== HOME TAB ===== */}
         {tab === 'home' && data && (
           <div className="space-y-4">
-            {/* Free bottles */}
-            <div className="card">
-              <div className="flex items-center justify-between mb-2">
-                <h3 className="font-semibold text-sm">{'\uD83C\uDF81'} Bouteilles gratuites (12+1)</h3>
-                <span className="badge bg-wine-100 text-wine-800">{data.freeBottles.available} disponible(s)</span>
-              </div>
-              <div className="w-full bg-gray-100 rounded-full h-3 mb-2">
-                <div
-                  className="bg-gradient-to-r from-wine-500 to-wine-700 h-3 rounded-full transition-all"
-                  style={{ width: `${((data.freeBottles.totalSold % data.freeBottles.threshold) / data.freeBottles.threshold) * 100}%` }}
-                />
-              </div>
-              <p className="text-xs text-gray-500 mb-2">
-                Encore {data.freeBottles.nextIn} bouteille(s) avant la prochaine gratuite
-              </p>
-              {/* Per-reference detail */}
-              {data.freeBottles.details?.length > 0 && (
-                <div className="border-t pt-2 mt-2 space-y-1">
-                  <p className="text-xs font-medium text-gray-600 mb-1">Détail par référence :</p>
-                  {data.freeBottles.details.map((d) => (
-                    <div key={d.product_id} className="flex items-center justify-between text-xs">
-                      <span className="text-gray-700 truncate mr-2">{d.product_name}</span>
-                      <span className="text-gray-500 flex-shrink-0">
-                        {d.sold} vendues · {d.earned > 0 ? <span className="text-wine-700 font-semibold">{d.earned} gratuite(s)</span> : `${d.nextIn} restantes`}
-                      </span>
-                    </div>
-                  ))}
+            {/* 12+1 Bouteilles offertes — format ambassadeur */}
+            {data.freeBottles && !data.freeBottles.disabled && data.freeBottles.threshold > 0 && (
+              <div className="card">
+                <div className="flex items-center gap-2 mb-4">
+                  <Gift size={20} className="text-green-600" />
+                  <h2 className="font-semibold text-lg">12+1 — Bouteilles offertes</h2>
                 </div>
-              )}
-              {/* Free bottles history */}
-              {data.freeBottles.history?.length > 0 && (
-                <div className="border-t pt-2 mt-2">
-                  <button
-                    onClick={() => setShowFreeHistory((v) => !v)}
-                    className="flex items-center justify-between w-full text-xs font-medium text-gray-600 hover:text-gray-800"
-                  >
-                    <span>Gratuités déjà remises ({data.freeBottles.history.length})</span>
-                    {showFreeHistory ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
-                  </button>
-                  {showFreeHistory && (
-                    <div className="mt-2 space-y-1">
-                      {data.freeBottles.history.map((h, i) => (
-                        <div key={i} className="flex items-center justify-between text-xs">
-                          <span className="text-gray-500 w-20 flex-shrink-0">{formatDate(h.date)}</span>
-                          <span className="text-gray-700 truncate mx-2 flex-1">{h.product_name}</span>
-                          <span className="text-wine-700 font-semibold flex-shrink-0">{h.quantity}</span>
-                        </div>
-                      ))}
-                    </div>
-                  )}
+
+                <div className="grid grid-cols-3 gap-3 mb-4">
+                  <div className="bg-green-50 rounded-lg p-3 text-center">
+                    <p className="text-xl font-bold text-green-700">{data.freeBottles.totalSold}</p>
+                    <p className="text-xs text-gray-500">Bouteilles vendues</p>
+                  </div>
+                  <div className="bg-emerald-50 rounded-lg p-3 text-center">
+                    <p className="text-xl font-bold text-emerald-700">{data.freeBottles.earned}</p>
+                    <p className="text-xs text-gray-500">Gratuites gagnées</p>
+                  </div>
+                  <div className="bg-teal-50 rounded-lg p-3 text-center">
+                    <p className="text-xl font-bold text-teal-700">{data.freeBottles.available}</p>
+                    <p className="text-xs text-gray-500">À récupérer</p>
+                  </div>
                 </div>
-              )}
-            </div>
+
+                <div>
+                  <div className="flex justify-between text-xs text-gray-500 mb-1">
+                    <span>{data.freeBottles.totalSold % data.freeBottles.threshold} / {data.freeBottles.threshold} vers la prochaine</span>
+                    <span>{Math.round((data.freeBottles.totalSold % data.freeBottles.threshold) / data.freeBottles.threshold * 100)}%</span>
+                  </div>
+                  <div className="w-full bg-green-100 rounded-full h-3">
+                    <div
+                      className="h-3 rounded-full bg-green-500 transition-all"
+                      style={{ width: `${(data.freeBottles.totalSold % data.freeBottles.threshold) / data.freeBottles.threshold * 100}%` }}
+                    />
+                  </div>
+                  <p className="text-xs text-gray-400 mt-1">
+                    Encore {data.freeBottles.nextIn} bouteille{data.freeBottles.nextIn > 1 ? 's' : ''} pour la prochaine gratuite
+                  </p>
+                </div>
+
+                {/* Détail par référence (spécifique student) */}
+                {data.freeBottles.details?.length > 0 && (
+                  <div className="border-t pt-2 mt-4 space-y-1">
+                    <p className="text-xs font-medium text-gray-600 mb-1">Détail par référence :</p>
+                    {data.freeBottles.details.map((d) => (
+                      <div key={d.product_id} className="flex items-center justify-between text-xs">
+                        <span className="text-gray-700 truncate mr-2">{d.product_name}</span>
+                        <span className="text-gray-500 flex-shrink-0">
+                          {d.sold} vendues · {d.earned > 0 ? <span className="text-wine-700 font-semibold">{d.earned} gratuite(s)</span> : `${d.nextIn} restantes`}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {/* Historique (spécifique student) */}
+                {data.freeBottles.history?.length > 0 && (
+                  <div className="border-t pt-2 mt-4">
+                    <button
+                      onClick={() => setShowFreeHistory((v) => !v)}
+                      className="flex items-center justify-between w-full text-xs font-medium text-gray-600 hover:text-gray-800"
+                    >
+                      <span>Gratuités déjà remises ({data.freeBottles.history.length})</span>
+                      {showFreeHistory ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+                    </button>
+                    {showFreeHistory && (
+                      <div className="mt-2 space-y-1">
+                        {data.freeBottles.history.map((h, i) => (
+                          <div key={i} className="flex items-center justify-between text-xs">
+                            <span className="text-gray-500 w-20 flex-shrink-0">{formatDate(h.date)}</span>
+                            <span className="text-gray-700 truncate mx-2 flex-1">{h.product_name}</span>
+                            <span className="text-wine-700 font-semibold flex-shrink-0">{h.quantity}</span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
 
             {/* Barriques — Part des anges (V4.1) */}
             {(data.fund_collective || data.fund_individual) && (
