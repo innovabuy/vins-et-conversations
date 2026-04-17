@@ -1,6 +1,6 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { ambassadorAPI, ordersAPI } from '../../services/api';
-import { Trophy, Share2, ShoppingCart, ShoppingBag, Gift, Copy, Check, ExternalLink, QrCode, Eye, X, Calendar, Wallet } from 'lucide-react';
+import { Trophy, Share2, ShoppingCart, ShoppingBag, Gift, Copy, Check, QrCode, Eye, X, Calendar, Wallet } from 'lucide-react';
 import { copyToClipboard } from '../../utils/copyToClipboard';
 
 const fmtEur = (v, decimals = 2) => new Intl.NumberFormat('fr-FR', { minimumFractionDigits: decimals, maximumFractionDigits: decimals }).format(v);
@@ -12,6 +12,60 @@ const TIER_COLORS = {
   Platine: { bg: 'bg-purple-100', text: 'text-purple-800', border: 'border-purple-500', bar: 'bg-purple-500' },
 };
 
+const FILTER_TABS = [
+  { id: 'all', label: 'Toutes' },
+  { id: 'direct', label: 'Directes' },
+  { id: 'referral', label: 'Via parrainage' },
+];
+
+function FilterTabs({ value, onChange, ariaLabel }) {
+  const refs = useRef([]);
+
+  const handleKeyDown = (e, idx) => {
+    if (e.key === 'ArrowRight' || e.key === 'ArrowLeft') {
+      e.preventDefault();
+      const dir = e.key === 'ArrowRight' ? 1 : -1;
+      const next = (idx + dir + FILTER_TABS.length) % FILTER_TABS.length;
+      refs.current[next]?.focus();
+      onChange(FILTER_TABS[next].id);
+    } else if (e.key === 'Home') {
+      e.preventDefault();
+      refs.current[0]?.focus();
+      onChange(FILTER_TABS[0].id);
+    } else if (e.key === 'End') {
+      e.preventDefault();
+      const last = FILTER_TABS.length - 1;
+      refs.current[last]?.focus();
+      onChange(FILTER_TABS[last].id);
+    }
+  };
+
+  return (
+    <div role="tablist" aria-label={ariaLabel} className="flex gap-1 mb-4 bg-gray-100 rounded-lg p-1">
+      {FILTER_TABS.map((t, i) => {
+        const selected = value === t.id;
+        return (
+          <button
+            key={t.id}
+            ref={(el) => { refs.current[i] = el; }}
+            role="tab"
+            type="button"
+            aria-selected={selected}
+            tabIndex={selected ? 0 : -1}
+            onClick={() => onChange(t.id)}
+            onKeyDown={(e) => handleKeyDown(e, i)}
+            className={`flex-1 text-sm py-1.5 px-3 rounded-md transition-colors focus:outline-none focus:ring-2 focus:ring-wine-500 ${
+              selected ? 'bg-white text-wine-700 font-medium shadow-sm' : 'text-gray-600 hover:text-gray-900'
+            }`}
+          >
+            {t.label}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
 export default function AmbassadorDashboard() {
   const [data, setData] = useState(null);
   const [referralData, setReferralData] = useState(null);
@@ -20,6 +74,8 @@ export default function AmbassadorDashboard() {
   const [showQR, setShowQR] = useState(false);
   const [selectedOrder, setSelectedOrder] = useState(null);
   const [showAllOrders, setShowAllOrders] = useState(false);
+  const [salesFilter, setSalesFilter] = useState('all');
+  const [ordersFilter, setOrdersFilter] = useState('all');
 
   useEffect(() => {
     loadDashboard();
@@ -63,6 +119,24 @@ export default function AmbassadorDashboard() {
   const tierStyle = TIER_COLORS[tier.current?.label] || TIER_COLORS.Bronze;
   const monthlyTierStyle = TIER_COLORS[monthlyTier?.current?.label] || TIER_COLORS.Bronze;
 
+  const referredIds = new Set((referralData?.referredOrders || []).map(o => o.id));
+  const taggedOrders = orders.map(o => ({
+    ...o,
+    order_source: referredIds.has(o.id) ? 'referral' : 'direct',
+  }));
+  const filterBy = (list, f) => (f === 'all' ? list : list.filter(o => o.order_source === f));
+  const salesFilteredOrders = filterBy(taggedOrders, salesFilter);
+  const ordersFilteredOrders = filterBy(taggedOrders, ordersFilter);
+
+  const directCA = data.direct_ca_ttc || 0;
+  const referredCA = data.referred_ca_ttc || 0;
+  const sumBottles = (list) => list.reduce((s, o) => s + (parseInt(o.total_items, 10) || 0), 0);
+  const salesKPIs = salesFilter === 'all'
+    ? { ca: sales.caTTC, bottles: sales.bottles, count: sales.orderCount }
+    : salesFilter === 'direct'
+      ? { ca: directCA, bottles: sumBottles(salesFilteredOrders), count: salesFilteredOrders.length }
+      : { ca: referredCA, bottles: sumBottles(salesFilteredOrders), count: salesFilteredOrders.length };
+
   return (
     <div className="space-y-6">
       {/* CTA — Passer commande (V4.2 BLOC 1.2) */}
@@ -76,7 +150,56 @@ export default function AmbassadorDashboard() {
         Passer commande sur la boutique
       </a>
 
-      {/* Section 5 — Gains (affiché en premier) */}
+      {/* 1 — Partage & Parrainage (hidden for alcohol-free campaigns) */}
+      {!data.alcohol_free && <div className="card">
+        <div className="flex items-center gap-2 mb-4">
+          <Share2 size={20} className="text-wine-700" />
+          <h2 className="font-semibold text-lg">Partage & Parrainage</h2>
+        </div>
+
+        <div className="bg-gray-50 rounded-lg p-3 mb-3">
+          <p className="text-xs text-gray-500 mb-1">Votre lien de parrainage</p>
+          <div className="flex items-center gap-2">
+            <input type="text" value={referralLink} readOnly className="input-field text-sm flex-1" />
+            <button onClick={copyLink} className="btn-primary text-sm px-3 py-2 flex items-center gap-1">
+              {copied ? <Check size={16} /> : <Copy size={16} />}
+              {copied ? 'Copié' : 'Copier'}
+            </button>
+          </div>
+        </div>
+
+        <div className="flex items-center justify-between text-sm">
+          <span className="text-gray-600">Clics sur votre lien</span>
+          <span className="font-semibold">{referralClicks}</span>
+        </div>
+
+        <div className="mt-3 flex gap-2">
+          <a
+            href={`https://wa.me/?text=${encodeURIComponent(`Découvrez les vins V&C : ${referralLink}`)}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex-1 bg-green-500 text-white text-center py-2 rounded-lg text-sm hover:bg-green-600"
+          >
+            WhatsApp
+          </a>
+          <a
+            href={`mailto:?subject=Vins%20%26%20Conversations&body=${encodeURIComponent(`Découvrez les vins V&C : ${referralLink}`)}`}
+            className="flex-1 bg-blue-500 text-white text-center py-2 rounded-lg text-sm hover:bg-blue-600"
+          >
+            Email
+          </a>
+          <button
+            onClick={() => setShowQR(!showQR)}
+            className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${showQR ? 'bg-wine-100 text-wine-700' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`}
+          >
+            <QrCode size={16} />
+          </button>
+        </div>
+
+        {showQR && <QRCodeDisplay url={referralLink} />}
+      </div>}
+
+      {/* 2 — Mes Gains */}
       <div className="card">
         <div className="flex items-center gap-2 mb-4">
           <Gift size={20} className="text-wine-700" />
@@ -85,8 +208,6 @@ export default function AmbassadorDashboard() {
 
         {/* Commission breakdown — direct vs referred (V4.2 BLOC 1.3) */}
         {(() => {
-          const directCA = data.direct_ca_ttc || 0;
-          const referredCA = data.referred_ca_ttc || 0;
           return (
             <div className="grid grid-cols-2 gap-3 mb-4">
               <div className="bg-blue-50 rounded-lg p-3 text-center">
@@ -161,7 +282,7 @@ export default function AmbassadorDashboard() {
         )}
       </div>
 
-      {/* Section 12+1 — Bouteilles gratuites */}
+      {/* 3 — 12+1 Bouteilles offertes */}
       {free_bottles && !free_bottles.disabled && free_bottles.threshold > 0 && (
         <div className="card">
           <div className="flex items-center gap-2 mb-4">
@@ -202,7 +323,7 @@ export default function AmbassadorDashboard() {
         </div>
       )}
 
-      {/* Section 1 — Progression / Tiers */}
+      {/* 4 — Ma Progression / Tiers */}
       <div className="card">
         <div className="flex items-center gap-2 mb-4">
           <Trophy size={20} className="text-wine-700" />
@@ -257,79 +378,32 @@ export default function AmbassadorDashboard() {
         </div>
       </div>
 
-      {/* Section 2 — Partage / QR (hidden for alcohol-free campaigns) */}
-      {!data.alcohol_free && <div className="card">
-        <div className="flex items-center gap-2 mb-4">
-          <Share2 size={20} className="text-wine-700" />
-          <h2 className="font-semibold text-lg">Partage & Parrainage</h2>
-        </div>
-
-        <div className="bg-gray-50 rounded-lg p-3 mb-3">
-          <p className="text-xs text-gray-500 mb-1">Votre lien de parrainage</p>
-          <div className="flex items-center gap-2">
-            <input type="text" value={referralLink} readOnly className="input-field text-sm flex-1" />
-            <button onClick={copyLink} className="btn-primary text-sm px-3 py-2 flex items-center gap-1">
-              {copied ? <Check size={16} /> : <Copy size={16} />}
-              {copied ? 'Copié' : 'Copier'}
-            </button>
-          </div>
-        </div>
-
-        <div className="flex items-center justify-between text-sm">
-          <span className="text-gray-600">Clics sur votre lien</span>
-          <span className="font-semibold">{referralClicks}</span>
-        </div>
-
-        <div className="mt-3 flex gap-2">
-          <a
-            href={`https://wa.me/?text=${encodeURIComponent(`Découvrez les vins V&C : ${referralLink}`)}`}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="flex-1 bg-green-500 text-white text-center py-2 rounded-lg text-sm hover:bg-green-600"
-          >
-            WhatsApp
-          </a>
-          <a
-            href={`mailto:?subject=Vins%20%26%20Conversations&body=${encodeURIComponent(`Découvrez les vins V&C : ${referralLink}`)}`}
-            className="flex-1 bg-blue-500 text-white text-center py-2 rounded-lg text-sm hover:bg-blue-600"
-          >
-            Email
-          </a>
-          <button
-            onClick={() => setShowQR(!showQR)}
-            className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${showQR ? 'bg-wine-100 text-wine-700' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`}
-          >
-            <QrCode size={16} />
-          </button>
-        </div>
-
-        {showQR && <QRCodeDisplay url={referralLink} />}
-      </div>}
-
-      {/* Section 3 — Ventes */}
+      {/* 5 — Mes Ventes (avec tabs filtre) */}
       <div className="card">
         <div className="flex items-center gap-2 mb-4">
           <ShoppingCart size={20} className="text-wine-700" />
           <h2 className="font-semibold text-lg">Mes Ventes</h2>
         </div>
 
+        <FilterTabs value={salesFilter} onChange={setSalesFilter} ariaLabel="Filtrer les ventes" />
+
         <div className="grid grid-cols-3 gap-3 mb-4">
           <div className="bg-blue-50 rounded-lg p-3 text-center">
-            <p className="text-xl font-bold text-blue-700">{fmtEur(sales.caTTC, 0)} EUR</p>
+            <p className="text-xl font-bold text-blue-700">{fmtEur(salesKPIs.ca, 0)} EUR</p>
             <p className="text-xs text-gray-500">CA TTC</p>
           </div>
           <div className="bg-green-50 rounded-lg p-3 text-center">
-            <p className="text-xl font-bold text-green-700">{sales.bottles}</p>
+            <p className="text-xl font-bold text-green-700">{salesKPIs.bottles}</p>
             <p className="text-xs text-gray-500">Bouteilles</p>
           </div>
           <div className="bg-purple-50 rounded-lg p-3 text-center">
-            <p className="text-xl font-bold text-purple-700">{sales.orderCount}</p>
+            <p className="text-xl font-bold text-purple-700">{salesKPIs.count}</p>
             <p className="text-xs text-gray-500">Commandes</p>
           </div>
         </div>
 
         {monthly && (
-          <div className="bg-orange-50 border border-orange-200 rounded-lg p-3 mb-4">
+          <div className="bg-orange-50 border border-orange-200 rounded-lg p-3">
             <div className="flex items-center gap-2 mb-1">
               <Calendar size={14} className="text-orange-600" />
               <span className="text-xs font-medium text-orange-700">{monthly.month}</span>
@@ -363,45 +437,58 @@ export default function AmbassadorDashboard() {
             )}
           </div>
         )}
-
-        {orders.length > 0 && (
-          <div>
-            <h3 className="text-sm font-medium text-gray-700 mb-2">Mes commandes</h3>
-            <div className="space-y-2">
-              {(showAllOrders ? orders : orders.slice(0, 10)).map((o) => (
-                <div key={o.id} onClick={() => setSelectedOrder(o.id)} className="flex items-center justify-between text-sm bg-gray-50 rounded p-2 cursor-pointer hover:bg-gray-100 transition-colors">
-                  <div>
-                    <span className="font-medium">{o.ref}</span>
-                    <span className="text-xs text-gray-400 ml-2">{new Date(o.created_at).toLocaleDateString('fr-FR')}</span>
-                    {o.customer_name && (
-                      <span className="text-sm text-gray-600 block">{o.customer_name}</span>
-                    )}
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <span className={`text-xs px-2 py-0.5 rounded ${
-                      o.status === 'delivered' ? 'bg-green-100 text-green-700' :
-                      o.status === 'shipped' ? 'bg-blue-100 text-blue-700' :
-                      'bg-gray-100 text-gray-600'
-                    }`}>{o.status}</span>
-                    <span className="font-medium">{fmtEur(parseFloat(o.total_ttc))} EUR</span>
-                    <Eye size={14} className="text-gray-400" />
-                  </div>
-                </div>
-              ))}
-            </div>
-            {orders.length > 10 && (
-              <button
-                onClick={() => setShowAllOrders(!showAllOrders)}
-                className="mt-2 text-sm text-wine-700 hover:text-wine-900 font-medium"
-              >
-                {showAllOrders ? 'Voir moins' : `Voir tout (${orders.length})`}
-              </button>
-            )}
-          </div>
-        )}
       </div>
 
-      {/* Section 3b — Historique mensuel */}
+      {/* 6 — Mes commandes (avec tabs filtre) */}
+      {orders.length > 0 && (
+        <div className="card">
+          <div className="flex items-center gap-2 mb-4">
+            <ShoppingBag size={20} className="text-wine-700" />
+            <h2 className="font-semibold text-lg">Mes commandes</h2>
+          </div>
+
+          <FilterTabs value={ordersFilter} onChange={setOrdersFilter} ariaLabel="Filtrer les commandes" />
+
+          {ordersFilteredOrders.length === 0 ? (
+            <p className="text-sm text-gray-500 py-4 text-center">Aucune commande dans cette catégorie</p>
+          ) : (
+            <>
+              <div className="space-y-2">
+                {(showAllOrders ? ordersFilteredOrders : ordersFilteredOrders.slice(0, 10)).map((o) => (
+                  <div key={o.id} onClick={() => setSelectedOrder(o.id)} className="flex items-center justify-between text-sm bg-gray-50 rounded p-2 cursor-pointer hover:bg-gray-100 transition-colors">
+                    <div>
+                      <span className="font-medium">{o.ref}</span>
+                      <span className="text-xs text-gray-400 ml-2">{new Date(o.created_at).toLocaleDateString('fr-FR')}</span>
+                      {o.customer_name && (
+                        <span className="text-sm text-gray-600 block">{o.customer_name}</span>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className={`text-xs px-2 py-0.5 rounded ${
+                        o.status === 'delivered' ? 'bg-green-100 text-green-700' :
+                        o.status === 'shipped' ? 'bg-blue-100 text-blue-700' :
+                        'bg-gray-100 text-gray-600'
+                      }`}>{o.status}</span>
+                      <span className="font-medium">{fmtEur(parseFloat(o.total_ttc))} EUR</span>
+                      <Eye size={14} className="text-gray-400" />
+                    </div>
+                  </div>
+                ))}
+              </div>
+              {ordersFilteredOrders.length > 10 && (
+                <button
+                  onClick={() => setShowAllOrders(!showAllOrders)}
+                  className="mt-2 text-sm text-wine-700 hover:text-wine-900 font-medium"
+                >
+                  {showAllOrders ? 'Voir moins' : `Voir tout (${ordersFilteredOrders.length})`}
+                </button>
+              )}
+            </>
+          )}
+        </div>
+      )}
+
+      {/* 7 — Historique mensuel */}
       {monthlyHistory?.length > 0 && (
         <div className="card">
           <div className="flex items-center gap-2 mb-4">
@@ -438,39 +525,6 @@ export default function AmbassadorDashboard() {
                 })}
               </tbody>
             </table>
-          </div>
-        </div>
-      )}
-
-      {/* Section 4 — Ventes via mon lien (hidden for alcohol-free) */}
-      {!data.alcohol_free && referralData?.referredOrders?.length > 0 && (
-        <div className="card">
-          <div className="flex items-center gap-2 mb-4">
-            <ExternalLink size={20} className="text-wine-700" />
-            <h2 className="font-semibold text-lg">Ventes via mon lien</h2>
-          </div>
-          <div className="grid grid-cols-2 gap-3 mb-4">
-            <div className="bg-indigo-50 rounded-lg p-3 text-center">
-              <p className="text-xl font-bold text-indigo-700">{referralData.referredOrders.length}</p>
-              <p className="text-xs text-gray-500">Commandes parrainées</p>
-            </div>
-            <div className="bg-wine-50 rounded-lg p-3 text-center">
-              <p className="text-xl font-bold text-wine-700">
-                {fmtEur(referralData.referredOrders.reduce((s, o) => s + parseFloat(o.total_ttc || 0), 0), 0)} EUR
-              </p>
-              <p className="text-xs text-gray-500">CA parrainé</p>
-            </div>
-          </div>
-          <div className="space-y-2">
-            {referralData.referredOrders.slice(0, 5).map((o) => (
-              <div key={o.id} className="flex items-center justify-between text-sm bg-gray-50 rounded p-2">
-                <div>
-                  <span className="font-medium">{o.ref}</span>
-                  <span className="text-xs text-gray-400 ml-2">{new Date(o.created_at).toLocaleDateString('fr-FR')}</span>
-                </div>
-                <span className="font-medium">{fmtEur(parseFloat(o.total_ttc))} EUR</span>
-              </div>
-            ))}
           </div>
         </div>
       )}
