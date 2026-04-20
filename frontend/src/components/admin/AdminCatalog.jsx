@@ -216,7 +216,10 @@ const ComponentsSection = React.forwardRef(function ComponentsSection({ productI
   }, [productId]);
 
   const handleAdd = async () => {
-    if (!newComp.component_name || !newComp.amount_ht) return;
+    if (!newComp.component_name?.trim() || !newComp.amount_ht) {
+      onToast?.('Remplissez le nom et le montant HT avant d\'ajouter', 'error');
+      return;
+    }
     setValidationError('');
     try {
       const res = await productsAPI.addComponent(productId, {
@@ -235,20 +238,19 @@ const ComponentsSection = React.forwardRef(function ComponentsSection({ productI
   React.useImperativeHandle(ref, () => ({
     async validateAndSave() {
       setValidationError('');
-      if (!adding) return true; // nothing pending
-      const hasName = !!newComp.component_name.trim();
+      const hasName = !!newComp.component_name?.trim();
       const hasAmount = !!newComp.amount_ht;
       if (hasName && hasAmount) {
-        // Auto-save the pending component
+        // Auto-save the pending component regardless of adding state
         await handleAdd();
         return true;
       }
       if (hasName || hasAmount) {
-        // Partially filled — block submission
-        setValidationError('Un composant est en cours de saisie — complétez-le ou annulez avant d\'enregistrer.');
-        return false;
+        // Partial fill — warn but don't block product save
+        onToast?.('Composant incomplet non sauvegardé', 'warning');
+        return true;
       }
-      return true; // form open but empty — allow
+      return true;
     }
   }));
 
@@ -815,6 +817,7 @@ export default function AdminCatalog() {
   useEffect(() => { fetchProducts(); }, [fetchProducts]);
 
   const handleSave = async (payload) => {
+    let resultId = editing?.id;
     if (editing?.id) {
       await productsAPI.update(editing.id, payload);
       addToast('Produit mis à jour', 'success');
@@ -822,6 +825,7 @@ export default function AdminCatalog() {
     } else {
       const { data } = await productsAPI.create(payload);
       const newProduct = data.data || data;
+      resultId = newProduct?.id;
       const cat = categoriesList.find(c => c.id === payload.category_id);
       const isCoffretProduct = cat?.product_type === 'gift_set' || payload.category === 'Coffrets';
       if (isCoffretProduct && newProduct?.id) {
@@ -834,7 +838,7 @@ export default function AdminCatalog() {
       }
     }
     fetchProducts();
-    return editing?.id ? { id: editing.id } : undefined;
+    return resultId ? { id: resultId } : undefined;
   };
 
 

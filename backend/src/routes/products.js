@@ -502,9 +502,12 @@ adminRouter.delete(
 
 // ─── Product Components (coffret TVA ventilation) ────
 
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 // GET /api/v1/admin/products/:id/components
-adminRouter.get('/:id/components', async (req, res) => {
+adminRouter.get('/:id/components', authenticate, requireRole('super_admin', 'commercial'), async (req, res) => {
   try {
+    if (!UUID_RE.test(req.params.id)) return res.status(400).json({ error: 'INVALID_ID', message: 'product_id invalide' });
     const components = await db('product_components')
       .where({ product_id: req.params.id })
       .orderBy('sort_order');
@@ -515,8 +518,9 @@ adminRouter.get('/:id/components', async (req, res) => {
 });
 
 // POST /api/v1/admin/products/:id/components
-adminRouter.post('/:id/components', async (req, res) => {
+adminRouter.post('/:id/components', authenticate, requireRole('super_admin', 'commercial'), async (req, res) => {
   try {
+    if (!UUID_RE.test(req.params.id)) return res.status(400).json({ error: 'INVALID_ID', message: 'product_id invalide' });
     const { component_name, amount_ht, vat_rate, sort_order } = req.body;
     if (!component_name || amount_ht == null || vat_rate == null) {
       return res.status(400).json({ error: 'MISSING_FIELDS', message: 'component_name, amount_ht et vat_rate requis' });
@@ -537,8 +541,11 @@ adminRouter.post('/:id/components', async (req, res) => {
 });
 
 // PUT /api/v1/admin/products/:id/components/:cid
-adminRouter.put('/:id/components/:cid', async (req, res) => {
+adminRouter.put('/:id/components/:cid', authenticate, requireRole('super_admin', 'commercial'), async (req, res) => {
   try {
+    if (!UUID_RE.test(req.params.id) || !UUID_RE.test(req.params.cid)) {
+      return res.status(400).json({ error: 'INVALID_ID', message: 'product_id ou component_id invalide' });
+    }
     const { component_name, amount_ht, vat_rate, sort_order } = req.body;
     const update = { updated_at: new Date() };
     if (component_name !== undefined) update.component_name = component_name;
@@ -559,8 +566,11 @@ adminRouter.put('/:id/components/:cid', async (req, res) => {
 });
 
 // DELETE /api/v1/admin/products/:id/components/:cid
-adminRouter.delete('/:id/components/:cid', async (req, res) => {
+adminRouter.delete('/:id/components/:cid', authenticate, requireRole('super_admin', 'commercial'), async (req, res) => {
   try {
+    if (!UUID_RE.test(req.params.id) || !UUID_RE.test(req.params.cid)) {
+      return res.status(400).json({ error: 'INVALID_ID', message: 'product_id ou component_id invalide' });
+    }
     const deleted = await db('product_components')
       .where({ id: req.params.cid, product_id: req.params.id }).del();
     if (!deleted) return res.status(404).json({ error: 'NOT_FOUND' });
