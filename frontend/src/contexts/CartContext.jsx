@@ -1,6 +1,7 @@
 import { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import api from '../services/api';
+import { useToast } from '../components/shared/Toast';
 
 const CartContext = createContext(null);
 
@@ -14,6 +15,8 @@ export function CartProvider({ children }) {
   const [searchParams] = useSearchParams();
   const [cart, setCart] = useState({ items: [], total_ht: 0, total_ttc: 0, total_items: 0 });
   const [loading, setLoading] = useState(false);
+  let toast = null;
+  try { toast = useToast(); } catch (e) { /* no ToastProvider — OK in tests */ }
 
   // Session ID persistence
   const getSessionId = () => sessionStorage.getItem('vc_cart_session');
@@ -50,6 +53,9 @@ export function CartProvider({ children }) {
       setSessionId(res.data.session_id);
       setCart(res.data);
       return res.data;
+    } catch (err) {
+      console.error('Cart update failed:', err);
+      if (toast) toast.error('Erreur technique, réessayez dans quelques instants');
     } finally {
       setLoading(false);
     }

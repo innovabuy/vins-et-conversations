@@ -3961,7 +3961,7 @@ describe('API Integration Tests', () => {
     });
 
     test('Public catalog includes is_featured field', async () => {
-      const res = await request(app).get('/api/v1/public/catalog');
+      const res = await request(app).get('/api/v1/public/catalog?limit=50');
 
       expect(res.status).toBe(200);
       const featured = res.body.data.find((p) => p.is_featured === true);
