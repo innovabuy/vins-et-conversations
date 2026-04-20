@@ -4,16 +4,7 @@ import { useState, useEffect, useRef } from 'react';
 import { boutiqueAPI } from '../../services/api';
 import { useAppSettings } from '../../contexts/AppSettingsContext';
 import { useSiteImage } from '../../contexts/SiteImagesContext';
-
-function useCartBadge() {
-  try {
-    const { useCart } = require('../../contexts/CartContext');
-    const { cart } = useCart();
-    return cart.total_items;
-  } catch {
-    return 0;
-  }
-}
+import { useCart } from '../../contexts/CartContext';
 
 function useReferral() {
   const [ambassador, setAmbassador] = useState(null);
@@ -62,7 +53,7 @@ function NavDropdown({ label, items }) {
 
 export default function PublicLayout() {
   const [menuOpen, setMenuOpen] = useState(false);
-  const cartCount = useCartBadge();
+  const { cart } = useCart();
   const ambassador = useReferral();
   const { app_logo_url, app_name } = useAppSettings();
   const headerImage = useSiteImage('commun_logo_header');
@@ -113,8 +104,8 @@ export default function PublicLayout() {
               </NavLink>
               <Link to="/boutique/panier" className="relative p-2 text-gray-600 hover:text-wine-700 transition-colors">
                 <ShoppingCart size={20} />
-                {cartCount > 0 && (
-                  <span className="absolute -top-1 -right-1 bg-wine-700 text-white text-xs w-5 h-5 rounded-full flex items-center justify-center font-bold">{cartCount}</span>
+                {cart.total_items > 0 && (
+                  <span className="absolute -top-1 -right-1 bg-wine-700 text-white text-xs w-5 h-5 rounded-full flex items-center justify-center font-bold">{cart.total_items}</span>
                 )}
               </Link>
               <Link to="/login" className="btn-primary text-sm px-4 py-2">
@@ -152,7 +143,7 @@ export default function PublicLayout() {
             <div className="border-t border-gray-100 mt-3 pt-3 space-y-2">
               <NavLink to="/boutique/contact" onClick={() => setMenuOpen(false)} className="block py-2 text-sm font-medium text-gray-700 hover:text-wine-700">Contact</NavLink>
               <Link to="/boutique/panier" onClick={() => setMenuOpen(false)} className="flex items-center gap-2 py-2 text-sm font-medium text-gray-700 hover:text-wine-700">
-                <ShoppingCart size={16} /> Panier {cartCount > 0 && <span className="bg-wine-700 text-white text-xs px-1.5 py-0.5 rounded-full">{cartCount}</span>}
+                <ShoppingCart size={16} /> Panier {cart.total_items > 0 && <span className="bg-wine-700 text-white text-xs px-1.5 py-0.5 rounded-full">{cart.total_items}</span>}
               </Link>
               <Link to="/login" onClick={() => setMenuOpen(false)} className="block btn-primary text-sm text-center py-2">Espace membre</Link>
             </div>
