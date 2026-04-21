@@ -122,6 +122,12 @@ router.get('/:id', async (req, res) => {
   try {
     const product = await db('products').where({ id: req.params.id }).first();
     if (!product) return res.status(404).json({ error: 'NOT_FOUND' });
+    const bundle = await db('coffret_products as cp')
+      .join('products as p', 'p.id', 'cp.product_id')
+      .where('cp.coffret_id', req.params.id)
+      .orderBy('cp.sort_order')
+      .select('p.id', 'p.name', 'p.price_ht', 'p.price_ttc', 'p.tva_rate as vat_rate', 'p.image_url', 'cp.sort_order');
+    product.bundle_products = bundle;
     res.json(product);
   } catch (err) {
     res.status(500).json({ error: 'SERVER_ERROR' });
@@ -400,6 +406,9 @@ adminRouter.put(
   auditAction('products'),
   async (req, res) => {
     try {
+      const hasBundle = Array.isArray(req.body.bundle_products);
+      const bundleIds = hasBundle ? req.body.bundle_products.filter((x) => UUID_RE.test(x)) : null;
+
       const body = { ...req.body, updated_at: new Date() };
       sanitizeNumericFields(body);
       if (Array.isArray(body.grape_varieties)) body.grape_varieties = JSON.stringify(body.grape_varieties);
@@ -422,11 +431,38 @@ adminRouter.put(
             .update({ is_featured: false });
         }
       }
-      const [product] = await db('products')
-        .where({ id: req.params.id })
-        .update(body)
-        .returning('*');
+
+      let product;
+      await db.transaction(async (trx) => {
+        if (hasBundle) {
+          await trx('coffret_products').where({ coffret_id: req.params.id }).del();
+          if (bundleIds.length > 0) {
+            await trx('coffret_products').insert(
+              bundleIds.map((pid, idx) => ({ coffret_id: req.params.id, product_id: pid, sort_order: idx }))
+            );
+            const sumRow = await trx('products').whereIn('id', bundleIds).sum({ total: 'price_ht' }).first();
+            const newPriceHt = parseFloat(sumRow?.total || 0);
+            body.price_ht = newPriceHt;
+            const tva = parseFloat(body.tva_rate != null ? body.tva_rate : (await trx('products').where({ id: req.params.id }).first())?.tva_rate || 20);
+            body.price_ttc = Math.round(newPriceHt * (1 + tva / 100) * 100) / 100;
+          }
+        }
+        const rows = await trx('products')
+          .where({ id: req.params.id })
+          .update(body)
+          .returning('*');
+        product = rows[0];
+      });
+
       if (!product) return res.status(404).json({ error: 'NOT_FOUND' });
+      if (hasBundle) {
+        const bundle = await db('coffret_products as cp')
+          .join('products as p', 'p.id', 'cp.product_id')
+          .where('cp.coffret_id', req.params.id)
+          .orderBy('cp.sort_order')
+          .select('p.id', 'p.name', 'p.price_ht', 'p.price_ttc', 'p.tva_rate as vat_rate', 'p.image_url', 'cp.sort_order');
+        product.bundle_products = bundle;
+      }
       await invalidateCache('vc:cache:/api/v1/products*');
       res.json(product);
     } catch (err) {

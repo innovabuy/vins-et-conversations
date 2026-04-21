@@ -121,10 +121,19 @@ function TagsInput({ value, onChange, placeholder }) {
 }
 
 // ─── Product Detail (fiche produit) ──────────────────
-function ProductDetail({ product, onClose, onEdit }) {
+function ProductDetail({ product: initialProduct, onClose, onEdit }) {
+  const [product, setProduct] = useState(initialProduct);
+  useEffect(() => {
+    let cancelled = false;
+    productsAPI.get(initialProduct.id).then((r) => { if (!cancelled) setProduct(r.data); }).catch(() => {});
+    return () => { cancelled = true; };
+  }, [initialProduct.id]);
   const grapes = parseJsonField(product.grape_varieties);
   const pairing = parseJsonField(product.food_pairing);
   const awards = parseJsonField(product.awards);
+  const bundle = Array.isArray(product.bundle_products) ? product.bundle_products : [];
+  const bundleTotalHt = bundle.reduce((s, b) => s + parseFloat(b.price_ht || 0), 0);
+  const isCoffretCat = (product.category || '').toLowerCase().includes('coffret');
 
   return (
     <div className="space-y-6">
@@ -199,6 +208,36 @@ function ProductDetail({ product, onClose, onEdit }) {
           </div>
         )}
       </div>
+
+      {(bundle.length > 0 || isCoffretCat) && (
+        <fieldset className="border rounded-lg p-4 space-y-2">
+          <legend className="text-sm font-semibold text-gray-700 px-2 flex items-center gap-1"><Package size={14} /> Contenu du coffret</legend>
+          {bundle.length === 0 ? (
+            <p className="text-sm text-gray-400 italic">Aucun produit dans ce coffret.</p>
+          ) : (
+            <>
+              <ul className="divide-y">
+                {bundle.map((b) => (
+                  <li key={b.id} className="flex items-center justify-between py-2 text-sm">
+                    <div className="flex items-center gap-2 min-w-0">
+                      {b.image_url ? (
+                        <img src={b.image_url} alt={b.name} className="w-8 h-8 object-contain rounded border shrink-0" />
+                      ) : (
+                        <Package size={16} className="text-wine-500 shrink-0" />
+                      )}
+                      <span className="truncate">{b.name}</span>
+                    </div>
+                    <span className="text-gray-600 shrink-0 ml-2">{formatEur(b.price_ht)} HT</span>
+                  </li>
+                ))}
+              </ul>
+              <div className="flex justify-end pt-2 border-t text-sm font-semibold">
+                Total HT : <span className="ml-2 text-wine-700">{formatEur(bundleTotalHt)}</span>
+              </div>
+            </>
+          )}
+        </fieldset>
+      )}
     </div>
   );
 }
@@ -328,11 +367,25 @@ function ProductForm({ product, onSave, onCancel, allProducts = [], categoriesLi
     food_pairing: parseJsonField(product.food_pairing),
     awards: parseJsonField(product.awards),
     tasting_notes: product.tasting_notes ? (typeof product.tasting_notes === 'string' ? JSON.parse(product.tasting_notes) : product.tasting_notes) : null,
-    bundle_products: parseJsonField(product.bundle_products),
+    bundle_products: parseJsonField(product.bundle_products).map((b) => (typeof b === 'string' ? b : b.id)).filter(Boolean),
   } : EMPTY_PRODUCT;
   const [form, setForm] = useState(initial);
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
+
+  // If editing an existing coffret, refetch to hydrate bundle_products (the list view omits them)
+  useEffect(() => {
+    if (!product?.id) return;
+    const alreadyHydrated = Array.isArray(product.bundle_products) && product.bundle_products.length > 0;
+    if (alreadyHydrated) return;
+    let cancelled = false;
+    productsAPI.get(product.id).then((r) => {
+      if (cancelled) return;
+      const ids = (r.data?.bundle_products || []).map((b) => b.id).filter(Boolean);
+      if (ids.length > 0) setForm((f) => ({ ...f, bundle_products: ids }));
+    }).catch(() => {});
+    return () => { cancelled = true; };
+  }, [product?.id]);
 
   // Resolve wine type from color + category
   const wineType = resolveWineType(form.color, form.category);
@@ -343,6 +396,24 @@ function ProductForm({ product, onSave, onCancel, allProducts = [], categoriesLi
   const isFoodProduct = selectedCategory?.product_type === 'food';
   const isBeverageProduct = selectedCategory?.product_type === 'beverage';
   const isGiftSet = selectedCategory?.product_type === 'gift_set';
+
+  // Live-compute price_ht for coffrets: sum of selected products' price_ht (read-only)
+  const coffretPriceHt = (isCoffret || isGiftSet)
+    ? (form.bundle_products || []).reduce((s, pid) => {
+        const p = allProducts.find(x => x.id === pid);
+        return s + (p ? parseFloat(p.price_ht) || 0 : 0);
+      }, 0)
+    : null;
+  useEffect(() => {
+    if (coffretPriceHt == null) return;
+    const tva = parseFloat(form.tva_rate) || 20;
+    const htRounded = Math.round(coffretPriceHt * 100) / 100;
+    const ttcRounded = Math.round(coffretPriceHt * (1 + tva / 100) * 100) / 100;
+    setForm((f) => {
+      if (parseFloat(f.price_ht || 0) === htRounded && parseFloat(f.price_ttc || 0) === ttcRounded) return f;
+      return { ...f, price_ht: htRounded, price_ttc: ttcRounded };
+    });
+  }, [coffretPriceHt, form.tva_rate]);
 
   // Auto-enable tasting for new products when criteria exist
   useEffect(() => {
@@ -379,6 +450,11 @@ function ProductForm({ product, onSave, onCancel, allProducts = [], categoriesLi
         const adapted = {};
         newCriteria.forEach(c => { adapted[c.key] = f.tasting_notes[c.key] || 0; });
         next.tasting_notes = adapted;
+      }
+      // Auto-select matching category by name (lookup in categoriesList)
+      if (newCategory) {
+        const matched = categoriesList.find(c => c.name?.toLowerCase() === newCategory.toLowerCase());
+        if (matched) next.category_id = matched.id;
       }
       return next;
     });
@@ -466,7 +542,7 @@ function ProductForm({ product, onSave, onCancel, allProducts = [], categoriesLi
         tva_rate: parseFloat(form.tva_rate),
         vintage: form.vintage ? parseInt(form.vintage) : null,
         tasting_notes: form.tasting_notes || null,
-        bundle_products: isCoffret ? (form.bundle_products || []) : [],
+        bundle_products: (isCoffret || isGiftSet) ? (form.bundle_products || []) : [],
       };
       const result = await onSave(payload);
       // Auto-reopen for new coffret so user can add components immediately
@@ -618,12 +694,20 @@ function ProductForm({ product, onSave, onCancel, allProducts = [], categoriesLi
             </select>
           </div>
           <div>
-            <label className="block text-xs font-medium text-gray-500 mb-1">Prix HT *</label>
-            <input type="number" step="0.01" value={form.price_ht} onChange={e => handleChange('price_ht', e.target.value)} className="w-full border rounded-lg px-3 py-2 text-sm" required />
+            <label className="block text-xs font-medium text-gray-500 mb-1">Prix HT *{(isCoffret || isGiftSet) && <span className="text-gray-400 font-normal"> (auto)</span>}</label>
+            <input type="number" step="0.01" value={form.price_ht}
+              onChange={e => handleChange('price_ht', e.target.value)}
+              readOnly={isCoffret || isGiftSet}
+              className={`w-full border rounded-lg px-3 py-2 text-sm ${(isCoffret || isGiftSet) ? 'bg-gray-50 text-gray-600 cursor-not-allowed' : ''}`}
+              required />
           </div>
           <div>
-            <label className="block text-xs font-medium text-gray-500 mb-1">Prix TTC *</label>
-            <input type="number" step="0.01" value={form.price_ttc} onChange={e => handleChange('price_ttc', e.target.value)} className="w-full border rounded-lg px-3 py-2 text-sm" required />
+            <label className="block text-xs font-medium text-gray-500 mb-1">Prix TTC *{(isCoffret || isGiftSet) && <span className="text-gray-400 font-normal"> (auto)</span>}</label>
+            <input type="number" step="0.01" value={form.price_ttc}
+              onChange={e => handleChange('price_ttc', e.target.value)}
+              readOnly={isCoffret || isGiftSet}
+              className={`w-full border rounded-lg px-3 py-2 text-sm ${(isCoffret || isGiftSet) ? 'bg-gray-50 text-gray-600 cursor-not-allowed' : ''}`}
+              required />
           </div>
           <div>
             <label className="block text-xs font-medium text-gray-500 mb-1">Prix achat *</label>
@@ -648,10 +732,15 @@ function ProductForm({ product, onSave, onCancel, allProducts = [], categoriesLi
               <label key={p.id} className={`flex items-center gap-2 p-2 rounded-lg border cursor-pointer text-sm ${(form.bundle_products || []).includes(p.id) ? 'border-wine-500 bg-wine-50' : 'hover:bg-gray-50'}`}>
                 <input type="checkbox" checked={(form.bundle_products || []).includes(p.id)} onChange={() => toggleBundleProduct(p.id)} className="rounded text-wine-700" />
                 <Package size={14} className="text-wine-500 shrink-0" />
-                <span>{p.name}</span>
-                {p.color && <span className={`ml-auto px-1.5 py-0.5 rounded-full text-[10px] ${COLOR_BADGES[p.color] || 'bg-gray-100'}`}>{p.color}</span>}
+                <span className="truncate">{p.name}</span>
+                <span className="ml-auto text-xs text-gray-500 shrink-0">{formatEur(p.price_ht)}</span>
+                {p.color && <span className={`px-1.5 py-0.5 rounded-full text-[10px] ${COLOR_BADGES[p.color] || 'bg-gray-100'}`}>{p.color}</span>}
               </label>
             ))}
+          </div>
+          <div className="flex items-center justify-between pt-2 border-t text-sm">
+            <span className="text-gray-500">{(form.bundle_products || []).length} produit(s) sélectionné(s)</span>
+            <span className="font-semibold">Total HT : <span className="text-wine-700">{formatEur(coffretPriceHt || 0)}</span></span>
           </div>
         </fieldset>
       ) : isFoodProduct ? (
