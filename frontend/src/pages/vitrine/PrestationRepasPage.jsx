@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { UtensilsCrossed, ChevronRight, CheckCircle } from 'lucide-react';
 import api from '../../services/api';
+import { useSiteImage } from '../../contexts/SiteImagesContext';
 
 const DEFAULT_CONTENT = {
   hero: {
@@ -22,6 +23,10 @@ const DEFAULT_CONTENT = {
 
 export default function PrestationRepasPage() {
   const [content, setContent] = useState(DEFAULT_CONTENT);
+  const heroBg = useSiteImage('repas_hero');
+  const gal1 = useSiteImage('repas_galerie_1');
+  const gal2 = useSiteImage('repas_galerie_2');
+  const galleryItems = [gal1, gal2].filter(g => g && g.image_url);
 
   useEffect(() => {
     api.get('/site-pages/prestations-repas')
@@ -31,8 +36,12 @@ export default function PrestationRepasPage() {
 
   return (
     <div>
-      <section className="bg-gradient-to-br from-amber-800 via-amber-700 to-amber-900 text-white py-20">
-        <div className="max-w-4xl mx-auto px-4 text-center">
+      <section
+        className={`relative text-white py-20 ${heroBg?.image_url ? 'bg-amber-900' : 'bg-gradient-to-br from-amber-800 via-amber-700 to-amber-900'}`}
+        style={heroBg?.image_url ? { backgroundImage: `url(${heroBg.image_url})`, backgroundSize: 'cover', backgroundPosition: 'center' } : undefined}
+      >
+        {heroBg?.image_url && <div className="absolute inset-0 bg-black/45" aria-hidden="true" />}
+        <div className="relative max-w-4xl mx-auto px-4 text-center">
           <div className="inline-flex items-center gap-2 bg-white/10 backdrop-blur rounded-full px-4 py-1.5 text-sm mb-6">
             <UtensilsCrossed size={16} /> Événements & Réceptions
           </div>
@@ -62,6 +71,27 @@ export default function PrestationRepasPage() {
             )}
           </div>
         ))}
+
+        {galleryItems.length > 0 && (
+          <div className="mb-12">
+            <h2 className="text-2xl font-bold text-gray-900 mb-6">Nos interventions</h2>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+              {galleryItems.map((img, i) => (
+                <figure key={i} className="rounded-2xl overflow-hidden bg-amber-50 shadow-sm">
+                  <img
+                    src={img.image_url}
+                    alt={img.alt_text || `Événement ${i + 1}`}
+                    loading="lazy"
+                    className="w-full aspect-[4/3] object-cover"
+                  />
+                  {img.alt_text && (
+                    <figcaption className="px-4 py-3 text-sm text-gray-600 text-center">{img.alt_text}</figcaption>
+                  )}
+                </figure>
+              ))}
+            </div>
+          </div>
+        )}
 
         <div className="text-center mt-12">
           <Link to={content.cta.href} className="inline-flex items-center gap-2 bg-amber-700 text-white px-8 py-3 rounded-xl font-semibold hover:bg-amber-800 transition-colors">

@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { Building2, ChevronRight, CheckCircle } from 'lucide-react';
 import api from '../../services/api';
+import { useSiteImage } from '../../contexts/SiteImagesContext';
 
 const DEFAULT_CONTENT = {
   hero: {
@@ -22,6 +23,11 @@ const DEFAULT_CONTENT = {
 
 export default function PrestationCSEPage() {
   const [content, setContent] = useState(DEFAULT_CONTENT);
+  const heroBg = useSiteImage('cse_hero');
+  const gal1 = useSiteImage('cse_galerie_1');
+  const gal2 = useSiteImage('cse_galerie_2');
+  const gal3 = useSiteImage('cse_galerie_3');
+  const galleryItems = [gal1, gal2, gal3].filter(g => g && g.image_url);
 
   useEffect(() => {
     api.get('/site-pages/prestations-cse')
@@ -31,8 +37,12 @@ export default function PrestationCSEPage() {
 
   return (
     <div>
-      <section className="bg-gradient-to-br from-blue-800 via-blue-700 to-blue-900 text-white py-20">
-        <div className="max-w-4xl mx-auto px-4 text-center">
+      <section
+        className={`relative text-white py-20 ${heroBg?.image_url ? 'bg-blue-900' : 'bg-gradient-to-br from-blue-800 via-blue-700 to-blue-900'}`}
+        style={heroBg?.image_url ? { backgroundImage: `url(${heroBg.image_url})`, backgroundSize: 'cover', backgroundPosition: 'center' } : undefined}
+      >
+        {heroBg?.image_url && <div className="absolute inset-0 bg-black/45" aria-hidden="true" />}
+        <div className="relative max-w-4xl mx-auto px-4 text-center">
           <div className="inline-flex items-center gap-2 bg-white/10 backdrop-blur rounded-full px-4 py-1.5 text-sm mb-6">
             <Building2 size={16} /> Comités Sociaux et Économiques
           </div>
@@ -58,6 +68,27 @@ export default function PrestationCSEPage() {
             {section.body && <p className="text-gray-600 leading-relaxed">{section.body}</p>}
           </div>
         ))}
+
+        {galleryItems.length > 0 && (
+          <div className="mb-12">
+            <h2 className="text-2xl font-bold text-gray-900 mb-6">Nos interventions</h2>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              {galleryItems.map((img, i) => (
+                <figure key={i} className="rounded-2xl overflow-hidden bg-blue-50 shadow-sm">
+                  <img
+                    src={img.image_url}
+                    alt={img.alt_text || `Intervention CSE ${i + 1}`}
+                    loading="lazy"
+                    className="w-full aspect-[4/3] object-cover"
+                  />
+                  {img.alt_text && (
+                    <figcaption className="px-4 py-3 text-sm text-gray-600 text-center">{img.alt_text}</figcaption>
+                  )}
+                </figure>
+              ))}
+            </div>
+          </div>
+        )}
 
         <div className="text-center mt-12">
           <Link to={content.cta.href} className="inline-flex items-center gap-2 bg-blue-700 text-white px-8 py-3 rounded-xl font-semibold hover:bg-blue-800 transition-colors">

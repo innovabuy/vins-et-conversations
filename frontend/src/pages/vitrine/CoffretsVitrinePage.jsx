@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { Gift, ChevronRight, Wine, ShoppingCart } from 'lucide-react';
 import api from '../../services/api';
 import { useCart } from '../../contexts/CartContext';
+import { useSiteImage } from '../../contexts/SiteImagesContext';
 
 const formatEur = (v) => new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR' }).format(v);
 
@@ -12,6 +13,7 @@ export default function CoffretsVitrinePage() {
   const [loading, setLoading] = useState(true);
   const [addedId, setAddedId] = useState(null);
   const { addToCart } = useCart();
+  const heroBg = useSiteImage('coffrets_hero');
 
   useEffect(() => {
     api.get('/site-pages/coffrets')
@@ -35,8 +37,12 @@ export default function CoffretsVitrinePage() {
 
   return (
     <div>
-      <section className="bg-gradient-to-br from-wine-800 via-wine-700 to-wine-900 text-white py-20">
-        <div className="max-w-4xl mx-auto px-4 text-center">
+      <section
+        className={`relative text-white py-20 ${heroBg?.image_url ? 'bg-wine-900' : 'bg-gradient-to-br from-wine-800 via-wine-700 to-wine-900'}`}
+        style={heroBg?.image_url ? { backgroundImage: `url(${heroBg.image_url})`, backgroundSize: 'cover', backgroundPosition: 'center' } : undefined}
+      >
+        {heroBg?.image_url && <div className="absolute inset-0 bg-black/50" aria-hidden="true" />}
+        <div className="relative max-w-4xl mx-auto px-4 text-center">
           <div className="inline-flex items-center gap-2 bg-white/10 backdrop-blur rounded-full px-4 py-1.5 text-sm mb-6">
             <Gift size={16} /> Coffrets cadeaux
           </div>

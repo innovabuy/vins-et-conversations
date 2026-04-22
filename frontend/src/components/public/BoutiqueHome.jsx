@@ -5,6 +5,7 @@ import api from '../../services/api';
 import { featuredAPI } from '../../services/api';
 import { useCart } from '../../contexts/CartContext';
 import { useToast } from '../shared/Toast';
+import { useSiteImage } from '../../contexts/SiteImagesContext';
 
 const formatEur = (v) => new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR' }).format(v);
 
@@ -34,6 +35,7 @@ export default function BoutiqueHome() {
   const { addToCart, getReferralCode } = useCart();
   const toast = useToast();
   const addToCartHandled = useRef(false);
+  const heroBg = useSiteImage('accueil_hero_fallback');
 
   // Handle add_to_cart URL parameter (from coffrets.html)
   useEffect(() => {
@@ -89,8 +91,12 @@ export default function BoutiqueHome() {
   return (
     <div>
       {/* Hero */}
-      <section className="bg-gradient-to-br from-wine-800 via-wine-700 to-wine-900 text-white py-20 sm:py-28">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
+      <section
+        className={`relative text-white py-20 sm:py-28 ${heroBg?.image_url ? 'bg-wine-900' : 'bg-gradient-to-br from-wine-800 via-wine-700 to-wine-900'}`}
+        style={heroBg?.image_url ? { backgroundImage: `url(${heroBg.image_url})`, backgroundSize: 'cover', backgroundPosition: 'center' } : undefined}
+      >
+        {heroBg?.image_url && <div className="absolute inset-0 bg-black/45" aria-hidden="true" />}
+        <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
           <div className="inline-flex items-center gap-2 bg-white/10 backdrop-blur rounded-full px-4 py-1.5 text-sm mb-6">
             <Wine size={16} /> Vins sélectionnés avec passion
           </div>
