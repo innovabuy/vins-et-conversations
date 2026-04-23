@@ -205,7 +205,7 @@ async function getStudentDashboard(userId, campaignId) {
           .andOn('orders.campaign_id', 'participations.campaign_id');
       })
       .where('orders.campaign_id', campaignId)
-      .where('participations.role_in_campaign', 'student')
+      .whereIn('participations.role_in_campaign', ['student', 'participant'])
       .whereIn('orders.status', validStatuses)
       .groupBy('participations.class_group')
       .select(
@@ -219,9 +219,12 @@ async function getStudentDashboard(userId, campaignId) {
 
     // Also count all participants per class (including those with 0 orders)
     const participantCounts = await db('participations')
-      .where({ campaign_id: campaignId, role_in_campaign: 'student' })
-      .groupBy('class_group')
-      .select('class_group', db.raw('COUNT(*) as count'));
+      .join('users', 'participations.user_id', 'users.id')
+      .where('participations.campaign_id', campaignId)
+      .whereIn('participations.role_in_campaign', ['student', 'participant'])
+      .where('users.role', 'etudiant')
+      .groupBy('participations.class_group')
+      .select('participations.class_group', db.raw('COUNT(*) as count'));
     const countMap = {};
     participantCounts.forEach((pc) => { countMap[pc.class_group] = parseInt(pc.count, 10); });
 
@@ -644,7 +647,9 @@ async function getTeacherDashboard(userId, campaignId) {
   // Alertes inactivité
   const allStudents = await db('participations')
     .join('users', 'participations.user_id', 'users.id')
-    .where({ campaign_id: campaignId, role_in_campaign: 'student' })
+    .where({ campaign_id: campaignId })
+    .whereIn('participations.role_in_campaign', ['student', 'participant'])
+    .where('users.role', 'etudiant')
     .select('users.id', 'users.name');
 
   const lastOrders = await db('orders')
@@ -673,7 +678,9 @@ async function getTeacherDashboard(userId, campaignId) {
   // Per-class aggregation (bottles only — NO euros)
   const allStudentsWithGroup = await db('participations')
     .join('users', 'participations.user_id', 'users.id')
-    .where({ campaign_id: campaignId, role_in_campaign: 'student' })
+    .where({ campaign_id: campaignId })
+    .whereIn('participations.role_in_campaign', ['student', 'participant'])
+    .where('users.role', 'etudiant')
     .select('users.id', 'users.name', 'participations.class_group');
 
   // Per-class aggregation (includes referral orders via UNION ALL)

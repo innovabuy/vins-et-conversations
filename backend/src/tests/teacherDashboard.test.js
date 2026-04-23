@@ -258,4 +258,85 @@ describe('Teacher Dashboard Financials', () => {
       await db('organizations').where('id', org.id).del();
     }
   });
+
+  // Helper — create isolated campaign + N students with arbitrary role_in_campaign
+  async function seedCampaignWithStudents(tag, studentsRoles) {
+    const { v4 } = require('uuid');
+    const orgType = await db('organization_types').select('id').first();
+    const campType = await db('campaign_types').select('id').first();
+    const clientType = await db('client_types').select('id').first();
+    const [org] = await db('organizations').insert({
+      name: `${tag} Org`, type: 'school', organization_type_id: orgType.id,
+    }).returning('*');
+    const [camp] = await db('campaigns').insert({
+      name: `${tag} Campaign`,
+      org_id: org.id,
+      campaign_type_id: campType.id,
+      client_type_id: clientType.id,
+      status: 'active',
+      goal: 1000,
+      config: JSON.stringify({ classes: ['GA'] }),
+    }).returning('*');
+    // Attach teacher (so auth passes)
+    await db('participations').insert({
+      user_id: teacherUserId, campaign_id: camp.id,
+      organization_id: org.id, role_in_campaign: 'teacher',
+    });
+    // Attach students
+    const studentIds = [];
+    for (const [i, roleIn] of studentsRoles.entries()) {
+      const sid = v4();
+      await db('users').insert({
+        id: sid, email: `${tag.toLowerCase()}-s${i}-${Date.now()}@test.fr`,
+        password_hash: '$2a$10$placeholder', name: `${tag} Student ${i}`,
+        role: 'etudiant', status: 'active',
+      });
+      await db('participations').insert({
+        user_id: sid, campaign_id: camp.id, organization_id: org.id,
+        role_in_campaign: roleIn, class_group: 'GA',
+      });
+      studentIds.push(sid);
+    }
+    return { org, camp, studentIds };
+  }
+
+  async function cleanupCampaign(org, camp, studentIds) {
+    await db('participations').where({ campaign_id: camp.id }).del();
+    await db('campaigns').where('id', camp.id).del();
+    await db('users').whereIn('id', studentIds).del();
+    await db('organizations').where('id', org.id).del();
+  }
+
+  test('TEACH-10: mix student+participant -> totalStudents compte les deux', async () => {
+    const { org, camp, studentIds } = await seedCampaignWithStudents(
+      'TEACH10', ['student', 'student', 'participant', 'participant']
+    );
+    try {
+      const res = await request(app)
+        .get(`/api/v1/dashboard/teacher?campaign_id=${camp.id}`)
+        .set('Authorization', `Bearer ${teacherToken}`);
+      expect(res.status).toBe(200);
+      expect(res.body.totalStudents).toBe(4);
+      expect(res.body.inactiveStudents.length).toBe(4); // none have orders
+      expect(res.body.classTotals.GA?.studentCount).toBe(4);
+    } finally {
+      await cleanupCampaign(org, camp, studentIds);
+    }
+  });
+
+  test('TEACH-11: 100% participant (cas TEST INTERNE) -> totalStudents > 0', async () => {
+    const { org, camp, studentIds } = await seedCampaignWithStudents(
+      'TEACH11', ['participant', 'participant', 'participant']
+    );
+    try {
+      const res = await request(app)
+        .get(`/api/v1/dashboard/teacher?campaign_id=${camp.id}`)
+        .set('Authorization', `Bearer ${teacherToken}`);
+      expect(res.status).toBe(200);
+      expect(res.body.totalStudents).toBe(3);
+      expect(res.body.classTotals.GA?.studentCount).toBe(3);
+    } finally {
+      await cleanupCampaign(org, camp, studentIds);
+    }
+  });
 });
