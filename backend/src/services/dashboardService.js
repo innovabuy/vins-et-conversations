@@ -677,16 +677,18 @@ async function getTeacherDashboard(userId, campaignId) {
     .select('users.id', 'users.name', 'participations.class_group');
 
   // Per-class aggregation (includes referral orders via UNION ALL)
-  const { sql: classSQL, params: classParams } = studentOrdersCombinedSQL(campaignId);
-  const classStatsResult = await db.raw(`
-    SELECT so.effective_user_id, SUM(so.total_items) as bottles, COUNT(so.id) as sales_count
-    FROM ${classSQL} so
-    WHERE so.effective_user_id IN (${allStudentsWithGroup.map(() => '?').join(',')})
-    GROUP BY so.effective_user_id
-  `, [...classParams, ...allStudentsWithGroup.map((s) => s.id)]);
-  const classStatsRows = classStatsResult.rows || classStatsResult;
   const classStatsMap = {};
-  classStatsRows.forEach((r) => { classStatsMap[r.effective_user_id] = r; });
+  if (allStudentsWithGroup.length > 0) {
+    const { sql: classSQL, params: classParams } = studentOrdersCombinedSQL(campaignId);
+    const classStatsResult = await db.raw(`
+      SELECT so.effective_user_id, SUM(so.total_items) as bottles, COUNT(so.id) as sales_count
+      FROM ${classSQL} so
+      WHERE so.effective_user_id IN (${allStudentsWithGroup.map(() => '?').join(',')})
+      GROUP BY so.effective_user_id
+    `, [...classParams, ...allStudentsWithGroup.map((s) => s.id)]);
+    const classStatsRows = classStatsResult.rows || classStatsResult;
+    classStatsRows.forEach((r) => { classStatsMap[r.effective_user_id] = r; });
+  }
 
   const classTotals = {};
   for (const cg of classGroups) {

@@ -210,4 +210,52 @@ describe('Teacher Dashboard Financials', () => {
     expect(vat55.amount_ht).toBeGreaterThan(0);
     expect(vat55.amount_ttc).toBeGreaterThan(vat55.amount_ht);
   });
+
+  test('TEACH-09: campagne sans aucun etudiant -> 200 HTTP (non-regression empty IN clause)', async () => {
+    const orgType = await db('organization_types').select('id').first();
+    const campType = await db('campaign_types').select('id').first();
+    const clientType = await db('client_types').select('id').first();
+    const [org] = await db('organizations').insert({
+      name: 'TEACH-09 Empty Org', type: 'school', organization_type_id: orgType.id,
+    }).returning('*');
+    const [emptyCamp] = await db('campaigns').insert({
+      name: 'TEACH-09 Empty Campaign',
+      org_id: org.id,
+      campaign_type_id: campType.id,
+      client_type_id: clientType.id,
+      status: 'active',
+      goal: 1000,
+      config: JSON.stringify({ classes: ['A'] }),
+    }).returning('*');
+    // Attach current teacher to the empty campaign so auth middleware accepts it
+    await db('participations').insert({
+      user_id: teacherUserId,
+      campaign_id: emptyCamp.id,
+      organization_id: org.id,
+      role_in_campaign: 'teacher',
+    });
+
+    try {
+      // HTTP end-to-end: middleware -> route -> service -> response
+      const res = await request(app)
+        .get(`/api/v1/dashboard/teacher?campaign_id=${emptyCamp.id}`)
+        .set('Authorization', `Bearer ${teacherToken}`);
+
+      expect(res.status).toBe(200);
+      expect(res.body).toBeDefined();
+      expect(res.body.totalStudents).toBe(0);
+      expect(res.body.students).toEqual([]);
+      expect(res.body.classTotals).toBeDefined();
+      expect(res.body.inactiveStudents).toEqual([]);
+      // Financials should be zero but structurally present (frontend relies on shape)
+      expect(res.body.campaign_financials).toBeDefined();
+      expect(res.body.campaign_financials.ca_ttc).toBe(0);
+      expect(res.body.campaign_financials.ca_ht).toBe(0);
+      expect(res.body.campaign_financials.vat_breakdown).toEqual([]);
+    } finally {
+      await db('participations').where({ campaign_id: emptyCamp.id }).del();
+      await db('campaigns').where('id', emptyCamp.id).del();
+      await db('organizations').where('id', org.id).del();
+    }
+  });
 });
