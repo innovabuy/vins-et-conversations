@@ -16,7 +16,6 @@ const DEFAULT_CONTENT = {
       'Devis sur mesure',
       'Coffrets cadeaux disponibles',
     ]},
-    { type: 'text', title: '', body: 'Section photo événement — contenu à compléter par Nicolas.' },
   ],
   cta: { label: 'Demander un devis', href: '/boutique/contact' },
 };
