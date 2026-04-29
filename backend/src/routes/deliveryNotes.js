@@ -60,13 +60,14 @@ router.get('/', authenticate, requireRole('super_admin', 'commercial'), async (r
   try {
     let query = db('delivery_notes')
       .join('orders', 'delivery_notes.order_id', 'orders.id')
-      .join('users', 'orders.user_id', 'users.id')
+      .leftJoin('users', 'orders.user_id', 'users.id')
+      .leftJoin('users as referrer', 'referrer.id', 'orders.referred_by')
       .select(
         'delivery_notes.*',
         'orders.ref as order_ref',
         'orders.total_ttc',
         'orders.total_items',
-        'users.name as user_name'
+        db.raw("COALESCE(users.name, '(externe via ' || referrer.name || ')') as user_name")
       );
 
     if (req.query.status) query = query.where('delivery_notes.status', req.query.status);
@@ -84,9 +85,15 @@ router.get('/:id', authenticate, requireRole('super_admin', 'commercial'), async
   try {
     const bl = await db('delivery_notes')
       .join('orders', 'delivery_notes.order_id', 'orders.id')
-      .join('users', 'orders.user_id', 'users.id')
+      .leftJoin('users', 'orders.user_id', 'users.id')
+      .leftJoin('users as referrer', 'referrer.id', 'orders.referred_by')
       .where('delivery_notes.id', req.params.id)
-      .select('delivery_notes.*', 'orders.ref as order_ref', 'orders.total_ttc', 'users.name as user_name')
+      .select(
+        'delivery_notes.*',
+        'orders.ref as order_ref',
+        'orders.total_ttc',
+        db.raw("COALESCE(users.name, '(externe via ' || referrer.name || ')') as user_name")
+      )
       .first();
 
     if (!bl) return res.status(404).json({ error: 'NOT_FOUND' });
@@ -206,9 +213,15 @@ router.get('/:id/pdf', authenticate, requireRole('super_admin', 'commercial'), a
     const PDFDocument = require('pdfkit');
     const bl = await db('delivery_notes')
       .join('orders', 'delivery_notes.order_id', 'orders.id')
-      .join('users', 'orders.user_id', 'users.id')
+      .leftJoin('users', 'orders.user_id', 'users.id')
+      .leftJoin('users as referrer', 'referrer.id', 'orders.referred_by')
       .where('delivery_notes.id', req.params.id)
-      .select('delivery_notes.*', 'orders.ref as order_ref', 'orders.total_ttc', 'users.name as user_name')
+      .select(
+        'delivery_notes.*',
+        'orders.ref as order_ref',
+        'orders.total_ttc',
+        db.raw("COALESCE(users.name, '(externe via ' || referrer.name || ')') as user_name")
+      )
       .first();
 
     if (!bl) return res.status(404).json({ error: 'NOT_FOUND' });
@@ -303,9 +316,14 @@ router.post('/:id/send-email', authenticate, requireRole('super_admin', 'commerc
   try {
     const bl = await db('delivery_notes')
       .join('orders', 'delivery_notes.order_id', 'orders.id')
-      .join('users', 'orders.user_id', 'users.id')
+      .leftJoin('users', 'orders.user_id', 'users.id')
+      .leftJoin('users as referrer', 'referrer.id', 'orders.referred_by')
       .where('delivery_notes.id', req.params.id)
-      .select('delivery_notes.*', 'users.email as user_email', 'users.name as user_name')
+      .select(
+        'delivery_notes.*',
+        db.raw("COALESCE(users.email, referrer.email) as user_email"),
+        db.raw("COALESCE(users.name, '(externe via ' || referrer.name || ')') as user_name")
+      )
       .first();
 
     if (!bl) return res.status(404).json({ error: 'NOT_FOUND' });
