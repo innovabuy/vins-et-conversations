@@ -283,9 +283,18 @@ router.get('/grouped/student/:userId', authenticate, requireRole('super_admin', 
     if (!user) return res.status(404).json({ error: 'USER_NOT_FOUND' });
 
     // Optional order_ids filter (comma-separated)
-    const orderIds = req.query.order_ids
-      ? req.query.order_ids.split(',').map(s => s.trim()).filter(Boolean)
-      : null;
+    let orderIds = null;
+    if (req.query.order_ids) {
+      orderIds = req.query.order_ids.split(',').map(s => s.trim()).filter(Boolean);
+    } else if (req.query.order_id) {
+      // Alias rétrocompat — TD-06: middleware Joi/Zod à mettre en place
+      console.warn(
+        '[A6 alias] /admin/delivery-notes/grouped/student: param order_id (singulier) ' +
+        'reçu, traité comme order_ids. Call-site à corriger côté frontend. ' +
+        'req.path=', req.path, 'req.query=', req.query
+      );
+      orderIds = [req.query.order_id];
+    }
 
     const rows = await fetchGroupedData(campaignId, userId, orderIds, filters);
     if (rows.length === 0) {

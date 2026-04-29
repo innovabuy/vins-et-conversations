@@ -129,9 +129,18 @@ router.get(
   cacheMiddleware(60),
   async (req, res) => {
     try {
-      const campaignIds = req.query.campaign_ids
-        ? req.query.campaign_ids.split(',')
-        : null;
+      let campaignIds = null;
+      if (req.query.campaign_ids) {
+        campaignIds = req.query.campaign_ids.split(',').filter(Boolean);
+      } else if (req.query.campaign_id) {
+        // Alias rétrocompat — TD-06: middleware Joi/Zod à mettre en place
+        console.warn(
+          '[A6 alias] /dashboard/admin/cockpit: param campaign_id (singulier) ' +
+          'reçu, traité comme campaign_ids. Call-site à corriger côté frontend. ' +
+          'req.path=', req.path, 'req.query=', req.query
+        );
+        campaignIds = [req.query.campaign_id];
+      }
       const data = await dashboardService.getAdminCockpit(campaignIds);
       res.json(data);
     } catch (err) {
