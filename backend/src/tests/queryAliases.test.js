@@ -4,15 +4,23 @@
  * Voir TD-06: middleware Joi/Zod à mettre en place pour rejeter strictement
  * les paramètres inconnus. En attendant, on accepte le singulier équivalent
  * + on log un warning pour identifier les call-sites frontend à corriger.
+ *
+ * R1: ce test crée ses propres pré-conditions (campagne + étudiant + participation)
+ * et cleanup en afterAll. Aucune dépendance au seed.
  */
 const request = require('supertest');
 const app = require('../index');
 const db = require('../config/database');
+const bcrypt = require('bcryptjs');
+const { v4: uuidv4 } = require('uuid');
 
 const PASSWORD = 'VinsConv2026!';
+const SUFFIX = `_ut_qa_${Date.now()}`;
+
 let adminToken;
-let campaignWithOrdersId;
-let studentForBLId, blCampaignId;
+const studentId = uuidv4();
+const campaignId = uuidv4();
+const orderId = uuidv4();
 
 beforeAll(async () => {
   await db.raw('SELECT 1');
@@ -22,31 +30,57 @@ beforeAll(async () => {
     .send({ email: 'nicolas@vins-conversations.fr', password: PASSWORD });
   adminToken = adminRes.body.accessToken;
 
-  // Pick a campaign that has at least one order (any status) for cockpit scope tests.
-  const campaignWithOrders = await db('orders')
-    .select('campaign_id')
-    .whereNotNull('campaign_id')
-    .groupBy('campaign_id')
-    .first();
-  campaignWithOrdersId = campaignWithOrders?.campaign_id
-    || (await db('campaigns').first())?.id;
+  // 1. Étudiant
+  const hash = await bcrypt.hash(PASSWORD, 4);
+  await db('users').insert({
+    id: studentId,
+    email: `student.qa${SUFFIX}@test.local`,
+    password_hash: hash,
+    name: `Student QA${SUFFIX}`,
+    role: 'etudiant',
+    status: 'active',
+  });
 
-  // Pick a student + their campaign for the groupedBL alias test.
-  // We don't need the response to be 200 (it can 404 if no BL), we only need both
-  // responses (?order_id=X vs ?order_ids=X) to be IDENTICAL.
-  const part = await db('participations')
-    .join('users', 'users.id', 'participations.user_id')
-    .where('users.role', 'etudiant')
-    .select('participations.user_id', 'participations.campaign_id')
-    .first();
-  studentForBLId = part.user_id;
-  blCampaignId = part.campaign_id;
+  // 2. Campagne
+  await db('campaigns').insert({
+    id: campaignId,
+    name: `Campagne QA${SUFFIX}`,
+    status: 'active',
+  });
+
+  // 3. Participation (rattachement étudiant à campagne, requis par groupedBL routing)
+  await db('participations').insert({
+    user_id: studentId,
+    campaign_id: campaignId,
+    role_in_campaign: 'participant',
+  });
+
+  // 4. Order minimal pour donner du grain au cockpit (caTTC > 0 facultatif, le test
+  //    n'asserte que le type number, pas la valeur)
+  await db('orders').insert({
+    id: orderId,
+    ref: `VC-UT-QA-${Date.now()}`,
+    campaign_id: campaignId,
+    user_id: studentId,
+    status: 'delivered',
+    total_ttc: 50,
+    total_ht: 41.67,
+    total_items: 1,
+    items: JSON.stringify([]),
+  });
+}, 15000);
+
+afterAll(async () => {
+  await db('orders').where({ id: orderId }).delete();
+  await db('participations').where({ user_id: studentId, campaign_id: campaignId }).delete();
+  await db('campaigns').where({ id: campaignId }).delete();
+  await db('users').where({ id: studentId }).delete();
 });
 
 describe('A6 — Query parameter aliases (campaign_id ↔ campaign_ids, order_id ↔ order_ids)', () => {
   test('CSP-PARAM-01: cockpit?campaign_ids=X → scope correct', async () => {
     const res = await request(app)
-      .get(`/api/v1/dashboard/admin/cockpit?campaign_ids=${campaignWithOrdersId}`)
+      .get(`/api/v1/dashboard/admin/cockpit?campaign_ids=${campaignId}`)
       .set('Authorization', `Bearer ${adminToken}`);
     expect(res.status).toBe(200);
     expect(res.body.kpis).toBeDefined();
@@ -58,13 +92,13 @@ describe('A6 — Query parameter aliases (campaign_id ↔ campaign_ids, order_id
 
     // Plural call for reference (different cache key)
     const refRes = await request(app)
-      .get(`/api/v1/dashboard/admin/cockpit?campaign_ids=${campaignWithOrdersId}`)
+      .get(`/api/v1/dashboard/admin/cockpit?campaign_ids=${campaignId}`)
       .set('Authorization', `Bearer ${adminToken}`);
     expect(refRes.status).toBe(200);
 
     // Singular alias call
     const aliasRes = await request(app)
-      .get(`/api/v1/dashboard/admin/cockpit?campaign_id=${campaignWithOrdersId}`)
+      .get(`/api/v1/dashboard/admin/cockpit?campaign_id=${campaignId}`)
       .set('Authorization', `Bearer ${adminToken}`);
     expect(aliasRes.status).toBe(200);
     expect(aliasRes.body.kpis.caTTC).toBe(refRes.body.kpis.caTTC);
@@ -92,23 +126,17 @@ describe('A6 — Query parameter aliases (campaign_id ↔ campaign_ids, order_id
   test('CSP-PARAM-04: groupedBL ?order_id=X équivalent à ?order_ids=X (alias actif)', async () => {
     const warnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
 
-    // Pick any order id in the chosen campaign (peut ne pas exister — l'alias doit
-    // se comporter pareil avec ?order_ids=X et ?order_id=X)
-    const someOrder = await db('orders')
-      .where({ campaign_id: blCampaignId })
-      .select('id')
-      .first();
-    const orderId = someOrder?.id || '00000000-0000-0000-0000-000000000000';
-
+    // L'order créé en beforeAll suffit pour tester l'alias. Si l'endpoint répond 404
+    // (pas de BL groupé pour cet étudiant), peu importe : l'alias doit produire LE MÊME
+    // statut + corps que la version plurielle.
     const pluralRes = await request(app)
-      .get(`/api/v1/admin/delivery-notes/grouped/student/${studentForBLId}?campaign_id=${blCampaignId}&order_ids=${orderId}`)
+      .get(`/api/v1/admin/delivery-notes/grouped/student/${studentId}?campaign_id=${campaignId}&order_ids=${orderId}`)
       .set('Authorization', `Bearer ${adminToken}`);
 
     const singularRes = await request(app)
-      .get(`/api/v1/admin/delivery-notes/grouped/student/${studentForBLId}?campaign_id=${blCampaignId}&order_id=${orderId}`)
+      .get(`/api/v1/admin/delivery-notes/grouped/student/${studentId}?campaign_id=${campaignId}&order_id=${orderId}`)
       .set('Authorization', `Bearer ${adminToken}`);
 
-    // Les deux appels doivent produire le même statut et la même structure de réponse.
     expect(singularRes.status).toBe(pluralRes.status);
     expect(singularRes.body).toEqual(pluralRes.body);
 
