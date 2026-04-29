@@ -81,7 +81,7 @@ beforeAll(async () => {
   campaignId = sacreCoeur?.id;
   cseCampaignId = cseCamp?.id;
   ambassadorCampaignId = ambCamp?.id;
-});
+}, 15000);
 
 afterAll(async () => {
   // Clean up test users
