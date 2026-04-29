@@ -586,17 +586,21 @@ router.get('/campaign-pivot', authenticate, requireRole('super_admin', 'admin', 
       return res.status(404).json({ error: true, code: 'CAMPAIGN_NOT_FOUND', message: 'Campagne introuvable' });
     }
 
+    // A2 (LEFT JOIN): commandes user_id NULL référées attribuées au parrain (referred_by).
+    // effective_student_id = COALESCE(user_id, referred_by). Pattern aligné sur commit ee9458b.
     const rows = await db('order_items as oi')
       .join('orders as o', 'o.id', 'oi.order_id')
       .join('products as p', 'p.id', 'oi.product_id')
-      .join('users as u', 'u.id', 'o.user_id')
+      .leftJoin('users as u', 'u.id', 'o.user_id')
+      .leftJoin('users as ru', 'ru.id', 'o.referred_by')
       .where('o.campaign_id', campaign_id)
       .whereNotIn('o.status', ['cancelled', 'draft'])
       .where('oi.type', 'product')
+      .whereRaw('COALESCE(o.user_id, o.referred_by) IS NOT NULL')
       .select(
-        'u.id as user_id',
-        'u.name as etudiant',
-        'u.email',
+        db.raw('COALESCE(o.user_id, o.referred_by) as user_id'),
+        db.raw('COALESCE(u.name, ru.name) as etudiant'),
+        db.raw('COALESCE(u.email, ru.email) as email'),
         'p.id as product_id',
         'p.name as produit',
         'p.price_ttc',
@@ -605,7 +609,7 @@ router.get('/campaign-pivot', authenticate, requireRole('super_admin', 'admin', 
         db.raw('SUM(oi.qty * oi.unit_price_ttc) as montant_ttc'),
         db.raw('SUM(oi.qty * oi.unit_price_ht) as montant_ht')
       )
-      .groupBy('u.id', 'u.name', 'u.email', 'p.id', 'p.name', 'p.price_ttc', 'p.price_ht')
+      .groupByRaw("COALESCE(o.user_id, o.referred_by), COALESCE(u.name, ru.name), COALESCE(u.email, ru.email), p.id, p.name, p.price_ttc, p.price_ht")
       .orderBy(['etudiant', 'produit']);
 
     if (rows.length === 0) {
