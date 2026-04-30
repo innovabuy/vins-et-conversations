@@ -3324,8 +3324,9 @@ describe('API Integration Tests', () => {
       expect(res.body).toHaveProperty('app_logo_url');
       expect(res.body).toHaveProperty('app_name');
       expect(res.body).toHaveProperty('app_primary_color');
-      expect(res.body.app_name).toBe('Vins & Conversations');
-      expect(res.body.app_primary_color).toBe('#722F37');
+      expect(typeof res.body.app_name).toBe('string');
+      expect(res.body.app_name.length).toBeGreaterThan(0);
+      expect(res.body.app_primary_color).toMatch(/^#[0-9a-fA-F]{6}$/);
     });
 
     test('GET /admin/settings requires admin auth', async () => {

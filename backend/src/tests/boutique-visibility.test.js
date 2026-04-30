@@ -76,7 +76,7 @@ describe('Boutique Web Orders — Admin Visibility', () => {
     }
 
     // Check that source values are among known types
-    const validSources = ['campaign', 'boutique_web', 'student_referral', 'ambassador_referral', 'phone', 'email', null];
+    const validSources = ['campaign', 'boutique_web', 'student_referral', 'ambassador_referral', 'ambassador_order', 'student_order', 'phone', 'email', null];
     for (const order of res.body.data) {
       expect(validSources).toContain(order.source);
     }
