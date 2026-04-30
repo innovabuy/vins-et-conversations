@@ -19,10 +19,15 @@ const ACTIVE_STATUSES_SQL = "('submitted','pending_payment','pending_stock','val
 function studentOrdersCombinedSQL(campaignId = null) {
   const campaignFilter = campaignId ? ' AND campaign_id = ?' : '';
   const params = campaignId ? [campaignId, campaignId] : [];
+  // Modèle C (Mathéo 29/04) : branche directe exclut les cmds cross-étudiant
+  // (user_id=A AND referred_by=B où B≠A) — l'acheteur n'est pas le porteur du CA.
+  // Ces cmds sont comptées chez le parrain via la branche referral.
+  // Auto-referral (user_id=A AND referred_by=A) reste comptée 1× via branche directe
+  // (le guard `referred_by = user_id` accepte ce cas).
   const sql = `(
     SELECT user_id as effective_user_id, id, total_ttc, total_ht, total_items, campaign_id, status, created_at
     FROM orders
-    WHERE status IN ${ACTIVE_STATUSES_SQL} AND user_id IS NOT NULL${campaignFilter}
+    WHERE status IN ${ACTIVE_STATUSES_SQL} AND user_id IS NOT NULL AND (referred_by IS NULL OR referred_by = user_id)${campaignFilter}
     UNION ALL
     SELECT referred_by as effective_user_id, id, total_ttc, total_ht, total_items, campaign_id, status, created_at
     FROM orders
@@ -51,19 +56,24 @@ async function getStudentDashboard(userId, campaignId) {
 
   // Combined user stats: direct CA/bottles/count + referred CA/bottles (3 queries → 1)
   const validStatuses = ACTIVE_STATUSES;
+  // Modèle C : branche directe (CASE WHEN direct) exclut cross-étudiant
+  // via `(referred_by IS NULL OR referred_by = ?)` — auto-referral OK, cross-étudiant exclu.
   const userStats = await db('orders')
     .whereIn('status', validStatuses)
     .where(function () {
-      this.where({ user_id: userId, campaign_id: campaignId })
+      this.where(function () {
+        this.where({ user_id: userId, campaign_id: campaignId })
+          .whereRaw('(referred_by IS NULL OR referred_by = ?)', [userId]);
+      })
         .orWhere(function () {
           this.where({ referred_by: userId, source: 'student_referral', campaign_id: campaignId })
             .whereRaw('(user_id IS NULL OR user_id != referred_by)');
         });
     })
     .select(
-      db.raw('SUM(CASE WHEN user_id = ? AND campaign_id = ? THEN total_ttc ELSE 0 END) as direct_ca', [userId, campaignId]),
-      db.raw('COUNT(CASE WHEN user_id = ? AND campaign_id = ? THEN 1 END) as order_count', [userId, campaignId]),
-      db.raw('SUM(CASE WHEN user_id = ? AND campaign_id = ? THEN total_items ELSE 0 END) as direct_bottles', [userId, campaignId]),
+      db.raw('SUM(CASE WHEN user_id = ? AND campaign_id = ? AND (referred_by IS NULL OR referred_by = ?) THEN total_ttc ELSE 0 END) as direct_ca', [userId, campaignId, userId]),
+      db.raw('COUNT(CASE WHEN user_id = ? AND campaign_id = ? AND (referred_by IS NULL OR referred_by = ?) THEN 1 END) as order_count', [userId, campaignId, userId]),
+      db.raw('SUM(CASE WHEN user_id = ? AND campaign_id = ? AND (referred_by IS NULL OR referred_by = ?) THEN total_items ELSE 0 END) as direct_bottles', [userId, campaignId, userId]),
       db.raw('SUM(CASE WHEN referred_by = ? AND source = \'student_referral\' AND campaign_id = ? AND (user_id IS NULL OR user_id != referred_by) THEN total_ttc ELSE 0 END) as referred_ca', [userId, campaignId]),
       db.raw('SUM(CASE WHEN referred_by = ? AND source = \'student_referral\' AND campaign_id = ? AND (user_id IS NULL OR user_id != referred_by) THEN total_items ELSE 0 END) as referred_bottles', [userId, campaignId]),
       db.raw('COUNT(CASE WHEN referred_by = ? AND source = \'student_referral\' AND campaign_id = ? AND (user_id IS NULL OR user_id != referred_by) THEN 1 END) as referred_orders_count', [userId, campaignId]),
@@ -81,10 +91,11 @@ async function getStudentDashboard(userId, campaignId) {
   const bottlesSold = parseInt(userStats?.direct_bottles || 0, 10) + bottlesReferred;
 
   // Classement (UNION ALL: direct orders + referred orders)
+  // Modèle C : branche directe exclut cross-étudiant (referred_by IS NULL OR = user_id)
   const ranking = await db.raw(`
     SELECT user_id, SUM(total_ttc) as ca FROM (
       SELECT user_id, total_ttc FROM orders
-        WHERE campaign_id = ? AND status IN ${ACTIVE_STATUSES_SQL} AND user_id IS NOT NULL
+        WHERE campaign_id = ? AND status IN ${ACTIVE_STATUSES_SQL} AND user_id IS NOT NULL AND (referred_by IS NULL OR referred_by = user_id)
       UNION ALL
       SELECT referred_by as user_id, total_ttc FROM orders
         WHERE referred_by IS NOT NULL AND source = 'student_referral' AND (user_id IS NULL OR user_id != referred_by) AND status IN ${ACTIVE_STATUSES_SQL} AND campaign_id = ?
@@ -335,7 +346,7 @@ async function getStudentRanking(userId, campaignId) {
            COUNT(combined.id) as orders_count
     FROM (
       SELECT id, user_id, total_ttc, total_items FROM orders
-        WHERE campaign_id = ? AND status IN ${validStatusList} AND user_id IS NOT NULL
+        WHERE campaign_id = ? AND status IN ${validStatusList} AND user_id IS NOT NULL AND (referred_by IS NULL OR referred_by = user_id)
       UNION ALL
       SELECT id, referred_by as user_id, total_ttc, total_items FROM orders
         WHERE referred_by IS NOT NULL AND source = 'student_referral' AND (user_id IS NULL OR user_id != referred_by) AND status IN ${validStatusList} AND campaign_id = ?
@@ -823,7 +834,7 @@ async function getStudentLeaderboard(userId, campaignId, { period = 'all', class
            COUNT(combined.id) as orders_count
     FROM (
       SELECT id, user_id, total_ttc, total_items, created_at FROM orders
-        WHERE campaign_id = ? AND status IN ${validStatusList} AND user_id IS NOT NULL${periodFilter}
+        WHERE campaign_id = ? AND status IN ${validStatusList} AND user_id IS NOT NULL AND (referred_by IS NULL OR referred_by = user_id)${periodFilter}
       UNION ALL
       SELECT id, referred_by as user_id, total_ttc, total_items, created_at FROM orders
         WHERE referred_by IS NOT NULL AND source = 'student_referral' AND (user_id IS NULL OR user_id != referred_by) AND status IN ${validStatusList} AND campaign_id = ?${periodFilter ? ' AND created_at >= ?' : ''}

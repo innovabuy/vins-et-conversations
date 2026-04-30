@@ -145,11 +145,17 @@ async function calculateFunds(campaignId, userId, commissionRules, options = {})
 
   if (individualRule && individualRule.type === 'percentage') {
     // Inclut commandes directes (user_id) + commandes parrainage (referred_by + sources configurables)
+    // Modèle C : branche directe exclut cross-étudiant via guard `referred_by IS NULL OR = userId`
     let indivQuery = db('orders')
       .where({ campaign_id: campaignId })
       .whereIn('status', FUND_STATUSES)
       .where(function () {
-        this.where({ user_id: userId })
+        this.where(function () {
+          this.where({ user_id: userId })
+            .where(function () {
+              this.whereNull('referred_by').orWhere('referred_by', userId);
+            });
+        })
           .orWhere(function () {
             this.where({ referred_by: userId })
               .whereIn('source', referralSources)
