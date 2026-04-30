@@ -10,6 +10,7 @@ const db = require('../config/database');
 const { authenticate, requireRole } = require('../middleware/auth');
 const { auditAction } = require('../middleware/audit');
 const rulesEngine = require('../services/rulesEngine');
+const { ACTIVE_STATUSES } = require('../services/dashboardService');
 
 // POST /admin/free-bottles/record
 router.post('/record', authenticate, requireRole('super_admin', 'commercial'), auditAction('free_bottles'), async (req, res) => {
@@ -140,14 +141,30 @@ router.get('/pending', authenticate, requireRole('super_admin', 'commercial'), a
       }
     }
 
-    // Fetch alcohol products available in this campaign
-    const products = await db('campaign_products')
+    // Fetch alcohol products available in this campaign — UNION (P2-FIX 30/04 Mathéo retour 4b) :
+    //   1) campaign_products active + 2) produits réellement commandés sur la campagne.
+    // Évite l'invisibilité des produits orphelins (ex: Lagoalva, Fils de Marcel Moelleux sur BTS NDRC).
+    const productsCampaign = db('campaign_products')
       .join('products', 'campaign_products.product_id', 'products.id')
       .join('product_categories', 'products.category_id', 'product_categories.id')
       .where({ 'campaign_products.campaign_id': campaign_id, 'campaign_products.active': true, 'products.active': true })
       .where('product_categories.is_alcohol', true)
-      .select('products.id', 'products.name', 'products.purchase_price')
-      .orderBy('products.purchase_price', 'asc');
+      .select('products.id', 'products.name', 'products.purchase_price');
+
+    const productsOrdered = db('order_items')
+      .join('orders', 'order_items.order_id', 'orders.id')
+      .join('products', 'order_items.product_id', 'products.id')
+      .join('product_categories', 'products.category_id', 'product_categories.id')
+      .where('orders.campaign_id', campaign_id)
+      .whereIn('orders.status', ACTIVE_STATUSES)
+      .where('products.active', true)
+      .where('product_categories.is_alcohol', true)
+      .where('order_items.type', 'product')
+      .distinct('products.id', 'products.name', 'products.purchase_price');
+
+    const products = await db
+      .union([productsCampaign, productsOrdered], true)
+      .orderBy('purchase_price', 'asc');
 
     res.json({ data: results, products, total: results.length });
   } catch (err) {
