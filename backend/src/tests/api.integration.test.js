@@ -4244,12 +4244,16 @@ describe('API Integration Tests', () => {
       const rules = await loadRulesForCampaign(campaign.id);
       const result = await calculateFreeBottles(student.id, campaign.id, rules.freeBottle);
 
-      expect(result).toHaveProperty('cost_per_bottle');
-      expect(typeof result.cost_per_bottle).toBe('number');
-      expect(result.cost_per_bottle).toBeGreaterThanOrEqual(0);
-      // If any free bottles earned, cost_per_bottle should be > 0
+      // D2.2 (30/04) : cost_per_bottle remplacé par total_free_cost + details ventilés
+      expect(result).toHaveProperty('total_free_cost');
+      expect(typeof result.total_free_cost).toBe('number');
+      expect(result.total_free_cost).toBeGreaterThanOrEqual(0);
+      expect(Array.isArray(result.details)).toBe(true);
+      // If any free bottles earned, total_free_cost should be > 0
       if (result.earned > 0) {
-        expect(result.cost_per_bottle).toBeGreaterThan(0);
+        expect(result.total_free_cost).toBeGreaterThan(0);
+        // details non vide : au moins une ligne par produit ayant gagné une gratuite
+        expect(result.details.length).toBeGreaterThan(0);
       }
     });
   });

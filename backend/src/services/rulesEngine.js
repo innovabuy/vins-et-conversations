@@ -244,11 +244,22 @@ function calculateCommissionTiers(caTTCMensuel, commissionRules) {
 // ─── §3.3 Bouteilles gratuites ───────────────────────
 
 /**
- * Calcule les bouteilles gratuites acquises par un étudiant
- * @param {string} userId
- * @param {string} campaignId
- * @param {Object} freeBottleRules - Rules JSONB
- * @returns {Object} { earned, used, available, totalSold, threshold, nextIn }
+ * Calcule les bouteilles gratuites acquises par un étudiant.
+ *
+ * Algo D2.2 (Mathéo 30/04) — lot par lot trié :
+ *   1. Récupérer les items éligibles (alcool only, ACTIVE_STATUSES, includeReferredBy).
+ *   2. Aggréger par product_id, expansion bouteille-par-bouteille.
+ *   3. Tri stable : purchase_price ASC, tie-breaker product_id ASC (déterminisme).
+ *   4. Découper en lots séquentiels de N (= rules.n, défaut 12). Reste < N ignoré.
+ *   5. Pour chaque lot, gratuite = produit le moins cher (= lot[0] car slice trié).
+ *      Mono-produit → cette ref. Mixte → la moins chère du lot.
+ *   6. earned = lots.length. details[] = {product_id, product_name, earned} par produit.
+ *   7. total_free_cost = Σ(purchase_price du produit choisi par lot).
+ *
+ * Champ `cost_per_bottle` retiré (0 call-site production — D2.2).
+ * `freeBottleRules.per_reference` ignoré — sémantique remplacée par l'algo unique.
+ *
+ * @returns {Object} { earned, used, available, totalSold, threshold, nextIn, total_free_cost, details, disabled? }
  */
 async function calculateFreeBottles(userId, campaignId, freeBottleRules, options = {}) {
   // Check per-participant free_bottle_enabled flag first (V4.3)
@@ -257,73 +268,118 @@ async function calculateFreeBottles(userId, campaignId, freeBottleRules, options
     .select('config')
     .first();
   if (participation?.config?.free_bottle_enabled === false) {
-    return { earned: 0, used: 0, available: 0, totalSold: 0, threshold: 0, nextIn: 0, cost_per_bottle: 0, disabled: true };
+    return { earned: 0, used: 0, available: 0, totalSold: 0, threshold: 0, nextIn: 0, total_free_cost: 0, details: [], disabled: true };
   }
 
   if (!freeBottleRules?.trigger || freeBottleRules.trigger !== 'every_n_sold') {
-    return { earned: 0, used: 0, available: 0, totalSold: 0, threshold: 0, nextIn: 0, cost_per_bottle: 0 };
+    return { earned: 0, used: 0, available: 0, totalSold: 0, threshold: 0, nextIn: 0, total_free_cost: 0, details: [] };
   }
 
   const n = freeBottleRules.n || 12;
   const alcoholOnly = freeBottleRules.applies_to_alcohol_only !== false;
-  const perReference = freeBottleRules.per_reference === true; // Panachage global par défaut
 
-  // V4.4: Count per-reference (per product) instead of global total
-  let soldQuery = db('order_items')
+  // 1. Récupérer items éligibles avec produit + prix
+  // Cohérence Modèle C (B-1 P1, 30/04) :
+  //   branche directe : exclut cross-étudiant via guard `referred_by IS NULL OR = user_id`
+  //   branche referral : exclut auto-referral via guard `user_id IS NULL OR != referred_by`
+  let itemsQuery = db('order_items')
     .join('orders', 'order_items.order_id', 'orders.id')
     .join('products', 'order_items.product_id', 'products.id')
     .where('orders.campaign_id', campaignId)
     .where(function () {
-      this.where('orders.user_id', userId);
+      this.where(function () {
+        this.where('orders.user_id', userId)
+          .whereRaw('(orders.referred_by IS NULL OR orders.referred_by = orders.user_id)');
+      });
       if (options.includeReferredBy) {
-        this.orWhere('orders.referred_by', userId);
+        this.orWhere(function () {
+          this.where('orders.referred_by', userId)
+            .whereRaw('(orders.user_id IS NULL OR orders.user_id != orders.referred_by)');
+        });
       }
     })
     .whereIn('orders.status', ['validated', 'preparing', 'shipped', 'delivered'])
     .where('order_items.type', 'product');
 
   if (alcoholOnly) {
-    soldQuery = soldQuery
+    itemsQuery = itemsQuery
       .leftJoin('product_categories', 'products.category_id', 'product_categories.id')
       .where(function () {
         this.where('product_categories.is_alcohol', true).orWhereNull('product_categories.is_alcohol');
       });
   }
 
-  let totalSold = 0;
-  let earned = 0;
-  let details = [];
+  const items = await itemsQuery.select(
+    'products.id as product_id',
+    'products.name as product_name',
+    'products.purchase_price',
+    'order_items.qty'
+  );
 
-  if (perReference) {
-    // Per-reference: group by product_id, each product independently earns free bottles
-    const perProduct = await soldQuery
-      .select('order_items.product_id', 'products.name as product_name')
-      .sum('order_items.qty as qty')
-      .groupBy('order_items.product_id', 'products.name');
-
-    for (const row of perProduct) {
-      const qty = parseInt(row.qty || 0, 10);
-      const earnedForProduct = Math.floor(qty / n);
-      totalSold += qty;
-      earned += earnedForProduct;
-      if (qty > 0) {
-        details.push({
-          product_id: row.product_id,
-          product_name: row.product_name,
-          sold: qty,
-          earned: earnedForProduct,
-          nextIn: n - (qty % n),
-        });
-      }
+  // 2. Aggréger par product_id (un même produit peut apparaître dans plusieurs order_items)
+  const aggByProduct = new Map();
+  for (const it of items) {
+    const qty = parseInt(it.qty || 0, 10);
+    if (qty <= 0) continue;
+    const ex = aggByProduct.get(it.product_id);
+    if (ex) {
+      ex.qty += qty;
+    } else {
+      aggByProduct.set(it.product_id, {
+        product_id: it.product_id,
+        product_name: it.product_name,
+        purchase_price: parseFloat(it.purchase_price || 0),
+        qty,
+      });
     }
-  } else {
-    // Legacy global counting
-    const soldResult = await soldQuery.sum('order_items.qty as total').first();
-    totalSold = parseInt(soldResult?.total || 0, 10);
-    earned = Math.floor(totalSold / n);
   }
 
-  // Bouteilles gratuites déjà utilisées
+  // 3. Tri stable : purchase_price ASC, tie-breaker product_id ASC
+  const aggregated = Array.from(aggByProduct.values()).sort((a, b) => {
+    if (a.purchase_price !== b.purchase_price) return a.purchase_price - b.purchase_price;
+    if (a.product_id < b.product_id) return -1;
+    if (a.product_id > b.product_id) return 1;
+    return 0;
+  });
+
+  // Expansion bouteille-par-bouteille (liste plate triée)
+  const flat = [];
+  for (const it of aggregated) {
+    for (let i = 0; i < it.qty; i++) {
+      flat.push(it);
+    }
+  }
+
+  const totalSold = flat.length;
+
+  // 4. Lots séquentiels de N
+  const lots = [];
+  for (let i = 0; i + n <= flat.length; i += n) {
+    lots.push(flat.slice(i, i + n));
+  }
+
+  // 5. Pour chaque lot, gratuite = lot[0] (le moins cher car flat trié)
+  const freeBottlesPerProduct = new Map();
+  let totalFreeCost = 0;
+  for (const lot of lots) {
+    const chosen = lot[0];
+    const ex = freeBottlesPerProduct.get(chosen.product_id);
+    if (ex) {
+      ex.earned += 1;
+    } else {
+      freeBottlesPerProduct.set(chosen.product_id, {
+        product_id: chosen.product_id,
+        product_name: chosen.product_name,
+        earned: 1,
+      });
+    }
+    totalFreeCost += chosen.purchase_price;
+  }
+
+  const earned = lots.length;
+  const details = Array.from(freeBottlesPerProduct.values());
+
+  // 7. Bouteilles gratuites déjà utilisées (financial_events)
   const usedResult = await db('financial_events')
     .where({ campaign_id: campaignId, type: 'free_bottle' })
     .whereRaw("metadata->>'user_id' = ?", [userId])
@@ -332,37 +388,18 @@ async function calculateFreeBottles(userId, campaignId, freeBottleRules, options
 
   const used = parseInt(usedResult?.count || 0, 10);
   const available = Math.max(0, earned - used);
-  // nextIn: for per-reference, use the minimum nextIn across all products (closest to earning)
-  const nextIn = perReference && details.length > 0
-    ? Math.min(...details.map(d => d.nextIn))
-    : n - (totalSold % n);
+  const nextIn = totalSold > 0 ? n - (totalSold % n) : n;
 
-  // V4.2: cost_per_bottle = cheapest purchase_price among items in user's orders
-  let costQuery = db('order_items')
-    .join('orders', 'order_items.order_id', 'orders.id')
-    .join('products', 'order_items.product_id', 'products.id')
-    .where('orders.campaign_id', campaignId)
-    .where(function () {
-      this.where('orders.user_id', userId);
-      if (options.includeReferredBy) {
-        this.orWhere('orders.referred_by', userId);
-      }
-    })
-    .whereIn('orders.status', ['validated', 'preparing', 'shipped', 'delivered'])
-    .where('order_items.type', 'product');
-
-  if (alcoholOnly) {
-    costQuery = costQuery
-      .leftJoin('product_categories', 'products.category_id', 'product_categories.id')
-      .where(function () {
-        this.where('product_categories.is_alcohol', true).orWhereNull('product_categories.is_alcohol');
-      });
-  }
-
-  const costResult = await costQuery.min('products.purchase_price as min_cost').first();
-  const cost_per_bottle = parseFloat(costResult?.min_cost || 0);
-
-  return { earned, used, available, totalSold, threshold: n, nextIn, cost_per_bottle, details };
+  return {
+    earned,
+    used,
+    available,
+    totalSold,
+    threshold: n,
+    nextIn,
+    total_free_cost: parseFloat(totalFreeCost.toFixed(2)),
+    details,
+  };
 }
 
 // ─── §3.3b Coût gratuite par commande (V4.2 BLOC 3) ──

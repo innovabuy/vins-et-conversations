@@ -137,11 +137,11 @@ describe('Parcours étudiant complet', () => {
     expect(typeof fb.earned).toBe('number');
     expect(typeof fb.threshold).toBe('number');
 
-    // If details exist, validate shape
+    // If details exist, validate shape (D2.2 30/04 : nouveau format {product_id, product_name, earned})
     if (fb.details && fb.details.length > 0) {
       for (const d of fb.details) {
+        expect(d).toHaveProperty('product_id');
         expect(d).toHaveProperty('product_name');
-        expect(d).toHaveProperty('sold');
         expect(d).toHaveProperty('earned');
       }
     }

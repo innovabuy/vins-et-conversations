@@ -586,8 +586,39 @@ router.get('/campaign-pivot', authenticate, requireRole('super_admin', 'admin', 
       return res.status(404).json({ error: true, code: 'CAMPAIGN_NOT_FOUND', message: 'Campagne introuvable' });
     }
 
-    // A2 (LEFT JOIN): commandes user_id NULL référées attribuées au parrain (referred_by).
-    // effective_student_id = COALESCE(user_id, referred_by). Pattern aligné sur commit ee9458b.
+    // D2.5 (30/04) : pivot aligné Modèle C (B-1 P1 + cohérence avec calculateFreeBottles patché D2.3).
+    //   effective_student_id =
+    //     - user_id pour cmd directe pure ou auto-référence (user_id IS NOT NULL AND (referred_by IS NULL OR referred_by = user_id))
+    //     - referred_by pour cmd cross-étudiant ou boutique web référée (sinon)
+    //   Avant ce patch : COALESCE(user_id, referred_by) simple — les cmds cross-étudiant étaient
+    //   attribuées à l'acheteur, créant incohérence ventes ↔ gratuités (cf. retour Mathéo PJ3 30/04).
+    const effectiveUserIdSQL = `
+      CASE
+        WHEN o.user_id IS NOT NULL AND (o.referred_by IS NULL OR o.referred_by = o.user_id)
+          THEN o.user_id
+        WHEN o.referred_by IS NOT NULL
+          THEN o.referred_by
+        ELSE NULL
+      END
+    `;
+    const effectiveNameSQL = `
+      CASE
+        WHEN o.user_id IS NOT NULL AND (o.referred_by IS NULL OR o.referred_by = o.user_id)
+          THEN u.name
+        WHEN o.referred_by IS NOT NULL
+          THEN ru.name
+        ELSE NULL
+      END
+    `;
+    const effectiveEmailSQL = `
+      CASE
+        WHEN o.user_id IS NOT NULL AND (o.referred_by IS NULL OR o.referred_by = o.user_id)
+          THEN u.email
+        WHEN o.referred_by IS NOT NULL
+          THEN ru.email
+        ELSE NULL
+      END
+    `;
     const rows = await db('order_items as oi')
       .join('orders as o', 'o.id', 'oi.order_id')
       .join('products as p', 'p.id', 'oi.product_id')
@@ -596,11 +627,11 @@ router.get('/campaign-pivot', authenticate, requireRole('super_admin', 'admin', 
       .where('o.campaign_id', campaign_id)
       .whereNotIn('o.status', ['cancelled', 'draft'])
       .where('oi.type', 'product')
-      .whereRaw('COALESCE(o.user_id, o.referred_by) IS NOT NULL')
+      .whereRaw(`(${effectiveUserIdSQL}) IS NOT NULL`)
       .select(
-        db.raw('COALESCE(o.user_id, o.referred_by) as user_id'),
-        db.raw('COALESCE(u.name, ru.name) as etudiant'),
-        db.raw('COALESCE(u.email, ru.email) as email'),
+        db.raw(`(${effectiveUserIdSQL}) as user_id`),
+        db.raw(`(${effectiveNameSQL}) as etudiant`),
+        db.raw(`(${effectiveEmailSQL}) as email`),
         'p.id as product_id',
         'p.name as produit',
         'p.price_ttc',
@@ -609,28 +640,40 @@ router.get('/campaign-pivot', authenticate, requireRole('super_admin', 'admin', 
         db.raw('SUM(oi.qty * oi.unit_price_ttc) as montant_ttc'),
         db.raw('SUM(oi.qty * oi.unit_price_ht) as montant_ht')
       )
-      .groupByRaw("COALESCE(o.user_id, o.referred_by), COALESCE(u.name, ru.name), COALESCE(u.email, ru.email), p.id, p.name, p.price_ttc, p.price_ht")
+      .groupByRaw(`(${effectiveUserIdSQL}), (${effectiveNameSQL}), (${effectiveEmailSQL}), p.id, p.name, p.price_ttc, p.price_ht`)
       .orderBy(['etudiant', 'produit']);
 
     if (rows.length === 0) {
       return res.status(404).json({ error: true, code: 'NO_DATA', message: 'Aucune commande pour cette campagne' });
     }
 
-    // Build free bottle map from financial_events (source of truth, append-only)
-    const freeBottleRows = await db('financial_events')
-      .where({ campaign_id, type: 'free_bottle' })
-      .select(
-        db.raw("metadata->>'user_id' as user_id"),
-        db.raw("metadata->>'product_id' as product_id"),
-        db.raw('COUNT(*) as qty_gratuite')
-      )
-      .groupByRaw("metadata->>'user_id', metadata->>'product_id'");
-    const freeBottleMap = new Map();
-    for (const fb of freeBottleRows) {
-      freeBottleMap.set(`${fb.user_id}__${fb.product_id}`, parseInt(fb.qty_gratuite, 10));
+    // D2.5 (30/04) : bascule pivot sur calculateFreeBottles (au lieu de financial_events).
+    // Cohérence dashboard étudiant ↔ pivot admin (résout retour Mathéo PJ3 30/04 — pivot affichait
+    // les gratuités historiques ENREGISTRÉES, pas les gratuités CALCULÉES par le nouvel algo lots triés).
+    const rulesEngineForPivot = require('../services/rulesEngine');
+    let pivotFreeBottleRules = null;
+    try {
+      const pivotRules = await rulesEngineForPivot.loadRulesForCampaign(campaign_id);
+      pivotFreeBottleRules = pivotRules?.freeBottle;
+    } catch (e) {
+      // Campagne sans client_type_id → pas de règles 12+1, pivot affiche 0 gratuités (cas test isolé)
+      pivotFreeBottleRules = null;
     }
 
-    // Inject qty_gratuite from financial_events into rows
+    const distinctStudentIds = [...new Set(rows.map((r) => r.user_id))];
+    const freeBottleMap = new Map();
+    if (pivotFreeBottleRules) {
+      for (const studentId of distinctStudentIds) {
+        const fb = await rulesEngineForPivot.calculateFreeBottles(
+          studentId, campaign_id, pivotFreeBottleRules, { includeReferredBy: true }
+        );
+        for (const d of fb.details || []) {
+          freeBottleMap.set(`${studentId}__${d.product_id}`, d.earned);
+        }
+      }
+    }
+
+    // Inject qty_gratuite into rows
     for (const row of rows) {
       row.qty_gratuite = freeBottleMap.get(`${row.user_id}__${row.product_id}`) || 0;
     }
