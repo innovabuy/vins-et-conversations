@@ -38,8 +38,13 @@ router.get('/filter-options', ...adminAuth, async (req, res) => {
     const [campaigns, segments, sellers, products, suppliers, classes] = await Promise.all([
       db('campaigns').select('id', 'name').orderBy('name'),
       db('client_types').select('name', 'label').orderBy('label'),
+      // .on().orOn() : inclut les vendeurs ayant une commande directe OU une commande référée user_id NULL
+      // groupBy users.id assure idempotence (auto-referral compté 1x)
       db('users')
-        .join('orders', 'users.id', 'orders.user_id')
+        .join('orders', function () {
+          this.on('users.id', '=', 'orders.user_id')
+            .orOn('users.id', '=', 'orders.referred_by');
+        })
         .whereIn('orders.status', VALID_STATUSES)
         .groupBy('users.id', 'users.name')
         .select('users.id', 'users.name')
@@ -289,14 +294,24 @@ router.get('/by-client', ...adminAuth, async (req, res) => {
   try {
     const filters = parseMarginFilters(req.query);
 
+    // LEFT JOIN users + referrer : commandes user_id NULL (boutique web référée) attribuées au parrain
     const byClientQ = db('order_items')
       .join('orders', 'order_items.order_id', 'orders.id')
       .join('products', 'order_items.product_id', 'products.id')
-      .join('users', 'orders.user_id', 'users.id')
+      .leftJoin('users', 'orders.user_id', 'users.id')
+      .leftJoin('users as referrer', 'orders.referred_by', 'referrer.id')
       .whereIn('orders.status', VALID_STATUSES)
-      .groupBy('users.id', 'users.name', 'users.email', 'users.role')
+      .groupByRaw(
+        'COALESCE(users.id, orders.referred_by), '
+        + 'COALESCE(users.name, referrer.name), '
+        + 'COALESCE(users.email, referrer.email), '
+        + 'COALESCE(users.role, referrer.role)'
+      )
       .select(
-        'users.id', 'users.name', 'users.email', 'users.role',
+        db.raw('COALESCE(users.id, orders.referred_by) as id'),
+        db.raw('COALESCE(users.name, referrer.name) as name'),
+        db.raw('COALESCE(users.email, referrer.email) as email'),
+        db.raw('COALESCE(users.role, referrer.role) as role'),
         db.raw('COUNT(DISTINCT orders.id) as orders_count'),
         db.raw('SUM(order_items.qty) as qty'),
         db.raw('SUM(order_items.qty * order_items.unit_price_ttc) as ca_ttc'),

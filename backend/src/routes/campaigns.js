@@ -281,12 +281,18 @@ router.get('/:id/report-pdf', authenticate, requireRole('super_admin', 'commerci
       ? parseFloat(stats.ca_ht) * (assoCommission.value / 100) : 0;
 
     // Top vendeurs
+    // LEFT JOIN users + referrer : commandes user_id NULL (boutique web référée) attribuées au parrain
     const topSellers = await db('orders')
-      .join('users', 'orders.user_id', 'users.id')
+      .leftJoin('users', 'orders.user_id', 'users.id')
+      .leftJoin('users as referrer', 'orders.referred_by', 'referrer.id')
       .where('orders.campaign_id', campaign.id)
       .whereIn('orders.status', validStatuses)
-      .groupBy('users.id', 'users.name')
-      .select('users.name', db.raw('SUM(orders.total_ttc) as ca'), db.raw('COUNT(orders.id) as orders_count'))
+      .groupByRaw('COALESCE(users.id, orders.referred_by), COALESCE(users.name, referrer.name)')
+      .select(
+        db.raw('COALESCE(users.name, referrer.name) as name'),
+        db.raw('SUM(orders.total_ttc) as ca'),
+        db.raw('COUNT(orders.id) as orders_count')
+      )
       .orderBy('ca', 'desc')
       .limit(10);
 

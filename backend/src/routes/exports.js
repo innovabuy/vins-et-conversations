@@ -1304,14 +1304,16 @@ router.get('/stock', async (req, res) => {
 router.get('/delivery-notes', async (req, res) => {
   try {
     const { start, end } = req.query;
+    // LEFT JOIN users as referrer : fallback "(externe via X)" pour cmd user_id NULL (cohérence commit 1 BL admin)
     let query = db('delivery_notes')
       .join('orders', 'delivery_notes.order_id', 'orders.id')
       .leftJoin('users', 'orders.user_id', 'users.id')
       .leftJoin('contacts', 'orders.customer_id', 'contacts.id')
+      .leftJoin('users as referrer', 'orders.referred_by', 'referrer.id')
       .select(
         'delivery_notes.*', 'orders.ref as order_ref',
         'orders.total_ttc',
-        db.raw("COALESCE(users.name, contacts.name, 'Boutique Web') as user_name")
+        db.raw("COALESCE(users.name, contacts.name, '(externe via ' || referrer.name || ')', 'Boutique Web') as user_name")
       );
 
     if (start) query = query.where('delivery_notes.created_at', '>=', start);

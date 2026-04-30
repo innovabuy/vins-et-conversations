@@ -37,13 +37,16 @@ router.get('/', authenticate, requireRole('super_admin', 'commercial', 'comptabl
     ).orderBy('mois');
 
     // 3. Top vendeurs (top 10)
+    // LEFT JOIN users + referrer pour inclure les commandes user_id NULL (boutique web référée)
+    // CA attribué au parrain via referred_by
     const topVendeurs = await applyFilters(
       db('orders')
-        .join('users', 'orders.user_id', 'users.id')
-        .select('users.name')
+        .leftJoin('users', 'orders.user_id', 'users.id')
+        .leftJoin('users as referrer', 'orders.referred_by', 'referrer.id')
+        .select(db.raw("COALESCE(users.name, referrer.name) as name"))
         .sum('orders.total_ttc as ca')
         .count('orders.id as nb_commandes')
-        .groupBy('users.id', 'users.name')
+        .groupByRaw('COALESCE(users.id, orders.referred_by), COALESCE(users.name, referrer.name)')
     ).orderBy('ca', 'desc').limit(10);
 
     // 4. Top produits (top 10)

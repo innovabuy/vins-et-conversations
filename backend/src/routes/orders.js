@@ -537,7 +537,11 @@ router.get('/:id/invoice', authenticate, async (req, res) => {
       .leftJoin('users', 'orders.user_id', 'users.id')
       .leftJoin('contacts', 'orders.customer_id', 'contacts.id')
       .where('orders.id', req.params.id)
-      .select('orders.*', db.raw("COALESCE(users.name, contacts.name, 'Client') as user_name"), 'users.email as user_email')
+      .select(
+        'orders.*',
+        db.raw("COALESCE(contacts.name, users.name, 'Client') as user_name"),
+        db.raw('COALESCE(users.email, contacts.email) as user_email')
+      )
       .first();
 
     if (!order) return res.status(404).json({ error: 'NOT_FOUND' });
@@ -806,11 +810,19 @@ router.patch(
 // GET /api/v1/orders/:id/pdf — Générer PDF commande
 router.get('/:id/pdf', authenticate, async (req, res) => {
   try {
+    // LEFT JOIN users + COALESCE contacts : PDF accessible aussi pour cmd boutique web (user_id NULL)
+    // Priorité contacts.name : pour un document destiné au client, c'est le nom du client final (pas l'étudiant qui a saisi la commande pour lui)
     const order = await db('orders')
-      .join('users', 'orders.user_id', 'users.id')
+      .leftJoin('users', 'orders.user_id', 'users.id')
       .leftJoin('contacts', 'orders.customer_id', 'contacts.id')
       .where('orders.id', req.params.id)
-      .select('orders.*', 'users.name as user_name', 'users.email as user_email', 'contacts.name as customer_name', 'contacts.address as customer_address')
+      .select(
+        'orders.*',
+        db.raw("COALESCE(contacts.name, users.name, 'Client') as user_name"),
+        db.raw('COALESCE(users.email, contacts.email) as user_email'),
+        'contacts.name as customer_name',
+        'contacts.address as customer_address'
+      )
       .first();
 
     if (!order) return res.status(404).json({ error: 'NOT_FOUND' });
@@ -897,13 +909,26 @@ router.post(
   auditAction('orders'),
   async (req, res) => {
     try {
+      // LEFT JOIN users + contacts : send-email fonctionne aussi pour cmd boutique web (user_id NULL)
+      // Email destinataire = acheteur (users.email ou contacts.email), PAS le parrain (qui a son propre flux ligne 502)
       const order = await db('orders')
-        .join('users', 'orders.user_id', 'users.id')
+        .leftJoin('users', 'orders.user_id', 'users.id')
+        .leftJoin('contacts', 'orders.customer_id', 'contacts.id')
         .where('orders.id', req.params.id)
-        .select('orders.*', 'users.name as user_name', 'users.email as user_email')
+        .select(
+          'orders.*',
+          db.raw("COALESCE(users.name, contacts.name, '(externe)') as user_name"),
+          db.raw('COALESCE(users.email, contacts.email) as user_email')
+        )
         .first();
 
       if (!order) return res.status(404).json({ error: 'NOT_FOUND' });
+      if (!order.user_email) {
+        return res.status(422).json({
+          error: 'NO_RECIPIENT_EMAIL',
+          message: 'Commande sans email destinataire',
+        });
+      }
 
       // Log the email action (actual sending will be configured later with nodemailer)
       await db('audit_log').insert({
