@@ -166,10 +166,11 @@ function OverviewTab({ data }) {
         <h3 className="font-semibold mb-3">Decomposition de la marge</h3>
         <div className="space-y-2 text-sm">
           <div className="flex justify-between py-1"><span className="text-gray-600">Marge brute</span><span className="font-semibold text-emerald-600">{formatEur(data.margin_brut)}</span></div>
-          {(data.free_bottle_cost > 0 || data.commission > 0) && <div className="border-t" />}
+          {(data.free_bottle_cost > 0 || data.commission > 0 || data.fund_individual > 0) && <div className="border-t" />}
           {data.free_bottle_cost > 0 && <div className="flex justify-between py-1"><span className="text-gray-600">Cout gratuites (12+1)</span><span className="font-semibold text-red-500">-{formatEur(data.free_bottle_cost)}</span></div>}
           {data.commission > 0 && <div className="flex justify-between py-1"><span className="text-gray-600">Commission association</span><span className="font-semibold text-red-500">-{formatEur(data.commission)}</span></div>}
-          {(data.free_bottle_cost > 0 || data.commission > 0) && <>
+          {data.fund_individual > 0 && <div className="flex justify-between py-1"><span className="text-gray-600">Commission étudiante</span><span className="font-semibold text-red-500">-{formatEur(data.fund_individual)}</span></div>}
+          {(data.free_bottle_cost > 0 || data.commission > 0 || data.fund_individual > 0) && <>
             <div className="border-t border-gray-300" />
             <div className="flex justify-between py-1"><span className="font-semibold text-gray-900">Marge nette</span><span className="font-bold text-emerald-700">{formatEur(data.margin)}</span></div>
           </>}
@@ -251,7 +252,7 @@ function ProductsTab({ data }) {
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead><tr className="border-b text-left text-gray-500">
-                <th className="py-2 px-2">Segment</th><th className="py-2 px-2 text-right">CA HT</th><th className="py-2 px-2 text-right">Marge brute</th><th className="py-2 px-2 text-right">Commission</th><th className="py-2 px-2 text-right">Gratuites</th><th className="py-2 px-2 text-right">Marge nette</th>
+                <th className="py-2 px-2">Segment</th><th className="py-2 px-2 text-right">CA HT</th><th className="py-2 px-2 text-right">Marge brute</th><th className="py-2 px-2 text-right">Commission</th><th className="py-2 px-2 text-right">Commission étudiante</th><th className="py-2 px-2 text-right">Gratuites</th><th className="py-2 px-2 text-right">Marge nette</th>
               </tr></thead>
               <tbody>
                 {data.bySegment.map((s) => (
@@ -260,6 +261,7 @@ function ProductsTab({ data }) {
                     <td className="py-2 px-2 text-right">{formatEur(s.ca_ht)}</td>
                     <td className="py-2 px-2 text-right">{formatEur(s.margin_brut)}</td>
                     <td className="py-2 px-2 text-right text-red-500">{s.commission ? `-${formatEur(s.commission)}` : '—'}</td>
+                    <td className="py-2 px-2 text-right text-red-500">{s.fund_individual ? `-${formatEur(s.fund_individual)}` : '—'}</td>
                     <td className="py-2 px-2 text-right text-red-500">{s.free_bottle_cost ? `-${formatEur(s.free_bottle_cost)}` : '—'}</td>
                     <td className="py-2 px-2 text-right font-bold text-emerald-700">{formatEur(s.margin_net || s.margin_brut)}</td>
                   </tr>
