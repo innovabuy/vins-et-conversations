@@ -124,11 +124,38 @@ router.get('/', ...adminAuth, async (req, res) => {
         return map;
       });
 
+    // B-1 P2 : commission étudiante = fund_individual × CA HT.
+    // Filter : on n'agrège que pour les client_types où fund_individual
+    // est sémantiquement une "commission étudiante" affichable au cockpit.
+    // 'ambassadeur' EXCLU car paliers progressifs (commission_tiers)
+    // prévalent ; sa fund_individual=3 en seed est un héritage historique
+    // non affiché côté UI (AmbassadorDashboard.jsx:225 masque la section).
+    // Maintenir cette liste si nouveau client_type créé avec fund_individual.
+    const FUND_INDIVIDUAL_ALLOWED = ['scolaire', 'bts_ndrc', 'cse'];
+    const fundIndividualRates = await db('client_types')
+      .select('name', 'commission_rules')
+      .then(rows => {
+        const map = {};
+        for (const r of rows) {
+          if (!FUND_INDIVIDUAL_ALLOWED.includes(r.name)) {
+            map[r.name] = 0;
+            continue;
+          }
+          const rules = typeof r.commission_rules === 'string'
+            ? JSON.parse(r.commission_rules) : (r.commission_rules || {});
+          const rate = (rules.fund_individual?.value ?? 0) / 100;
+          map[r.name] = rate;
+        }
+        return map;
+      });
+
     const segmentsWithCommission = bySegment.map((s) => {
       const caHT = parseFloat(s.ca_ht);
       const marginBrut = parseFloat(s.margin_brut);
       const commissionRate = commissionRates[s.segment] || 0;
       const commission = parseFloat((caHT * commissionRate).toFixed(2));
+      const fundIndividualRate = fundIndividualRates[s.segment] || 0;
+      const fundIndividual = parseFloat((caHT * fundIndividualRate).toFixed(2));
       const freeBottleCost = parseFloat((fbcBySegment[s.segment] || 0).toFixed(2));
       return {
         segment: s.segment,
@@ -137,8 +164,9 @@ router.get('/', ...adminAuth, async (req, res) => {
         cost: parseFloat(s.cost),
         margin_brut: marginBrut,
         commission,
+        fund_individual: fundIndividual,
         free_bottle_cost: freeBottleCost,
-        margin_net: parseFloat((marginBrut - commission - freeBottleCost).toFixed(2)),
+        margin_net: parseFloat((marginBrut - commission - fundIndividual - freeBottleCost).toFixed(2)),
       };
     });
 
@@ -501,8 +529,32 @@ router.get('/overview', ...adminAuth, async (req, res) => {
     const commOverviewResult = await commOverviewQuery;
     const overviewCommission = parseFloat(commOverviewResult[0]?.commission || 0);
 
+    // B-1 P2 : Commission individuelle étudiante (fund_individual) for overview.
+    // Filter : exclut 'ambassadeur' (paliers progressifs commission_tiers
+    // prévalent, fund_individual=3 en seed est mort historique non utilisé
+    // côté UI). Maintenir cette liste si nouveau client_type créé avec
+    // fund_individual configuré.
+    let fundIndivOverviewQuery = db('orders')
+      .join('campaigns', 'orders.campaign_id', 'campaigns.id')
+      .join('client_types', 'campaigns.client_type_id', 'client_types.id')
+      .whereIn('orders.status', VALID_STATUSES)
+      .select(db.raw(`COALESCE(SUM(
+        CASE
+          WHEN client_types.name IN ('scolaire', 'bts_ndrc', 'cse') THEN
+            orders.total_ht * COALESCE(
+              (campaigns.config->>'fund_individual_pct')::numeric,
+              (client_types.commission_rules->'fund_individual'->>'value')::numeric,
+              0
+            ) / 100
+          ELSE 0
+        END
+      ), 0) as fund_individual`));
+    applyOrderOnlyFilters(fundIndivOverviewQuery, filters, { hasCampaignsJoin: true, hasClientTypesJoin: true });
+    const fundIndivOverviewResult = await fundIndivOverviewQuery;
+    const overviewFundIndividual = parseFloat(fundIndivOverviewResult[0]?.fund_individual || 0);
+
     const marginBrutOverview = parseFloat(sales.total_ht) - parseFloat(purchases.total_cost);
-    const marginNetOverview = marginBrutOverview - overviewFbc.total - overviewCommission;
+    const marginNetOverview = marginBrutOverview - overviewFbc.total - overviewCommission - overviewFundIndividual;
 
     res.json({
       sales: {
@@ -518,6 +570,7 @@ router.get('/overview', ...adminAuth, async (req, res) => {
       margin: parseFloat(marginNetOverview.toFixed(2)),
       free_bottle_cost: overviewFbc.total,
       commission: parseFloat(overviewCommission.toFixed(2)),
+      fund_individual: parseFloat(overviewFundIndividual.toFixed(2)),
       margin_pct: parseFloat(sales.total_ht) > 0
         ? parseFloat(((marginNetOverview / parseFloat(sales.total_ht)) * 100).toFixed(1))
         : 0,

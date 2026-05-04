@@ -300,13 +300,13 @@ describe('Manual free bottle impacts margin', () => {
     }
   });
 
-  test('overview margin = margin_brut - free_bottle_cost - commission', async () => {
+  test('overview margin = margin_brut - free_bottle_cost - commission - fund_individual', async () => {
     const res = await request(app)
       .get('/api/v1/admin/margins/overview')
       .set('Authorization', `Bearer ${adminToken}`);
     expect(res.status).toBe(200);
 
-    const expected = res.body.margin_brut - res.body.free_bottle_cost - res.body.commission;
+    const expected = res.body.margin_brut - res.body.free_bottle_cost - res.body.commission - res.body.fund_individual;
     expect(res.body.margin).toBeCloseTo(expected, 1);
   });
 
