@@ -355,3 +355,54 @@ describe('Cockpit CA consistency', () => {
     expect(diff).toBeLessThan(500); // tolerance for test-created orders
   });
 });
+
+describe('B-1 P2 — Filter client_types.name fund_individual', () => {
+
+  test('COCK-FI-FILTER-01: client_type ambassadeur EXCLU du calcul fund_individual', async () => {
+    // Garde-fou architectural — vérifie que le filtre liste explicite
+    // (scolaire/bts_ndrc/cse) du commit 13f41a0 exclut bien ambassadeur,
+    // malgré la valeur configurée en seed.
+    const ct = await db('client_types').where({ name: 'ambassadeur' }).first();
+    expect(ct).toBeDefined();
+    const rules = typeof ct.commission_rules === 'string'
+      ? JSON.parse(ct.commission_rules) : ct.commission_rules;
+    // Pré-condition : ambassadeur a bien fund_individual configuré (sinon test trivial)
+    expect(rules.fund_individual?.value).toBeGreaterThan(0);
+
+    const res = await request(app)
+      .get('/api/v1/admin/margins')
+      .set('Authorization', `Bearer ${adminToken}`);
+    expect(res.status).toBe(200);
+
+    const ambSeg = res.body.bySegment.find(s => s.segment === 'ambassadeur');
+    // Si segment ambassadeur présent, fund_individual DOIT être 0
+    // (filtre liste explicite scolaire/bts_ndrc/cse exclut ambassadeur).
+    if (ambSeg) {
+      expect(ambSeg.fund_individual).toBe(0);
+    }
+  });
+
+  test('COCK-FI-RATE-01: client_type scolaire INCLUS, fund_individual = rate × CA HT', async () => {
+    // Garde-fou architectural — vérifie que le taux fund_individual est lu
+    // depuis commission_rules.fund_individual.value de client_types.scolaire
+    // (pas hardcodé). Robuste si le seed change la valeur (ex: 2 → 5).
+    const ct = await db('client_types').where({ name: 'scolaire' }).first();
+    expect(ct).toBeDefined();
+    const rules = typeof ct.commission_rules === 'string'
+      ? JSON.parse(ct.commission_rules) : ct.commission_rules;
+    const rate = rules.fund_individual?.value;
+    expect(rate).toBeDefined();
+
+    const res = await request(app)
+      .get('/api/v1/admin/margins')
+      .set('Authorization', `Bearer ${adminToken}`);
+    expect(res.status).toBe(200);
+
+    const scoSeg = res.body.bySegment.find(s => s.segment === 'scolaire');
+    if (scoSeg && scoSeg.ca_ht > 0) {
+      const expected = parseFloat((scoSeg.ca_ht * rate / 100).toFixed(2));
+      expect(scoSeg.fund_individual).toBeCloseTo(expected, 2);
+    }
+  });
+
+});
