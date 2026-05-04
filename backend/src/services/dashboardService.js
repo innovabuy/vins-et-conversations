@@ -536,17 +536,21 @@ async function getTeacherDashboard(userId, campaignId) {
   const ca = parseFloat(caResult?.ca || 0);
   const progress = campaign.goal > 0 ? Math.round((ca / campaign.goal) * 100) : 0;
 
-  // Classement élèves — SANS CA, uniquement nombre de ventes (inclut referral)
+  // Classement élèves — Tri par CA TTC décroissant (cohérent avec affichage CA,
+  // levée partielle CDC §4.5 actée le 31/03 commit e3737e1).
+  // Tie-break sur bottles_sold DESC pour déterminisme en cas d'égalité de CA.
+  // Inclut referral via studentOrdersCombinedSQL.
   const { sql: teacherStudentSQL, params: teacherStudentParams } = studentOrdersCombinedSQL(campaignId);
   const studentsResult = await db.raw(`
     SELECT u.name, p.class_group, so.effective_user_id,
-           COUNT(so.id) as sales_count, SUM(so.total_items) as bottles_sold
+           COUNT(so.id) as sales_count, SUM(so.total_items) as bottles_sold,
+           COALESCE(SUM(so.total_ttc), 0) as ca_ttc
     FROM ${teacherStudentSQL} so
     JOIN users u ON so.effective_user_id = u.id
     JOIN participations p ON p.user_id = so.effective_user_id AND p.campaign_id = ?
     WHERE u.role = 'etudiant'
     GROUP BY so.effective_user_id, u.name, p.class_group
-    ORDER BY bottles_sold DESC
+    ORDER BY ca_ttc DESC, bottles_sold DESC
   `, [...teacherStudentParams, campaignId]);
   const students = (studentsResult.rows || studentsResult);
 
