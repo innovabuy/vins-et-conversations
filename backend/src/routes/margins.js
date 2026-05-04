@@ -110,12 +110,22 @@ router.get('/', ...adminAuth, async (req, res) => {
     // V4.2 BLOC 3: Free bottle cost by segment
     const fbcBySegment = await calculateFreeBottleCostsBySegment(filters);
 
-    // Read commission rates from DB (client_types.commission_rules) — NEVER hardcode
+    // Read commission rates from DB (client_types.commission_rules) — NEVER hardcode.
+    // P3 (COCK-2 part 2) : exclure 'ambassadeur' du calcul fund_collective
+    // — mêmes raisons que P2 fund_individual (paliers progressifs commission_tiers
+    // prévalent côté ambassadeur ; fund_collective seed=5% sur ambassadeur n'a
+    // pas de sens métier au cockpit). Maintenir cette liste alignée avec
+    // FUND_INDIVIDUAL_ALLOWED ci-dessous (TD-FACTOR-FUND-CONSTANTS prévu).
+    const FUND_COLLECTIVE_ALLOWED = ['scolaire', 'bts_ndrc', 'cse'];
     const commissionRates = await db('client_types')
       .select('name', 'commission_rules')
       .then(rows => {
         const map = {};
         for (const r of rows) {
+          if (!FUND_COLLECTIVE_ALLOWED.includes(r.name)) {
+            map[r.name] = 0;
+            continue;
+          }
           const rules = typeof r.commission_rules === 'string'
             ? JSON.parse(r.commission_rules) : (r.commission_rules || {});
           const rate = (rules.fund_collective?.value ?? rules.association?.value ?? 0) / 100;
@@ -512,18 +522,25 @@ router.get('/overview', ...adminAuth, async (req, res) => {
 
     // V4.2 BLOC 3: Free bottle cost deduction for overview
     const overviewFbc = await calculateFreeBottleCosts(filters);
-    // Commission totale (fund_collective) for overview
+    // Commission totale (fund_collective) for overview.
+    // P3 (COCK-2 part 2) : filtre miroir P2 — exclut 'ambassadeur'
+    // (paliers progressifs commission_tiers prévalent ; le fund_collective
+    // seed sur ambassadeur n'a pas de sens métier au cockpit).
     let commOverviewQuery = db('orders')
       .join('campaigns', 'orders.campaign_id', 'campaigns.id')
       .join('client_types', 'campaigns.client_type_id', 'client_types.id')
       .whereIn('orders.status', VALID_STATUSES)
       .select(db.raw(`COALESCE(SUM(
-        orders.total_ht * COALESCE(
-          (campaigns.config->>'fund_collective_pct')::numeric,
-          (client_types.commission_rules->'fund_collective'->>'value')::numeric,
-          (client_types.commission_rules->'association'->>'value')::numeric,
-          0
-        ) / 100
+        CASE
+          WHEN client_types.name IN ('scolaire', 'bts_ndrc', 'cse') THEN
+            orders.total_ht * COALESCE(
+              (campaigns.config->>'fund_collective_pct')::numeric,
+              (client_types.commission_rules->'fund_collective'->>'value')::numeric,
+              (client_types.commission_rules->'association'->>'value')::numeric,
+              0
+            ) / 100
+          ELSE 0
+        END
       ), 0) as commission`));
     applyOrderOnlyFilters(commOverviewQuery, filters, { hasCampaignsJoin: true, hasClientTypesJoin: true });
     const commOverviewResult = await commOverviewQuery;
