@@ -486,7 +486,7 @@ describe('PARTIE 3 — Frais de port Kuehne+Nagel', () => {
     test('dept=13, qty=6 → HT=49.50, TTC=59.40', async () => {
       const res = await request(app)
         .post('/api/v1/shipping/calculate')
-        .send({ dept_code: '13', qty: 6 });
+        .send({ dept_code: '13', qty: 6, date: '2026-02-15' });
       expect(res.status).toBe(200);
       expect(res.body.price_ht).toBe(49.50);
       expect(res.body.price_ttc).toBe(59.40);
@@ -495,7 +495,7 @@ describe('PARTIE 3 — Frais de port Kuehne+Nagel', () => {
     test('dept=13, qty=36 → HT=60.23, TTC=72.28', async () => {
       const res = await request(app)
         .post('/api/v1/shipping/calculate')
-        .send({ dept_code: '13', qty: 36 });
+        .send({ dept_code: '13', qty: 36, date: '2026-02-15' });
       expect(res.status).toBe(200);
       expect(res.body.price_ht).toBe(60.23);
       expect(res.body.price_ttc).toBe(72.28);
@@ -507,7 +507,7 @@ describe('PARTIE 3 — Frais de port Kuehne+Nagel', () => {
     test('dept=20, qty=6 → HT=111.84, TTC=134.21 (base + 15€ Corse)', async () => {
       const res = await request(app)
         .post('/api/v1/shipping/calculate')
-        .send({ dept_code: '20', qty: 6 });
+        .send({ dept_code: '20', qty: 6, date: '2026-02-15' });
       expect(res.status).toBe(200);
       expect(res.body.price_ht).toBe(111.84);
       expect(res.body.price_ttc).toBe(134.21);
@@ -520,7 +520,7 @@ describe('PARTIE 3 — Frais de port Kuehne+Nagel', () => {
     test('dept=20, qty=12 → même tranche que qty=6', async () => {
       const res = await request(app)
         .post('/api/v1/shipping/calculate')
-        .send({ dept_code: '20', qty: 12 });
+        .send({ dept_code: '20', qty: 12, date: '2026-02-15' });
       expect(res.status).toBe(200);
       expect(res.body.price_ht).toBe(111.84);
     });
@@ -528,7 +528,7 @@ describe('PARTIE 3 — Frais de port Kuehne+Nagel', () => {
     test('dept=20, qty=24 → HT=124.47, TTC=149.36', async () => {
       const res = await request(app)
         .post('/api/v1/shipping/calculate')
-        .send({ dept_code: '20', qty: 24 });
+        .send({ dept_code: '20', qty: 24, date: '2026-02-15' });
       expect(res.status).toBe(200);
       expect(res.body.price_ht).toBe(124.47);
       expect(res.body.price_ttc).toBe(149.36);
@@ -537,7 +537,7 @@ describe('PARTIE 3 — Frais de port Kuehne+Nagel', () => {
     test('dept=20, qty=100 (par_colis) → HT=165.20, TTC=198.24', async () => {
       const res = await request(app)
         .post('/api/v1/shipping/calculate')
-        .send({ dept_code: '20', qty: 100 });
+        .send({ dept_code: '20', qty: 100, date: '2026-02-15' });
       expect(res.status).toBe(200);
       expect(res.body.price_ht).toBe(165.20);
       expect(res.body.price_ttc).toBe(198.24);
@@ -716,7 +716,7 @@ describe('PARTIE 4 — Total commande avec transport', () => {
 
       const shippingRes = await request(app)
         .post('/api/v1/shipping/calculate')
-        .send({ dept_code: '20', qty: 12 });
+        .send({ dept_code: '20', qty: 12, date: '2026-02-15' });
       expect(shippingRes.body.price_ttc).toBe(134.21);
 
       const total = round2(productTotal + shippingRes.body.price_ttc);
@@ -864,7 +864,7 @@ describe('PARTIE 5 — Parcours boutique E2E', () => {
       // 5. Calculer frais de port
       const shippingRes = await request(app)
         .post('/api/v1/shipping/calculate')
-        .send({ dept_code: '44', qty: 5 });
+        .send({ dept_code: '44', qty: 5, date: '2026-02-15' });
       expect(shippingRes.status).toBe(200);
       expect(shippingRes.body.price_ttc).toBe(36.91);
 
