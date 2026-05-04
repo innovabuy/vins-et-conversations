@@ -840,7 +840,7 @@ export default function StudentDashboard() {
                       <p className="text-xs text-gray-400">{formatDate(o.created_at)} · {o.total_items} art.</p>
                     </div>
                     <div className="text-right flex-shrink-0">
-                      <p className="font-semibold">{formatEur(o.total_ttc)}</p>
+                      <p className="font-semibold">{formatEur(o.total_ht)} HT / {formatEur(o.total_ttc)} TTC</p>
                       {o.payment_method && <p className="text-[10px] text-gray-400">{PAYMENT_LABELS[o.payment_method] || o.payment_method}</p>}
                     </div>
                   </div>
@@ -1050,7 +1050,7 @@ function ProfileOrders({ campaignId }) {
               <p className="text-xs text-gray-400">{formatDate(o.created_at)} · {o.total_items} art.</p>
             </div>
             <div className="text-right">
-              <p className="font-semibold">{formatEur(o.total_ttc)}</p>
+              <p className="font-semibold">{formatEur(o.total_ht)} HT / {formatEur(o.total_ttc)} TTC</p>
               <p className="text-xs text-gray-400">{STATUS_LABELS[o.status] || o.status}</p>
               {o.payment_method && <p className="text-[10px] text-gray-300">{PAYMENT_LABELS[o.payment_method] || o.payment_method}</p>}
               {['validated', 'preparing', 'shipped', 'delivered'].includes(o.status) && (
