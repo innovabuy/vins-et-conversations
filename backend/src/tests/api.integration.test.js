@@ -4219,8 +4219,10 @@ describe('API Integration Tests', () => {
         expect(seg).toHaveProperty('margin_brut');
         expect(seg).toHaveProperty('margin_net');
         // margin_net = margin_brut - commission - fund_individual - free_bottle_cost
-        expect(seg.margin_net).toBe(
-          parseFloat((seg.margin_brut - seg.commission - seg.fund_individual - seg.free_bottle_cost).toFixed(2))
+        // toBeCloseTo(., 1) au lieu de toBe(parseFloat(toFixed(2))) pour
+        // tolérance FP (cohérent margins-financial:310, fix flakiness FP).
+        expect(seg.margin_net).toBeCloseTo(
+          seg.margin_brut - seg.commission - seg.fund_individual - seg.free_bottle_cost, 1
         );
       }
     });
@@ -4236,8 +4238,10 @@ describe('API Integration Tests', () => {
       expect(res.body).toHaveProperty('margin');
       expect(res.body).toHaveProperty('commission');
       // margin = margin_brut - free_bottle_cost - commission - fund_individual
-      expect(res.body.margin).toBe(
-        parseFloat((res.body.margin_brut - res.body.free_bottle_cost - res.body.commission - res.body.fund_individual).toFixed(2))
+      // toBeCloseTo(., 1) au lieu de toBe(parseFloat(toFixed(2))) pour
+      // tolérance FP (cohérent margins-financial:310, fix flakiness FP).
+      expect(res.body.margin).toBeCloseTo(
+        res.body.margin_brut - res.body.free_bottle_cost - res.body.commission - res.body.fund_individual, 1
       );
     });
 
