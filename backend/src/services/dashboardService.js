@@ -72,9 +72,11 @@ async function getStudentDashboard(userId, campaignId) {
     })
     .select(
       db.raw('SUM(CASE WHEN user_id = ? AND campaign_id = ? AND (referred_by IS NULL OR referred_by = ?) THEN total_ttc ELSE 0 END) as direct_ca', [userId, campaignId, userId]),
+      db.raw('SUM(CASE WHEN user_id = ? AND campaign_id = ? AND (referred_by IS NULL OR referred_by = ?) THEN total_ht ELSE 0 END) as direct_ca_ht', [userId, campaignId, userId]),
       db.raw('COUNT(CASE WHEN user_id = ? AND campaign_id = ? AND (referred_by IS NULL OR referred_by = ?) THEN 1 END) as order_count', [userId, campaignId, userId]),
       db.raw('SUM(CASE WHEN user_id = ? AND campaign_id = ? AND (referred_by IS NULL OR referred_by = ?) THEN total_items ELSE 0 END) as direct_bottles', [userId, campaignId, userId]),
       db.raw('SUM(CASE WHEN referred_by = ? AND source = \'student_referral\' AND campaign_id = ? AND (user_id IS NULL OR user_id != referred_by) THEN total_ttc ELSE 0 END) as referred_ca', [userId, campaignId]),
+      db.raw('SUM(CASE WHEN referred_by = ? AND source = \'student_referral\' AND campaign_id = ? AND (user_id IS NULL OR user_id != referred_by) THEN total_ht ELSE 0 END) as referred_ca_ht', [userId, campaignId]),
       db.raw('SUM(CASE WHEN referred_by = ? AND source = \'student_referral\' AND campaign_id = ? AND (user_id IS NULL OR user_id != referred_by) THEN total_items ELSE 0 END) as referred_bottles', [userId, campaignId]),
       db.raw('COUNT(CASE WHEN referred_by = ? AND source = \'student_referral\' AND campaign_id = ? AND (user_id IS NULL OR user_id != referred_by) THEN 1 END) as referred_orders_count', [userId, campaignId]),
       db.raw('COUNT(DISTINCT CASE WHEN referred_by = ? AND source = \'student_referral\' AND campaign_id = ? AND (user_id IS NULL OR user_id != referred_by) THEN user_id END) as referred_clients_count', [userId, campaignId]),
@@ -82,12 +84,15 @@ async function getStudentDashboard(userId, campaignId) {
     .first();
 
   const ca = parseFloat(userStats?.direct_ca || 0);
+  const caHt = parseFloat(userStats?.direct_ca_ht || 0);
   const orderCount = parseInt(userStats?.order_count || 0, 10);
   const caReferred = parseFloat(userStats?.referred_ca || 0);
+  const caReferredHt = parseFloat(userStats?.referred_ca_ht || 0);
   const bottlesReferred = parseInt(userStats?.referred_bottles || 0, 10);
   const referredOrdersCount = parseInt(userStats?.referred_orders_count || 0, 10);
   const referredClientsCount = parseInt(userStats?.referred_clients_count || 0, 10);
   const caTotal = parseFloat((ca + caReferred).toFixed(2));
+  const caTotalHt = parseFloat((caHt + caReferredHt).toFixed(2));
   const bottlesSold = parseInt(userStats?.direct_bottles || 0, 10) + bottlesReferred;
 
   // Classement (UNION ALL: direct orders + referred orders)
@@ -260,12 +265,15 @@ async function getStudentDashboard(userId, campaignId) {
     .whereIn('orders.status', ACTIVE_STATUSES)
     .orderBy('orders.created_at', 'desc')
     .limit(5)
-    .select('orders.id', 'orders.ref', 'orders.total_ttc', 'orders.total_items', 'orders.created_at', 'orders.payment_method', 'contacts.name as customer_name', 'orders.referred_by', 'orders.source');
+    .select('orders.id', 'orders.ref', 'orders.total_ttc', 'orders.total_ht', 'orders.total_items', 'orders.created_at', 'orders.payment_method', 'contacts.name as customer_name', 'orders.referred_by', 'orders.source');
 
   return {
     ca,
+    ca_ht: caHt,
     ca_referred: caReferred,
+    ca_referred_ht: caReferredHt,
     ca_total: caTotal,
+    ca_total_ht: caTotalHt,
     referral_stats: {
       orders_count: referredOrdersCount,
       ca_ttc: caReferred,
@@ -318,6 +326,7 @@ async function getStudentDashboard(userId, campaignId) {
         id: o.id,
         ref: o.ref,
         total_ttc: parseFloat(o.total_ttc),
+        total_ht: parseFloat(o.total_ht),
         total_items: parseInt(o.total_items, 10),
         created_at: o.created_at,
         payment_method: o.payment_method,
