@@ -835,7 +835,6 @@ export default function StudentDashboard() {
                     <div className="flex-1 min-w-0">
                       <p className="font-medium truncate">
                         {o.customer_name || 'Client'}
-                        {o.is_referred && <span className="ml-1.5 px-1.5 py-0.5 bg-indigo-100 text-indigo-700 text-[10px] rounded-full font-medium">Référé</span>}
                       </p>
                       <p className="text-xs text-gray-400">{formatDate(o.created_at)} · {o.total_items} art.</p>
                     </div>
@@ -1044,7 +1043,6 @@ function ProfileOrders({ campaignId }) {
             <div>
               <p className="font-mono text-xs text-gray-500">
                 {o.ref}
-                {o.order_type === 'parrainage' && <span className="text-xs bg-pink-100 text-pink-700 px-2 py-0.5 rounded-full ml-2 font-sans">Parrainage</span>}
               </p>
               {o.customer_name && <p className="text-xs text-gray-600 font-medium">{o.customer_name}</p>}
               <p className="text-xs text-gray-400">{formatDate(o.created_at)} · {o.total_items} art.</p>
