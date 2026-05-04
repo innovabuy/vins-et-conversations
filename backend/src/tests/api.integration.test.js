@@ -480,8 +480,14 @@ describe('API Integration Tests', () => {
   describe('CSE — Min order enforcement', () => {
     let cseToken;
     let cseCampaignId;
+    let originalCsePricingRules;
 
     beforeAll(async () => {
+      // Snapshot value before mutation (for afterAll restore — préserve les
+      // états transitoires d'autres suites au lieu de hardcoder la valeur seed)
+      const ct = await db('client_types').where({ name: 'cse' }).select('pricing_rules').first();
+      originalCsePricingRules = ct?.pricing_rules;
+
       // Ensure CSE min_order=200 (may have been set to 0 by other test suites)
       await db('client_types').where({ name: 'cse' })
         .update({ pricing_rules: JSON.stringify({ type: 'percentage_discount', value: 10, min_order: 200, applies_to: 'all' }) });
@@ -497,6 +503,19 @@ describe('API Integration Tests', () => {
         .where('users.email', 'cse@leroymerlin.fr')
         .first();
       cseCampaignId = participation?.campaign_id;
+    });
+
+    afterAll(async () => {
+      // Restore client_types.cse.pricing_rules à la valeur pré-test
+      // (le driver Knex peut retourner JSONB en string ou objet selon version)
+      if (originalCsePricingRules !== undefined) {
+        await db('client_types').where({ name: 'cse' })
+          .update({
+            pricing_rules: typeof originalCsePricingRules === 'string'
+              ? originalCsePricingRules
+              : JSON.stringify(originalCsePricingRules),
+          });
+      }
     });
 
     test('CSE order < 200 EUR returns 400 MIN_ORDER_NOT_MET', async () => {
