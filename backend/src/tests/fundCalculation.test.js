@@ -145,9 +145,9 @@ describe('Fund Calculations', () => {
     expect(funds.fund_collective).toBeDefined();
     expect(funds.fund_collective.base_amount).toBeGreaterThan(0);
 
-    // Verify calculation
-    expect(funds.fund_collective.amount).toBe(
-      parseFloat((funds.fund_collective.base_amount * funds.fund_collective.rate / 100).toFixed(2))
+    // Verify calculation (TD-16: toBeCloseTo for FP tolerance, was flaky toBe)
+    expect(funds.fund_collective.amount).toBeCloseTo(
+      funds.fund_collective.base_amount * funds.fund_collective.rate / 100, 2
     );
   });
 });
