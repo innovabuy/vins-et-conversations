@@ -823,18 +823,28 @@ describe('API Integration Tests', () => {
   describe('BTS Dashboard — Formation modules', () => {
     let btsToken;
     let btsCampaignId;
+    let btsUserId;
 
     beforeAll(async () => {
       const res = await request(app)
         .post('/api/v1/auth/login')
         .send({ email: 'bts@espl.fr', password: 'VinsConv2026!' });
       btsToken = res.body.accessToken;
+      btsUserId = res.body.user?.id;
 
       const participation = await db('participations')
         .join('users', 'participations.user_id', 'users.id')
         .where('users.email', 'bts@espl.fr')
         .first();
       btsCampaignId = participation?.campaign_id;
+    });
+
+    afterAll(async () => {
+      // Tests below UPSERT formation_progress for BTS user. Seed never inserts
+      // formation_progress rows, so deleting all rows for this user is safe.
+      if (btsUserId) {
+        await db('formation_progress').where({ user_id: btsUserId }).del().catch(() => {});
+      }
     });
 
     test('BTS dashboard returns formation modules', async () => {
@@ -3724,6 +3734,8 @@ describe('API Integration Tests', () => {
   // ═══════════════════════════════════════════════════════
   describe('Student Referral', () => {
     let studentReferralToken;
+    const studentReferralOrderIds = [];
+    const studentReferralContactEmails = ['student.ref.test@example.fr', 'new.referral.client@example.fr'];
 
     beforeAll(async () => {
       // Login as student (ACKAVONG)
@@ -3731,6 +3743,24 @@ describe('API Integration Tests', () => {
         .post('/api/v1/auth/login')
         .send({ email: 'ackavong@eleve.sc.fr', password: 'VinsConv2026!' });
       studentReferralToken = res.body.accessToken;
+    });
+
+    afterAll(async () => {
+      // FK-safe cleanup of any rows left behind by the checkout / register tests,
+      // even when an assertion failed before the inline cleanup ran. stock_movements
+      // is keyed by orders.ref (string), not order_id — so resolve the ref first.
+      for (const orderId of studentReferralOrderIds) {
+        const order = await db('orders').where({ id: orderId }).first().catch(() => null);
+        await db('notifications').where('link', 'like', `%${orderId}%`).del().catch(() => {});
+        await db('payments').where({ order_id: orderId }).del().catch(() => {});
+        if (order?.ref) {
+          await db('stock_movements').where({ reference: order.ref }).del().catch(() => {});
+        }
+        await db('financial_events').where({ order_id: orderId }).del().catch(() => {});
+        await db('order_items').where({ order_id: orderId }).del().catch(() => {});
+        await db('orders').where({ id: orderId }).del().catch(() => {});
+      }
+      await db('contacts').whereIn('email', studentReferralContactEmails).del().catch(() => {});
     });
 
     test('Student participations have referral_code generated', async () => {
@@ -3815,17 +3845,15 @@ describe('API Integration Tests', () => {
           referral_code: studentParticipation.referral_code,
         });
 
+      // Track for cleanup before assertions, so afterAll runs even if expect() throws.
+      if (res.body?.order_id) studentReferralOrderIds.push(res.body.order_id);
+
       expect(res.status).toBe(201);
 
       // Verify source in DB
       const order = await db('orders').where({ id: res.body.order_id }).first();
       expect(order.source).toBe('student_referral');
       expect(order.referred_by).toBe(studentParticipation.user_id);
-
-      // Cleanup
-      await db('financial_events').where({ order_id: res.body.order_id }).delete();
-      await db('order_items').where({ order_id: res.body.order_id }).delete();
-      await db('orders').where({ id: res.body.order_id }).delete();
     });
 
     test('Contact CRM source contains referral: prefix', async () => {
@@ -3878,9 +3906,7 @@ describe('API Integration Tests', () => {
       // Verify CRM source
       const contact = await db('contacts').where({ email: 'new.referral.client@example.fr' }).first();
       expect(contact.source).toContain('referral:');
-
-      // Cleanup
-      await db('contacts').where({ email: 'new.referral.client@example.fr' }).delete();
+      // Cleanup centralised in afterAll (email tracked at scope).
     });
 
     test('Dashboard student includes ca_referred and ca_total', async () => {
@@ -4005,6 +4031,7 @@ describe('API Integration Tests', () => {
   describe('Campaign Resources — Espace ressources', () => {
     let resourceId;
     let resourceCampaignId;
+    let resourceSnapshot = [];
 
     beforeAll(async () => {
       // Sacré-Cœur has seeded resources and student participates in it
@@ -4013,6 +4040,32 @@ describe('API Integration Tests', () => {
         .where({ status: 'active' })
         .first();
       resourceCampaignId = campaign?.id;
+
+      // Snapshot seeded resources so afterAll can restore title/sort_order
+      // (the "reorder" + "update" tests below mutate seeded rows in place).
+      if (resourceCampaignId) {
+        resourceSnapshot = await db('campaign_resources')
+          .where({ campaign_id: resourceCampaignId })
+          .select('id', 'title', 'sort_order');
+      }
+    });
+
+    afterAll(async () => {
+      if (!resourceCampaignId) return;
+      const seededIds = resourceSnapshot.map((r) => r.id);
+      // Drop any rows the tests created (Test Resource / Updated Resource etc.)
+      await db('campaign_resources')
+        .where({ campaign_id: resourceCampaignId })
+        .whereNotIn('id', seededIds.length ? seededIds : ['00000000-0000-0000-0000-000000000000'])
+        .del()
+        .catch(() => {});
+      // Restore title + sort_order on the seeded rows mutated by update/reorder.
+      for (const r of resourceSnapshot) {
+        await db('campaign_resources')
+          .where({ id: r.id })
+          .update({ title: r.title, sort_order: r.sort_order })
+          .catch(() => {});
+      }
     });
 
     test('Admin can list resources for a campaign', async () => {
