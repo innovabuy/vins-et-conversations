@@ -466,12 +466,7 @@ describe('Parcours 7 — Referral étudiant', () => {
     expect(res.body.name).toBeDefined();
   });
 
-  // SKIP TD-DBDRIFT-SEED — drift de seed sur IDS.ackavong (uuidv4 volatile à
-  // chaque run alors que les orders.referred_by persistent → FK orphelins).
-  // Démasqué par le cleanup api.integration (3 afterAll ajoutés). À corriger
-  // dans les fixtures (UUID fixe pour ackavong OU TRUNCATE orders en début
-  // de seed).
-  test.skip('3. Commandes référées en DB → referred_by correct', async () => {
+  test('3. Commandes référées en DB → referred_by correct', async () => {
     const student = await db('users').where({ email: 'ackavong@eleve.sc.fr' }).first();
     const referredOrders = await db('orders')
       .where({ referred_by: student.id, source: 'student_referral' });

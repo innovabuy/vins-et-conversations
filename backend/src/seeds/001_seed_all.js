@@ -8,7 +8,11 @@ const IDS = {
   matheo: uuidv4(),
   nicolas: uuidv4(),
   // Étudiants
-  ackavong: uuidv4(),
+  // ackavong : UUID fixe (TD-DBDRIFT-SEED) — référencé par orders.referred_by
+  // (orders SCMA1234 dans ce seed + fixture FIX-REF-STU-0001 dans 002).
+  // Tout autre persona reste en uuidv4() : aucun n'est utilisé comme FK
+  // persistante entre runs (vérifié : grep IDS.* dans inserts).
+  ackavong: '2298f525-1d32-4787-b634-152525a9aac1',
   bourcier: uuidv4(),
   lebreton: uuidv4(),
   flipeau: uuidv4(),

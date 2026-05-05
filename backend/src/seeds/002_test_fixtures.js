@@ -21,6 +21,11 @@ const FIXTURE_REF_STUDENT_ORDER = 'FIX-REF-STU-0001';
 const FIXTURE_REF_AMB_ORDER = 'FIX-AMB-CA-0001';
 
 exports.seed = async function (knex) {
+  if (process.env.NODE_ENV === 'production') {
+    console.log('⚠️ test_fixtures: skipped in production');
+    return;
+  }
+
   const ambassador = await knex('users').where({ email: FIXTURE_AMBASSADOR_EMAIL }).first();
   const student = await knex('users').where({ email: FIXTURE_STUDENT_EMAIL }).first();
 
@@ -94,8 +99,12 @@ exports.seed = async function (knex) {
   }
 
   // ─── 3. Boutique order with student_referral source ──────
+  // TD-DBDRIFT-SEED: check par (source + referred_by) au lieu de source seule.
+  // Sinon n'importe quelle order student_referral pré-existante (coco/bar/bts
+  // venant de 001) court-circuite la création de la fixture pointant vers
+  // ackavong → parcours.test.js #3 fail.
   const existingStudentReferralOrder = await knex('orders')
-    .where({ source: 'student_referral' })
+    .where({ source: 'student_referral', referred_by: student.id })
     .first();
 
   if (!existingStudentReferralOrder) {
