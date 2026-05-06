@@ -376,7 +376,7 @@ function buildMontantSheet(workbook, pivotData, campaign, type) {
 }
 
 /** Onglet Récap par étudiant */
-function buildRecapEtudiantSheet(workbook, pivotData, campaign) {
+function buildRecapEtudiantSheet(workbook, pivotData, campaign, fundIndividualPct = 0) {
   const { students, totalsByStudent } = pivotData;
   const sheet = workbook.addWorksheet('Récap par étudiant');
 
@@ -385,14 +385,16 @@ function buildRecapEtudiantSheet(workbook, pivotData, campaign) {
   const border = { style: 'thin', color: { argb: 'FFD0D0D0' } };
   const allBorders = { top: border, left: border, bottom: border, right: border };
   const euroFmt = '#,##0.00 "€"';
+  const euroIntFmt = '#,##0 "€"';
+  const rate = fundIndividualPct || 0;
 
-  sheet.mergeCells(1, 1, 1, 5);
+  sheet.mergeCells(1, 1, 1, 7);
   sheet.getCell(1, 1).value = `Récap par étudiant — ${campaign.name}`;
   sheet.getCell(1, 1).font = { bold: true, size: 13, color: { argb: 'FF722F37' } };
   sheet.getCell(1, 1).alignment = { horizontal: 'center' };
   sheet.addRow([]);
 
-  const headers = ['Rang', 'Étudiant', 'Bouteilles vendues', 'CA TTC', 'CA HT'];
+  const headers = ['Rang', 'Étudiant', 'Bouteilles vendues', 'CA TTC', 'CA HT', 'Commission HT', 'Montant carte Edenred'];
   const headerRow = sheet.addRow(headers);
   headerRow.eachCell((cell) => {
     cell.fill = headerFill;
@@ -409,7 +411,9 @@ function buildRecapEtudiantSheet(workbook, pivotData, campaign) {
 
   sorted.forEach((student, index) => {
     const total = totalsByStudent.get(student.id) || { total_qty: 0, total_ttc: 0, total_ht: 0 };
-    const row = sheet.addRow([index + 1, student.name, total.total_qty, total.total_ttc, total.total_ht]);
+    const commissionHT = total.total_ht * rate / 100;
+    const montantEdenred = Math.round(commissionHT);
+    const row = sheet.addRow([index + 1, student.name, total.total_qty, total.total_ttc, total.total_ht, commissionHT, montantEdenred]);
 
     row.getCell(3).numFmt = '0';
     row.getCell(3).alignment = { horizontal: 'center' };
@@ -417,6 +421,10 @@ function buildRecapEtudiantSheet(workbook, pivotData, campaign) {
     row.getCell(4).alignment = { horizontal: 'right' };
     row.getCell(5).numFmt = euroFmt;
     row.getCell(5).alignment = { horizontal: 'right' };
+    row.getCell(6).numFmt = euroFmt;
+    row.getCell(6).alignment = { horizontal: 'right' };
+    row.getCell(7).numFmt = euroIntFmt;
+    row.getCell(7).alignment = { horizontal: 'right' };
 
     if (index % 2 === 0) {
       row.eachCell((cell) => {
@@ -426,11 +434,16 @@ function buildRecapEtudiantSheet(workbook, pivotData, campaign) {
     row.eachCell((cell) => { cell.border = allBorders; });
   });
 
-  const grandTotals = { qty: 0, ttc: 0, ht: 0 };
+  const grandTotals = { qty: 0, ttc: 0, ht: 0, commissionHT: 0, edenred: 0 };
   for (const [, t] of totalsByStudent) {
-    grandTotals.qty += t.total_qty; grandTotals.ttc += t.total_ttc; grandTotals.ht += t.total_ht;
+    grandTotals.qty += t.total_qty;
+    grandTotals.ttc += t.total_ttc;
+    grandTotals.ht += t.total_ht;
+    const commissionHT = t.total_ht * rate / 100;
+    grandTotals.commissionHT += commissionHT;
+    grandTotals.edenred += Math.round(commissionHT);
   }
-  const totalRow = sheet.addRow(['', 'TOTAL CAMPAGNE', grandTotals.qty, grandTotals.ttc, grandTotals.ht]);
+  const totalRow = sheet.addRow(['', 'TOTAL CAMPAGNE', grandTotals.qty, grandTotals.ttc, grandTotals.ht, grandTotals.commissionHT, grandTotals.edenred]);
   totalRow.eachCell((cell) => {
     cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFCD7F32' } };
     cell.font = { bold: true, color: { argb: 'FFFFFFFF' } };
@@ -442,12 +455,18 @@ function buildRecapEtudiantSheet(workbook, pivotData, campaign) {
   totalRow.getCell(4).alignment = { horizontal: 'right' };
   totalRow.getCell(5).numFmt = euroFmt;
   totalRow.getCell(5).alignment = { horizontal: 'right' };
+  totalRow.getCell(6).numFmt = euroFmt;
+  totalRow.getCell(6).alignment = { horizontal: 'right' };
+  totalRow.getCell(7).numFmt = euroIntFmt;
+  totalRow.getCell(7).alignment = { horizontal: 'right' };
 
   sheet.getColumn(1).width = 8;
   sheet.getColumn(2).width = 28;
   sheet.getColumn(3).width = 20;
   sheet.getColumn(4).width = 16;
   sheet.getColumn(5).width = 16;
+  sheet.getColumn(6).width = 16;
+  sheet.getColumn(7).width = 22;
 }
 
 /** Onglet Récap par produit */
@@ -652,12 +671,15 @@ router.get('/campaign-pivot', authenticate, requireRole('super_admin', 'admin', 
     // les gratuités historiques ENREGISTRÉES, pas les gratuités CALCULÉES par le nouvel algo lots triés).
     const rulesEngineForPivot = require('../services/rulesEngine');
     let pivotFreeBottleRules = null;
+    let pivotFundIndividualPct = 0;
     try {
       const pivotRules = await rulesEngineForPivot.loadRulesForCampaign(campaign_id);
       pivotFreeBottleRules = pivotRules?.freeBottle;
+      pivotFundIndividualPct = pivotRules?.commission?.fund_individual?.value || 0;
     } catch (e) {
       // Campagne sans client_type_id → pas de règles 12+1, pivot affiche 0 gratuités (cas test isolé)
       pivotFreeBottleRules = null;
+      pivotFundIndividualPct = 0;
     }
 
     const distinctStudentIds = [...new Set(rows.map((r) => r.user_id))];
@@ -695,7 +717,7 @@ router.get('/campaign-pivot', authenticate, requireRole('super_admin', 'admin', 
     buildQuantiteSheet(workbook, pivotData, campaign);
     buildMontantSheet(workbook, pivotData, campaign, 'ttc');
     buildMontantSheet(workbook, pivotData, campaign, 'ht');
-    buildRecapEtudiantSheet(workbook, pivotData, campaign);
+    buildRecapEtudiantSheet(workbook, pivotData, campaign, pivotFundIndividualPct);
     buildRecapProduitSheet(workbook, pivotData, campaign);
 
     const safeName = campaign.name.normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9 ]/gi, '-').replace(/-+/g, '-').replace(/^-|-$/g, '');

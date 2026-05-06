@@ -129,3 +129,73 @@ describe('A2 — Pivot inclut commandes user_id NULL via parrain', () => {
     expect(qty).toBeGreaterThanOrEqual(100);
   });
 });
+
+describe('Récap étudiant — colonnes Edenred (B-3)', () => {
+  const ExcelJS = require('exceljs');
+
+  async function fetchRecapSheet(campId) {
+    const res = await request(app)
+      .get(`/api/v1/admin/exports/campaign-pivot?campaign_id=${campId}&format=xlsx`)
+      .set('Authorization', `Bearer ${adminToken}`)
+      .buffer(true)
+      .parse((r, cb) => {
+        const chunks = [];
+        r.on('data', (c) => chunks.push(c));
+        r.on('end', () => cb(null, Buffer.concat(chunks)));
+      });
+    expect(res.status).toBe(200);
+    const workbook = new ExcelJS.Workbook();
+    await workbook.xlsx.load(res.body);
+    return workbook.getWorksheet('Récap par étudiant');
+  }
+
+  test('EDENRED-01: headers étendus à 7 colonnes incluent Commission HT et Montant carte Edenred', async () => {
+    const sheet = await fetchRecapSheet(campaignId);
+    expect(sheet).toBeDefined();
+    // Row 1 = title (merged), row 2 = empty, row 3 = headers
+    const headerRow = sheet.getRow(3);
+    const headers = [];
+    for (let i = 1; i <= 7; i++) headers.push(headerRow.getCell(i).value);
+    expect(headers).toEqual([
+      'Rang', 'Étudiant', 'Bouteilles vendues', 'CA TTC', 'CA HT', 'Commission HT', 'Montant carte Edenred',
+    ]);
+  });
+
+  test('EDENRED-02: campagne sans client_type → commission HT et Edenred = 0', async () => {
+    // La campagne du beforeAll n'a pas de client_type_id → loadRulesForCampaign throw → rate=0
+    const sheet = await fetchRecapSheet(campaignId);
+    // Première ligne data (row 4 = parrain car seule entrée)
+    const dataRow = sheet.getRow(4);
+    const commissionHT = dataRow.getCell(6).value;
+    const montantEdenred = dataRow.getCell(7).value;
+    expect(commissionHT).toBe(0);
+    expect(montantEdenred).toBe(0);
+  });
+
+  test('EDENRED-03: campagne scolaire (rate connu) → commission_ht ≈ ca_ht × rate / 100, edenred = round(commission_ht)', async () => {
+    // Récupère une campagne scolaire seedée + son rate effectif (override campagne sinon client_type)
+    const scolaireCampaign = await db('campaigns')
+      .join('client_types', 'campaigns.client_type_id', 'client_types.id')
+      .where('client_types.name', 'scolaire')
+      .where('campaigns.name', 'like', '%Sacr%')
+      .whereNull('campaigns.deleted_at')
+      .select('campaigns.id', 'campaigns.config', 'client_types.commission_rules')
+      .first();
+    if (!scolaireCampaign) return; // Skip silencieux si pas de seed scolaire dispo
+
+    const config = typeof scolaireCampaign.config === 'string' ? JSON.parse(scolaireCampaign.config) : (scolaireCampaign.config || {});
+    const rules = typeof scolaireCampaign.commission_rules === 'string' ? JSON.parse(scolaireCampaign.commission_rules) : (scolaireCampaign.commission_rules || {});
+    const rate = config.fund_individual_pct ?? rules.fund_individual?.value ?? 0;
+    expect(rate).toBeGreaterThan(0); // sanity: scolaire seed has 2%
+
+    const sheet = await fetchRecapSheet(scolaireCampaign.id);
+    // Première ligne data = top vendeur (sort by total_ttc desc)
+    const dataRow = sheet.getRow(4);
+    const caHT = parseFloat(dataRow.getCell(5).value);
+    const commissionHT = parseFloat(dataRow.getCell(6).value);
+    const montantEdenred = dataRow.getCell(7).value;
+
+    expect(commissionHT).toBeCloseTo(caHT * rate / 100, 1);
+    expect(montantEdenred).toBe(Math.round(commissionHT));
+  });
+});
