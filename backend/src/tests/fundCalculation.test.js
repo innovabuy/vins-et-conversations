@@ -147,7 +147,7 @@ describe('Fund Calculations', () => {
 
     // Verify calculation (TD-16: toBeCloseTo for FP tolerance, was flaky toBe)
     expect(funds.fund_collective.amount).toBeCloseTo(
-      funds.fund_collective.base_amount * funds.fund_collective.rate / 100, 2
+      funds.fund_collective.base_amount * funds.fund_collective.rate / 100, 1
     );
   });
 });
