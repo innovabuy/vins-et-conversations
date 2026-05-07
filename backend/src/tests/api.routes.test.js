@@ -770,11 +770,17 @@ describe('Exports', () => {
     expect(res.status).toBe(200);
   });
 
-  test('GET /admin/exports/commissions → CSV commissions', async () => {
+  test('GET /admin/exports/commissions?format=csv → CSV commissions (BOM + colonnes)', async () => {
     const res = await request(app)
-      .get('/api/v1/admin/exports/commissions')
+      .get('/api/v1/admin/exports/commissions?format=csv')
       .set('Authorization', `Bearer ${adminToken}`);
     expect(res.status).toBe(200);
+    expect(res.headers['content-type']).toMatch(/text\/csv/);
+    const body = res.text || res.body.toString('utf8');
+    expect(body.charCodeAt(0)).toBe(0xFEFF);
+    const header = body.replace(/^﻿/, '').split(/\r?\n/)[0];
+    ['campaign', 'ca_ht', 'taux_collectif', 'commission_collective', 'taux_individuel', 'commission_individuelle']
+      .forEach((col) => expect(header).toContain(col));
   });
 
   test('GET /admin/exports/stock → CSV inventaire', async () => {
