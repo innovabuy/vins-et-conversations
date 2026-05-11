@@ -411,16 +411,123 @@ async function createOrder({ userId, campaignId, items, customerId, notes, custo
 
 /**
  * Valider une commande (admin)
+ *
+ * Phase 1 — Tracking auto 12+1 (Mathéo Benoit 07/05/2026) :
+ * Après le passage submitted|pending_stock → validated, on attribue
+ * automatiquement les bouteilles gratuites dues au bénéficiaire :
+ * - Modèle C : bénéficiaire = referred_by si source='*_referral', sinon user_id.
+ * - On compare earned (par produit, via calculateFreeBottles) avec déjà
+ *   attribué (financial_events groupé par metadata->>'product_id').
+ * - Pour chaque pending : INSERT order_items (free_qty=1, qty=0) +
+ *   financial_events (amount=+purchase_price) + stock_movements (type='free').
+ * - Tout en une seule transaction : rollback intégral si une étape échoue.
  */
 async function validateOrder(orderId, adminUserId) {
   const order = await db('orders').where({ id: orderId }).first();
   if (!order) throw new Error('ORDER_NOT_FOUND');
   if (!['submitted', 'pending_stock'].includes(order.status)) throw new Error('ORDER_NOT_SUBMITTABLE');
 
-  await db('orders').where({ id: orderId }).update({
-    status: 'validated',
-    updated_at: new Date(),
+  // Modèle C : déterminer le bénéficiaire du 12+1
+  const referralSources = ['student_referral', 'ambassador_referral'];
+  const isReferralFlow = !!order.referred_by && referralSources.includes(order.source);
+  const beneficiaryId = isReferralFlow ? order.referred_by : order.user_id;
+
+  let freeBottlesCreated = 0;
+
+  await db.transaction(async (trx) => {
+    await trx('orders').where({ id: orderId }).update({
+      status: 'validated',
+      updated_at: new Date(),
+    });
+
+    if (!beneficiaryId) return; // commande sans user (boutique anonyme) — pas de 12+1
+
+    const rules = await rulesEngine.loadRulesForCampaign(order.campaign_id);
+    const freeBottleRules = rules?.freeBottle;
+    if (!freeBottleRules || freeBottleRules.trigger !== 'every_n_sold') return;
+
+    // Calcul de l'état attendu (déjà filtre alcohol-only + statuts validés + Modèle C).
+    // On passe trx pour que la query voie l'UPDATE statut → 'validated' non encore commité.
+    const balance = await rulesEngine.calculateFreeBottles(
+      beneficiaryId,
+      order.campaign_id,
+      freeBottleRules,
+      { includeReferredBy: true, trx }
+    );
+    if (balance.disabled) return;
+    if (!balance.details || balance.details.length === 0) return;
+    if (balance.available <= 0) return;
+
+    // Déjà attribuées par produit pour ce bénéficiaire dans cette campagne
+    const usedRows = await trx('financial_events')
+      .where({ campaign_id: order.campaign_id, type: 'free_bottle' })
+      .whereRaw("metadata->>'user_id' = ?", [beneficiaryId])
+      .select(
+        db.raw("metadata->>'product_id' as product_id"),
+        db.raw('COUNT(*)::int as count')
+      )
+      .groupBy(db.raw("metadata->>'product_id'"));
+    const usedByProduct = new Map();
+    for (const r of usedRows) {
+      if (r.product_id) usedByProduct.set(r.product_id, parseInt(r.count, 10));
+    }
+
+    for (const detail of balance.details) {
+      const used = usedByProduct.get(detail.product_id) || 0;
+      const pending = Math.max(0, detail.earned - used);
+      if (pending === 0) continue;
+
+      const product = await trx('products').where({ id: detail.product_id }).first();
+      if (!product) continue;
+
+      const orderItemRows = [];
+      const finEventRows = [];
+      const stockRows = [];
+      for (let i = 0; i < pending; i++) {
+        orderItemRows.push({
+          order_id: orderId,
+          product_id: detail.product_id,
+          qty: 0,
+          free_qty: 1,
+          unit_price_ht: 0,
+          unit_price_ttc: 0,
+          vat_rate: product.tva_rate,
+          type: 'product',
+        });
+        finEventRows.push({
+          order_id: orderId,
+          campaign_id: order.campaign_id,
+          type: 'free_bottle',
+          amount: parseFloat(product.purchase_price || 0),
+          description: `Bouteille offerte 12+1 (auto) — ${product.name}`,
+          metadata: JSON.stringify({
+            user_id: beneficiaryId,
+            product_id: detail.product_id,
+            product_name: product.name,
+            auto_attributed: true,
+            triggering_order_id: orderId,
+          }),
+        });
+        stockRows.push({
+          product_id: detail.product_id,
+          campaign_id: order.campaign_id,
+          type: 'free',
+          qty: 1,
+          reference: order.ref,
+          reason: 'Bouteille offerte 12+1 (auto)',
+        });
+      }
+
+      await trx('order_items').insert(orderItemRows);
+      await trx('financial_events').insert(finEventRows);
+      await trx('stock_movements').insert(stockRows);
+      freeBottlesCreated += pending;
+    }
   });
+
+  if (freeBottlesCreated > 0) {
+    logger.info(`[12+1 auto] Order ${order.ref} validée → ${freeBottlesCreated} gratuites attribuées au user ${beneficiaryId}`);
+  }
 
   logger.info(`Order ${order.ref} validated by admin ${adminUserId}`);
 

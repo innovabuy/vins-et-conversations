@@ -262,8 +262,13 @@ function calculateCommissionTiers(caTTCMensuel, commissionRules) {
  * @returns {Object} { earned, used, available, totalSold, threshold, nextIn, total_free_cost, details, disabled? }
  */
 async function calculateFreeBottles(userId, campaignId, freeBottleRules, options = {}) {
+  // V4.3+ Phase 1 12+1 auto : permet d'utiliser une transaction Knex passée en
+  // options.trx pour voir les UPDATE non encore commités (cas validateOrder).
+  // Default = db direct (comportement historique inchangé).
+  const conn = options.trx || db;
+
   // Check per-participant free_bottle_enabled flag first (V4.3)
-  const participation = await db('participations')
+  const participation = await conn('participations')
     .where({ user_id: userId, campaign_id: campaignId })
     .select('config')
     .first();
@@ -282,7 +287,7 @@ async function calculateFreeBottles(userId, campaignId, freeBottleRules, options
   // Cohérence Modèle C (B-1 P1, 30/04) :
   //   branche directe : exclut cross-étudiant via guard `referred_by IS NULL OR = user_id`
   //   branche referral : exclut auto-referral via guard `user_id IS NULL OR != referred_by`
-  let itemsQuery = db('order_items')
+  let itemsQuery = conn('order_items')
     .join('orders', 'order_items.order_id', 'orders.id')
     .join('products', 'order_items.product_id', 'products.id')
     .where('orders.campaign_id', campaignId)
@@ -380,7 +385,7 @@ async function calculateFreeBottles(userId, campaignId, freeBottleRules, options
   const details = Array.from(freeBottlesPerProduct.values());
 
   // 7. Bouteilles gratuites déjà utilisées (financial_events)
-  const usedResult = await db('financial_events')
+  const usedResult = await conn('financial_events')
     .where({ campaign_id: campaignId, type: 'free_bottle' })
     .whereRaw("metadata->>'user_id' = ?", [userId])
     .count('id as count')

@@ -80,6 +80,7 @@ async function fetchGroupedData(campaignId, userId, orderIds, opts = {}) {
       'referrer.email as referrer_email',
       'products.name as product_name',
       'order_items.qty',
+      'order_items.free_qty',
       'order_items.unit_price_ttc',
       db.raw("CASE WHEN orders.referred_by IS NOT NULL AND orders.source = 'student_referral' AND (orders.user_id IS NULL OR orders.user_id != orders.referred_by) THEN true ELSE false END as is_referral"),
     )
@@ -149,6 +150,7 @@ function groupByUser(rows, targetUserId) {
     user.orders.get(row.order_id).items.push({
       product_name: row.product_name,
       qty: row.qty,
+      free_qty: parseInt(row.free_qty || 0, 10),
       unit_price_ttc: parseFloat(row.unit_price_ttc),
     });
   }
@@ -196,30 +198,55 @@ function renderStudentPage(doc, student, brandName) {
     let orderSubtotal = 0;
     const dateStr = new Date(order.date).toLocaleDateString('fr-FR');
 
+    let isFirstVisibleLine = true;
     for (let ii = 0; ii < order.items.length; ii++) {
       const item = order.items[ii];
       const lineTotal = item.qty * item.unit_price_ttc;
       orderSubtotal += lineTotal;
 
-      // Check if we need a new page
-      if (doc.y > doc.page.height - 100) {
-        addCapNumerikFooter(doc);
-        doc.addPage();
-        doc.fontSize(8).fillColor('#333').font('Helvetica');
+      // Render normal line only if qty > 0 (free-only items skip this)
+      if (item.qty > 0) {
+        if (doc.y > doc.page.height - 100) {
+          addCapNumerikFooter(doc);
+          doc.addPage();
+          doc.fontSize(8).fillColor('#333').font('Helvetica');
+        }
+        const y = doc.y;
+        if (isFirstVisibleLine) {
+          const refLabel = order.is_referral ? `${order.ref} *` : order.ref;
+          doc.text(refLabel, colX.ref, y, { width: 85 });
+          doc.text(dateStr, colX.date, y, { width: 70 });
+          isFirstVisibleLine = false;
+        }
+        doc.text(item.product_name, colX.product, y, { width: 170 });
+        doc.text(String(item.qty), colX.qty, y, { width: 40, align: 'right' });
+        doc.text(`${item.unit_price_ttc.toFixed(2)} EUR`, colX.pu, y, { width: 50, align: 'right' });
+        doc.text(`${lineTotal.toFixed(2)} EUR`, colX.total, y, { width: 55, align: 'right' });
+        doc.moveDown(0.3);
       }
 
-      const y = doc.y;
-      // Only show ref + date on first item line of each order
-      if (ii === 0) {
-        const refLabel = order.is_referral ? `${order.ref} *` : order.ref;
-        doc.text(refLabel, colX.ref, y, { width: 85 });
-        doc.text(dateStr, colX.date, y, { width: 70 });
+      // Render free 12+1 line if free_qty > 0
+      if (item.free_qty > 0) {
+        if (doc.y > doc.page.height - 100) {
+          addCapNumerikFooter(doc);
+          doc.addPage();
+          doc.fontSize(8).fillColor('#333').font('Helvetica');
+        }
+        const fy = doc.y;
+        if (isFirstVisibleLine) {
+          const refLabel = order.is_referral ? `${order.ref} *` : order.ref;
+          doc.text(refLabel, colX.ref, fy, { width: 85 });
+          doc.text(dateStr, colX.date, fy, { width: 70 });
+          isFirstVisibleLine = false;
+        }
+        doc.font('Helvetica-Oblique').fillColor('#7a1c3b');
+        doc.text(`Bouteille offerte 12+1 - ${item.product_name}`, colX.product, fy, { width: 170 });
+        doc.text(String(item.free_qty), colX.qty, fy, { width: 40, align: 'right' });
+        doc.text('0,00 EUR', colX.pu, fy, { width: 50, align: 'right' });
+        doc.text('0,00 EUR', colX.total, fy, { width: 55, align: 'right' });
+        doc.font('Helvetica').fillColor('#333');
+        doc.moveDown(0.3);
       }
-      doc.text(item.product_name, colX.product, y, { width: 170 });
-      doc.text(String(item.qty), colX.qty, y, { width: 40, align: 'right' });
-      doc.text(`${item.unit_price_ttc.toFixed(2)} EUR`, colX.pu, y, { width: 50, align: 'right' });
-      doc.text(`${lineTotal.toFixed(2)} EUR`, colX.total, y, { width: 55, align: 'right' });
-      doc.moveDown(0.3);
     }
 
     // Order subtotal
