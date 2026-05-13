@@ -557,6 +557,22 @@ router.get(
       // includeReferredBy: ambassador's referral orders count toward 12+1
       const freeBottles = await rulesEngine.calculateFreeBottles(req.user.userId, campaignId, rules.freeBottle, { includeReferredBy: true });
 
+      // Historique des gratuités déjà remises — parité avec dashboard étudiant
+      const freeBottlesHistory = await db('financial_events')
+        .where({ campaign_id: campaignId, type: 'free_bottle' })
+        .whereRaw("metadata->>'user_id' = ?", [req.user.userId])
+        .orderBy('created_at', 'desc')
+        .select('created_at', 'metadata');
+
+      freeBottles.history = freeBottlesHistory.map((fe) => {
+        const meta = typeof fe.metadata === 'string' ? JSON.parse(fe.metadata) : (fe.metadata || {});
+        return {
+          date: fe.created_at,
+          product_name: meta.product_name || 'Produit inconnu',
+          quantity: 1,
+        };
+      });
+
       // Ambassador commission (cagnotte) — total + monthly
       const ambCommissionOpts = { referralSources: ['ambassador_referral'] };
       const fundsTotal = await rulesEngine.calculateFunds(campaignId, req.user.userId, rules.commission, ambCommissionOpts);

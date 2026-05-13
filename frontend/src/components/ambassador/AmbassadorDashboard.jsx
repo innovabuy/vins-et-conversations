@@ -1,9 +1,10 @@
 import { useState, useEffect, useRef } from 'react';
-import { ambassadorAPI, ordersAPI } from '../../services/api';
-import { Trophy, Share2, ShoppingCart, ShoppingBag, Gift, Copy, Check, QrCode, Eye, X, Calendar, Wallet } from 'lucide-react';
+import { ambassadorAPI, ordersAPI, invoicesAPI } from '../../services/api';
+import { Trophy, Share2, ShoppingCart, ShoppingBag, Gift, Copy, Check, QrCode, Eye, X, Calendar, Wallet, ChevronUp, ChevronDown, FileDown } from 'lucide-react';
 import { copyToClipboard } from '../../utils/copyToClipboard';
 
 const fmtEur = (v, decimals = 2) => new Intl.NumberFormat('fr-FR', { minimumFractionDigits: decimals, maximumFractionDigits: decimals }).format(v);
+const formatDate = (d) => new Date(d).toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit', year: 'numeric' });
 
 const TIER_COLORS = {
   Bronze: { bg: 'bg-amber-100', text: 'text-amber-800', border: 'border-amber-400', bar: 'bg-amber-500' },
@@ -76,6 +77,27 @@ export default function AmbassadorDashboard() {
   const [showAllOrders, setShowAllOrders] = useState(false);
   const [salesFilter, setSalesFilter] = useState('all');
   const [ordersFilter, setOrdersFilter] = useState('all');
+  const [showFreeHistory, setShowFreeHistory] = useState(false);
+  const [downloading, setDownloading] = useState(null);
+
+  const handleDownloadInvoice = async (order) => {
+    setDownloading(order.id);
+    try {
+      const res = await invoicesAPI.download(order.id);
+      const url = window.URL.createObjectURL(new Blob([res.data], { type: 'application/pdf' }));
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `facture-${order.ref || order.id}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      window.URL.revokeObjectURL(url);
+    } catch {
+      alert('Erreur lors du telechargement de la facture');
+    } finally {
+      setDownloading(null);
+    }
+  };
 
   useEffect(() => {
     loadDashboard();
@@ -320,6 +342,45 @@ export default function AmbassadorDashboard() {
               Encore {free_bottles.nextIn} bouteille{free_bottles.nextIn > 1 ? 's' : ''} pour la prochaine gratuite
             </p>
           </div>
+
+          {/* Détail par référence */}
+          {free_bottles.details?.length > 0 && (
+            <div className="border-t pt-2 mt-4 space-y-1">
+              <p className="text-xs font-medium text-gray-600 mb-1">Détail par référence :</p>
+              {free_bottles.details.map((d) => (
+                <div key={d.product_id} className="flex items-center justify-between text-xs">
+                  <span className="text-gray-700 truncate mr-2">{d.product_name}</span>
+                  <span className="text-gray-500 flex-shrink-0">
+                    {d.sold} vendues · {d.earned > 0 ? <span className="text-wine-700 font-semibold">{d.earned} gratuite(s)</span> : `${d.nextIn} restantes`}
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* Historique des gratuités déjà remises (repliable) */}
+          {free_bottles.history?.length > 0 && (
+            <div className="border-t pt-2 mt-4">
+              <button
+                onClick={() => setShowFreeHistory((v) => !v)}
+                className="flex items-center justify-between w-full text-xs font-medium text-gray-600 hover:text-gray-800"
+              >
+                <span>Gratuités déjà remises ({free_bottles.history.length})</span>
+                {showFreeHistory ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+              </button>
+              {showFreeHistory && (
+                <div className="mt-2 space-y-1">
+                  {free_bottles.history.map((h, i) => (
+                    <div key={i} className="flex items-center justify-between text-xs">
+                      <span className="text-gray-500 w-20 flex-shrink-0">{formatDate(h.date)}</span>
+                      <span className="text-gray-700 truncate mx-2 flex-1">{h.product_name}</span>
+                      <span className="text-wine-700 font-semibold flex-shrink-0">{h.quantity}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
         </div>
       )}
 
@@ -470,6 +531,17 @@ export default function AmbassadorDashboard() {
                         'bg-gray-100 text-gray-600'
                       }`}>{o.status}</span>
                       <span className="font-medium">{fmtEur(parseFloat(o.total_ttc))} EUR</span>
+                      {['validated', 'preparing', 'shipped', 'delivered'].includes(o.status) && (
+                        <button
+                          onClick={(e) => { e.stopPropagation(); handleDownloadInvoice(o); }}
+                          disabled={downloading === o.id}
+                          className="inline-flex items-center gap-1 text-[10px] text-wine-700 hover:text-wine-900 font-medium"
+                          title="Télécharger la facture"
+                        >
+                          <FileDown size={12} />
+                          {downloading === o.id ? 'Telechargement...' : 'Facture'}
+                        </button>
+                      )}
                       <Eye size={14} className="text-gray-400" />
                     </div>
                   </div>

@@ -548,7 +548,8 @@ export default function StudentDashboard() {
           <>
             <div className="text-center py-4">
               <p className="text-wine-200 text-sm">{data.ca_referred > 0 ? 'Mon CA total' : 'Mon CA'}</p>
-              <p className="text-4xl font-bold">{formatEur(data.ca_referred > 0 ? data.ca_total : data.ca)}</p>
+              <p className="text-4xl font-bold">{formatEur(data.ca_referred > 0 ? data.ca_total : data.ca)} TTC</p>
+              <p className="text-wine-300 text-xs mt-0.5 italic">({formatEur(data.ca_referred > 0 ? (data.ca_total_ht || 0) : (data.ca_ht || 0))} HT)</p>
               {data.ca_referred > 0 && (
                 <p className="text-wine-300 text-xs mt-1">dont {formatEur(data.ca_referred)} par partage</p>
               )}
