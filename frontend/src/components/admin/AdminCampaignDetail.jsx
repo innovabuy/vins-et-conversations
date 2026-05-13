@@ -293,6 +293,7 @@ function GroupedBLModal({ participant, campaignId, onClose }) {
           user_id: participant.id,
           campaign_id: campaignId,
           status: 'validated',
+          include_referrals: true,
           limit: 200,
         });
         const list = data.data || [];
@@ -343,19 +344,27 @@ function GroupedBLModal({ participant, campaignId, onClose }) {
             <>
               <p className="text-sm text-gray-500 mb-3">Selectionnez les commandes a inclure :</p>
               <div className="space-y-2">
-                {orders.map((o) => (
-                  <label key={o.id} className="flex items-center gap-3 p-2 rounded-lg hover:bg-gray-50 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={selected.has(o.id)}
-                      onChange={() => toggle(o.id)}
-                      className="rounded border-gray-300 text-wine-600 focus:ring-wine-500"
-                    />
-                    <span className="flex-1 text-sm font-medium">{o.ref}</span>
-                    <span className="text-sm text-gray-500">{o.user_name || participant.name}</span>
-                    <span className="text-sm font-semibold">{formatEur(parseFloat(o.total_ttc || 0))}</span>
-                  </label>
-                ))}
+                {orders.map((o) => {
+                  const isReferral = o.referred_by === participant.id && o.user_id !== participant.id;
+                  return (
+                    <label key={o.id} className="flex items-center gap-3 p-2 rounded-lg hover:bg-gray-50 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={selected.has(o.id)}
+                        onChange={() => toggle(o.id)}
+                        className="rounded border-gray-300 text-wine-600 focus:ring-wine-500"
+                      />
+                      <span className="flex-1 text-sm font-medium flex items-center gap-2">
+                        {o.ref}
+                        {isReferral && (
+                          <span className="text-[10px] font-medium bg-indigo-100 text-indigo-700 px-1.5 py-0.5 rounded">parrainage</span>
+                        )}
+                      </span>
+                      <span className="text-sm text-gray-500">{o.user_name || participant.name}</span>
+                      <span className="text-sm font-semibold">{formatEur(parseFloat(o.total_ttc || 0))}</span>
+                    </label>
+                  );
+                })}
               </div>
 
               <div className="flex gap-3 mt-3">

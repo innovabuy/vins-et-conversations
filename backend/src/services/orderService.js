@@ -572,8 +572,11 @@ async function validateOrder(orderId, adminUserId) {
 
 /**
  * Liste des commandes avec filtres
+ * @param {boolean} [includeReferrals=false] — quand userId est fourni, inclut aussi
+ *   les commandes parrainées (referred_by=userId, source='student_referral').
+ *   Par défaut false pour préserver le comportement strict des autres écrans.
  */
-async function listOrders({ campaignId, status, userId, source, page = 1, limit = 20 }) {
+async function listOrders({ campaignId, status, userId, source, includeReferrals = false, page = 1, limit = 20 }) {
   let query = db('orders')
     .leftJoin('users', 'orders.user_id', 'users.id')
     .leftJoin('contacts', 'orders.customer_id', 'contacts.id')
@@ -588,7 +591,19 @@ async function listOrders({ campaignId, status, userId, source, page = 1, limit 
 
   if (campaignId) query = query.where('orders.campaign_id', campaignId);
   if (status) query = query.where('orders.status', status);
-  if (userId) query = query.where('orders.user_id', userId);
+  if (userId) {
+    if (includeReferrals) {
+      query = query.where(function () {
+        this.where('orders.user_id', userId)
+          .orWhere(function () {
+            this.where('orders.referred_by', userId)
+              .where('orders.source', 'student_referral');
+          });
+      });
+    } else {
+      query = query.where('orders.user_id', userId);
+    }
+  }
   if (source) query = query.where('orders.source', source);
 
   const total = await query.clone().clearSelect().count('orders.id as count').first();

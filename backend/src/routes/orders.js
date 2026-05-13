@@ -297,6 +297,7 @@ router.get(
         status: req.query.status,
         userId: req.query.user_id,
         source: req.query.source,
+        includeReferrals: req.query.include_referrals === 'true' || req.query.include_referrals === true,
         page: parseInt(req.query.page || 1, 10),
         limit: parseInt(req.query.limit || 20, 10),
       });
