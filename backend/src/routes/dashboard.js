@@ -109,7 +109,7 @@ router.get(
         })
         .orderBy('orders.created_at', 'desc')
         .select(
-          'orders.id', 'orders.ref', 'orders.status', 'orders.total_ttc', 'orders.total_items',
+          'orders.id', 'orders.ref', 'orders.status', 'orders.total_ht', 'orders.total_ttc', 'orders.total_items',
           'orders.created_at', 'orders.payment_method', 'contacts.name as customer_name',
           db.raw(`CASE WHEN orders.user_id = ? THEN 'directe' ELSE 'parrainage' END AS order_type`, [userId])
         );

@@ -178,4 +178,17 @@ describe('DASH-REF: Commandes parrainage dans le dashboard étudiant', () => {
     expect(autoOrders).toHaveLength(1);
     expect(autoOrders[0].order_type).toBe('directe');
   });
+
+  test('DR-05: total_ht présent dans la réponse (BUG-B non-régression)', async () => {
+    const res = await request(app)
+      .get(`/api/v1/dashboard/student/orders?campaign_id=${campaignId}`)
+      .set('Authorization', `Bearer ${studentToken}`);
+
+    expect(res.status).toBe(200);
+    const referralOrder = res.body.data.find((o) => o.id === referralOrderId);
+    expect(referralOrder).toBeDefined();
+    expect(referralOrder.total_ht).toBeDefined();
+    expect(referralOrder.total_ht).not.toBeNull();
+    expect(parseFloat(referralOrder.total_ht)).toBeCloseTo(10.84, 2);
+  });
 });
