@@ -222,7 +222,10 @@ function renderStudentPage(doc, student, brandName) {
         doc.text(String(item.qty), colX.qty, y, { width: 40, align: 'right' });
         doc.text(`${item.unit_price_ttc.toFixed(2)} EUR`, colX.pu, y, { width: 50, align: 'right' });
         doc.text(`${lineTotal.toFixed(2)} EUR`, colX.total, y, { width: 55, align: 'right' });
-        doc.moveDown(0.3);
+        // BUG-C : ancrer doc.y sur la hauteur réelle du label (wrap-aware)
+        // pour éviter le chevauchement quand le nom produit est long.
+        const labelHeight = doc.heightOfString(item.product_name, { width: 170 });
+        doc.y = y + Math.max(labelHeight, doc.currentLineHeight()) + 3;
       }
 
       // Render free 12+1 line if free_qty > 0
@@ -240,12 +243,16 @@ function renderStudentPage(doc, student, brandName) {
           isFirstVisibleLine = false;
         }
         doc.font('Helvetica-Oblique').fillColor('#7a1c3b');
-        doc.text(`Bouteille offerte 12+1 - ${item.product_name}`, colX.product, fy, { width: 170 });
+        const freeLabel = `Bouteille offerte 12+1 - ${item.product_name}`;
+        doc.text(freeLabel, colX.product, fy, { width: 170 });
         doc.text(String(item.free_qty), colX.qty, fy, { width: 40, align: 'right' });
         doc.text('0,00 EUR', colX.pu, fy, { width: 50, align: 'right' });
         doc.text('0,00 EUR', colX.total, fy, { width: 55, align: 'right' });
+        // BUG-C : avance Y wrap-aware (label 12+1 plus long que produit seul).
+        // heightOfString calculé AVANT reset font pour mesurer en Helvetica-Oblique.
+        const freeLabelHeight = doc.heightOfString(freeLabel, { width: 170 });
         doc.font('Helvetica').fillColor('#333');
-        doc.moveDown(0.3);
+        doc.y = fy + Math.max(freeLabelHeight, doc.currentLineHeight()) + 3;
       }
     }
 
