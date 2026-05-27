@@ -459,9 +459,15 @@ async function validateOrder(orderId, adminUserId) {
     if (balance.available <= 0) return;
 
     // Déjà attribuées par produit pour ce bénéficiaire dans cette campagne
+    // BUG-A2-rev : exclure les free_bottle events neutralisés par une correction.
     const usedRows = await trx('financial_events')
       .where({ campaign_id: order.campaign_id, type: 'free_bottle' })
       .whereRaw("metadata->>'user_id' = ?", [beneficiaryId])
+      .whereRaw(`NOT EXISTS (
+        SELECT 1 FROM financial_events fc
+        WHERE fc.type = 'correction'
+          AND fc.metadata->>'corrects_event_id' = financial_events.id::text
+      )`)
       .select(
         db.raw("metadata->>'product_id' as product_id"),
         db.raw('COUNT(*)::int as count')
@@ -472,9 +478,19 @@ async function validateOrder(orderId, adminUserId) {
       if (r.product_id) usedByProduct.set(r.product_id, parseInt(r.count, 10));
     }
 
+    // BUG-A2-rev (cap global) : Σ pending par produit peut dépasser balance.available
+    // si des events historiques existent pour un produit "orphelin" (= product_id présent
+    // dans financial_events mais sorti de balance.details parce qu'un produit moins cher
+    // est arrivé entre-temps). Sans cap, on créerait des events en excès.
+    const totalToCreate = balance.available;
+    let createdCount = 0;
+
     for (const detail of balance.details) {
+      if (createdCount >= totalToCreate) break;
       const used = usedByProduct.get(detail.product_id) || 0;
-      const pending = Math.max(0, detail.earned - used);
+      let pending = Math.max(0, detail.earned - used);
+      const remaining = totalToCreate - createdCount;
+      if (pending > remaining) pending = remaining;
       if (pending === 0) continue;
 
       const product = await trx('products').where({ id: detail.product_id }).first();
@@ -522,6 +538,7 @@ async function validateOrder(orderId, adminUserId) {
       await trx('financial_events').insert(finEventRows);
       await trx('stock_movements').insert(stockRows);
       freeBottlesCreated += pending;
+      createdCount += pending;
     }
   });
 

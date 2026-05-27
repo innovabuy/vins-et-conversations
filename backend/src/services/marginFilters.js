@@ -129,10 +129,19 @@ function applyOrderOnlyFilters(qb, filters, opts = {}) {
 // ─── Free bottle cost calculation (V4.2 BLOC 3) ─────────────────
 // Source of truth: financial_events with type='free_bottle' (append-only)
 // These events are created both by manual recording and automatic triggers.
+// BUG-A2-rev : on inclut aussi les events 'correction' liés à un free_bottle
+// (metadata.corrects_event_id NOT NULL) — leur amount est négatif, donc SUM
+// nets out le coût d'un freebie obsolète.
 
 async function calculateFreeBottleCosts(filters = {}) {
   const query = db('financial_events')
-    .where('financial_events.type', 'free_bottle')
+    .where(function () {
+      this.where('financial_events.type', 'free_bottle')
+        .orWhere(function () {
+          this.where('financial_events.type', 'correction')
+            .whereRaw("financial_events.metadata->>'corrects_event_id' IS NOT NULL");
+        });
+    })
     .select(
       'financial_events.order_id',
       db.raw('SUM(financial_events.amount) as free_bottle_cost')

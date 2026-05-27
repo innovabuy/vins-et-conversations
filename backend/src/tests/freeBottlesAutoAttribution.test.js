@@ -19,6 +19,7 @@ const bcrypt = require('bcryptjs');
 const { v4: uuidv4 } = require('uuid');
 const orderService = require('../services/orderService');
 const rulesEngine = require('../services/rulesEngine');
+const marginFilters = require('../services/marginFilters');
 
 const SUFFIX = `_fbauto_${Date.now()}`;
 
@@ -45,6 +46,9 @@ const users = {
   cas07: uuidv4(),
   cas08: uuidv4(),
   cas10: uuidv4(),
+  casA2cap: uuidv4(),
+  casA2used: uuidv4(),
+  casA2margin: uuidv4(),
 };
 
 const createdOrderIds = new Set();
@@ -414,5 +418,125 @@ describe('FB-AUTO — Tracking auto 12+1 à la validation', () => {
       // Skip path : product introuvable, validation OK sans free_bottle attribué
       expect(order.status).toBe('validated');
     }
+  });
+
+  // ─── BUG-A2-rev — Cap global + Event correction ─────────────────────────
+  // Le scénario "orphelin" : un produit a été choisi comme freebie à T0,
+  // puis un produit moins cher arrive à T1 et le supplante dans le sort.
+  // Sans cap, la boucle per-produit ignore les events historiques sur le
+  // produit sorti de details → events créés en excès.
+
+  test('FB-AUTO-A2-CAP : Σ pending par produit > balance.available → cap au global, pas d\'excès', async () => {
+    // T0 : 12 Apertus → 1 free Apertus
+    const t0 = await createSubmittedOrder({
+      userId: users.casA2cap,
+      items: [{ product: prodApertus, qty: 12 }],
+    });
+    await orderService.validateOrder(t0, adminUserId);
+    const eventsT0 = await db('financial_events')
+      .where({ campaign_id: campaignId, type: 'free_bottle' })
+      .whereRaw("metadata->>'user_id' = ?", [users.casA2cap]);
+    expect(eventsT0).toHaveLength(1);
+    const meta0 = typeof eventsT0[0].metadata === 'string' ? JSON.parse(eventsT0[0].metadata) : eventsT0[0].metadata;
+    expect(meta0.product_id).toBe(prodApertus.id);
+
+    // T1 : +24 Oriolus (cheaper, 2.00 < 4.00). Total alcool = 36 → 3 lots → earned=3.
+    // Sans le cap : pending Oriolus = 3, available = 2 → on créerait 3 events au lieu de 2.
+    // Avec le cap : on s'arrête à 2.
+    const t1 = await createSubmittedOrder({
+      userId: users.casA2cap,
+      items: [{ product: prodOriolus, qty: 24 }],
+    });
+    await orderService.validateOrder(t1, adminUserId);
+
+    const allEvents = await db('financial_events')
+      .where({ campaign_id: campaignId, type: 'free_bottle' })
+      .whereRaw("metadata->>'user_id' = ?", [users.casA2cap]);
+    expect(allEvents).toHaveLength(3); // 1 Apertus (orphan) + 2 Oriolus (cap respecté)
+
+    const oriolusEvents = allEvents.filter((e) => {
+      const m = typeof e.metadata === 'string' ? JSON.parse(e.metadata) : e.metadata;
+      return m.product_id === prodOriolus.id;
+    });
+    expect(oriolusEvents).toHaveLength(2);
+
+    // Balance globale cohérente (earned=3, used=3, available=0)
+    const rules = await rulesEngine.loadRulesForCampaign(campaignId);
+    const balance = await rulesEngine.calculateFreeBottles(
+      users.casA2cap, campaignId, rules.freeBottle, { includeReferredBy: true }
+    );
+    expect(balance.earned).toBe(3);
+    expect(balance.used).toBe(3);
+    expect(balance.available).toBe(0);
+  });
+
+  test('FB-AUTO-A2-USED : event correction décrémente le compteur used dans calculateFreeBottles', async () => {
+    const orderId = await createSubmittedOrder({
+      userId: users.casA2used,
+      items: [{ product: prodApertus, qty: 12 }],
+    });
+    await orderService.validateOrder(orderId, adminUserId);
+    const events = await db('financial_events')
+      .where({ campaign_id: campaignId, type: 'free_bottle' })
+      .whereRaw("metadata->>'user_id' = ?", [users.casA2used]);
+    expect(events).toHaveLength(1);
+
+    const rules = await rulesEngine.loadRulesForCampaign(campaignId);
+    let balance = await rulesEngine.calculateFreeBottles(
+      users.casA2used, campaignId, rules.freeBottle, { includeReferredBy: true }
+    );
+    expect(balance.used).toBe(1);
+    expect(balance.available).toBe(0);
+
+    // INSERT correction
+    await db('financial_events').insert({
+      type: 'correction',
+      amount: -prodApertus.purchase_price,
+      campaign_id: campaignId,
+      order_id: orderId,
+      description: 'Test correction A2-rev',
+      metadata: JSON.stringify({
+        user_id: users.casA2used,
+        corrects_event_id: events[0].id,
+        reason: 'test_retroactive_optimum_shift',
+      }),
+    });
+
+    balance = await rulesEngine.calculateFreeBottles(
+      users.casA2used, campaignId, rules.freeBottle, { includeReferredBy: true }
+    );
+    expect(balance.used).toBe(0);
+    expect(balance.available).toBe(1);
+  });
+
+  test('FB-AUTO-A2-MARGIN : event correction neutralise le coût free_bottle dans calculateFreeBottleCosts', async () => {
+    const orderId = await createSubmittedOrder({
+      userId: users.casA2margin,
+      items: [{ product: prodApertus, qty: 12 }],
+    });
+    await orderService.validateOrder(orderId, adminUserId);
+    const events = await db('financial_events').where({ order_id: orderId, type: 'free_bottle' });
+    expect(events).toHaveLength(1);
+
+    let costs = await marginFilters.calculateFreeBottleCosts({ campaign_id: campaignId });
+    const before = costs.byOrder.find((r) => r.order_id === orderId);
+    expect(parseFloat(before.free_bottle_cost)).toBeCloseTo(prodApertus.purchase_price, 2);
+
+    await db('financial_events').insert({
+      type: 'correction',
+      amount: -prodApertus.purchase_price,
+      campaign_id: campaignId,
+      order_id: orderId,
+      description: 'Test correction margin A2-rev',
+      metadata: JSON.stringify({
+        user_id: users.casA2margin,
+        corrects_event_id: events[0].id,
+        reason: 'test_retroactive_optimum_shift',
+      }),
+    });
+
+    costs = await marginFilters.calculateFreeBottleCosts({ campaign_id: campaignId });
+    const after = costs.byOrder.find((r) => r.order_id === orderId);
+    expect(parseFloat(after.free_bottle_cost)).toBeCloseTo(0, 2);
   });
 });

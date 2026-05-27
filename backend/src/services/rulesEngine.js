@@ -385,9 +385,16 @@ async function calculateFreeBottles(userId, campaignId, freeBottleRules, options
   const details = Array.from(freeBottlesPerProduct.values());
 
   // 7. Bouteilles gratuites déjà utilisées (financial_events)
+  // BUG-A2-rev : exclure les free_bottle events neutralisés par une correction
+  // (events 'correction' dont metadata.corrects_event_id pointe vers ce free_bottle).
   const usedResult = await conn('financial_events')
     .where({ campaign_id: campaignId, type: 'free_bottle' })
     .whereRaw("metadata->>'user_id' = ?", [userId])
+    .whereRaw(`NOT EXISTS (
+      SELECT 1 FROM financial_events fc
+      WHERE fc.type = 'correction'
+        AND fc.metadata->>'corrects_event_id' = financial_events.id::text
+    )`)
     .count('id as count')
     .first();
 
