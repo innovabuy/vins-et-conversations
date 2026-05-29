@@ -879,6 +879,7 @@ export default function AdminCatalog() {
   const [editing, setEditing] = useState(null);
   const [viewing, setViewing] = useState(null);
   const [filters, setFilters] = useState({ color: '', region: '', category: '', boutiqueOnly: false });
+  const [search, setSearch] = useState('');
   const [emailModal, setEmailModal] = useState(false);
   const [emailForm, setEmailForm] = useState({ email: '', subject: 'Catalogue Vins & Conversations', message: '' });
   const [sending, setSending] = useState(false);
@@ -1002,7 +1003,17 @@ export default function AdminCatalog() {
 
   // Unique regions for filter
   const regions = [...new Set(products.map(p => p.region).filter(Boolean))];
-  const displayProducts = filters.boutiqueOnly ? products.filter(p => p.visible_boutique) : products;
+  // Normalisation insensible casse + accents (« cremant » trouve « Crémant »), gère les null.
+  const normalize = (s) => (s || '').toString().normalize('NFD').replace(new RegExp('[\u0300-\u036f]', 'g'), '').toLowerCase();
+  const searchQuery = normalize(search.trim());
+  let displayProducts = filters.boutiqueOnly ? products.filter(p => p.visible_boutique) : products;
+  if (searchQuery) {
+    displayProducts = displayProducts.filter(p =>
+      normalize(p.name).includes(searchQuery)
+      || normalize(p.color).includes(searchQuery)
+      || normalize(p.region).includes(searchQuery)
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -1076,6 +1087,16 @@ export default function AdminCatalog() {
       {/* Filters */}
       <div className="card">
         <div className="flex flex-wrap gap-3 items-end">
+          <div className="min-w-[220px] flex-1">
+            <label className="block text-xs font-medium text-gray-500 mb-1">Recherche</label>
+            <input
+              type="text"
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+              placeholder="Nom, couleur, région…"
+              className="w-full border rounded-lg px-3 py-2 text-sm"
+            />
+          </div>
           <div className="min-w-[140px]">
             <label className="block text-xs font-medium text-gray-500 mb-1">Couleur</label>
             <select value={filters.color} onChange={e => setFilters(f => ({ ...f, color: e.target.value }))} className="w-full border rounded-lg px-3 py-2 text-sm">
@@ -1094,7 +1115,7 @@ export default function AdminCatalog() {
             {filters.boutiqueOnly ? <Eye size={14} /> : <EyeOff size={14} />}
             {filters.boutiqueOnly ? 'Boutique seuls' : 'Tous les produits'}
           </button>
-          <button onClick={() => setFilters({ color: '', region: '', category: '', boutiqueOnly: false })} className="text-sm text-gray-500 hover:text-gray-700 px-3 py-2">Effacer</button>
+          <button onClick={() => { setFilters({ color: '', region: '', category: '', boutiqueOnly: false }); setSearch(''); }} className="text-sm text-gray-500 hover:text-gray-700 px-3 py-2">Effacer</button>
         </div>
       </div>
 
