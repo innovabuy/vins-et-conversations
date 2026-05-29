@@ -150,6 +150,7 @@ campaignProductsRouter.get(
         .leftJoin('product_categories', 'products.category_id', 'product_categories.id')
         .where('campaign_products.campaign_id', req.params.campaignId)
         .where('campaign_products.active', true)
+        .where('products.active', true) // ← AJOUT : ne jamais servir un produit soft-deleté
         .select('products.*', 'campaign_products.custom_price', 'campaign_products.sort_order as campaign_sort',
           'product_categories.name as category_name', 'product_categories.type as category_type',
           'product_categories.product_type as category_product_type', 'product_categories.is_alcohol as category_is_alcohol',
