@@ -38,7 +38,7 @@ module.exports = {
     connection: process.env.DATABASE_URL || {
       host: 'localhost',
       port: 5432,
-      database: 'vins_conversations',
+      database: 'vins_conversations_test',
       user: 'vc_admin',
       password: 'vc_dev_2026',
     },
