@@ -450,19 +450,37 @@ async function validateOrder(orderId, adminUserId) {
   let freeBottlesCreated = 0;
 
   await db.transaction(async (trx) => {
+    // Modèle A — on n'attribue que les paliers franchis PAR cette validation
+    // (= earned_après − earned_avant), pas tout le solde campagne. Le backlog
+    // historique non matérialisé reste non attribué (assumé).
+    //
+    // earned_avant : on charge les règles et on calcule AVANT de flipper le statut.
+    // À ce stade l'order est encore 'submitted', donc EXCLU de calculateFreeBottles
+    // (qui ne compte que validated|preparing|shipped|delivered) → il n'est pas compté.
+    const rules = beneficiaryId ? await rulesEngine.loadRulesForCampaign(order.campaign_id) : null;
+    const freeBottleRules = rules?.freeBottle;
+    const applies12plus1 = !!beneficiaryId && !!freeBottleRules && freeBottleRules.trigger === 'every_n_sold';
+
+    let earnedBefore = 0;
+    if (applies12plus1) {
+      const balanceBefore = await rulesEngine.calculateFreeBottles(
+        beneficiaryId,
+        order.campaign_id,
+        freeBottleRules,
+        { includeReferredBy: true, trx }
+      );
+      earnedBefore = balanceBefore.disabled ? 0 : balanceBefore.earned;
+    }
+
     await trx('orders').where({ id: orderId }).update({
       status: 'validated',
       updated_at: new Date(),
     });
 
-    if (!beneficiaryId) return; // commande sans user (boutique anonyme) — pas de 12+1
+    if (!applies12plus1) return; // pas de bénéficiaire (boutique anonyme) ou pas de règle 12+1
 
-    const rules = await rulesEngine.loadRulesForCampaign(order.campaign_id);
-    const freeBottleRules = rules?.freeBottle;
-    if (!freeBottleRules || freeBottleRules.trigger !== 'every_n_sold') return;
-
-    // Calcul de l'état attendu (déjà filtre alcohol-only + statuts validés + Modèle C).
-    // On passe trx pour que la query voie l'UPDATE statut → 'validated' non encore commité.
+    // Calcul de l'état APRÈS (order désormais 'validated' → compté).
+    // On passe trx pour que la query voie l'UPDATE statut non encore commité.
     const balance = await rulesEngine.calculateFreeBottles(
       beneficiaryId,
       order.campaign_id,
@@ -471,7 +489,10 @@ async function validateOrder(orderId, adminUserId) {
     );
     if (balance.disabled) return;
     if (!balance.details || balance.details.length === 0) return;
-    if (balance.available <= 0) return;
+
+    // Delta de paliers franchis par cette commande (Modèle A).
+    const earnedDelta = Math.max(0, balance.earned - earnedBefore);
+    if (earnedDelta <= 0) return;
 
     // Déjà attribuées par produit pour ce bénéficiaire dans cette campagne
     // BUG-A2-rev : exclure les free_bottle events neutralisés par une correction.
@@ -493,11 +514,12 @@ async function validateOrder(orderId, adminUserId) {
       if (r.product_id) usedByProduct.set(r.product_id, parseInt(r.count, 10));
     }
 
-    // BUG-A2-rev (cap global) : Σ pending par produit peut dépasser balance.available
-    // si des events historiques existent pour un produit "orphelin" (= product_id présent
-    // dans financial_events mais sorti de balance.details parce qu'un produit moins cher
-    // est arrivé entre-temps). Sans cap, on créerait des events en excès.
-    const totalToCreate = balance.available;
+    // Modèle A : plafond global = nombre de paliers franchis par CETTE validation.
+    // (Remplace balance.available, qui déversait tout le solde campagne → bug du
+    //  déversement en bloc.) Le `pending = earned − used` par produit ci-dessous reste
+    //  borné par `remaining = totalToCreate − createdCount`, donc on ne crée jamais plus
+    //  que le delta même si un produit a un earned historique énorme avec used=0.
+    const totalToCreate = earnedDelta;
     let createdCount = 0;
 
     for (const detail of balance.details) {

@@ -49,6 +49,8 @@ const users = {
   casA2cap: uuidv4(),
   casA2used: uuidv4(),
   casA2margin: uuidv4(),
+  casDelta: uuidv4(),
+  casDeltaNoCross: uuidv4(),
 };
 
 const createdOrderIds = new Set();
@@ -538,5 +540,69 @@ describe('FB-AUTO — Tracking auto 12+1 à la validation', () => {
     costs = await marginFilters.calculateFreeBottleCosts({ campaign_id: campaignId });
     const after = costs.byOrder.find((r) => r.order_id === orderId);
     expect(parseFloat(after.free_bottle_cost)).toBeCloseTo(0, 2);
+  });
+
+  // ─── Modèle A — delta de paliers (anti-déversement en bloc) ──────────────
+  // Le bug corrigé : validateOrder attribuait balance.available (tout le solde
+  // campagne) sur la commande qui déclenche → déversement (70, 137 lignes).
+  // Fix : n'attribuer que earned_après − earned_avant (les paliers franchis par
+  // CETTE validation). Le backlog historique non matérialisé reste non attribué.
+
+  test('FB-AUTO-DELTA-1 : backlog non matérialisé (earned=5, used=0) → seul le delta (2) est attribué, pas le backlog', async () => {
+    // Backlog : 60 Apertus en 'delivered' SANS passer par le hook (simule les
+    // commandes validées avant activation du hook auto) → earned_avant=5, used=0.
+    const backlog = await createSubmittedOrder({
+      userId: users.casDelta,
+      items: [{ product: prodApertus, qty: 60 }],
+    });
+    await db('orders').where({ id: backlog }).update({ status: 'delivered' });
+
+    const rules = await rulesEngine.loadRulesForCampaign(campaignId);
+    const before = await rulesEngine.calculateFreeBottles(
+      users.casDelta, campaignId, rules.freeBottle, { includeReferredBy: true }
+    );
+    expect(before.earned).toBe(5);
+    expect(before.used).toBe(0);
+    expect(before.available).toBe(5); // ce que l'ANCIEN code aurait déversé
+
+    // Commande qui franchit 2 paliers : +24 Oriolus (moins cher) → cumul 84 → earned 7 → delta = 2
+    const crossing = await createSubmittedOrder({
+      userId: users.casDelta,
+      items: [{ product: prodOriolus, qty: 24 }],
+    });
+    await orderService.validateOrder(crossing, adminUserId);
+
+    // ANTI-DÉVERSEMENT : exactement 2 events sur la commande (le delta), PAS 5 ni 7.
+    const eventsOnOrder = await db('financial_events').where({ order_id: crossing, type: 'free_bottle' });
+    expect(eventsOnOrder).toHaveLength(2);
+    // Attribution = la moins chère (Oriolus), via réutilisation de balance.details
+    for (const e of eventsOnOrder) {
+      const m = typeof e.metadata === 'string' ? JSON.parse(e.metadata) : e.metadata;
+      expect(m.product_id).toBe(prodOriolus.id);
+    }
+    // Total user = 2 : le backlog de 5 lots n'a PAS été matérialisé (Modèle A)
+    const totalEvents = await db('financial_events')
+      .where({ campaign_id: campaignId, type: 'free_bottle' })
+      .whereRaw("metadata->>'user_id' = ?", [users.casDelta]);
+    expect(totalEvents).toHaveLength(2);
+  });
+
+  test('FB-AUTO-DELTA-2 : commande qui ne franchit aucun palier → 0 gratuite', async () => {
+    // Backlog 60 Apertus delivered (earned=5)
+    const backlog = await createSubmittedOrder({
+      userId: users.casDeltaNoCross,
+      items: [{ product: prodApertus, qty: 60 }],
+    });
+    await db('orders').where({ id: backlog }).update({ status: 'delivered' });
+
+    // +6 Apertus → cumul 66 → floor(66/12)=5 → delta = 0
+    const noCross = await createSubmittedOrder({
+      userId: users.casDeltaNoCross,
+      items: [{ product: prodApertus, qty: 6 }],
+    });
+    await orderService.validateOrder(noCross, adminUserId);
+
+    const eventsOnOrder = await db('financial_events').where({ order_id: noCross, type: 'free_bottle' });
+    expect(eventsOnOrder).toHaveLength(0);
   });
 });
