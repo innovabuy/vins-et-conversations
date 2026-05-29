@@ -69,9 +69,24 @@ async function createOrder({ userId, campaignId, items, customerId, notes, custo
     .where('campaign_products.campaign_id', campaignId)
     .whereIn('products.id', productIds)
     .where('campaign_products.active', true)
+    .where('products.active', true) // intégrité : ne jamais créer de commande sur un produit soft-deleté
     .select('products.*', 'campaign_products.custom_price');
 
   if (products.length !== productIds.length) {
+    // Différencier produit désactivé (panier obsolète) vs lien réellement invalide,
+    // pour ne pas perdre l'info de diagnostic et afficher un message clair côté front.
+    const foundIds = new Set(products.map((p) => p.id));
+    const missingIds = productIds.filter((id) => !foundIds.has(id));
+    const unavailable = await db('products')
+      .join('campaign_products', 'products.id', 'campaign_products.product_id')
+      .where('campaign_products.campaign_id', campaignId)
+      .whereIn('products.id', missingIds)
+      .where('campaign_products.active', true)
+      .where('products.active', false)
+      .select('products.id');
+    if (unavailable.length > 0) {
+      throw new Error('PRODUCT_UNAVAILABLE');
+    }
     throw new Error('INVALID_PRODUCTS');
   }
 

@@ -128,6 +128,9 @@ router.post(
       if (err.message === 'INVALID_PRODUCTS') {
         return res.status(400).json({ error: 'INVALID_PRODUCTS', message: 'Produits invalides pour cette campagne' });
       }
+      if (err.message === 'PRODUCT_UNAVAILABLE') {
+        return res.status(400).json({ error: 'PRODUCT_UNAVAILABLE', message: "Un produit de votre panier n'est plus disponible. Veuillez le retirer et réessayer." });
+      }
       if (err.message === 'MIN_ORDER_NOT_MET') {
         return res.status(400).json({ error: 'MIN_ORDER_NOT_MET', message: 'Commande minimum non atteinte' });
       }
@@ -656,6 +659,7 @@ router.post(
       res.status(201).json(order);
     } catch (err) {
       if (err.message === 'INVALID_PRODUCTS') return res.status(400).json({ error: err.message });
+      if (err.message === 'PRODUCT_UNAVAILABLE') return res.status(400).json({ error: err.message, message: "Un produit n'est plus disponible." });
       if (err.message === 'NOT_PARTICIPANT') return res.status(403).json({ error: err.message });
       if (err.message.startsWith('DEFERRED_NOT_ELIGIBLE:')) {
         const names = err.message.split(':')[1];
