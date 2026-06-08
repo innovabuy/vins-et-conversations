@@ -69,6 +69,7 @@ import PrestationEcolesPage from './pages/vitrine/PrestationEcolesPage';
 import PrestationRepasPage from './pages/vitrine/PrestationRepasPage';
 import AProposPage from './pages/vitrine/AProposPage';
 import EquipePage from './pages/vitrine/EquipePage';
+import RaisonDetrePage from './pages/vitrine/RaisonDetrePage';
 import FAQPage from './pages/vitrine/FAQPage';
 import AvisPage from './pages/vitrine/AvisPage';
 import PartenairesPage from './pages/vitrine/PartenairesPage';
@@ -116,6 +117,7 @@ function AppRoutes() {
         <Route path="prestations/repas" element={<PrestationRepasPage />} />
         <Route path="apropos" element={<AProposPage />} />
         <Route path="equipe" element={<EquipePage />} />
+        <Route path="raison-d-etre" element={<RaisonDetrePage />} />
         <Route path="faq" element={<FAQPage />} />
         <Route path="avis" element={<AvisPage />} />
         <Route path="partenaires" element={<PartenairesPage />} />

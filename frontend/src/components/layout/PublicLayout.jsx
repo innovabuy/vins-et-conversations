@@ -93,6 +93,7 @@ export default function PublicLayout() {
               ]} />
               <NavDropdown label="À Propos" items={[
                 { href: '/boutique/apropos', label: 'Notre histoire' },
+                { href: '/boutique/raison-d-etre', label: 'Notre raison d\'être' },
                 { href: '/boutique/equipe', label: "L'équipe" },
                 { href: '/boutique/ambassadeurs', label: 'Nos Ambassadeurs' },
                 { href: '/boutique/faq', label: 'FAQ' },
@@ -136,6 +137,7 @@ export default function PublicLayout() {
 
             <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider pt-3 pb-1">À Propos</p>
             <NavLink to="/boutique/apropos" onClick={() => setMenuOpen(false)} className="block py-2 pl-3 text-sm text-gray-700 hover:text-wine-700">Notre histoire</NavLink>
+            <NavLink to="/boutique/raison-d-etre" onClick={() => setMenuOpen(false)} className="block py-2 pl-3 text-sm text-gray-700 hover:text-wine-700">Notre raison d'être</NavLink>
             <NavLink to="/boutique/equipe" onClick={() => setMenuOpen(false)} className="block py-2 pl-3 text-sm text-gray-700 hover:text-wine-700">L'équipe</NavLink>
             <NavLink to="/boutique/ambassadeurs" onClick={() => setMenuOpen(false)} className="block py-2 pl-3 text-sm text-gray-700 hover:text-wine-700">Nos Ambassadeurs</NavLink>
             <NavLink to="/boutique/faq" onClick={() => setMenuOpen(false)} className="block py-2 pl-3 text-sm text-gray-700 hover:text-wine-700">FAQ</NavLink>
@@ -190,6 +192,7 @@ export default function PublicLayout() {
                 <Link to="/boutique" className="block text-sm text-gray-300 hover:text-white">Nos vins</Link>
                 <Link to="/boutique/selection" className="block text-sm text-gray-300 hover:text-white">Sélection du moment</Link>
                 <Link to="/boutique/coffrets" className="block text-sm text-gray-300 hover:text-white">Coffrets</Link>
+                <Link to="/boutique/raison-d-etre" className="block text-sm text-gray-300 hover:text-white">Notre raison d'être</Link>
                 <Link to="/boutique/prestations/cse" className="block text-sm text-gray-300 hover:text-white">Espace CSE</Link>
                 <Link to="/boutique/prestations/ecoles" className="block text-sm text-gray-300 hover:text-white">Partenariat Écoles</Link>
                 <Link to="/boutique/ambassadeurs" className="block text-sm text-gray-300 hover:text-white">Devenir Ambassadeur</Link>

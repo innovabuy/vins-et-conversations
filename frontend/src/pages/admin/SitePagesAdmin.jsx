@@ -8,6 +8,7 @@ const KNOWN_SLUGS = [
   { slug: 'prestations-repas', label: 'Prestation Repas & Soirées' },
   { slug: 'a-propos', label: 'À Propos' },
   { slug: 'equipe', label: 'L\'Équipe' },
+  { slug: 'raison-d-etre', label: 'Raison d\'être / Manifeste' },
   { slug: 'faq', label: 'FAQ' },
   { slug: 'avis', label: 'Avis' },
   { slug: 'partenaires', label: 'Partenaires' },
