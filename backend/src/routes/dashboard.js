@@ -199,6 +199,7 @@ router.get(
         .leftJoin('product_categories', 'products.category_id', 'product_categories.id')
         .where('campaign_products.campaign_id', campaignId)
         .where('campaign_products.active', true)
+        .where('products.active', true)
         .select('products.*', 'campaign_products.custom_price')
         .orderBy('products.sort_order');
 
