@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { Wine, ChevronRight, Heart, Grape, Award } from 'lucide-react';
 import api from '../../services/api';
+import { useSiteImage } from '../../contexts/SiteImagesContext';
 
 const DEFAULT_CONTENT = {
   hero: {
@@ -23,6 +24,8 @@ const ICON_MAP = { heart: Heart, grape: Grape, award: Award };
 
 export default function AProposPage() {
   const [content, setContent] = useState(DEFAULT_CONTENT);
+  const heroBg = useSiteImage('apropos_hero');
+  const nicolasPhoto = useSiteImage('apropos_nicolas_grand');
 
   useEffect(() => {
     api.get('/site-pages/a-propos')
@@ -32,8 +35,12 @@ export default function AProposPage() {
 
   return (
     <div>
-      <section className="bg-gradient-to-br from-wine-800 via-wine-700 to-wine-900 text-white py-20">
-        <div className="max-w-4xl mx-auto px-4 text-center">
+      <section
+        className={`relative text-white py-20 ${heroBg?.image_url ? 'bg-wine-900' : 'bg-gradient-to-br from-wine-800 via-wine-700 to-wine-900'}`}
+        style={heroBg?.image_url ? { backgroundImage: `url(${heroBg.image_url})`, backgroundSize: 'cover', backgroundPosition: 'center' } : undefined}
+      >
+        {heroBg?.image_url && <div className="absolute inset-0 bg-black/45" aria-hidden="true" />}
+        <div className="relative max-w-4xl mx-auto px-4 text-center">
           <div className="inline-flex items-center gap-2 bg-white/10 backdrop-blur rounded-full px-4 py-1.5 text-sm mb-6">
             <Wine size={16} /> Notre histoire
           </div>
@@ -43,6 +50,19 @@ export default function AProposPage() {
       </section>
 
       <section className="max-w-4xl mx-auto px-4 py-16">
+        {nicolasPhoto?.image_url && (
+          <figure className="mb-12 rounded-2xl overflow-hidden bg-wine-50 shadow-sm">
+            <img
+              src={nicolasPhoto.image_url}
+              alt={nicolasPhoto.alt_text || 'Nicolas Froment, fondateur de Vins & Conversations'}
+              loading="lazy"
+              className="w-full aspect-[16/9] object-cover"
+            />
+            {nicolasPhoto.alt_text && (
+              <figcaption className="px-4 py-3 text-sm text-gray-600 text-center">{nicolasPhoto.alt_text}</figcaption>
+            )}
+          </figure>
+        )}
         {content.sections.map((section, i) => (
           <div key={i} className="mb-12">
             {section.title && <h2 className="text-2xl font-bold text-gray-900 mb-6">{section.title}</h2>}
