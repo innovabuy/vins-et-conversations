@@ -1,27 +1,43 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { Users, ChevronRight } from 'lucide-react';
+import { Users, ChevronRight, Mail, UserRound } from 'lucide-react';
 import api from '../../services/api';
+import { useSiteImage } from '../../contexts/SiteImagesContext';
 
 const DEFAULT_CONTENT = {
   hero: {
     title: 'L\'Équipe',
     subtitle: 'Les passionnés derrière Vins & Conversations.',
   },
-  sections: [
-    { type: 'placeholder', body: 'Contenu en cours de rédaction — Nicolas fournira prochainement les textes et photos de l\'équipe.' },
+  members: [
+    { slot: 'equipe_nicolas', name: 'Nicolas Froment', role: 'Fondateur & Gérant', bio: 'Ancien caviste et négociant en vins et spiritueux pendant près de 12 ans, Nicolas a lancé Vins & Conversations pour partager sa passion du vin et du lien humain.', email: '' },
+    { slot: 'equipe_matheo', name: 'Mathéo Benoit', role: 'Relation clients', bio: 'Présentation à compléter.', email: '' },
+    { slot: 'equipe_malone', name: 'Malone Froment', role: 'Équipe', bio: 'Présentation à compléter.', email: '' },
+    { slot: 'equipe_martin', name: 'Martin Hery', role: 'Équipe', bio: 'Présentation à compléter.', email: '' },
   ],
   cta: { label: 'Nous contacter', href: '/boutique/contact' },
 };
 
 export default function EquipePage() {
   const [content, setContent] = useState(DEFAULT_CONTENT);
+  const imgNicolas = useSiteImage('equipe_nicolas');
+  const imgMatheo = useSiteImage('equipe_matheo');
+  const imgMalone = useSiteImage('equipe_malone');
+  const imgMartin = useSiteImage('equipe_martin');
+  const photoBySlot = {
+    equipe_nicolas: imgNicolas,
+    equipe_matheo: imgMatheo,
+    equipe_malone: imgMalone,
+    equipe_martin: imgMartin,
+  };
 
   useEffect(() => {
     api.get('/site-pages/equipe')
       .then(({ data }) => { if (data.content_json) setContent(data.content_json); })
       .catch(() => {});
   }, []);
+
+  const members = content.members || [];
 
   return (
     <div>
@@ -35,21 +51,40 @@ export default function EquipePage() {
         </div>
       </section>
 
-      <section className="max-w-4xl mx-auto px-4 py-16">
-        {content.sections.map((section, i) => (
-          <div key={i} className="mb-12">
-            {section.title && <h2 className="text-2xl font-bold text-gray-900 mb-6">{section.title}</h2>}
-            {section.type === 'placeholder' && (
-              <div className="p-8 bg-gray-50 rounded-2xl border-2 border-dashed border-gray-200 text-center">
-                <Users size={48} className="mx-auto text-gray-300 mb-4" />
-                <p className="text-gray-500 italic">{section.body}</p>
+      <section className="max-w-5xl mx-auto px-4 py-16">
+        <div className="grid sm:grid-cols-2 gap-8">
+          {members.map((m, i) => {
+            const photo = photoBySlot[m.slot];
+            return (
+              <div key={m.slot || i} className="flex gap-5 p-6 bg-white border border-gray-100 rounded-2xl shadow-sm">
+                <div className="flex-shrink-0">
+                  {photo?.image_url ? (
+                    <img
+                      src={photo.image_url}
+                      alt={photo.alt_text || m.name}
+                      loading="lazy"
+                      className="w-24 h-24 rounded-full object-cover"
+                    />
+                  ) : (
+                    <div className="w-24 h-24 rounded-full bg-wine-100 flex items-center justify-center" aria-hidden="true">
+                      <UserRound size={40} className="text-wine-400" />
+                    </div>
+                  )}
+                </div>
+                <div className="min-w-0">
+                  <h3 className="text-lg font-bold text-gray-900">{m.name}</h3>
+                  {m.role && <span className="inline-block text-sm font-medium text-wine-700 mb-2">{m.role}</span>}
+                  {m.bio && <p className="text-sm text-gray-600 leading-relaxed">{m.bio}</p>}
+                  {m.email && (
+                    <a href={`mailto:${m.email}`} className="inline-flex items-center gap-1.5 mt-3 text-sm text-wine-700 hover:text-wine-800">
+                      <Mail size={14} /> {m.email}
+                    </a>
+                  )}
+                </div>
               </div>
-            )}
-            {section.body && section.type !== 'placeholder' && (
-              <p className="text-gray-600 leading-relaxed">{section.body}</p>
-            )}
-          </div>
-        ))}
+            );
+          })}
+        </div>
 
         <div className="text-center mt-12">
           <Link to={content.cta.href} className="inline-flex items-center gap-2 bg-wine-700 text-white px-8 py-3 rounded-xl font-semibold hover:bg-wine-800 transition-colors">
