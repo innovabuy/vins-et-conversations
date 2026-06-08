@@ -96,6 +96,7 @@ export default function PublicLayout() {
                 { href: '/boutique/raison-d-etre', label: 'Notre raison d\'être' },
                 { href: '/boutique/equipe', label: "L'équipe" },
                 { href: '/boutique/ambassadeurs', label: 'Nos Ambassadeurs' },
+                { href: '/boutique/cercle-ambassadeurs', label: 'Cercle des ambassadeurs' },
                 { href: '/boutique/faq', label: 'FAQ' },
                 { href: '/boutique/avis', label: 'Avis' },
                 { href: '/boutique/partenaires', label: 'Nos partenaires' },
@@ -140,6 +141,7 @@ export default function PublicLayout() {
             <NavLink to="/boutique/raison-d-etre" onClick={() => setMenuOpen(false)} className="block py-2 pl-3 text-sm text-gray-700 hover:text-wine-700">Notre raison d'être</NavLink>
             <NavLink to="/boutique/equipe" onClick={() => setMenuOpen(false)} className="block py-2 pl-3 text-sm text-gray-700 hover:text-wine-700">L'équipe</NavLink>
             <NavLink to="/boutique/ambassadeurs" onClick={() => setMenuOpen(false)} className="block py-2 pl-3 text-sm text-gray-700 hover:text-wine-700">Nos Ambassadeurs</NavLink>
+            <NavLink to="/boutique/cercle-ambassadeurs" onClick={() => setMenuOpen(false)} className="block py-2 pl-3 text-sm text-gray-700 hover:text-wine-700">Cercle des ambassadeurs</NavLink>
             <NavLink to="/boutique/faq" onClick={() => setMenuOpen(false)} className="block py-2 pl-3 text-sm text-gray-700 hover:text-wine-700">FAQ</NavLink>
 
             <div className="border-t border-gray-100 mt-3 pt-3 space-y-2">
@@ -197,6 +199,7 @@ export default function PublicLayout() {
                 <Link to="/boutique/prestations/ecoles" className="block text-sm text-gray-300 hover:text-white">Partenariat Écoles</Link>
                 <Link to="/boutique/ambassadeurs" className="block text-sm text-gray-300 hover:text-white">Devenir Ambassadeur</Link>
                 <Link to="/boutique/ambassadeurs" className="block text-sm text-gray-300 hover:text-white">Nos Ambassadeurs</Link>
+                <Link to="/boutique/cercle-ambassadeurs" className="block text-sm text-gray-300 hover:text-white">Cercle des ambassadeurs</Link>
                 <Link to="/boutique/contact" className="block text-sm text-gray-300 hover:text-white">Contact</Link>
                 <Link to="/login" className="block text-sm text-gray-300 hover:text-white">Espace membre</Link>
               </div>

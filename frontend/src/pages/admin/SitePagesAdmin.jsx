@@ -9,6 +9,7 @@ const KNOWN_SLUGS = [
   { slug: 'a-propos', label: 'À Propos' },
   { slug: 'equipe', label: 'L\'Équipe' },
   { slug: 'raison-d-etre', label: 'Raison d\'être / Manifeste' },
+  { slug: 'cercle-ambassadeurs', label: 'Cercle des ambassadeurs' },
   { slug: 'faq', label: 'FAQ' },
   { slug: 'avis', label: 'Avis' },
   { slug: 'partenaires', label: 'Partenaires' },
