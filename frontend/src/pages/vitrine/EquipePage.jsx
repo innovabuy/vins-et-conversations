@@ -24,6 +24,7 @@ export default function EquipePage() {
   const imgMatheo = useSiteImage('equipe_matheo');
   const imgMalone = useSiteImage('equipe_malone');
   const imgMartin = useSiteImage('equipe_martin');
+  const imgGroupe = useSiteImage('equipe_groupe');
   const photoBySlot = {
     equipe_nicolas: imgNicolas,
     equipe_matheo: imgMatheo,
@@ -50,6 +51,17 @@ export default function EquipePage() {
           <p className="text-lg text-wine-200 max-w-2xl mx-auto">{content.hero.subtitle}</p>
         </div>
       </section>
+
+      {imgGroupe?.image_url && (
+        <section className="max-w-5xl mx-auto px-4 pt-12">
+          <img
+            src={imgGroupe.image_url}
+            alt={imgGroupe.alt_text || content.hero.title}
+            loading="lazy"
+            className="w-full rounded-2xl object-cover shadow-sm"
+          />
+        </section>
+      )}
 
       <section className="max-w-5xl mx-auto px-4 py-16">
         <div className="grid sm:grid-cols-2 gap-8">
