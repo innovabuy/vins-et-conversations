@@ -25,6 +25,11 @@ export default function BoutiqueHome() {
   const [products, setProducts] = useState([]);
   const [filters, setFilters] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [page, setPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [totalCount, setTotalCount] = useState(0);
+  const reqIdRef = useRef(0);
   const [search, setSearch] = useState('');
   const [region, setRegion] = useState('');
   const [categoryId, setCategoryId] = useState('');
@@ -64,20 +69,32 @@ export default function BoutiqueHome() {
     }
   }, []);
 
-  const fetchProducts = async () => {
-    setLoading(true);
+  const fetchProducts = async (pageToFetch) => {
+    // Séquence : seule la réponse de la requête la plus récente est appliquée
+    // (protège contre un changement de filtre survenu pendant un fetch en cours).
+    const reqId = ++reqIdRef.current;
+    if (pageToFetch === 1) setLoading(true);
+    else setLoadingMore(true);
     try {
-      const params = {};
+      const params = { page: pageToFetch };
       if (search) params.search = search;
       if (region) params.region = region;
       if (categoryId) params.category_id = categoryId;
       if (campaignId) params.campaign_id = campaignId;
       const { data } = await api.get('/public/catalog', { params });
-      setProducts(data.data || []);
+      if (reqId !== reqIdRef.current) return; // réponse périmée → ignorée
+      const items = data.data || [];
+      // Page 1 (mount ou changement de filtre) → remplace ; pages suivantes → concatène.
+      setProducts(prev => (pageToFetch === 1 ? items : [...prev, ...items]));
+      setTotalPages(data.pagination?.pages || 1);
+      setTotalCount(data.pagination?.total ?? items.length);
     } catch (err) {
-      console.error(err);
+      if (reqId === reqIdRef.current) console.error(err);
     } finally {
-      setLoading(false);
+      if (reqId === reqIdRef.current) {
+        setLoading(false);
+        setLoadingMore(false);
+      }
     }
   };
 
@@ -86,7 +103,11 @@ export default function BoutiqueHome() {
     featuredAPI.list().then(r => setFeatured(r.data.data || [])).catch(() => {});
   }, []);
 
-  useEffect(() => { fetchProducts(); }, [search, region, categoryId, campaignId]);
+  // Changement de filtre → on repart page 1 (la liste sera remplacée, pas concaténée).
+  useEffect(() => { setPage(1); }, [search, region, categoryId, campaignId]);
+
+  // Fetch sur changement de page OU de filtre.
+  useEffect(() => { fetchProducts(page); }, [page, search, region, categoryId, campaignId]);
 
   return (
     <div>
@@ -324,6 +345,27 @@ export default function BoutiqueHome() {
                 </div>
               </Link>
             ))}
+          </div>
+        )}
+
+        {/* Charger plus — visible uniquement s'il reste des pages */}
+        {!loading && page < totalPages && (
+          <div className="flex flex-col items-center gap-2 mt-10">
+            <button
+              onClick={() => setPage(p => p + 1)}
+              disabled={loadingMore}
+              className="inline-flex items-center gap-2 px-6 py-3 rounded-xl font-semibold border border-wine-200 text-wine-700 hover:bg-wine-50 transition-all disabled:opacity-60 disabled:cursor-not-allowed"
+            >
+              {loadingMore ? (
+                <>
+                  <span className="animate-spin rounded-full h-4 w-4 border-b-2 border-wine-700" />
+                  Chargement…
+                </>
+              ) : (
+                <>Charger plus de vins <ChevronRight size={18} /></>
+              )}
+            </button>
+            <span className="text-xs text-gray-400">{products.length} sur {totalCount} vins</span>
           </div>
         )}
       </section>
