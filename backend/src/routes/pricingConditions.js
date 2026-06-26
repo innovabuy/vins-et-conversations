@@ -9,8 +9,10 @@ const { invalidateCache } = require('../middleware/cache');
 const router = express.Router();
 
 /**
- * Synchronise pricing_conditions → client_types.pricing_rules JSONB
- * So that dashboard/CSE and orderService always read fresh values.
+ * Synchronise pricing_conditions → client_types.pricing_rules JSONB (remise `value` uniquement).
+ * Étape 3 (volet suppression) : min_order n'est PLUS synchronisé vers le client_type — la campagne
+ * (campaign.config.min_order) est la source de vérité unique depuis l'étape 1. On retire ici toute
+ * clé min_order résiduelle (le spread la préserverait sinon) pour que le client_type n'en porte plus.
  */
 async function syncToClientTypes(condition) {
   const clientType = await db('client_types')
@@ -21,9 +23,10 @@ async function syncToClientTypes(condition) {
   const currentRules = typeof clientType.pricing_rules === 'string'
     ? JSON.parse(clientType.pricing_rules) : (clientType.pricing_rules || {});
 
+  // Drop min_order (clé legacy) et ne resynchronise que la remise.
+  const { min_order: _droppedMinOrder, ...restRules } = currentRules;
   const updatedRules = {
-    ...currentRules,
-    min_order: parseFloat(condition.min_order) || 0,
+    ...restRules,
     value: parseFloat(condition.discount_pct) || 0,
   };
 

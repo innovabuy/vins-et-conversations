@@ -488,9 +488,10 @@ describe('API Integration Tests', () => {
       const ct = await db('client_types').where({ name: 'cse' }).select('pricing_rules').first();
       originalCsePricingRules = ct?.pricing_rules;
 
-      // Ensure CSE min_order=200 (may have been set to 0 by other test suites)
+      // Étape 3 — min_order ne vit plus dans le client_type (campagne = source unique). On ne pose
+      // que la remise ; l'enforcement <200€ des tests ci-dessous est piloté par campaign.config (seed=200).
       await db('client_types').where({ name: 'cse' })
-        .update({ pricing_rules: JSON.stringify({ type: 'percentage_discount', value: 10, min_order: 200, applies_to: 'all' }) });
+        .update({ pricing_rules: JSON.stringify({ type: 'percentage_discount', value: 10, applies_to: 'all' }) });
 
       const res = await request(app)
         .post('/api/v1/auth/login')
@@ -3257,21 +3258,25 @@ describe('API Integration Tests', () => {
       }
     });
 
-    test('Source unique: pricing-conditions sync le client_type, mais campaign.config pilote le dashboard', async () => {
+    test('Source unique: pricing-conditions ne sync PLUS min_order vers le client_type (value seule), campaign.config pilote', async () => {
       if (!adminToken || !csePricingConditionId || !cseToken || !cseCampaignId) return;
 
-      // (1) L'endpoint admin pricing-conditions continue de synchroniser client_types.pricing_rules (comportement legacy conservé)
+      // (1) Étape 3 — l'endpoint admin pricing-conditions ne propage plus min_order vers
+      // client_types.pricing_rules (clé legacy retirée) ; il ne synchronise que la remise (value).
+      // On envoie min_order:200 exprès pour prouver qu'il N'atterrit PAS dans le client_type.
       const updateRes = await request(app)
         .put(`/api/v1/admin/pricing-conditions/${csePricingConditionId}`)
         .set('Authorization', `Bearer ${adminToken}`)
         .send({
           client_type: 'cse', label: 'CSE Standard', discount_pct: 10,
-          commission_pct: 0, min_order: 0, payment_terms: '30_days', active: true,
+          commission_pct: 0, min_order: 200, payment_terms: '30_days', active: true,
         });
       expect(updateRes.status).toBe(200);
       const ct = await db('client_types').where({ name: 'cse' }).first();
       const rules = typeof ct.pricing_rules === 'string' ? JSON.parse(ct.pricing_rules) : ct.pricing_rules;
-      expect(rules.min_order).toBe(0);
+      // min_order absent du client_type, remise (value) bien synchronisée
+      expect(rules.min_order).toBeUndefined();
+      expect(rules.value).toBe(10);
 
       // (2) Mais le dashboard CSE lit désormais campaign.config.min_order (source de vérité unique)
       await db('campaigns').where({ id: cseCampaignId })

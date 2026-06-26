@@ -321,7 +321,9 @@ exports.seed = async function (knex) {
       id: IDS.ct_cse,
       name: 'cse',
       label: 'Offre CSE',
-      pricing_rules: JSON.stringify({ type: 'percentage_discount', value: 10, applies_to: 'all', min_order: 200 }),
+      // Étape 3 — min_order retiré du client_type : la campagne (campaign.config.min_order) est
+      // la source de vérité unique. La remise (value:10) reste portée par le client_type.
+      pricing_rules: JSON.stringify({ type: 'percentage_discount', value: 10, applies_to: 'all' }),
       commission_rules: JSON.stringify({}),
       free_bottle_rules: JSON.stringify({}),
       tier_rules: JSON.stringify({
