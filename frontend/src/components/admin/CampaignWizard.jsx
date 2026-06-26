@@ -30,7 +30,7 @@ function NewClientTypeModal({ existingTypes, onCreated, onClose }) {
   const [ctForm, setCtForm] = useState({
     name: '',
     label: '',
-    pricing_rules: { type: 'none', value: 0, applies_to: 'all', min_order: 0 },
+    pricing_rules: { type: 'none', value: 0, applies_to: 'all' },
     commission_rules: {},
     free_bottle_rules: { enabled: false, every_n_sold: 12, choice: 'catalog' },
     tier_rules: { enabled: false, tiers: [] },
@@ -116,10 +116,6 @@ function NewClientTypeModal({ existingTypes, onCreated, onClose }) {
               <label className="block text-xs font-medium mb-1">Valeur remise</label>
               <input type="number" min="0" step="0.5" value={ctForm.pricing_rules.value || 0} onChange={(e) => updatePricing('value', parseFloat(e.target.value) || 0)} className="w-full border rounded-lg px-3 py-2 text-sm" />
             </div>
-          </div>
-          <div>
-            <label className="block text-xs font-medium mb-1">Commande minimum (EUR)</label>
-            <input type="number" min="0" step="10" value={ctForm.pricing_rules.min_order || 0} onChange={(e) => updatePricing('min_order', parseFloat(e.target.value) || 0)} className="w-full border rounded-lg px-3 py-2 text-sm" />
           </div>
         </div>
 
