@@ -12,8 +12,6 @@ const DEFAULT_CONTENT = {
   sections: [
     { type: 'features', title: 'Avantages CSE', items: [
       'Remise CSE (–10 % sur le prix public)',
-      'Commande minimum 200 €',
-      'Paiement par virement 30 jours',
       'Facture PDF automatique',
       'Catalogue dédié',
     ]},
