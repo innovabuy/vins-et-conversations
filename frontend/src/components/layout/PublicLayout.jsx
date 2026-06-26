@@ -174,8 +174,8 @@ export default function PublicLayout() {
       <footer className="bg-gray-900 text-white">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-            <div>
-              <div className="flex items-center gap-2 mb-4">
+            <div className="md:text-center">
+              <div className="flex items-center gap-2 mb-4 md:justify-center">
                 {footerLogo ? (
                   <img src={footerLogo} alt={footerImage?.alt_text || app_name} className="h-8 w-auto object-contain bg-white rounded-md p-0.5" />
                 ) : (
@@ -188,7 +188,7 @@ export default function PublicLayout() {
                 Vente de vins à travers des campagnes solidaires et conviviales.
               </p>
             </div>
-            <div>
+            <div className="md:text-center">
               <h3 className="font-semibold mb-3 text-sm uppercase tracking-wider text-gray-400">Navigation</h3>
               <div className="space-y-2">
                 <Link to="/boutique" className="block text-sm text-gray-300 hover:text-white">Nos vins</Link>
@@ -204,13 +204,13 @@ export default function PublicLayout() {
                 <Link to="/login" className="block text-sm text-gray-300 hover:text-white">Espace membre</Link>
               </div>
             </div>
-            <div>
+            <div className="md:text-center">
               <h3 className="font-semibold mb-3 text-sm uppercase tracking-wider text-gray-400">Contact</h3>
               <div className="space-y-2 text-sm text-gray-300">
-                <a href="mailto:vins.et.conversations@gmail.com" className="flex items-center gap-2 hover:text-white">
+                <a href="mailto:vins.et.conversations@gmail.com" className="flex items-center gap-2 md:justify-center hover:text-white">
                   <Mail size={14} /> vins.et.conversations@gmail.com
                 </a>
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 md:justify-center">
                   <Phone size={14} /> Saint-Sylvain-d'Anjou (49)
                 </div>
               </div>
