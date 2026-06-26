@@ -189,9 +189,12 @@ router.get(
 
       const pricingRules = typeof campaign.pricing_rules === 'string'
         ? JSON.parse(campaign.pricing_rules) : campaign.pricing_rules;
+      const campConfig = typeof campaign.config === 'string'
+        ? JSON.parse(campaign.config) : (campaign.config || {});
 
       const discountPct = pricingRules?.value || 0;
-      const minOrder = pricingRules?.min_order || 0;
+      // V4.x — min_order piloté par la campagne (source de vérité unique). Fallback 0 si absent.
+      const minOrder = campConfig.min_order != null ? Number(campConfig.min_order) : 0;
 
       // Products with original + CSE prices
       let productsQuery = db('products')
@@ -265,7 +268,6 @@ router.get(
 
       const orders = await ordersQuery;
 
-      const campConfig = typeof campaign.config === 'string' ? JSON.parse(campaign.config) : (campaign.config || {});
       const paymentTerms = campConfig.payment_terms || pricingRules?.payment_terms || null;
 
       // Campaign CA and goal for gauge

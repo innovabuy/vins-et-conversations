@@ -3239,7 +3239,7 @@ describe('API Integration Tests', () => {
     });
 
     afterAll(async () => {
-      // Restore min_order to seed default (200)
+      // Restore min_order to seed default (200) — pricing_conditions (→ sync client_type) ET campaign.config (source de vérité)
       if (csePricingConditionId) {
         await request(app)
           .put(`/api/v1/admin/pricing-conditions/${csePricingConditionId}`)
@@ -3249,12 +3249,16 @@ describe('API Integration Tests', () => {
             commission_pct: 0, min_order: 200, payment_terms: '30_days', active: true,
           });
       }
+      if (cseCampaignId) {
+        await db('campaigns').where({ id: cseCampaignId })
+          .update({ config: db.raw("jsonb_set(config, '{min_order}', '200'::jsonb)") });
+      }
     });
 
-    test('Admin updates min_order=0 → CSE dashboard reflects minOrder=0', async () => {
+    test('Source unique: pricing-conditions sync le client_type, mais campaign.config pilote le dashboard', async () => {
       if (!adminToken || !csePricingConditionId || !cseToken || !cseCampaignId) return;
 
-      // Set min_order to 0 via admin API
+      // (1) L'endpoint admin pricing-conditions continue de synchroniser client_types.pricing_rules (comportement legacy conservé)
       const updateRes = await request(app)
         .put(`/api/v1/admin/pricing-conditions/${csePricingConditionId}`)
         .set('Authorization', `Bearer ${adminToken}`)
@@ -3262,16 +3266,14 @@ describe('API Integration Tests', () => {
           client_type: 'cse', label: 'CSE Standard', discount_pct: 10,
           commission_pct: 0, min_order: 0, payment_terms: '30_days', active: true,
         });
-
       expect(updateRes.status).toBe(200);
-      expect(parseFloat(updateRes.body.min_order)).toBe(0);
-
-      // Verify client_types.pricing_rules was synced
       const ct = await db('client_types').where({ name: 'cse' }).first();
       const rules = typeof ct.pricing_rules === 'string' ? JSON.parse(ct.pricing_rules) : ct.pricing_rules;
       expect(rules.min_order).toBe(0);
 
-      // Verify CSE dashboard returns minOrder=0
+      // (2) Mais le dashboard CSE lit désormais campaign.config.min_order (source de vérité unique)
+      await db('campaigns').where({ id: cseCampaignId })
+        .update({ config: db.raw("jsonb_set(config, '{min_order}', '0'::jsonb)") });
       const dashRes = await request(app)
         .get('/api/v1/dashboard/cse')
         .set('Authorization', `Bearer ${cseToken}`)
@@ -3281,17 +3283,12 @@ describe('API Integration Tests', () => {
       expect(dashRes.body.minOrder).toBe(0);
     });
 
-    test('CSE order with min_order=0 → accepts any amount', async () => {
-      if (!cseToken || !cseCampaignId || !csePricingConditionId) return;
+    test('CSE order with campaign.config.min_order=0 → accepts any amount', async () => {
+      if (!cseToken || !cseCampaignId) return;
 
-      // Ensure min_order is 0
-      await request(app)
-        .put(`/api/v1/admin/pricing-conditions/${csePricingConditionId}`)
-        .set('Authorization', `Bearer ${adminToken}`)
-        .send({
-          client_type: 'cse', label: 'CSE Standard', discount_pct: 10,
-          commission_pct: 0, min_order: 0, payment_terms: '30_days', active: true,
-        });
+      // Source unique : min_order piloté par la campagne
+      await db('campaigns').where({ id: cseCampaignId })
+        .update({ config: db.raw("jsonb_set(config, '{min_order}', '0'::jsonb)") });
 
       // Order just 1 cheap product (< 200 EUR)
       const cp = await db('campaign_products')
@@ -3310,17 +3307,12 @@ describe('API Integration Tests', () => {
       expect(res.status).toBe(201);
     });
 
-    test('Admin sets min_order=50 → CSE order below 50 EUR rejected', async () => {
-      if (!cseToken || !cseCampaignId || !csePricingConditionId) return;
+    test('campaign.config.min_order=50 → CSE order below 50 EUR rejected', async () => {
+      if (!cseToken || !cseCampaignId) return;
 
-      // Set min_order to 50
-      await request(app)
-        .put(`/api/v1/admin/pricing-conditions/${csePricingConditionId}`)
-        .set('Authorization', `Bearer ${adminToken}`)
-        .send({
-          client_type: 'cse', label: 'CSE Standard', discount_pct: 10,
-          commission_pct: 0, min_order: 50, payment_terms: '30_days', active: true,
-        });
+      // Source unique : min_order piloté par la campagne
+      await db('campaigns').where({ id: cseCampaignId })
+        .update({ config: db.raw("jsonb_set(config, '{min_order}', '50'::jsonb)") });
 
       // Order 1 cheap product (should be < 50 EUR)
       const cp = await db('campaign_products')
@@ -3340,6 +3332,36 @@ describe('API Integration Tests', () => {
 
       expect(res.status).toBe(400);
       expect(res.body.error).toBe('MIN_ORDER_NOT_MET');
+    });
+
+    test('campaign.config SANS clé min_order (absente) → fallback 0, pas de crash ni retour à 200', async () => {
+      if (!cseToken || !cseCampaignId) return;
+
+      // Cas distinct de la valeur 0 explicite : la clé min_order est totalement absente de la config
+      await db('campaigns').where({ id: cseCampaignId })
+        .update({ config: db.raw("config - 'min_order'") });
+
+      // (1) Dashboard → minOrder = 0 (fallback), surtout pas 200 hérité
+      const dashRes = await request(app)
+        .get('/api/v1/dashboard/cse')
+        .set('Authorization', `Bearer ${cseToken}`)
+        .query({ campaign_id: cseCampaignId });
+      expect(dashRes.status).toBe(200);
+      expect(dashRes.body.minOrder).toBe(0);
+
+      // (2) Enforcement → commande < 200 acceptée (aucune contrainte), pas de crash
+      const cp = await db('campaign_products')
+        .where({ campaign_id: cseCampaignId, active: true })
+        .first();
+      if (!cp) return;
+      const res = await request(app)
+        .post('/api/v1/orders')
+        .set('Authorization', `Bearer ${cseToken}`)
+        .send({
+          campaign_id: cseCampaignId,
+          items: [{ productId: cp.product_id, qty: 1 }],
+        });
+      expect(res.status).toBe(201);
     });
   });
 

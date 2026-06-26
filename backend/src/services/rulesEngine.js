@@ -565,8 +565,14 @@ async function loadRulesForCampaign(campaignId) {
     };
   }
 
+  const pricing = parse(campaign.pricing_rules);
+  // V4.x — min_order piloté par la campagne (source de vérité unique).
+  // La remise (value) reste portée par le client_type. Fallback 0 si absent
+  // (jamais de retour silencieux à une valeur héritée du client_type).
+  pricing.min_order = campConfig.min_order != null ? Number(campConfig.min_order) : 0;
+
   return {
-    pricing: parse(campaign.pricing_rules),
+    pricing,
     commission,
     freeBottle: parse(campaign.free_bottle_rules),
     tier: parse(campaign.tier_rules),
