@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { Link, useSearchParams, useNavigate } from 'react-router-dom';
-import { Wine, Search, Filter, ChevronRight, ShoppingCart, Check, Star, Clock } from 'lucide-react';
+import { Wine, Search, Filter, ChevronRight, ChevronLeft, ShoppingCart, Check, Star, Clock } from 'lucide-react';
 import api from '../../services/api';
 import { featuredAPI } from '../../services/api';
 import { useCart } from '../../contexts/CartContext';
@@ -32,6 +32,10 @@ export default function BoutiqueHome() {
   const [addedId, setAddedId] = useState(null);
   const [referrerName, setReferrerName] = useState(null);
   const [featured, setFeatured] = useState([]);
+  // Carrousel mobile « Sélection du moment » (une slide à la fois) — desktop garde la grille sm:grid
+  const [activeIndex, setActiveIndex] = useState(0);
+  const carouselRef = useRef(null);
+  const slideRefs = useRef([]);
   const { addToCart, getReferralCode } = useCart();
   const toast = useToast();
   const addToCartHandled = useRef(false);
@@ -88,6 +92,33 @@ export default function BoutiqueHome() {
 
   useEffect(() => { fetchProducts(); }, [search, region, categoryId, campaignId]);
 
+  // Sync swipe tactile → activeIndex via IntersectionObserver (la slide ≥50% visible devient active).
+  // Garde flèches + points alignés sur la position réelle quand l'utilisateur swipe à la main.
+  useEffect(() => {
+    if (featured.length < 2 || !carouselRef.current) return;
+    const observer = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          if (entry.isIntersecting) {
+            const idx = slideRefs.current.indexOf(entry.target);
+            if (idx !== -1) setActiveIndex(idx);
+          }
+        });
+      },
+      { root: carouselRef.current, threshold: 0.5 }
+    );
+    slideRefs.current.forEach((el) => el && observer.observe(el));
+    return () => observer.disconnect();
+  }, [featured]);
+
+  // Navigation programmatique (flèches / points) — borne l'index, scroll la slide cible en vue.
+  const scrollToIndex = (i) => {
+    const clamped = Math.max(0, Math.min(i, featured.length - 1));
+    const el = slideRefs.current[clamped];
+    if (el) el.scrollIntoView({ behavior: 'smooth', inline: 'start', block: 'nearest' });
+    setActiveIndex(clamped);
+  };
+
   return (
     <div>
       {/* Hero */}
@@ -140,14 +171,16 @@ export default function BoutiqueHome() {
               Tout voir <ChevronRight size={16} />
             </Link>
           </div>
-          <div className="flex gap-6 overflow-x-auto pb-4 snap-x snap-mandatory scrollbar-hide sm:overflow-visible sm:pb-0 sm:grid sm:gap-6"
+          <div className="relative">
+          <div ref={carouselRef} className="flex gap-6 overflow-x-auto pb-4 snap-x snap-mandatory scrollbar-hide sm:overflow-visible sm:pb-0 sm:grid sm:gap-6"
             style={{ gridTemplateColumns: `repeat(${Math.min(featured.length, 4)}, minmax(0, 1fr))` }}
           >
-            {featured.map((p) => (
+            {featured.map((p, i) => (
               <Link
                 key={p.id}
+                ref={(el) => (slideRefs.current[i] = el)}
                 to={`/boutique/vin/${p.id}`}
-                className="group relative bg-white border-2 border-yellow-200 rounded-2xl overflow-hidden hover:shadow-lg transition-all hover:-translate-y-1 flex flex-col min-w-[260px] flex-shrink-0 snap-start sm:min-w-0 sm:flex-shrink"
+                className="group relative bg-white border-2 border-yellow-200 rounded-2xl overflow-hidden hover:shadow-lg transition-all hover:-translate-y-1 flex flex-col w-full flex-shrink-0 snap-start sm:min-w-0 sm:w-auto sm:flex-shrink"
               >
                 <div className="absolute top-3 right-3 z-10 bg-yellow-400 text-yellow-900 px-2 py-0.5 rounded-full text-xs font-semibold flex items-center gap-1">
                   <Star size={12} className="fill-yellow-900" /> Sélection
@@ -197,6 +230,45 @@ export default function BoutiqueHome() {
               </Link>
             ))}
           </div>
+          {/* Flèches latérales — mobile only, non circulaires (désactivées aux bornes) */}
+          {featured.length > 1 && (
+            <>
+              <button
+                type="button"
+                onClick={() => scrollToIndex(activeIndex - 1)}
+                disabled={activeIndex === 0}
+                aria-label="Produit précédent"
+                className="sm:hidden absolute left-1 top-1/2 -translate-y-1/2 z-20 grid place-items-center h-9 w-9 rounded-full bg-white/90 shadow-md border border-gray-200 text-gray-700 transition-opacity disabled:opacity-0 disabled:pointer-events-none"
+              >
+                <ChevronLeft size={20} />
+              </button>
+              <button
+                type="button"
+                onClick={() => scrollToIndex(activeIndex + 1)}
+                disabled={activeIndex === featured.length - 1}
+                aria-label="Produit suivant"
+                className="sm:hidden absolute right-1 top-1/2 -translate-y-1/2 z-20 grid place-items-center h-9 w-9 rounded-full bg-white/90 shadow-md border border-gray-200 text-gray-700 transition-opacity disabled:opacity-0 disabled:pointer-events-none"
+              >
+                <ChevronRight size={20} />
+              </button>
+            </>
+          )}
+          </div>
+          {/* Points indicateurs — mobile only, synchronisés avec activeIndex (tappables) */}
+          {featured.length > 1 && (
+            <div className="sm:hidden flex items-center justify-center gap-2 mt-3">
+              {featured.map((p, i) => (
+                <button
+                  key={p.id}
+                  type="button"
+                  onClick={() => scrollToIndex(i)}
+                  aria-label={`Aller au produit ${i + 1}`}
+                  aria-current={activeIndex === i}
+                  className={`h-2 rounded-full transition-all ${activeIndex === i ? 'w-5 bg-wine-700' : 'w-2 bg-gray-300 hover:bg-gray-400'}`}
+                />
+              ))}
+            </div>
+          )}
         </section>
       )}
 
