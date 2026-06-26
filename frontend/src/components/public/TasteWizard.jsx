@@ -300,6 +300,7 @@ export default function TasteWizard() {
           onNext={() => setSelectedIndex(Math.min(displayedResults.length - 1, selectedIndex + 1))}
           hasPrev={selectedIndex > 0}
           hasNext={selectedIndex < displayedResults.length - 1}
+          showFreeBottleBadge={false}
         />
       )}
     </div>
