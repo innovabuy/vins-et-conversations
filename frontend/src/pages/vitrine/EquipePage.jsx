@@ -88,7 +88,7 @@ export default function EquipePage() {
                   {m.role && <span className="inline-block text-sm font-medium text-wine-700 mb-2">{m.role}</span>}
                   {m.bio && <p className="text-sm text-gray-600 leading-relaxed">{m.bio}</p>}
                   {m.email && (
-                    <a href={`mailto:${m.email}`} className="inline-flex items-center gap-1.5 mt-3 text-sm text-wine-700 hover:text-wine-800">
+                    <a href={`mailto:${m.email}?subject=${encodeURIComponent("Demande d'information")}`} className="inline-flex items-center gap-1.5 mt-3 text-sm text-wine-700 hover:text-wine-800">
                       <Mail size={14} /> {m.email}
                     </a>
                   )}
