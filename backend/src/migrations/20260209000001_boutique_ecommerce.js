@@ -59,7 +59,7 @@ exports.up = async function (knex) {
     id: orgId,
     name: 'Boutique Web',
     type: 'boutique',
-    contact: JSON.stringify({ name: 'Nicolas Froment', email: 'nicolas@vins-conversations.fr' }),
+    contact: JSON.stringify({ name: 'Nicolas Froment', email: 'vins.et.conversations@gmail.com' }),
   });
 
   const campaignId = uuidv4();

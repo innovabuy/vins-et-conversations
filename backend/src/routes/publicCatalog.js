@@ -366,7 +366,7 @@ router.get('/catalog/:id/pdf', async (req, res) => {
     doc.fontSize(9).fillColor('#6b7280').text(`${formatEur(product.price_ht)} HT — TVA ${product.tva_rate}%`);
 
     // Footer
-    doc.fontSize(7).fillColor('#d1d5db').text(`${brandingPC.app_name} — nicolas@vins-conversations.fr`, 50, 780, { align: 'center', width: 495 });
+    doc.fontSize(7).fillColor('#d1d5db').text(`${brandingPC.app_name} — vins.et.conversations@gmail.com`, 50, 780, { align: 'center', width: 495 });
 
     addCapNumerikFooter(doc);
     doc.end();

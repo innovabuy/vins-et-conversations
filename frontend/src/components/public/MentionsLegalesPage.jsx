@@ -9,7 +9,7 @@ export default function MentionsLegalesPage() {
           Vins & Conversations<br />
           Nicolas Froment<br />
           Angers, France<br />
-          Email : nicolas@vins-conversations.fr
+          Email : vins.et.conversations@gmail.com
         </p>
 
         <h2 className="text-lg font-semibold text-gray-900">Hébergement</h2>
@@ -20,7 +20,7 @@ export default function MentionsLegalesPage() {
 
         <h2 className="text-lg font-semibold text-gray-900">Protection des données personnelles</h2>
         <p>Conformément au RGPD, les données personnelles collectées lors de la commande sont traitées uniquement pour la gestion de votre commande et ne sont pas transmises à des tiers.</p>
-        <p>Vous disposez d'un droit d'accès, de rectification et de suppression de vos données. Pour exercer ces droits, contactez-nous à nicolas@vins-conversations.fr.</p>
+        <p>Vous disposez d'un droit d'accès, de rectification et de suppression de vos données. Pour exercer ces droits, contactez-nous à vins.et.conversations@gmail.com.</p>
 
         <h2 className="text-lg font-semibold text-gray-900">Cookies</h2>
         <p>Le site utilise des cookies techniques nécessaires à son fonctionnement (session de panier). Aucun cookie de tracking n'est utilisé.</p>

@@ -272,7 +272,7 @@ function generatePremiumPDF(doc, products, { segment = 'public', pricingRules = 
   doc.fontSize(10).fillColor('#6b7280').text(appName, { align: 'center' });
   doc.moveDown(0.5);
   doc.text('06 XX XX XX XX', { align: 'center' });
-  doc.text('nicolas@vins-conversations.fr', { align: 'center' });
+  doc.text('vins.et.conversations@gmail.com', { align: 'center' });
   doc.text('www.vins-conversations.fr', { align: 'center' });
   doc.moveDown(3);
   doc.moveTo(150, doc.y).lineTo(445, doc.y).lineWidth(0.5).stroke('#e5e7eb');

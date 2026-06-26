@@ -849,7 +849,7 @@ router.get('/:id/pdf', authenticate, async (req, res) => {
     // Header
     const brandingBon = await getAppBranding();
     doc.fontSize(22).fillColor('#7a1c3b').text(brandingBon.app_name, { align: 'center' });
-    doc.fontSize(9).fillColor('#666').text('Nicolas Froment — Angers — contact@vins-conversations.fr', { align: 'center' });
+    doc.fontSize(9).fillColor('#666').text('Nicolas Froment — Angers — vins.et.conversations@gmail.com', { align: 'center' });
     doc.moveDown(1.5);
 
     // Order info

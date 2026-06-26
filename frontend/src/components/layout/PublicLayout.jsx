@@ -207,8 +207,8 @@ export default function PublicLayout() {
             <div>
               <h3 className="font-semibold mb-3 text-sm uppercase tracking-wider text-gray-400">Contact</h3>
               <div className="space-y-2 text-sm text-gray-300">
-                <a href="mailto:nicolas@vins-conversations.fr" className="flex items-center gap-2 hover:text-white">
-                  <Mail size={14} /> nicolas@vins-conversations.fr
+                <a href="mailto:vins.et.conversations@gmail.com" className="flex items-center gap-2 hover:text-white">
+                  <Mail size={14} /> vins.et.conversations@gmail.com
                 </a>
                 <div className="flex items-center gap-2">
                   <Phone size={14} /> Saint-Sylvain-d'Anjou (49)

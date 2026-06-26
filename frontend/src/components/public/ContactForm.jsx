@@ -102,7 +102,7 @@ export default function ContactForm() {
             <p className="text-sm text-wine-700 leading-relaxed">
               Nicolas Froment<br />
               Angers, France<br /><br />
-              nicolas@vins-conversations.fr
+              vins.et.conversations@gmail.com
             </p>
           </div>
           <div className="bg-gray-50 rounded-2xl p-6">
