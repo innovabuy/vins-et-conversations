@@ -58,6 +58,7 @@ router.get('/catalog', async (req, res) => {
         'product_categories.product_type as cat_product_type', 'product_categories.is_alcohol as cat_is_alcohol', 'product_categories.icon_emoji as cat_icon_emoji'
       )
       .orderBy('products.sort_order')
+      .orderBy('products.id') // tie-breaker stable : sort_order non unique → pagination OFFSET déterministe (pas de doublon/omission)
       .limit(limit)
       .offset(offset);
 
@@ -156,7 +157,8 @@ router.get('/featured', async (req, res) => {
         'product_categories.color as cat_color', 'product_categories.slug as cat_slug',
         'product_categories.product_type as cat_product_type', 'product_categories.is_alcohol as cat_is_alcohol', 'product_categories.icon_emoji as cat_icon_emoji'
       )
-      .orderBy('products.sort_order');
+      .orderBy('products.sort_order')
+      .orderBy('products.id'); // tie-breaker stable : ordre déterministe pour la sélection
 
     res.json({
       data: products.map(p => ({
