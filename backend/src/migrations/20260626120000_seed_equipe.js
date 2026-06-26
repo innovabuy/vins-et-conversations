@@ -19,7 +19,7 @@ exports.up = async function (knex) {
         name: 'Nicolas Froment',
         role: 'Gérant',
         bio: "Ancien caviste, négociant en vins et spiritueux pendant 12 ans, je place mon expérience et ma connaissance des domaines au service de Vins&Conversations pour le bonheur des amateurs de beaux terroirs !",
-        email: 'vinsetconversations@gmail.com',
+        email: 'vins.et.conversations@gmail.com',
       },
       {
         slot: 'equipe_matheo',
