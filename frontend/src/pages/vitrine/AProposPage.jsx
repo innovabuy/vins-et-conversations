@@ -67,7 +67,7 @@ export default function AProposPage() {
           <div key={i} className="mb-12">
             {section.title && <h2 className="text-2xl font-bold text-gray-900 mb-6">{section.title}</h2>}
             {section.type === 'text' && section.body && (
-              <div className="p-6 bg-wine-50 rounded-xl text-gray-700 leading-relaxed">{section.body}</div>
+              <div className="p-6 bg-wine-50 rounded-xl text-gray-700 leading-relaxed whitespace-pre-line">{section.body}</div>
             )}
             {section.type === 'values' && section.items && (
               <div className="grid sm:grid-cols-3 gap-6">
