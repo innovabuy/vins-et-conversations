@@ -312,7 +312,9 @@ async function createOrder({ userId, campaignId, items, customerId, notes, custo
     await trx('stock_movements').insert(stockMovements);
 
     // CSE auto-payment: transfer with 30 days payment terms
-    if (user && user.role === 'cse') {
+    // V4.x — gaté sur le flag campagne (lu côté serveur via loadRulesForCampaign).
+    // Flag off ⇒ AUCUNE ligne payments 30_days écrite (anti-fantôme), même si un client forgeait l'appel.
+    if (user && user.role === 'cse' && rules.paymentTransferEnabled) {
       await trx('payments').insert({
         order_id: orderId,
         method: 'transfer',
@@ -418,6 +420,8 @@ async function createOrder({ userId, campaignId, items, customerId, notes, custo
     status: finalStatus,
     paymentMethod: paymentMethod || null,
     customerName: customerName || null,
+    // V4.x — virement 30j gouverné par la campagne ; surfacé pour l'UI (cache le bouton si off).
+    payment_transfer_enabled: rules.paymentTransferEnabled,
     requiresCautionReview: requiresCautionReview,
     amountImmediate: hasDeferredItems ? amountImmediate : undefined,
     amountDeferred: hasDeferredItems ? amountDeferred : undefined,

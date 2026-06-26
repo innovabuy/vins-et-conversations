@@ -3250,8 +3250,10 @@ describe('API Integration Tests', () => {
           });
       }
       if (cseCampaignId) {
+        // β — restaure l'état seedé de LM : min_order 200 ET virement-on explicite (flag true).
+        // NE PAS retirer le flag : sous β, l'absence vaut OFF et casserait les tests E2E LM ultérieurs (--runInBand).
         await db('campaigns').where({ id: cseCampaignId })
-          .update({ config: db.raw("jsonb_set(config, '{min_order}', '200'::jsonb)") });
+          .update({ config: db.raw("jsonb_set(jsonb_set(config, '{min_order}', '200'::jsonb), '{payment_transfer_enabled}', 'true'::jsonb)") });
       }
     });
 
@@ -3362,6 +3364,98 @@ describe('API Integration Tests', () => {
           items: [{ productId: cp.product_id, qty: 1 }],
         });
       expect(res.status).toBe(201);
+    });
+
+    // ─── Virement 30j gouverné par campaign.config.payment_transfer_enabled ───
+    test('Virement OFF (flag false) → AUCUNE ligne payments 30_days écrite (anti-fantôme)', async () => {
+      if (!cseToken || !cseCampaignId) return;
+
+      // Flag explicite OFF + min_order 0 pour que la commande passe
+      await db('campaigns').where({ id: cseCampaignId })
+        .update({ config: db.raw("jsonb_set(config, '{min_order}', '0'::jsonb) || '{\"payment_transfer_enabled\": false}'::jsonb") });
+
+      // Dashboard ne mentionne plus le paiement différé
+      const dashRes = await request(app)
+        .get('/api/v1/dashboard/cse')
+        .set('Authorization', `Bearer ${cseToken}`)
+        .query({ campaign_id: cseCampaignId });
+      expect(dashRes.status).toBe(200);
+      expect(dashRes.body.paymentTerms).toBeNull();
+
+      const cp = await db('campaign_products').where({ campaign_id: cseCampaignId, active: true }).first();
+      if (!cp) return;
+      const res = await request(app)
+        .post('/api/v1/orders')
+        .set('Authorization', `Bearer ${cseToken}`)
+        .send({ campaign_id: cseCampaignId, items: [{ productId: cp.product_id, qty: 1 }] });
+      expect(res.status).toBe(201);
+      expect(res.body.payment_transfer_enabled).toBe(false);
+
+      // Anti-fantôme : aucune ligne payments transfer/30_days pour cette commande
+      const transferPayments = await db('payments')
+        .where({ order_id: res.body.id, method: 'transfer' });
+      expect(transferPayments.length).toBe(0);
+    });
+
+    test('Virement ON (flag true) → ligne payments 30_days écrite', async () => {
+      if (!cseToken || !cseCampaignId) return;
+
+      // β : virement actif uniquement sur activation explicite (flag === true). min_order 0 pour laisser passer.
+      await db('campaigns').where({ id: cseCampaignId })
+        .update({ config: db.raw("jsonb_set(config, '{min_order}', '0'::jsonb) || '{\"payment_transfer_enabled\": true}'::jsonb") });
+
+      const dashRes = await request(app)
+        .get('/api/v1/dashboard/cse')
+        .set('Authorization', `Bearer ${cseToken}`)
+        .query({ campaign_id: cseCampaignId });
+      expect(dashRes.status).toBe(200);
+      expect(dashRes.body.paymentTerms).toBe('30_days');
+
+      const cp = await db('campaign_products').where({ campaign_id: cseCampaignId, active: true }).first();
+      if (!cp) return;
+      const res = await request(app)
+        .post('/api/v1/orders')
+        .set('Authorization', `Bearer ${cseToken}`)
+        .send({ campaign_id: cseCampaignId, items: [{ productId: cp.product_id, qty: 1 }] });
+      expect(res.status).toBe(201);
+      expect(res.body.payment_transfer_enabled).toBe(true);
+
+      const transferPayments = await db('payments')
+        .where({ order_id: res.body.id, method: 'transfer' });
+      expect(transferPayments.length).toBe(1);
+      const meta = typeof transferPayments[0].metadata === 'string'
+        ? JSON.parse(transferPayments[0].metadata) : transferPayments[0].metadata;
+      expect(meta.payment_terms).toBe('30_days');
+    });
+
+    test('Virement absent (flag retiré, β: absence = OFF) → AUCUNE ligne payments 30_days écrite', async () => {
+      if (!cseToken || !cseCampaignId) return;
+
+      // β : absence de clé ⇒ OFF, exactement comme false (le défaut d'exécution = défaut de création).
+      await db('campaigns').where({ id: cseCampaignId })
+        .update({ config: db.raw("jsonb_set(config, '{min_order}', '0'::jsonb) - 'payment_transfer_enabled'") });
+
+      // Dashboard ne mentionne plus le paiement différé (absence = off)
+      const dashRes = await request(app)
+        .get('/api/v1/dashboard/cse')
+        .set('Authorization', `Bearer ${cseToken}`)
+        .query({ campaign_id: cseCampaignId });
+      expect(dashRes.status).toBe(200);
+      expect(dashRes.body.paymentTerms).toBeNull();
+
+      const cp = await db('campaign_products').where({ campaign_id: cseCampaignId, active: true }).first();
+      if (!cp) return;
+      const res = await request(app)
+        .post('/api/v1/orders')
+        .set('Authorization', `Bearer ${cseToken}`)
+        .send({ campaign_id: cseCampaignId, items: [{ productId: cp.product_id, qty: 1 }] });
+      expect(res.status).toBe(201);
+      expect(res.body.payment_transfer_enabled).toBe(false);
+
+      // Anti-fantôme : absence de flag = aucune ligne transfer/30_days
+      const transferPayments = await db('payments')
+        .where({ order_id: res.body.id, method: 'transfer' });
+      expect(transferPayments.length).toBe(0);
     });
   });
 

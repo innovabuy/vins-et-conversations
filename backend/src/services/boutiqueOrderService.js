@@ -352,6 +352,10 @@ async function createBoutiqueOrder({ cartItems, customer, referralCode, delivery
 
   logger.info(`Boutique order created: ${ref} for ${customer.email} (${source})`);
 
+  // V4.x — virement 30j gouverné par la campagne résolue : surfacé pour l'UI (bouton checkout CSE).
+  const orderCampaign = await db('campaigns').where({ id: campaignId }).select('config').first();
+  const paymentTransferEnabled = require('./rulesEngine').isPaymentTransferEnabled(orderCampaign?.config);
+
   return {
     id: orderId,
     ref,
@@ -367,6 +371,7 @@ async function createBoutiqueOrder({ cartItems, customer, referralCode, delivery
     customer_email: contact.email,
     promo_code_id: promoCodeId,
     promo_discount: promoDiscount,
+    payment_transfer_enabled: paymentTransferEnabled,
   };
 }
 

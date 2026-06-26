@@ -93,7 +93,7 @@ function parseNotes(val) {
 
 // ─── Premium multi-page PDF ─────────────────────────
 
-function generatePremiumPDF(doc, products, { segment = 'public', pricingRules = null, conditions = null, branding = {} } = {}) {
+function generatePremiumPDF(doc, products, { segment = 'public', pricingRules = null, conditions = null, branding = {}, paymentTransferEnabled = false } = {}) {
   const appName = branding.app_name || 'Vins & Conversations';
   const formatEur = (v) => parseFloat(v).toFixed(2).replace('.', ',') + ' €';
   const dateStr = new Date().toLocaleDateString('fr-FR', { day: '2-digit', month: 'long', year: 'numeric' });
@@ -257,7 +257,8 @@ function generatePremiumPDF(doc, products, { segment = 'public', pricingRules = 
     if (conditions.min_order > 0) {
       doc.text(`Commande minimum : ${conditions.min_order} €`);
     }
-    doc.text(`Conditions de paiement : ${conditions.payment_terms === '30_days' ? 'Virement sous 30 jours' : 'Paiement immédiat'}`);
+    // V4.x — n'affiche le virement 30j que si la campagne l'autorise (sinon "Paiement immédiat", pas de contradiction).
+    doc.text(`Conditions de paiement : ${(conditions.payment_terms === '30_days' && paymentTransferEnabled) ? 'Virement sous 30 jours' : 'Paiement immédiat'}`);
     doc.moveDown(1);
     doc.fontSize(8).fillColor('#6b7280').text('Les prix sont susceptibles de modification sans préavis. Conditions valables pour la saison en cours.');
   }
@@ -310,12 +311,20 @@ router.get(
       // Load conditions for the segment
       const conditions = await db('pricing_conditions').where('client_type', segment === 'public' ? 'particulier' : segment).where({ active: true }).first();
 
+      // V4.x — virement 30j gouverné par la campagne (β) : actif uniquement si une
+      // campagne fournie l'active explicitement. Sans campaign_id ⇒ OFF (pas d'activation).
+      let paymentTransferEnabled = false;
+      if (req.query.campaign_id) {
+        const camp = await db('campaigns').where({ id: req.query.campaign_id }).select('config').first();
+        paymentTransferEnabled = require('../services/rulesEngine').isPaymentTransferEnabled(camp?.config);
+      }
+
       const doc = new PDFDocument({ margin: 50, size: 'A4' });
       res.setHeader('Content-Type', 'application/pdf');
       res.setHeader('Content-Disposition', `inline; filename=catalogue-${segment}.pdf`);
       doc.pipe(res);
       const branding = await getAppBranding();
-      generatePremiumPDF(doc, products, { segment, pricingRules, conditions, branding });
+      generatePremiumPDF(doc, products, { segment, pricingRules, conditions, branding, paymentTransferEnabled });
       addCapNumerikFooter(doc);
       doc.end();
     } catch (err) {

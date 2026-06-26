@@ -643,7 +643,7 @@ export default function CheckoutPage() {
                     </div>
                   </button>
 
-                  {user?.role === 'cse' && (
+                  {user?.role === 'cse' && orderData?.payment_transfer_enabled && (
                     <button
                       onClick={() => setPaymentMethod('transfer')}
                       className={`flex items-center gap-3 p-4 rounded-xl border-2 transition-all text-left ${

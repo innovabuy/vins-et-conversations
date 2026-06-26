@@ -268,7 +268,9 @@ router.get(
 
       const orders = await ordersQuery;
 
-      const paymentTerms = campConfig.payment_terms || pricingRules?.payment_terms || null;
+      // V4.x — virement 30j gouverné par la campagne : flag off ⇒ aucune mention paiement différé.
+      const transferEnabled = require('../services/rulesEngine').isPaymentTransferEnabled(campConfig);
+      const paymentTerms = transferEnabled ? (campConfig.payment_terms || pricingRules?.payment_terms || null) : null;
 
       // Campaign CA and goal for gauge
       const caStats = await db('orders')

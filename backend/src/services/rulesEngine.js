@@ -13,6 +13,19 @@ function roundToNearest5Cents(price) {
   return Math.round(price * 20) / 20;
 }
 
+/**
+ * Virement 30j CSE gouverné par la campagne (config.payment_transfer_enabled).
+ * Sémantique β (source de vérité unique) : virement ACTIF uniquement si la clé vaut
+ * strictement `true`. Toute autre valeur — clé absente, null, undefined, false — ⇒ OFF.
+ * Le défaut d'exécution coïncide ainsi avec le défaut de création (étape 4) :
+ * virement off partout sauf activation explicite. Les campagnes pré-flag (ex. Leroy
+ * Merlin) doivent donc poser explicitement le flag à true en base pour rester virement-on.
+ */
+function isPaymentTransferEnabled(config) {
+  const c = typeof config === 'string' ? JSON.parse(config) : (config || {});
+  return c.payment_transfer_enabled === true;
+}
+
 // ─── §3.1 Tarification ───────────────────────────────
 
 /**
@@ -577,6 +590,8 @@ async function loadRulesForCampaign(campaignId) {
     freeBottle: parse(campaign.free_bottle_rules),
     tier: parse(campaign.tier_rules),
     ui: parse(campaign.ui_config),
+    // V4.x — virement 30j CSE gouverné par la campagne (source de vérité unique).
+    paymentTransferEnabled: isPaymentTransferEnabled(campConfig),
   };
 }
 
@@ -590,4 +605,5 @@ module.exports = {
   calculateTier,
   loadRulesForCampaign,
   roundToNearest5Cents,
+  isPaymentTransferEnabled,
 };

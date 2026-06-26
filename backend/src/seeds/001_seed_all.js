@@ -515,7 +515,9 @@ exports.seed = async function (knex) {
       goal: 8000,
       start_date: '2025-11-01',
       end_date: '2026-03-07',
-      config: JSON.stringify({ discount: 10, min_order: 200, payment_terms: '30_days', max_unpaid_orders: 3, inactivity_threshold: 7, delivery_free_threshold: 1000 }),
+      // β — virement 30j actif uniquement sur activation explicite (flag === true). LM est une
+      // campagne virement-on : le flag est posé ici (miroir test de l'écriture live LM sur le VPS).
+      config: JSON.stringify({ discount: 10, min_order: 200, payment_terms: '30_days', payment_transfer_enabled: true, max_unpaid_orders: 3, inactivity_threshold: 7, delivery_free_threshold: 1000 }),
     },
     {
       id: IDS.camp_ambassadeurs,
