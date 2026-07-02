@@ -11,8 +11,7 @@ const DEFAULT_CONTENT = {
   },
   sections: [
     { type: 'features', title: 'Le programme en bref', items: [
-      '5 % du CA HT reversé à l\'association',
-      'Bouteille gratuite pour 12 vendues (règle 12+1)',
+      'Rémunération en fonction de votre CA HT',
       'Dashboard élève gamifié',
       'Suivi en temps réel',
       'Campagne sur mesure',
