@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { MapPin, Filter } from 'lucide-react';
+import { MapPin } from 'lucide-react';
 import api from '../../services/api';
 
 const AVATAR_COLORS = [
@@ -25,18 +25,16 @@ export default function AmbassadorsPage() {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [regionFilter, setRegionFilter] = useState('');
-  const [tierFilter, setTierFilter] = useState('');
 
   useEffect(() => {
     const params = {};
     if (regionFilter) params.region_id = regionFilter;
-    if (tierFilter) params.tier = tierFilter;
     setLoading(true);
     api.get('/ambassador/public', { params })
       .then(r => setData(r.data))
       .catch(() => {})
       .finally(() => setLoading(false));
-  }, [regionFilter, tierFilter]);
+  }, [regionFilter]);
 
   return (
     <div className="max-w-5xl mx-auto px-4 py-8">
@@ -50,13 +48,6 @@ export default function AmbassadorsPage() {
           <select value={regionFilter} onChange={e => setRegionFilter(e.target.value)} className="border rounded-lg px-3 py-1.5 text-sm">
             <option value="">Toutes les regions</option>
             {data?.filters?.regions?.map(r => <option key={r.id} value={r.id}>{r.name}</option>)}
-          </select>
-        </div>
-        <div className="flex items-center gap-2">
-          <Filter size={16} className="text-gray-400" />
-          <select value={tierFilter} onChange={e => setTierFilter(e.target.value)} className="border rounded-lg px-3 py-1.5 text-sm">
-            <option value="">Tous les paliers</option>
-            {data?.filters?.tiers?.map(t => <option key={t.label} value={t.label}>{t.label}</option>)}
           </select>
         </div>
       </div>
