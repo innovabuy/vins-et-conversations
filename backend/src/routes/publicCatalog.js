@@ -414,17 +414,19 @@ router.post('/contact', async (req, res) => {
       notes: JSON.stringify({ message: value.message, company: value.company || null }),
     }).returning('*');
 
-    // Notify admin by email (template-based)
-    emailService.sendContactNotification({
+    // Notify admin by email (template-based). We AWAIT this: it is the signal that
+    // the message actually reached V&C. The UI must reflect the truth — never claim
+    // "Message envoyé" when the delivery failed.
+    const notifyResult = await emailService.sendContactNotification({
       name: value.name,
       email: value.email,
       phone: value.phone || '',
       company: value.company || '',
       type: value.type,
       message: value.message,
-    }).catch((e) => logger.error(`Contact notification email failed: ${e.message}`));
+    });
 
-    // Send acknowledgement to sender
+    // Acknowledgement to sender + in-app notification are secondary — fire-and-forget.
     emailService.sendContactReceived({
       email: value.email,
       name: value.name,
@@ -434,6 +436,16 @@ router.post('/contact', async (req, res) => {
 
     notificationService.onNewContact(value.name, value.type)
       .catch((e) => logger.error(`Contact notification failed: ${e.message}`));
+
+    // The lead is captured in CRM regardless, but tell the visitor the truth about delivery.
+    if (!notifyResult || notifyResult.success === false) {
+      logger.error(`Contact notification email failed: ${notifyResult && notifyResult.error}`);
+      return res.status(502).json({
+        error: 'EMAIL_DELIVERY_FAILED',
+        message: "Votre message n'a pas pu être transmis pour le moment. Merci de réessayer plus tard ou de nous contacter directement par téléphone.",
+        id: contact.id,
+      });
+    }
 
     res.status(201).json({ message: 'Message envoyé', id: contact.id });
   } catch (err) {

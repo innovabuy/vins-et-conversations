@@ -41,6 +41,10 @@ describe('Contact form → notification', () => {
         type: 'question',
       });
 
+    // NOTE (à réviser post-go-live) : ce test reste vert grâce au test-mode Jest,
+    // qui force le succès de l'envoi email (emailService: mode 'test' sous Jest) →
+    // la route renvoie donc toujours 201 ici. Une fois le SMTP réel testable en CI,
+    // ce test DOIT asserter explicitement 201 si l'envoi réussit / 502 s'il échoue.
     expect(res.status).toBe(201);
     expect(res.body.id).toBeDefined();
     createdContactId = res.body.id;

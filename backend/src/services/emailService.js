@@ -12,14 +12,17 @@ let cachedTransporter = null;
 let cachedSmtpMode = null;
 
 async function getSmtpConfig() {
-  // In test env, skip DB lookup
+  // In test env (Jest), skip DB lookup AND force test mode: no real SMTP is ever
+  // hit during tests, so sendEmail() short-circuits to a success log. This keeps
+  // the contact route's awaited send deterministically "successful" under Jest,
+  // regardless of any SMTP_MODE leaking into the test environment.
   if (process.env.NODE_ENV === 'test' || process.env.JEST_WORKER_ID) {
     return {
       host: process.env.SMTP_HOST || 'localhost',
       port: parseInt(process.env.SMTP_PORT || '587', 10),
       from_name: process.env.SMTP_FROM_NAME || 'Vins & Conversations',
       from_email: process.env.SMTP_FROM_EMAIL || 'noreply@vins-conversations.fr',
-      mode: process.env.SMTP_MODE || 'test',
+      mode: 'test',
     };
   }
 
@@ -323,7 +326,9 @@ async function sendContactReceived({ email, name, type, company }) {
   return sendEmail({ to: email, subject: 'Nous avons bien recu votre message', html });
 }
 
-async function sendContactNotification({ name, email, phone, company, type, message }) {
+// `to` is an optional recipient override (used for one-off delivery-chain tests);
+// when omitted the notification goes to ADMIN_EMAIL as in production.
+async function sendContactNotification({ name, email, phone, company, type, message, to }) {
   const TYPE_LABELS = { question: 'Question', devis: 'Demande de devis', partenariat: 'Partenariat', autre: 'Autre' };
   const html = renderTemplate('contact-notification', {
     SUBJECT: `[Contact] ${TYPE_LABELS[type] || type} — ${name}`,
@@ -335,7 +340,7 @@ async function sendContactNotification({ name, email, phone, company, type, mess
     MESSAGE: message.replace(/\n/g, '<br>'),
   });
   return sendEmail({
-    to: process.env.ADMIN_EMAIL || 'nicolas@vins-conversations.fr',
+    to: to || process.env.ADMIN_EMAIL || 'nicolas@vins-conversations.fr',
     subject: `[Contact] ${TYPE_LABELS[type] || type} — ${name}`,
     html,
   });

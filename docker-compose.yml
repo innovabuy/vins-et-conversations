@@ -49,6 +49,15 @@ services:
       SITE_PUBLIC_URL: ${SITE_PUBLIC_URL:-http://76.13.44.13:8082}
       FRONTEND_URL: ${FRONTEND_URL:-http://76.13.44.13:5173}
       BASE_URL: ${BASE_URL:-http://76.13.44.13:5173}
+      # ─── SMTP (Resend) — valeurs depuis .env hôte, hors git. Token jamais en clair. ───
+      SMTP_HOST: ${SMTP_HOST}
+      SMTP_PORT: ${SMTP_PORT}
+      SMTP_USER: ${SMTP_USER}
+      SMTP_PASS: ${SMTP_PASS}
+      SMTP_MODE: ${SMTP_MODE}
+      SMTP_FROM_EMAIL: ${SMTP_FROM_EMAIL}
+      SMTP_FROM_NAME: ${SMTP_FROM_NAME}
+      ADMIN_EMAIL: ${ADMIN_EMAIL}
     ports:
       - "3001:3001"
     volumes:
