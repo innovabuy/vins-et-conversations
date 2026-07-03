@@ -63,7 +63,7 @@ export default function PrestationEcolesPage() {
                 ))}
               </div>
             )}
-            {section.body && <p className="text-gray-600 leading-relaxed">{section.body}</p>}
+            {section.body && <p className="text-gray-600 leading-relaxed whitespace-pre-line">{section.body}</p>}
           </div>
         ))}
 
@@ -89,6 +89,7 @@ export default function PrestationEcolesPage() {
         )}
 
         <div className="text-center mt-12">
+          {content.cta.tagline && <p className="mb-4 text-gray-600">{content.cta.tagline}</p>}
           <Link to={content.cta.href} className="inline-flex items-center gap-2 bg-emerald-700 text-white px-8 py-3 rounded-xl font-semibold hover:bg-emerald-800 transition-colors">
             {content.cta.label} <ChevronRight size={18} />
           </Link>

@@ -64,7 +64,7 @@ export default function PrestationRepasPage() {
               </div>
             )}
             {section.body && (
-              <div className="p-6 bg-gray-50 rounded-xl border border-dashed border-gray-300 text-gray-500 italic">
+              <div className="p-6 bg-amber-50 rounded-xl text-gray-700 leading-relaxed whitespace-pre-line">
                 {section.body}
               </div>
             )}
@@ -93,6 +93,7 @@ export default function PrestationRepasPage() {
         )}
 
         <div className="text-center mt-12">
+          {content.cta.tagline && <p className="mb-4 text-gray-600">{content.cta.tagline}</p>}
           <Link to={content.cta.href} className="inline-flex items-center gap-2 bg-amber-700 text-white px-8 py-3 rounded-xl font-semibold hover:bg-amber-800 transition-colors">
             {content.cta.label} <ChevronRight size={18} />
           </Link>
