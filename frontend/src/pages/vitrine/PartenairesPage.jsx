@@ -45,15 +45,21 @@ export default function PartenairesPage() {
             {section.title && <h2 className="text-2xl font-bold text-gray-900 mb-6">{section.title}</h2>}
             {section.type === 'partners' && section.items && (
               <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-6">
-                {section.items.map((p, j) => (
-                  <div key={j} className="flex items-center justify-center p-6 bg-white border border-gray-100 rounded-2xl shadow-sm aspect-square">
-                    {p.logo ? (
-                      <img src={p.logo} alt={p.name} className="max-h-20 object-contain" />
-                    ) : (
-                      <span className="text-lg font-bold text-gray-400">{p.name}</span>
-                    )}
-                  </div>
-                ))}
+                {section.items.map((p, j) => {
+                  const cardClass = 'flex items-center justify-center p-6 bg-white border border-gray-100 rounded-2xl shadow-sm aspect-square';
+                  const inner = p.logo ? (
+                    <img src={p.logo} alt={p.name} className="max-h-20 object-contain" />
+                  ) : (
+                    <span className="text-lg font-bold text-gray-400">{p.name}</span>
+                  );
+                  return p.url ? (
+                    <a key={j} href={p.url} target="_blank" rel="noopener noreferrer" className={`${cardClass} transition-transform hover:-translate-y-0.5`}>
+                      {inner}
+                    </a>
+                  ) : (
+                    <div key={j} className={cardClass}>{inner}</div>
+                  );
+                })}
               </div>
             )}
             {section.type === 'placeholder' && (
