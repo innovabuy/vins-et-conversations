@@ -17,6 +17,46 @@ let testOrder;
 let createdOrderId;
 let createdFinancialEventIds = [];
 let createdPaymentIds = [];
+let createdOrderIds = [];
+
+// Crée une commande DÉDIÉE et fraîche (sans event sale préexistant) pour tester
+// capture-order en contrôlant la précondition d'idempotence. Réutilise la campagne
+// et l'utilisateur de testOrder pour satisfaire les FK NOT NULL.
+async function makeCaptureOrder(overrides = {}) {
+  const suffix = `${Date.now()}-${createdOrderIds.length}`;
+  const [row] = await db('orders')
+    .insert({
+      ref: `VC-TEST-PP-${suffix}`,
+      campaign_id: testOrder.campaign_id,
+      user_id: testOrder.user_id,
+      status: 'pending_payment',
+      total_ht: 10.42,
+      total_ttc: 12.50,
+      ...overrides,
+    })
+    .returning('*');
+  createdOrderIds.push(row.id);
+  return row;
+}
+
+// Fabrique une réponse captureData PayPal v2 mockée. custom_id est placé au chemin réel
+// (purchase_units[].payments.captures[].custom_id). NB go-live: chemin à valider contre
+// une capture sandbox réelle — le mock reflète l'hypothèse, il ne la prouve pas.
+function mockCapture({ customId, value = '12.50', currency = 'EUR', status = 'COMPLETED' }) {
+  paypalService.captureOrder.mockResolvedValue({
+    id: 'PP_TEST',
+    status,
+    purchase_units: [{
+      payments: {
+        captures: [{
+          id: 'CAP_TEST',
+          custom_id: customId,
+          amount: { currency_code: currency, value: String(value) },
+        }],
+      },
+    }],
+  });
+}
 
 beforeAll(async () => {
   await db.raw('SELECT 1');
@@ -43,6 +83,13 @@ afterAll(async () => {
       payment_method: testOrder.payment_method,
       updated_at: new Date(),
     }).catch(() => {});
+  }
+  // Nettoyage des commandes dédiées créées pour les tests capture-order
+  // (events + payments d'abord car FK order_id en SET NULL, on préfère supprimer).
+  if (createdOrderIds.length) {
+    await db('financial_events').whereIn('order_id', createdOrderIds).del().catch(() => {});
+    await db('payments').whereIn('order_id', createdOrderIds).del().catch(() => {});
+    await db('orders').whereIn('id', createdOrderIds).del().catch(() => {});
   }
   await db.destroy();
 });
@@ -104,48 +151,119 @@ describe('PayPal Routes', () => {
 
   // ─── POST /paypal/capture-order ────────────────────
 
-  test('POST /paypal/capture-order with valid data → 200 + order validated', async () => {
-    expect(testOrder).toBeDefined();
-
-    paypalService.captureOrder.mockResolvedValue({
-      id: 'PAYPAL_TEST_ORDER_123',
-      status: 'COMPLETED',
-      purchase_units: [{
-        payments: {
-          captures: [{
-            id: 'CAPTURE_123',
-            amount: { currency_code: 'EUR', value: testOrder.total_ttc.toString() },
-          }],
-        },
-      }],
-    });
+  test('capture-order — flux légitime (match) → 200, validated, 1 event sale au montant capturé, payment reconciled', async () => {
+    const order = await makeCaptureOrder({ total_ttc: 12.50 });
+    mockCapture({ customId: order.id, value: '12.50' });
 
     const res = await request(app)
       .post('/api/v1/paypal/capture-order')
-      .send({
-        paypal_order_id: 'PAYPAL_TEST_ORDER_123',
-        order_id: testOrder.id,
-      });
+      .send({ paypal_order_id: 'PP_OK', order_id: order.id });
 
     expect(res.status).toBe(200);
     expect(res.body.success).toBe(true);
-    expect(res.body.order).toBeDefined();
     expect(res.body.order.status).toBe('validated');
     expect(res.body.order.payment_method).toBe('paypal');
 
-    // Verify financial event was created
-    const events = await db('financial_events')
-      .where({ order_id: testOrder.id, type: 'sale' })
-      .whereRaw("metadata::text LIKE '%PAYPAL_TEST_ORDER_123%'");
-    expect(events.length).toBeGreaterThan(0);
-    createdFinancialEventIds.push(...events.map(e => e.id));
+    const events = await db('financial_events').where({ order_id: order.id, type: 'sale' });
+    expect(events.length).toBe(1);
+    expect(parseFloat(events[0].amount)).toBeCloseTo(12.50, 2);
 
-    // Verify payment record was created
-    const payments = await db('payments')
-      .where({ order_id: testOrder.id, method: 'paypal' });
-    expect(payments.length).toBeGreaterThan(0);
+    const payments = await db('payments').where({ order_id: order.id, method: 'paypal' });
+    expect(payments.length).toBe(1);
     expect(payments[0].status).toBe('reconciled');
-    createdPaymentIds.push(...payments.map(p => p.id));
+    expect(parseFloat(payments[0].amount)).toBeCloseTo(12.50, 2);
+  });
+
+  test('capture-order — Contrôle 2 : écrit le montant CAPTURÉ (≠ total_ttc), flag amount_mismatch, PAS de rejet', async () => {
+    // total_ttc = 12.50 mais PayPal capture 10.00 → on doit écrire 10.00, pas 12.50.
+    const order = await makeCaptureOrder({ total_ttc: 12.50 });
+    mockCapture({ customId: order.id, value: '10.00' });
+
+    const res = await request(app)
+      .post('/api/v1/paypal/capture-order')
+      .send({ paypal_order_id: 'PP_MISMATCH', order_id: order.id });
+
+    expect(res.status).toBe(200); // pas de rejet sur écart de montant
+    expect(res.body.success).toBe(true);
+
+    const events = await db('financial_events').where({ order_id: order.id, type: 'sale' });
+    expect(events.length).toBe(1);
+    expect(parseFloat(events[0].amount)).toBeCloseTo(10.00, 2);   // capturé
+    expect(parseFloat(events[0].amount)).not.toBeCloseTo(12.50, 2); // PAS total_ttc
+
+    const meta = typeof events[0].metadata === 'string'
+      ? JSON.parse(events[0].metadata) : events[0].metadata;
+    expect(meta.amount_mismatch).toBeDefined();
+    expect(meta.amount_mismatch.captured).toBeCloseTo(10.00, 2);
+    expect(meta.amount_mismatch.expected).toBeCloseTo(12.50, 2);
+  });
+
+  test('capture-order — Contrôle 1 : cross-order (custom_id ≠ order_id) → 403 ORDER_MISMATCH, AUCUNE écriture', async () => {
+    const order = await makeCaptureOrder({ total_ttc: 12.50 });
+    // custom_id d'une AUTRE commande (attaque cross-order)
+    mockCapture({ customId: '11111111-1111-1111-1111-111111111111', value: '12.50' });
+
+    const res = await request(app)
+      .post('/api/v1/paypal/capture-order')
+      .send({ paypal_order_id: 'PP_CROSS', order_id: order.id });
+
+    expect(res.status).toBe(403);
+    expect(res.body.error).toBe('ORDER_MISMATCH');
+
+    const events = await db('financial_events').where({ order_id: order.id, type: 'sale' });
+    expect(events.length).toBe(0);
+    const after = await db('orders').where({ id: order.id }).first();
+    expect(after.status).toBe('pending_payment'); // statut inchangé
+  });
+
+  test('capture-order — Contrôle 1 : custom_id absent → 403 (fail-closed), AUCUNE écriture', async () => {
+    const order = await makeCaptureOrder();
+    mockCapture({ customId: undefined, value: '12.50' });
+
+    const res = await request(app)
+      .post('/api/v1/paypal/capture-order')
+      .send({ paypal_order_id: 'PP_NOCUSTOM', order_id: order.id });
+
+    expect(res.status).toBe(403);
+    expect(res.body.error).toBe('ORDER_MISMATCH');
+    const events = await db('financial_events').where({ order_id: order.id, type: 'sale' });
+    expect(events.length).toBe(0);
+  });
+
+  test('capture-order — Contrôle devise : ≠ EUR → 400 INVALID_CURRENCY (fail-closed), AUCUNE écriture', async () => {
+    const order = await makeCaptureOrder();
+    mockCapture({ customId: order.id, value: '12.50', currency: 'USD' });
+
+    const res = await request(app)
+      .post('/api/v1/paypal/capture-order')
+      .send({ paypal_order_id: 'PP_USD', order_id: order.id });
+
+    expect(res.status).toBe(400);
+    expect(res.body.error).toBe('INVALID_CURRENCY');
+    const events = await db('financial_events').where({ order_id: order.id, type: 'sale' });
+    expect(events.length).toBe(0);
+  });
+
+  test('capture-order — Contrôle 3 : rejeu (double appel légitime) → 1 SEUL event sale (idempotent)', async () => {
+    const order = await makeCaptureOrder({ total_ttc: 12.50 });
+    mockCapture({ customId: order.id, value: '12.50' });
+
+    const r1 = await request(app)
+      .post('/api/v1/paypal/capture-order')
+      .send({ paypal_order_id: 'PP_REPLAY', order_id: order.id });
+    expect(r1.status).toBe(200);
+    expect(r1.body.success).toBe(true);
+
+    // Rejeu : le client recharge confirmation.html → ne doit ni planter ni doubler
+    const r2 = await request(app)
+      .post('/api/v1/paypal/capture-order')
+      .send({ paypal_order_id: 'PP_REPLAY', order_id: order.id });
+    expect(r2.status).toBe(200);
+    expect(r2.body.success).toBe(true);
+    expect(r2.body.idempotent).toBe(true);
+
+    const events = await db('financial_events').where({ order_id: order.id, type: 'sale' });
+    expect(events.length).toBe(1); // le plus important : ledger append-only NON doublé
   });
 
   test('POST /paypal/capture-order with nonexistent order → 404', async () => {
@@ -172,7 +290,7 @@ describe('PayPal Routes', () => {
   });
 
   test('POST /paypal/capture-order with PayPal failure → 502', async () => {
-    expect(testOrder).toBeDefined();
+    const order = await makeCaptureOrder();
 
     paypalService.captureOrder.mockRejectedValue(new Error('PAYPAL_CAPTURE_FAILED'));
 
@@ -180,7 +298,7 @@ describe('PayPal Routes', () => {
       .post('/api/v1/paypal/capture-order')
       .send({
         paypal_order_id: 'PAYPAL_FAIL',
-        order_id: testOrder.id,
+        order_id: order.id,
       });
 
     expect(res.status).toBe(502);
