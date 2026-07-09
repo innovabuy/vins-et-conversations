@@ -30,8 +30,11 @@ router.post('/create-order', async (req, res) => {
     }
 
     const siteUrl = process.env.SITE_PUBLIC_URL || 'http://localhost:8082';
-    const returnUrl = `${siteUrl}/confirmation.html?order_id=${order_id}`;
-    const cancelUrl = `${siteUrl}/boutique.html?paypal_cancelled=true`;
+    // Routes SPA réelles (le site statique .html n'existe plus).
+    // return_url : la page confirmation déclenche la capture via ?paypal=1 + order_id ;
+    // PayPal y ajoute lui-même ?token=<paypal_order_id>&PayerID=... au retour.
+    const returnUrl = `${siteUrl}/boutique/confirmation/${order.ref}?paypal=1&order_id=${order_id}`;
+    const cancelUrl = `${siteUrl}/boutique/panier?paypal_cancelled=1`;
 
     const result = await paypalService.createOrder(
       parseFloat(order.total_ttc),

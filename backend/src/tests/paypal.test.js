@@ -121,8 +121,8 @@ describe('PayPal Routes', () => {
       'EUR',
       testOrder.id,
       expect.objectContaining({
-        returnUrl: expect.stringContaining(`/confirmation.html?order_id=${testOrder.id}`),
-        cancelUrl: expect.stringContaining('/boutique.html?paypal_cancelled=true'),
+        returnUrl: expect.stringContaining(`/boutique/confirmation/${testOrder.ref}?paypal=1&order_id=${testOrder.id}`),
+        cancelUrl: expect.stringContaining('/boutique/panier?paypal_cancelled=1'),
       })
     );
 
