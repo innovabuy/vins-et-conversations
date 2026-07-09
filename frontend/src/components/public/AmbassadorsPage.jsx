@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
-import { MapPin } from 'lucide-react';
+import { MapPin, Users } from 'lucide-react';
 import api from '../../services/api';
+import { useSiteImage } from '../../contexts/SiteImagesContext';
 
 const AVATAR_COLORS = [
   '#7C3AED', '#2563EB', '#059669', '#D97706', '#DC2626',
@@ -25,6 +26,7 @@ export default function AmbassadorsPage() {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [regionFilter, setRegionFilter] = useState('');
+  const heroBg = useSiteImage('ambassadeurs_hero');
 
   useEffect(() => {
     const params = {};
@@ -37,10 +39,22 @@ export default function AmbassadorsPage() {
   }, [regionFilter]);
 
   return (
-    <div className="max-w-5xl mx-auto px-4 py-8">
-      <h1 className="text-3xl font-bold text-gray-900 mb-2">Nos Ambassadeurs</h1>
-      <p className="text-gray-500 mb-6">Retrouvez nos ambassadeurs dans toute la France</p>
+    <>
+    <section
+      className={`relative text-white py-16 ${heroBg?.image_url ? 'bg-wine-900' : 'bg-gradient-to-br from-wine-800 via-wine-700 to-wine-900'}`}
+      style={heroBg?.image_url ? { backgroundImage: `url(${heroBg.image_url})`, backgroundSize: 'cover', backgroundPosition: 'center' } : undefined}
+    >
+      {heroBg?.image_url && <div className="absolute inset-0 bg-black/45" aria-hidden="true" />}
+      <div className="relative max-w-5xl mx-auto px-4 text-center">
+        <div className="inline-flex items-center gap-2 bg-white/10 backdrop-blur rounded-full px-4 py-1.5 text-sm mb-6">
+          <Users size={16} /> Le réseau
+        </div>
+        <h1 className="text-4xl sm:text-5xl font-bold mb-4">Nos Ambassadeurs</h1>
+        <p className="text-lg text-wine-100 max-w-2xl mx-auto">Retrouvez nos ambassadeurs dans toute la France</p>
+      </div>
+    </section>
 
+    <div className="max-w-5xl mx-auto px-4 py-8">
       {/* Filters */}
       <div className="flex flex-wrap gap-3 mb-6">
         <div className="flex items-center gap-2">
@@ -91,5 +105,6 @@ export default function AmbassadorsPage() {
         </div>
       )}
     </div>
+    </>
   );
 }
