@@ -1,0 +1,29 @@
+# syntax=docker/dockerfile:1
+# ═══════════════════════════════════════════════════════════════════════════
+# Image FIGÉE de l'API — runtime node (ni nodemon, ni volume source monté).
+# Calquée sur frontend/Dockerfile.prod (multi-stage), adaptée : le stage runtime
+# FAIT TOURNER node en continu (process long), il ne sert pas du statique via nginx.
+# NODE_ENV n'est PAS baké ici — il vient du compose (reste development ; le flip
+# production est un chantier B séparé, prérequis SSL DB non résolu).
+# ═══════════════════════════════════════════════════════════════════════════
+
+# ---- Stage 1 : dépendances de PRODUCTION uniquement ----
+# npm ci = déterministe (package-lock) ; --omit=dev exclut nodemon/jest/eslint/supertest.
+# knex/pg/express/etc. sont en `dependencies` → conservés (migrations lançables).
+FROM node:20-alpine AS deps
+WORKDIR /app
+COPY package*.json ./
+RUN npm ci --omit=dev
+
+# ---- Stage 2 : runtime figé ----
+FROM node:20-alpine
+WORKDIR /app
+# Source COPIÉ (pas monté). Le .dockerignore exclut node_modules/.env/.git.
+COPY . .
+# node_modules PROD depuis le stage deps EN DERNIER → écrase tout node_modules
+# résiduel du contexte (ceinture+bretelles) avec des binaires alpine/musl propres.
+COPY --from=deps /app/node_modules ./node_modules
+EXPOSE 3001
+# Entrypoint PROD : node direct. Migrations toujours lançables depuis l'image via
+#   docker compose run --rm api npx knex migrate:latest --knexfile src/config/knexfile.js
+CMD ["node", "src/index.js"]

@@ -31,7 +31,7 @@ services:
   api:
     build:
       context: ./backend
-      dockerfile: Dockerfile
+      dockerfile: Dockerfile.prod
     container_name: vc-api
     restart: always
     environment:
@@ -60,15 +60,15 @@ services:
       ADMIN_EMAIL: ${ADMIN_EMAIL}
     ports:
       - "3001:3001"
+    # Image figée : plus de volume source (code baked-in). uploads reste monté (DONNÉES).
     volumes:
-      - ./backend/src:/app/src
       - ./backend/uploads:/app/uploads
     depends_on:
       postgres:
         condition: service_healthy
       redis:
         condition: service_healthy
-    command: npm run dev
+    # command retiré → CMD figé de l'image (node src/index.js), plus de nodemon.
 
   frontend:
     build:
