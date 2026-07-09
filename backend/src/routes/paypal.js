@@ -68,135 +68,128 @@ router.post('/capture-order', async (req, res) => {
       });
     }
 
-    const order = await db('orders').where({ id: order_id }).first();
-    if (!order) {
-      return res.status(404).json({ error: 'NOT_FOUND', message: 'Commande introuvable' });
-    }
+    // ── Transaction + verrou pessimiste : sérialise les captures concurrentes ──
+    // Deux capture-order simultanés pour la même commande (retour SPA + futur webhook)
+    // ne peuvent pas franchir la garde d'idempotence ensemble : le SELECT ... FOR UPDATE
+    // sur la ligne `orders` bloque le second jusqu'au commit du premier, qui aura écrit
+    // le 'sale' → le second voit `existingSale` et répond idempotent SANS re-capturer.
+    // Le callback RETOURNE { status, body } (jamais de res.* dedans) ; un retour = commit
+    // (les rejets de validation n'écrivent rien → commit vide inoffensif), un throw = rollback.
+    const outcome = await db.transaction(async (trx) => {
+      const order = await trx('orders').where({ id: order_id }).forUpdate().first();
+      if (!order) {
+        return { status: 404, body: { error: 'NOT_FOUND', message: 'Commande introuvable' } };
+      }
 
-    // ── Contrôle 3 — Idempotence (garde du ledger append-only) ──
-    // Un event `sale` existe déjà pour cette commande → capture déjà traitée.
-    // On répond succès idempotent SANS rappeler PayPal (la capture n'est pas idempotente
-    // côté PayPal) et SANS second INSERT. Flux légitime rejoué (client recharge
-    // confirmation.html) → confirmation, pas d'erreur, pas de doublon.
-    const existingSale = await db('financial_events')
-      .where({ order_id, type: 'sale' })
-      .first();
-    if (existingSale) {
-      logger.info(`PayPal capture-order idempotent: order ${order_id} déjà capturé (event sale existant)`);
-      return res.json({ success: true, order, idempotent: true });
-    }
+      // ── Contrôle 3 — Idempotence (sous verrou) ──
+      // Depuis la séparation création/paiement (order_created ≠ sale), un 'sale' ne peut
+      // provenir QUE d'une capture → sa présence = capture déjà traitée. Flux rejoué
+      // (client recharge la page de confirmation) → succès idempotent, pas de doublon.
+      const existingSale = await trx('financial_events')
+        .where({ order_id, type: 'sale' })
+        .first();
+      if (existingSale) {
+        logger.info(`PayPal capture-order idempotent: order ${order_id} déjà capturé (sale de paiement existant)`);
+        return { status: 200, body: { success: true, order, idempotent: true } };
+      }
 
-    // Capture payment on PayPal
-    const captureData = await paypalService.captureOrder(paypal_order_id);
+      // Capture payment on PayPal (appel réseau sous verrou order — scope par commande)
+      const captureData = await paypalService.captureOrder(paypal_order_id);
 
-    if (captureData.status !== 'COMPLETED') {
-      return res.status(400).json({
-        error: 'PAYPAL_CAPTURE_INCOMPLETE',
-        message: `Statut PayPal: ${captureData.status}`,
-      });
-    }
+      if (captureData.status !== 'COMPLETED') {
+        return { status: 400, body: { error: 'PAYPAL_CAPTURE_INCOMPLETE', message: `Statut PayPal: ${captureData.status}` } };
+      }
 
-    const capture = captureData.purchase_units?.[0]?.payments?.captures?.[0];
+      const capture = captureData.purchase_units?.[0]?.payments?.captures?.[0];
 
-    // ── Contrôle 1 — Binding custom_id (SÉCURITÉ : ferme le cross-order) ──
-    // Lecture défensive : niveau capture puis fallback niveau purchase_unit.
-    // FAIL-CLOSED : custom_id absent/undefined OU ≠ order_id → 403, AUCUNE écriture.
-    const customId = capture?.custom_id ?? captureData.purchase_units?.[0]?.custom_id;
-    if (!customId || customId !== order_id) {
-      logger.error(
-        `PayPal capture-order ORDER_MISMATCH: custom_id=${customId} attendu order_id=${order_id} (paypal ${paypal_order_id})`
-      );
-      return res.status(403).json({
-        error: 'ORDER_MISMATCH',
-        message: 'La commande PayPal ne correspond pas à la commande.',
-      });
-    }
+      // ── Contrôle 1 — Binding custom_id (SÉCURITÉ : ferme le cross-order) ──
+      // FAIL-CLOSED : custom_id absent/undefined OU ≠ order_id → 403, AUCUNE écriture.
+      const customId = capture?.custom_id ?? captureData.purchase_units?.[0]?.custom_id;
+      if (!customId || customId !== order_id) {
+        logger.error(
+          `PayPal capture-order ORDER_MISMATCH: custom_id=${customId} attendu order_id=${order_id} (paypal ${paypal_order_id})`
+        );
+        return { status: 403, body: { error: 'ORDER_MISMATCH', message: 'La commande PayPal ne correspond pas à la commande.' } };
+      }
 
-    // ── Contrôle devise (fail-closed) ──
-    const currency = capture?.amount?.currency_code;
-    if (currency !== 'EUR') {
-      logger.error(
-        `PayPal capture-order INVALID_CURRENCY: ${currency} pour order ${order_id} (paypal ${paypal_order_id})`
-      );
-      return res.status(400).json({
-        error: 'INVALID_CURRENCY',
-        message: 'Devise de paiement non supportée.',
-      });
-    }
+      // ── Contrôle devise (fail-closed) ──
+      const currency = capture?.amount?.currency_code;
+      if (currency !== 'EUR') {
+        logger.error(
+          `PayPal capture-order INVALID_CURRENCY: ${currency} pour order ${order_id} (paypal ${paypal_order_id})`
+        );
+        return { status: 400, body: { error: 'INVALID_CURRENCY', message: 'Devise de paiement non supportée.' } };
+      }
 
-    // ── Contrôle 2 — Montant réellement capturé (INTÉGRITÉ COMPTABLE, pas de rejet) ──
-    // On écrit TOUJOURS le montant capturé par PayPal (brut acheteur, purchase_units[].
-    // payments.captures[].amount.value), jamais order.total_ttc. Un écart au-delà de la
-    // tolérance ne rejette PAS (l'argent est déjà encaissé) : WARNING détaillé + flag dans
-    // le ledger pour réconciliation. Jamais d'écriture silencieuse d'un montant divergent.
-    const capturedAmount = parseFloat(capture?.amount?.value);
-    if (Number.isNaN(capturedAmount)) {
-      logger.error(
-        `PayPal capture-order montant illisible pour order ${order_id} (paypal ${paypal_order_id})`
-      );
-      return res.status(502).json({
-        error: 'PAYPAL_CAPTURE_INVALID',
-        message: 'Montant de capture PayPal illisible.',
-      });
-    }
-    const expectedAmount = parseFloat(order.total_ttc);
-    const amountMismatch = Math.abs(capturedAmount - expectedAmount) > 0.005;
-    if (amountMismatch) {
-      logger.warn(
-        `PayPal capture-order AMOUNT_MISMATCH: order ${order_id} attendu=${expectedAmount} `
-        + `capturé=${capturedAmount} écart=${capturedAmount - expectedAmount} (paypal ${paypal_order_id})`
-      );
-    }
+      // ── Contrôle 2 — Montant réellement capturé (INTÉGRITÉ COMPTABLE, pas de rejet) ──
+      const capturedAmount = parseFloat(capture?.amount?.value);
+      if (Number.isNaN(capturedAmount)) {
+        logger.error(
+          `PayPal capture-order montant illisible pour order ${order_id} (paypal ${paypal_order_id})`
+        );
+        return { status: 502, body: { error: 'PAYPAL_CAPTURE_INVALID', message: 'Montant de capture PayPal illisible.' } };
+      }
+      const expectedAmount = parseFloat(order.total_ttc);
+      const amountMismatch = Math.abs(capturedAmount - expectedAmount) > 0.005;
+      if (amountMismatch) {
+        logger.warn(
+          `PayPal capture-order AMOUNT_MISMATCH: order ${order_id} attendu=${expectedAmount} `
+          + `capturé=${capturedAmount} écart=${capturedAmount - expectedAmount} (paypal ${paypal_order_id})`
+        );
+      }
 
-    // Update order in database
-    await db('orders').where({ id: order_id }).update({
-      status: 'validated',
-      payment_method: 'paypal',
-      updated_at: new Date(),
-    });
-
-    // Append financial event (immutable ledger) — montant RÉELLEMENT capturé
-    const metadata = { paypal_order_id };
-    if (amountMismatch) {
-      metadata.amount_mismatch = { expected: expectedAmount, captured: capturedAmount };
-    }
-    await db('financial_events').insert({
-      order_id: order_id,
-      campaign_id: order.campaign_id,
-      type: 'sale',
-      amount: capturedAmount,
-      description: `Paiement PayPal ${paypal_order_id} confirmé`,
-      metadata: JSON.stringify(metadata),
-    });
-
-    // Upsert payment record (montant réellement capturé)
-    const existingPayment = await db('payments')
-      .where({ order_id: order_id, method: 'paypal' })
-      .first();
-
-    if (existingPayment) {
-      await db('payments').where({ id: existingPayment.id }).update({
-        status: 'reconciled',
-        stripe_id: paypal_order_id, // reuse stripe_id column for paypal ref
-        amount: capturedAmount,
-        reconciled_at: new Date(),
+      // Update order (dans la transaction)
+      await trx('orders').where({ id: order_id }).update({
+        status: 'validated',
+        payment_method: 'paypal',
         updated_at: new Date(),
       });
-    } else {
-      await db('payments').insert({
+
+      // Append financial event (immutable ledger) — montant RÉELLEMENT capturé
+      const metadata = { paypal_order_id };
+      if (amountMismatch) {
+        metadata.amount_mismatch = { expected: expectedAmount, captured: capturedAmount };
+      }
+      await trx('financial_events').insert({
         order_id: order_id,
-        method: 'paypal',
+        campaign_id: order.campaign_id,
+        type: 'sale',
         amount: capturedAmount,
-        status: 'reconciled',
-        stripe_id: paypal_order_id,
-        reconciled_at: new Date(),
+        description: `Paiement PayPal ${paypal_order_id} confirmé`,
+        metadata: JSON.stringify(metadata),
       });
-    }
 
-    const updatedOrder = await db('orders').where({ id: order_id }).first();
+      // Upsert payment record (montant réellement capturé)
+      const existingPayment = await trx('payments')
+        .where({ order_id: order_id, method: 'paypal' })
+        .first();
 
-    logger.info(`PayPal capture-order: order ${order_id} validated via PayPal ${paypal_order_id} (montant ${capturedAmount})`);
-    res.json({ success: true, order: updatedOrder });
+      if (existingPayment) {
+        await trx('payments').where({ id: existingPayment.id }).update({
+          status: 'reconciled',
+          stripe_id: paypal_order_id, // reuse stripe_id column for paypal ref
+          amount: capturedAmount,
+          reconciled_at: new Date(),
+          updated_at: new Date(),
+        });
+      } else {
+        await trx('payments').insert({
+          order_id: order_id,
+          method: 'paypal',
+          amount: capturedAmount,
+          status: 'reconciled',
+          stripe_id: paypal_order_id,
+          reconciled_at: new Date(),
+        });
+      }
+
+      const updatedOrder = await trx('orders').where({ id: order_id }).first();
+
+      logger.info(`PayPal capture-order: order ${order_id} validated via PayPal ${paypal_order_id} (montant ${capturedAmount})`);
+      return { status: 200, body: { success: true, order: updatedOrder } };
+    });
+
+    return res.status(outcome.status).json(outcome.body);
   } catch (err) {
     logger.error(`PayPal capture-order error: ${err.message}`);
     if (err.message === 'PAYPAL_CAPTURE_FAILED') {

@@ -152,21 +152,17 @@ async function handleWebhook(rawBody, signature) {
             updated_at: new Date(),
           });
 
-        // Append financial event
-        await db('financial_events').insert({
-          order_id: orderId,
-          type: 'sale',
-          amount: (pi.amount || 0) / 100,
-          description: `Paiement Stripe ${stripeId} confirmé`,
-          metadata: JSON.stringify({ stripe_id: stripeId }),
-        });
-
+        // Le 'sale' de PAIEMENT est désormais booké EXCLUSIVEMENT par
+        // confirmBoutiqueOrder (source unique, idempotente sous verrou) — plus d'INSERT
+        // ici, pour éliminer le double-compte création+webhook (13 commandes constatées).
         // Auto-confirm boutique orders with pending_payment status
         const order = await db('orders').where({ id: orderId }).first();
         if (order && order.status === 'pending_payment') {
           try {
             const boutiqueOrderService = require('./boutiqueOrderService');
-            await boutiqueOrderService.confirmBoutiqueOrder(orderId, stripeId);
+            // Encaissé réel : amount_received (capturé), pas amount (demandé).
+            const capturedEur = (pi.amount_received != null ? pi.amount_received : (pi.amount || 0)) / 100;
+            await boutiqueOrderService.confirmBoutiqueOrder(orderId, stripeId, capturedEur);
             logger.info(`Stripe webhook: boutique order ${orderId} auto-confirmed`);
           } catch (e) {
             logger.error(`Stripe webhook: boutique order auto-confirm failed: ${e.message}`);
@@ -249,4 +245,23 @@ async function handleWebhook(rawBody, signature) {
   return { received: true };
 }
 
-module.exports = { getStripe, resetStripeCache, createPaymentIntent, handleWebhook };
+/**
+ * Montant RÉELLEMENT encaissé d'un PaymentIntent (en euros), pour booker le 'sale'
+ * au montant capturé et non au montant déclaré. Lit `amount_received` (l'encaissé),
+ * PAS `amount` (le demandé) — fallback `amount` seulement si `amount_received` absent.
+ * Retourne null si Stripe indisponible / échec → l'appelant retombe sur total_ttc.
+ */
+async function getCapturedAmount(paymentIntentId) {
+  try {
+    const stripe = await getStripe();
+    if (!stripe) return null;
+    const pi = await stripe.paymentIntents.retrieve(paymentIntentId);
+    const cents = pi.amount_received != null ? pi.amount_received : pi.amount;
+    return cents != null ? cents / 100 : null;
+  } catch (err) {
+    logger.error(`Stripe getCapturedAmount failed for ${paymentIntentId}: ${err.message}`);
+    return null;
+  }
+}
+
+module.exports = { getStripe, resetStripeCache, createPaymentIntent, handleWebhook, getCapturedAmount };

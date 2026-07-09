@@ -125,10 +125,11 @@ describe('FLUX-01: Commande boutique web avec code promo', () => {
       const order = await db('orders').where({ id: orderId }).first();
       expect(parseFloat(order.promo_discount)).toBeGreaterThan(0);
 
-      // 5. Verify financial_event with valid type (not violating CHECK constraint)
+      // 5. Verify financial_event de CRÉATION (order_created ≠ sale depuis Bloc A :
+      // le 'sale' est réservé au paiement réel, pas à la création de commande)
       const events = await db('financial_events').where({ order_id: orderId });
-      const saleEvent = events.find(e => e.type === 'sale');
-      expect(saleEvent).toBeTruthy();
+      const createdEvent = events.find(e => e.type === 'order_created');
+      expect(createdEvent).toBeTruthy();
 
       const promoEvent = events.find(e => e.type === 'correction' && parseFloat(e.amount) < 0);
       expect(promoEvent).toBeTruthy();

@@ -327,10 +327,15 @@ async function createBoutiqueOrder({ cartItems, customer, referralCode, delivery
       });
     }
 
+    // Event de CRÉATION (trace + montant TTC), PAS un encaissement.
+    // type='order_created' (≠ 'sale') : le 'sale' est réservé au paiement réel
+    // (capture PayPal/Stripe). Sépare création et encaissement — cf. migration
+    // 20260709160000. Ne surtout pas remettre 'sale' ici : casserait la garde
+    // d'idempotence PayPal (court-circuit) et le calcul de commission (rulesEngine).
     await trx('financial_events').insert({
       order_id: orderId,
       campaign_id: campaignId,
-      type: 'sale',
+      type: 'order_created',
       amount: parseFloat(totalTTC.toFixed(2)),
       description: `Commande boutique ${ref}`,
     });
@@ -378,56 +383,99 @@ async function createBoutiqueOrder({ cartItems, customer, referralCode, delivery
 /**
  * Confirm a boutique order after payment
  */
-async function confirmBoutiqueOrder(orderId, paymentIntentId) {
-  const order = await db('orders').where({ id: orderId }).first();
-  if (!order) throw new Error('ORDER_NOT_FOUND');
-  if (order.status !== 'pending_payment') throw new Error('ORDER_NOT_PENDING_PAYMENT');
-
-  await db('orders').where({ id: orderId }).update({
-    status: 'submitted',
-    updated_at: new Date(),
-  });
-
-  // Create payment record
-  await db('payments').insert({
-    order_id: orderId,
-    method: 'stripe',
-    amount: order.total_ttc,
-    status: 'reconciled',
-    stripe_id: paymentIntentId,
-    reconciled_at: new Date(),
-  });
-
-  // Stock movements (only product items, not shipping)
-  const items = await db('order_items').where({ order_id: orderId }).whereNotNull('product_id').select('product_id', 'qty');
-  if (items.length > 0) {
-    await db('stock_movements').insert(
-      items.map((item) => ({
-        product_id: item.product_id,
-        campaign_id: order.campaign_id,
-        type: 'exit',
-        qty: item.qty,
-        reference: order.ref,
-      }))
-    );
+async function confirmBoutiqueOrder(orderId, paymentIntentId, capturedAmount = null) {
+  // Montant RÉELLEMENT encaissé (symétrie PayPal). Deux entrées convergent ici :
+  //  - webhook : passe déjà l'encaissé (amount_received).
+  //  - direct-confirm : capturedAmount null → on fetch le PaymentIntent AVANT la
+  //    transaction (appel réseau hors verrou) pour lire l'encaissé réel (amount_received),
+  //    JAMAIS le total_ttc déclaré côté client. null si Stripe indispo → fallback total_ttc.
+  if (capturedAmount == null) {
+    const stripeService = require('./stripeService');
+    capturedAmount = await stripeService.getCapturedAmount(paymentIntentId);
   }
 
-  // Notify admins
-  const admins = await db('users').whereIn('role', ['super_admin', 'comptable']).select('id');
-  if (admins.length) {
-    await db('notifications').insert(
-      admins.map((a) => ({
-        user_id: a.id,
-        type: 'order',
-        message: `Nouvelle commande boutique ${order.ref} (${parseFloat(order.total_ttc).toFixed(2)} EUR)`,
-        link: `/admin/orders?selected=${orderId}`,
-      }))
-    );
-  }
+  // Transaction + verrou pessimiste : confirm direct et webhook peuvent frapper la MÊME
+  // commande. Le SELECT ... FOR UPDATE sérialise : le second attend le commit du premier,
+  // voit status != 'pending_payment' et repart en ORDER_NOT_PENDING_PAYMENT → une seule
+  // confirmation, un seul 'sale' de paiement. Même patron que la garde PayPal.
+  return db.transaction(async (trx) => {
+    const order = await trx('orders').where({ id: orderId }).forUpdate().first();
+    if (!order) throw new Error('ORDER_NOT_FOUND');
+    if (order.status !== 'pending_payment') throw new Error('ORDER_NOT_PENDING_PAYMENT');
 
-  logger.info(`Boutique order confirmed: ${order.ref} (payment: ${paymentIntentId})`);
+    // ── Montant du 'sale' = encaissé réel si connu, sinon fallback total_ttc attendu ──
+    // Contrôle d'écart identique à la capture PayPal : on ne bloque PAS sur un écart
+    // (l'argent est encaissé), on écrit le montant RÉEL et on trace le mismatch en metadata.
+    const expectedAmount = parseFloat(order.total_ttc);
+    const saleAmount = capturedAmount != null ? capturedAmount : expectedAmount;
+    const amountMismatch = capturedAmount != null && Math.abs(saleAmount - expectedAmount) > 0.005;
+    if (amountMismatch) {
+      logger.warn(`Stripe confirm AMOUNT_MISMATCH: order ${orderId} attendu=${expectedAmount} encaissé=${saleAmount} (pi ${paymentIntentId})`);
+    }
 
-  return { ...order, status: 'submitted' };
+    await trx('orders').where({ id: orderId }).update({
+      status: 'submitted',
+      updated_at: new Date(),
+    });
+
+    // Create payment record (montant réellement encaissé)
+    await trx('payments').insert({
+      order_id: orderId,
+      method: 'stripe',
+      amount: saleAmount,
+      status: 'reconciled',
+      stripe_id: paymentIntentId,
+      reconciled_at: new Date(),
+    });
+
+    // ── Booking REVENU : 'sale' de PAIEMENT (source unique, symétrie PayPal) ──
+    // Auparavant ce 'sale' venait de l'event de création (bug) OU du webhook (double).
+    // Désormais UNIQUEMENT ici → une commande Stripe confirmée booke son revenu, une seule
+    // fois, au montant RÉELLEMENT encaissé, quel que soit le chemin (direct-confirm ou webhook).
+    const metadata = { stripe_id: paymentIntentId };
+    if (amountMismatch) {
+      metadata.amount_mismatch = { expected: expectedAmount, captured: saleAmount };
+    }
+    await trx('financial_events').insert({
+      order_id: orderId,
+      campaign_id: order.campaign_id,
+      type: 'sale',
+      amount: saleAmount,
+      description: `Paiement Stripe ${paymentIntentId} confirmé`,
+      metadata: JSON.stringify(metadata),
+    });
+
+    // Stock movements (only product items, not shipping)
+    const items = await trx('order_items').where({ order_id: orderId }).whereNotNull('product_id').select('product_id', 'qty');
+    if (items.length > 0) {
+      await trx('stock_movements').insert(
+        items.map((item) => ({
+          product_id: item.product_id,
+          campaign_id: order.campaign_id,
+          type: 'exit',
+          qty: item.qty,
+          reference: order.ref,
+        }))
+      );
+    }
+
+    // Notify admins
+    const admins = await trx('users').whereIn('role', ['super_admin', 'comptable']).select('id');
+    if (admins.length) {
+      await trx('notifications').insert(
+        admins.map((a) => ({
+          user_id: a.id,
+          type: 'order',
+          message: `Nouvelle commande boutique ${order.ref} (${parseFloat(order.total_ttc).toFixed(2)} EUR)`,
+          link: `/admin/orders?selected=${orderId}`,
+        }))
+      );
+    }
+
+    logger.info(`Boutique order confirmed: ${order.ref} (payment: ${paymentIntentId}, sale ${saleAmount})`);
+
+    return { ...order, status: 'submitted' };
+  });
 }
 
 /**

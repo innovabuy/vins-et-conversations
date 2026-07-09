@@ -7,6 +7,8 @@ const request = require('supertest');
 const app = require('../index');
 const db = require('../config/database');
 const crypto = require('crypto');
+const boutiqueOrderService = require('../services/boutiqueOrderService');
+const stripeService = require('../services/stripeService');
 
 let sessionId; // will be set by first cart call (server-generated UUID)
 let testProduct;
@@ -182,10 +184,107 @@ describe('Checkout & Stripe', () => {
   test('Financial event created after confirm', async () => {
     expect(orderId).toBeDefined();
 
+    // Depuis Bloc A : le 'sale' est booké par confirmBoutiqueOrder (le booking qui
+    // manquait — auparavant seul l'event de création, mal typé, en tenait lieu).
     const events = await db('financial_events')
       .where({ order_id: orderId, type: 'sale' });
 
     expect(events.length).toBe(1);
     expect(parseFloat(events[0].amount)).toBeGreaterThan(0);
+    // C'est bien le sale de PAIEMENT (pas la création) : metadata Stripe + libellé
+    expect(events[0].metadata.stripe_id).toBeTruthy();
+    expect(events[0].description).toMatch(/Paiement Stripe/);
+  });
+});
+
+// ─── Idempotence Stripe : direct-confirm + webhook même commande → 1 sale (Bloc A) ───
+describe('Stripe — double traitement (confirm + webhook) → 1 seul sale', () => {
+  let dblProduct;
+
+  beforeAll(async () => {
+    dblProduct = await db('products').where({ active: true }).first();
+    await db('stock_movements').insert({
+      product_id: dblProduct.id, type: 'entry', qty: 100, reference: 'TEST-STRIPE-DBL',
+    });
+  });
+
+  test('confirm direct puis webhook Stripe → un seul sale de paiement', async () => {
+    // Commande fraîche via le vrai chemin (event order_created, PAS sale)
+    const created = await boutiqueOrderService.createBoutiqueOrder({
+      cartItems: [{ product_id: dblProduct.id, qty: 1 }],
+      customer: { name: 'Dbl', email: `stripe-dbl-${Date.now()}@test.fr`, phone: '0600000000', address: '2 rue Test', city: 'Angers', postal_code: '49000' },
+      delivery_type: 'click_and_collect',
+    });
+    const oid = created.id;
+
+    try {
+      const pi = 'pi_dbl_' + Date.now();
+
+      // 1) direct-confirm (/checkout/confirm → confirmBoutiqueOrder) → booke le sale
+      const r1 = await request(app)
+        .post('/api/v1/public/checkout/confirm')
+        .send({ order_id: oid, payment_intent_id: pi });
+      expect(r1.status).toBe(200);
+
+      // 2) webhook Stripe pour la MÊME commande (déjà submitted) → ne doit PAS re-booker
+      const event = {
+        type: 'payment_intent.succeeded',
+        data: { object: { id: pi, amount: Math.round(parseFloat(created.total_ttc) * 100), metadata: { order_id: oid } } },
+      };
+      await stripeService.handleWebhook(Buffer.from(JSON.stringify(event)), 'sig_test');
+
+      // INVARIANT : un seul sale de paiement malgré les deux chemins
+      const sales = await db('financial_events').where({ order_id: oid, type: 'sale' });
+      expect(sales.length).toBe(1);
+      expect(sales[0].metadata.stripe_id).toBe(pi);
+    } finally {
+      const ref = (await db('orders').where({ id: oid }).first())?.ref;
+      if (ref) await db('stock_movements').where({ reference: ref }).del().catch(() => {});
+      await db('notifications').where('link', 'like', `%${oid}%`).del().catch(() => {});
+      await db('financial_events').where({ order_id: oid }).del().catch(() => {});
+      await db('payments').where({ order_id: oid }).del().catch(() => {});
+      await db('order_items').where({ order_id: oid }).del().catch(() => {});
+      await db('orders').where({ id: oid }).del().catch(() => {});
+    }
+  });
+
+  test('direct-confirm : le sale suit l\'ENCAISSÉ réel (PI) ≠ total_ttc → montant réel + mismatch tracé', async () => {
+    const created = await boutiqueOrderService.createBoutiqueOrder({
+      cartItems: [{ product_id: dblProduct.id, qty: 1 }],
+      customer: { name: 'Mism', email: `stripe-mism-${Date.now()}@test.fr`, phone: '0600000000', address: '3 rue Test', city: 'Angers', postal_code: '49000' },
+      delivery_type: 'click_and_collect',
+    });
+    const oid = created.id;
+    const expected = parseFloat(created.total_ttc);
+    const realCaptured = Math.round((expected + 3.33) * 100) / 100; // encaissé ≠ déclaré
+
+    // Le direct-confirm ne passe pas de montant → confirmBoutiqueOrder fetch le PI.
+    // On simule l'encaissé réel renvoyé par Stripe (amount_received).
+    const spy = jest.spyOn(stripeService, 'getCapturedAmount').mockResolvedValue(realCaptured);
+    try {
+      const pi = 'pi_mism_' + Date.now();
+      const r = await request(app)
+        .post('/api/v1/public/checkout/confirm')
+        .send({ order_id: oid, payment_intent_id: pi });
+      expect(r.status).toBe(200);
+
+      const sales = await db('financial_events').where({ order_id: oid, type: 'sale' });
+      expect(sales.length).toBe(1);
+      // Le sale suit l'ENCAISSÉ réel, PAS le total_ttc déclaré
+      expect(parseFloat(sales[0].amount)).toBe(realCaptured);
+      // L'écart est tracé (non bloquant) — symétrie avec la capture PayPal
+      expect(sales[0].metadata.amount_mismatch).toBeTruthy();
+      expect(parseFloat(sales[0].metadata.amount_mismatch.expected)).toBe(expected);
+      expect(parseFloat(sales[0].metadata.amount_mismatch.captured)).toBe(realCaptured);
+    } finally {
+      spy.mockRestore();
+      const ref = (await db('orders').where({ id: oid }).first())?.ref;
+      if (ref) await db('stock_movements').where({ reference: ref }).del().catch(() => {});
+      await db('notifications').where('link', 'like', `%${oid}%`).del().catch(() => {});
+      await db('financial_events').where({ order_id: oid }).del().catch(() => {});
+      await db('payments').where({ order_id: oid }).del().catch(() => {});
+      await db('order_items').where({ order_id: oid }).del().catch(() => {});
+      await db('orders').where({ id: oid }).del().catch(() => {});
+    }
   });
 });

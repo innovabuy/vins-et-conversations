@@ -9,8 +9,10 @@ const request = require('supertest');
 const app = require('../index');
 const db = require('../config/database');
 const paypalService = require('../services/paypalService');
+const boutiqueOrderService = require('../services/boutiqueOrderService');
 
-// Mock the paypalService module
+// Mock the paypalService module (boutiqueOrderService reste RÉEL — on veut le vrai
+// chemin de création pour reproduire la collision order_created / sale).
 jest.mock('../services/paypalService');
 
 let testOrder;
@@ -303,5 +305,97 @@ describe('PayPal Routes', () => {
 
     expect(res.status).toBe(502);
     expect(res.body.error).toBe('PAYPAL_CAPTURE_FAILED');
+  });
+});
+
+// ─── Vraie collision boutique : order_created ≠ sale (fix Bloc A) ─────────────
+// Reproduit VC-2026-1884 via le VRAI chemin boutiqueOrderService (pas un insert
+// direct) : la commande porte un event 'order_created' au moment de la capture.
+// Le fix (retype création → order_created + garde d'idempotence sur le 'sale' de
+// paiement + verrou FOR UPDATE) doit permettre à la capture d'aboutir, une seule fois.
+describe('Capture — collision création/paiement (fix Bloc A)', () => {
+  let product;
+
+  beforeAll(async () => {
+    product = await db('products').where({ active: true }).first();
+    // Garantir du stock (le calcul de stock ne filtre pas la campagne) pour éviter
+    // INSUFFICIENT_STOCK sur un produit sans backorder.
+    await db('stock_movements').insert({
+      product_id: product.id,
+      campaign_id: testOrder.campaign_id,
+      type: 'entry',
+      qty: 500,
+      reference: 'TEST-PP-COLLISION',
+    });
+  });
+
+  async function makeBoutiqueOrder() {
+    const order = await boutiqueOrderService.createBoutiqueOrder({
+      cartItems: [{ product_id: product.id, qty: 1 }],
+      customer: {
+        name: 'Buyer Test',
+        email: `pp-collision-${Date.now()}-${createdOrderIds.length}@test.fr`,
+        phone: '0600000000',
+        address: '1 rue du Test',
+        city: 'Angers',
+        postal_code: '49000',
+      },
+      delivery_type: 'click_and_collect', // pas de shipping → pas de dépendance shipping_zones
+    });
+    createdOrderIds.push(order.id);
+    return order;
+  }
+
+  test('un order_created NE court-circuite PAS la capture (encaissement réel)', async () => {
+    const order = await makeBoutiqueOrder();
+
+    // Précondition : l'event de création est bien 'order_created', et AUCUN 'sale'
+    const created = await db('financial_events').where({ order_id: order.id, type: 'order_created' });
+    expect(created.length).toBe(1);
+    const salesBefore = await db('financial_events').where({ order_id: order.id, type: 'sale' });
+    expect(salesBefore.length).toBe(0);
+
+    mockCapture({ customId: order.id, value: String(order.total_ttc) });
+
+    const res = await request(app)
+      .post('/api/v1/paypal/capture-order')
+      .send({ paypal_order_id: 'PP_COLLISION', order_id: order.id });
+
+    // La capture DOIT aboutir — pas de court-circuit idempotent
+    expect(res.status).toBe(200);
+    expect(res.body.success).toBe(true);
+    expect(res.body.idempotent).toBeUndefined();
+
+    // Commande validée + 1 sale de PAIEMENT (metadata paypal) + payment reconciled
+    const updated = await db('orders').where({ id: order.id }).first();
+    expect(updated.status).toBe('validated');
+
+    const sales = await db('financial_events').where({ order_id: order.id, type: 'sale' });
+    expect(sales.length).toBe(1);
+    expect(sales[0].metadata.paypal_order_id).toBe('PP_COLLISION');
+
+    const payment = await db('payments').where({ order_id: order.id, method: 'paypal' }).first();
+    expect(payment).toBeTruthy();
+    expect(payment.status).toBe('reconciled');
+  });
+
+  test('double capture CONCURRENTE → 1 seul sale de paiement (verrou FOR UPDATE)', async () => {
+    const order = await makeBoutiqueOrder();
+    mockCapture({ customId: order.id, value: String(order.total_ttc) });
+
+    const [a, b] = await Promise.all([
+      request(app).post('/api/v1/paypal/capture-order').send({ paypal_order_id: 'PP_CONC', order_id: order.id }),
+      request(app).post('/api/v1/paypal/capture-order').send({ paypal_order_id: 'PP_CONC', order_id: order.id }),
+    ]);
+
+    // Les deux répondent 200 succès (l'un capture, l'autre idempotent) — jamais d'erreur
+    expect(a.status).toBe(200);
+    expect(b.status).toBe(200);
+    expect(a.body.success).toBe(true);
+    expect(b.body.success).toBe(true);
+
+    // INVARIANT : un seul sale de paiement malgré la concurrence
+    const sales = await db('financial_events').where({ order_id: order.id, type: 'sale' });
+    expect(sales.length).toBe(1);
   });
 });
