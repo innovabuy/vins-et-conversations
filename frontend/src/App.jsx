@@ -67,6 +67,7 @@ import JoinCampaignPage from './pages/JoinCampaignPage';
 import PrestationCSEPage from './pages/vitrine/PrestationCSEPage';
 import PrestationEcolesPage from './pages/vitrine/PrestationEcolesPage';
 import PrestationRepasPage from './pages/vitrine/PrestationRepasPage';
+import FinancementProjetPage from './pages/vitrine/FinancementProjetPage';
 import AProposPage from './pages/vitrine/AProposPage';
 import EquipePage from './pages/vitrine/EquipePage';
 import RaisonDetrePage from './pages/vitrine/RaisonDetrePage';
@@ -116,6 +117,7 @@ function AppRoutes() {
         <Route path="prestations/cse" element={<PrestationCSEPage />} />
         <Route path="prestations/ecoles" element={<PrestationEcolesPage />} />
         <Route path="prestations/repas" element={<PrestationRepasPage />} />
+        <Route path="prestations/financement" element={<FinancementProjetPage />} />
         <Route path="apropos" element={<AProposPage />} />
         <Route path="equipe" element={<EquipePage />} />
         <Route path="raison-d-etre" element={<RaisonDetrePage />} />

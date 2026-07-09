@@ -91,6 +91,7 @@ export default function PublicLayout() {
                 { href: '/boutique/ambassadeurs', label: 'Devenir Ambassadeur' },
                 { href: '/boutique/cercle-ambassadeurs', label: 'Cercle des ambassadeurs' },
                 { href: '/boutique/prestations/repas', label: 'Repas & Soirées' },
+                { href: '/boutique/prestations/financement', label: 'Financement de projet' },
               ]} />
               <NavDropdown label="À Propos" items={[
                 { href: '/boutique/apropos', label: 'Notre histoire' },
@@ -136,6 +137,7 @@ export default function PublicLayout() {
             <NavLink to="/boutique/ambassadeurs" onClick={() => setMenuOpen(false)} className="block py-2 pl-3 text-sm text-gray-700 hover:text-wine-700">Devenir Ambassadeur</NavLink>
             <NavLink to="/boutique/cercle-ambassadeurs" onClick={() => setMenuOpen(false)} className="block py-2 pl-3 text-sm text-gray-700 hover:text-wine-700">Cercle des ambassadeurs</NavLink>
             <NavLink to="/boutique/prestations/repas" onClick={() => setMenuOpen(false)} className="block py-2 pl-3 text-sm text-gray-700 hover:text-wine-700">Repas & Soirées</NavLink>
+            <NavLink to="/boutique/prestations/financement" onClick={() => setMenuOpen(false)} className="block py-2 pl-3 text-sm text-gray-700 hover:text-wine-700">Financement de projet</NavLink>
 
             <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider pt-3 pb-1">À Propos</p>
             <NavLink to="/boutique/apropos" onClick={() => setMenuOpen(false)} className="block py-2 pl-3 text-sm text-gray-700 hover:text-wine-700">Notre histoire</NavLink>
