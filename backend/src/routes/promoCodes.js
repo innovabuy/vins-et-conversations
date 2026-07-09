@@ -11,7 +11,7 @@ const publicRouter = express.Router();
 // ─── Admin CRUD ──────────────────────────────────────
 
 // GET / - List all promo codes
-router.get('/', authenticate, async (req, res) => {
+router.get('/', authenticate, requireRole('super_admin', 'commercial'), async (req, res) => {
   try {
     const codes = await db('promo_codes').orderBy('created_at', 'desc');
     res.json({ data: codes });
@@ -33,7 +33,7 @@ const createSchema = Joi.object({
   active: Joi.boolean().default(true),
 });
 
-router.post('/', authenticate, auditAction('promo_codes'), async (req, res) => {
+router.post('/', authenticate, requireRole('super_admin', 'commercial'), auditAction('promo_codes'), async (req, res) => {
   try {
     const { error, value } = createSchema.validate(req.body);
     if (error) return res.status(400).json({ error: 'VALIDATION_ERROR', message: error.details[0].message });
@@ -67,7 +67,7 @@ const updateSchema = Joi.object({
   active: Joi.boolean().optional(),
 });
 
-router.put('/:id', authenticate, auditAction('promo_codes'), async (req, res) => {
+router.put('/:id', authenticate, requireRole('super_admin', 'commercial'), auditAction('promo_codes'), async (req, res) => {
   try {
     const { error, value } = updateSchema.validate(req.body);
     if (error) return res.status(400).json({ error: 'VALIDATION_ERROR', message: error.details[0].message });
@@ -94,7 +94,7 @@ router.put('/:id', authenticate, auditAction('promo_codes'), async (req, res) =>
 });
 
 // DELETE /:id - Delete a promo code
-router.delete('/:id', authenticate, auditAction('promo_codes'), async (req, res) => {
+router.delete('/:id', authenticate, requireRole('super_admin', 'commercial'), auditAction('promo_codes'), async (req, res) => {
   try {
     const usedInOrders = await db('orders').where({ promo_code_id: req.params.id }).first();
     if (usedInOrders) {

@@ -3,6 +3,7 @@ const app = require('../index');
 const db = require('../config/database');
 
 let adminToken;
+let studentToken;
 const testCodeIds = [];
 
 beforeAll(async () => {
@@ -11,7 +12,7 @@ beforeAll(async () => {
   // Cleanup leftover test codes from previous runs
   await db('promo_codes').whereIn('code', [
     'BIENVENUE10', 'REDUCTION5', 'TESTINACTIVE', 'TESTEXPIRED',
-    'TESTMAXED', 'TESTBIG50', 'TESTDELETE',
+    'TESTMAXED', 'TESTBIG50', 'TESTDELETE', 'HACK10',
   ]).del().catch(() => {});
 
   // Login as admin
@@ -19,6 +20,12 @@ beforeAll(async () => {
     .post('/api/v1/auth/login')
     .send({ email: 'nicolas@vins-conversations.fr', password: 'VinsConv2026!' });
   adminToken = res.body.accessToken;
+
+  // Login as a non-admin (étudiant) for the RBAC negative tests (A1)
+  const studentRes = await request(app)
+    .post('/api/v1/auth/login')
+    .send({ email: 'ackavong@eleve.sc.fr', password: 'VinsConv2026!' });
+  studentToken = studentRes.body.accessToken;
 });
 
 afterAll(async () => {
@@ -107,6 +114,38 @@ describe('Promo Codes', () => {
         .put(`/api/v1/admin/promo-codes/${percentCodeId}`)
         .set('Authorization', `Bearer ${adminToken}`)
         .send({ active: true });
+    });
+  });
+
+  // ─── Sécurité RBAC (A1) — non-admin interdit ────
+  describe('RBAC — routes admin refusées aux non-admins (A1)', () => {
+    const DUMMY_ID = '00000000-0000-0000-0000-000000000000';
+
+    test('POST / — rôle étudiant → 403', async () => {
+      const res = await request(app)
+        .post('/api/v1/admin/promo-codes')
+        .set('Authorization', `Bearer ${studentToken}`)
+        .send({ code: 'HACK10', type: 'percentage', value: 10 });
+
+      expect(res.status).toBe(403);
+      expect(res.body.error).toBe('FORBIDDEN');
+    });
+
+    test('PUT /:id — rôle étudiant → 403', async () => {
+      const res = await request(app)
+        .put(`/api/v1/admin/promo-codes/${DUMMY_ID}`)
+        .set('Authorization', `Bearer ${studentToken}`)
+        .send({ value: 99 });
+
+      expect(res.status).toBe(403);
+    });
+
+    test('DELETE /:id — rôle étudiant → 403', async () => {
+      const res = await request(app)
+        .delete(`/api/v1/admin/promo-codes/${DUMMY_ID}`)
+        .set('Authorization', `Bearer ${studentToken}`);
+
+      expect(res.status).toBe(403);
     });
   });
 
