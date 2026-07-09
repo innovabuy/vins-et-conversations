@@ -559,9 +559,14 @@ describe('FLUX-11: Lien parrainage', () => {
     expect(res.status).toBe(200);
     expect(res.body.referral_link).toBeTruthy();
 
-    // Must not point to Wix or external domain
+    // Must not point to Wix
     expect(res.body.referral_link).not.toMatch(/wix/i);
-    expect(res.body.referral_link).not.toMatch(/vinsetconversations\.com/i);
+    // Depuis le cutover HTTPS, vinsetconversations.com EST le front légitime.
+    // En CI, FRONTEND_URL n'est pas défini → le lien est un path relatif.
+    if (process.env.BASE_URL || process.env.FRONTEND_URL) {
+      expect(res.body.referral_link).toMatch(/^http/);
+      expect(res.body.referral_link).not.toContain('localhost');
+    }
 
     // Must contain a referral code
     expect(res.body.referral_code).toBeTruthy();
