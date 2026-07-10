@@ -229,7 +229,11 @@ export default function PublicLayout() {
           <div className="border-t border-gray-800 mt-4 pt-4 text-center">
             <p className="text-[0.7rem] text-gray-600">
               Réalisation{' '}
-              <a href="https://www.cap-numerik.fr" target="_blank" rel="noopener noreferrer" className="text-gray-500 hover:text-gray-400 no-underline font-medium">Cap-Numerik Angers</a>
+              <a href="https://cap-numerik.fr/?utm_source=vinsetconversations&utm_medium=footer" target="_blank" rel="noopener" className="text-gray-500 hover:text-gray-400 no-underline font-medium">Cap-Numerik</a>
+              {' · '}
+              <a href="https://www.cap-performances.fr/?utm_source=vinsetconversations&utm_medium=footer" target="_blank" rel="noopener" className="text-gray-500 hover:text-gray-400 no-underline font-medium">Cap-Performances</a>
+              {' · '}
+              <a href="https://vendmieux.fr/?utm_source=vinsetconversations&utm_medium=footer" target="_blank" rel="noopener" className="text-gray-500 hover:text-gray-400 no-underline font-medium">VendMieux</a>
               {' · '}
               <a href="tel:+33760403966" className="text-gray-500 hover:text-gray-400 no-underline">07 60 40 39 66</a>
             </p>
