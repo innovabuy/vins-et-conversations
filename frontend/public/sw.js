@@ -1,4 +1,4 @@
-const CACHE_NAME = 'vc-cache-v3';
+const CACHE_NAME = 'vc-cache-v4';
 const STATIC_ASSETS = [
   '/',
   '/manifest.json',
