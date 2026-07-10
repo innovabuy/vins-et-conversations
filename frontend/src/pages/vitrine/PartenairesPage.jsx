@@ -13,6 +13,10 @@ const DEFAULT_CONTENT = {
       { name: 'ESPL', logo: null },
       { name: 'PBA', logo: null },
     ]},
+    { type: 'brand_links', label: 'Nos autres marques', items: [
+      { name: 'Cap Performances', url: 'https://www.cap-performances.fr/' },
+      { name: 'VendMieux', url: 'https://vendmieux.fr/' },
+    ]},
     { type: 'placeholder', body: 'Section partenaires à enrichir par Nicolas — logos et descriptions à ajouter.' },
   ],
   cta: { label: 'Devenir partenaire', href: '/boutique/contact' },
@@ -67,6 +71,17 @@ export default function PartenairesPage() {
                 <Users size={48} className="mx-auto text-gray-300 mb-4" />
                 <p className="text-gray-500 italic">{section.body}</p>
               </div>
+            )}
+            {section.type === 'brand_links' && section.items && (
+              <p className="text-sm text-gray-400 text-center">
+                {section.label ? `${section.label} : ` : ''}
+                {section.items.map((b, k) => (
+                  <span key={k}>
+                    {k > 0 && <span className="text-gray-300"> · </span>}
+                    <a href={b.url} target="_blank" rel="noopener" className="text-gray-500 hover:text-wine-700 underline-offset-2">{b.name}</a>
+                  </span>
+                ))}
+              </p>
             )}
           </div>
         ))}
