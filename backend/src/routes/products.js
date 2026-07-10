@@ -441,11 +441,8 @@ adminRouter.put(
             await trx('coffret_products').insert(
               bundleIds.map((pid, idx) => ({ coffret_id: req.params.id, product_id: pid, sort_order: idx }))
             );
-            const sumRow = await trx('products').whereIn('id', bundleIds).sum({ total: 'price_ht' }).first();
-            const newPriceHt = parseFloat(sumRow?.total || 0);
-            body.price_ht = newPriceHt;
-            const tva = parseFloat(body.tva_rate != null ? body.tva_rate : (await trx('products').where({ id: req.params.id }).first())?.tva_rate || 20);
-            body.price_ttc = Math.round(newPriceHt * (1 + tva / 100) * 100) / 100;
+            // Le prix (price_ht/price_ttc) n'est PLUS recomputé ici : on fait confiance à la
+            // valeur envoyée par le front (somme suggérée par défaut, surchargeable par l'admin).
           }
         }
         const rows = await trx('products')

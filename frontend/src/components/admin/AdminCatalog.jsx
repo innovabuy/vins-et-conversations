@@ -397,23 +397,15 @@ function ProductForm({ product, onSave, onCancel, allProducts = [], categoriesLi
   const isBeverageProduct = selectedCategory?.product_type === 'beverage';
   const isGiftSet = selectedCategory?.product_type === 'gift_set';
 
-  // Live-compute price_ht for coffrets: sum of selected products' price_ht (read-only)
+  // Somme HT du contenu du coffret = SUGGESTION de prix. Le pré-remplissage se fait à la
+  // sélection du bundle (toggleBundleProduct) ; le champ reste éditable et n'est jamais
+  // ré-écrasé par un render, pour permettre la surcharge manuelle (prix cadeau ≠ somme).
   const coffretPriceHt = (isCoffret || isGiftSet)
     ? (form.bundle_products || []).reduce((s, pid) => {
         const p = allProducts.find(x => x.id === pid);
         return s + (p ? parseFloat(p.price_ht) || 0 : 0);
       }, 0)
     : null;
-  useEffect(() => {
-    if (coffretPriceHt == null) return;
-    const tva = parseFloat(form.tva_rate) || 20;
-    const htRounded = Math.round(coffretPriceHt * 100) / 100;
-    const ttcRounded = Math.round(coffretPriceHt * (1 + tva / 100) * 100) / 100;
-    setForm((f) => {
-      if (parseFloat(f.price_ht || 0) === htRounded && parseFloat(f.price_ttc || 0) === ttcRounded) return f;
-      return { ...f, price_ht: htRounded, price_ttc: ttcRounded };
-    });
-  }, [coffretPriceHt, form.tva_rate]);
 
   // Auto-enable tasting for new products when criteria exist
   useEffect(() => {
@@ -478,7 +470,19 @@ function ProductForm({ product, onSave, onCancel, allProducts = [], categoriesLi
     setForm(f => {
       const current = f.bundle_products || [];
       const next = current.includes(productId) ? current.filter(id => id !== productId) : [...current, productId];
-      return { ...f, bundle_products: next };
+      // Pré-remplissage suggestion : à chaque modif du contenu, on propose la somme du contenu.
+      // L'admin peut ensuite surcharger le prix ; sa saisie ne sera plus ré-écrasée.
+      const sumHt = next.reduce((s, pid) => {
+        const p = allProducts.find(x => x.id === pid);
+        return s + (p ? parseFloat(p.price_ht) || 0 : 0);
+      }, 0);
+      const tva = parseFloat(f.tva_rate) || 20;
+      return {
+        ...f,
+        bundle_products: next,
+        price_ht: (Math.round(sumHt * 100) / 100).toFixed(2),
+        price_ttc: (Math.round(sumHt * (1 + tva / 100) * 100) / 100).toFixed(2),
+      };
     });
   };
 
@@ -694,20 +698,21 @@ function ProductForm({ product, onSave, onCancel, allProducts = [], categoriesLi
             </select>
           </div>
           <div>
-            <label className="block text-xs font-medium text-gray-500 mb-1">Prix HT *{(isCoffret || isGiftSet) && <span className="text-gray-400 font-normal"> (auto)</span>}</label>
+            <label className="block text-xs font-medium text-gray-500 mb-1">Prix HT *{(isCoffret || isGiftSet) && <span className="text-gray-400 font-normal"> (suggéré)</span>}</label>
             <input type="number" step="0.01" value={form.price_ht}
               onChange={e => handleChange('price_ht', e.target.value)}
-              readOnly={isCoffret || isGiftSet}
-              className={`w-full border rounded-lg px-3 py-2 text-sm ${(isCoffret || isGiftSet) ? 'bg-gray-50 text-gray-600 cursor-not-allowed' : ''}`}
+              className="w-full border rounded-lg px-3 py-2 text-sm"
               required />
           </div>
           <div>
-            <label className="block text-xs font-medium text-gray-500 mb-1">Prix TTC *{(isCoffret || isGiftSet) && <span className="text-gray-400 font-normal"> (auto)</span>}</label>
+            <label className="block text-xs font-medium text-gray-500 mb-1">Prix TTC *{(isCoffret || isGiftSet) && <span className="text-gray-400 font-normal"> (suggéré)</span>}</label>
             <input type="number" step="0.01" value={form.price_ttc}
               onChange={e => handleChange('price_ttc', e.target.value)}
-              readOnly={isCoffret || isGiftSet}
-              className={`w-full border rounded-lg px-3 py-2 text-sm ${(isCoffret || isGiftSet) ? 'bg-gray-50 text-gray-600 cursor-not-allowed' : ''}`}
+              className="w-full border rounded-lg px-3 py-2 text-sm"
               required />
+            {(isCoffret || isGiftSet) && (form.bundle_products?.length > 0) && (
+              <p className="text-xs text-gray-400 mt-1">Somme du contenu : {formatEur(coffretPriceHt * (1 + (parseFloat(form.tva_rate) || 20) / 100))}</p>
+            )}
           </div>
           <div>
             <label className="block text-xs font-medium text-gray-500 mb-1">Prix achat *</label>
