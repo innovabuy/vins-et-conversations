@@ -20,8 +20,17 @@ export default function CoffretsVitrinePage() {
       .then(({ data }) => { if (data.content_json) setContent(data.content_json); })
       .catch(() => {});
 
-    api.get('/public/catalog', { params: { product_type: 'gift_set' } })
-      .then(({ data }) => setProducts(data.data || []))
+    // Le back /public/catalog ne filtre pas par product_type (param ignoré) → on filtre par
+    // category_id (chemin géré par applyFilters, comme BoutiqueHome). L'id de la catégorie gift_set
+    // n'est PAS stable entre seeds (uuid regénéré au cutover) → on le récupère dynamiquement via
+    // /public/filters plutôt que de le coder en dur (sinon la page recasse au prochain reseed).
+    api.get('/public/filters')
+      .then(({ data }) => {
+        const giftSet = (data.categoryObjects || []).find((c) => c.product_type === 'gift_set');
+        if (!giftSet) { setProducts([]); return; }
+        return api.get('/public/catalog', { params: { category_id: giftSet.id } })
+          .then(({ data }) => setProducts(data.data || []));
+      })
       .catch(() => {})
       .finally(() => setLoading(false));
   }, []);
