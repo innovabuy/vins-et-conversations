@@ -11,7 +11,7 @@ const DEFAULT_CONTENT = {
   },
   sections: [
     { type: 'features', title: 'Avantages CSE', items: [
-      'Remise CSE (–10 % sur le prix public)',
+      'Remises CSE',
       'Facture PDF automatique',
       'Catalogue dédié',
     ]},
