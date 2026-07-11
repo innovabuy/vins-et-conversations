@@ -25,10 +25,11 @@ exports.up = async function (knex) {
   const updated = await knex('product_categories')
     .whereIn('name', NAMES)
     .update({ active: false });
-  // Garde-fou : les 3 libellés doivent exister. 0 ligne = erreur de libellé.
+  // 0 ligne = no-op légitime (base vierge au cutover/CI : migrate tourne avant le seed,
+  // ou re-run sur base déjà migrée). On log sans throw pour ne pas casser migrate:latest.
   if (updated === 0) {
-    throw new Error(
-      `[hide_categories_boutique] Aucune catégorie matchée parmi ${JSON.stringify(NAMES)} — libellé erroné, abort.`
+    console.warn(
+      `[hide_categories_boutique] catégorie(s) ${JSON.stringify(NAMES)} absente(s) — no-op (base vierge au cutover/CI).`
     );
   }
 };

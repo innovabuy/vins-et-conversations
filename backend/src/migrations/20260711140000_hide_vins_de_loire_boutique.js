@@ -24,10 +24,11 @@ exports.up = async function (knex) {
   const updated = await knex('product_categories')
     .where({ name: NAME })
     .update({ active: false });
-  // Garde-fou : le libellé doit exister. 0 ligne = erreur de libellé.
+  // 0 ligne = no-op légitime (base vierge au cutover/CI : migrate tourne avant le seed,
+  // ou re-run sur base déjà migrée). On log sans throw pour ne pas casser migrate:latest.
   if (updated === 0) {
-    throw new Error(
-      `[hide_vins_de_loire_boutique] Catégorie "${NAME}" introuvable — libellé erroné, abort.`
+    console.warn(
+      `[hide_vins_de_loire_boutique] catégorie "${NAME}" absente — no-op (base vierge au cutover/CI).`
     );
   }
 };
