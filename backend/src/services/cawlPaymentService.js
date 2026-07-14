@@ -12,7 +12,9 @@
  *
  * Env attendu (dans .env, jamais en code/UI/DB) :
  *   CAWL_HOST, CAWL_API_KEY_ID, CAWL_SECRET_API_KEY, CAWL_MERCHANT_ID
- *   CAWL_INTEGRATOR (libre, défaut 'VinsEtConversations'), CAWL_MODE (log only)
+ *   CAWL_INTEGRATOR (libre, défaut 'VinsEtConversations')
+ * NB : pas de sélecteur de mode — le host complet (sandbox OU prod) vient de CAWL_HOST ;
+ * une CAWL_HOST manquante fait planter (CAWL_NOT_CONFIGURED), jamais de fallback preprod.
  */
 
 const logger = require('../utils/logger');
