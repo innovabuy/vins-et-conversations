@@ -88,7 +88,7 @@ export default function PublicLayout() {
               <NavDropdown label="Nos Prestations" items={[
                 { href: '/boutique/prestations/cse', label: 'Espace CSE' },
                 { href: '/boutique/prestations/ecoles', label: 'Partenariat Écoles' },
-                { href: '/boutique/ambassadeurs', label: 'Devenir Ambassadeur' },
+                { href: '/boutique/devenir-ambassadeur', label: 'Devenir Ambassadeur' },
                 { href: '/boutique/cercle-ambassadeurs', label: 'Cercle des ambassadeurs' },
                 { href: '/boutique/prestations/repas', label: 'Repas & Soirées' },
                 { href: '/boutique/prestations/financement', label: 'Financement de projet' },
@@ -134,7 +134,7 @@ export default function PublicLayout() {
             <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider pt-3 pb-1">Nos Prestations</p>
             <NavLink to="/boutique/prestations/cse" onClick={() => setMenuOpen(false)} className="block py-2 pl-3 text-sm text-gray-700 hover:text-wine-700">Espace CSE</NavLink>
             <NavLink to="/boutique/prestations/ecoles" onClick={() => setMenuOpen(false)} className="block py-2 pl-3 text-sm text-gray-700 hover:text-wine-700">Partenariat Écoles</NavLink>
-            <NavLink to="/boutique/ambassadeurs" onClick={() => setMenuOpen(false)} className="block py-2 pl-3 text-sm text-gray-700 hover:text-wine-700">Devenir Ambassadeur</NavLink>
+            <NavLink to="/boutique/devenir-ambassadeur" onClick={() => setMenuOpen(false)} className="block py-2 pl-3 text-sm text-gray-700 hover:text-wine-700">Devenir Ambassadeur</NavLink>
             <NavLink to="/boutique/cercle-ambassadeurs" onClick={() => setMenuOpen(false)} className="block py-2 pl-3 text-sm text-gray-700 hover:text-wine-700">Cercle des ambassadeurs</NavLink>
             <NavLink to="/boutique/prestations/repas" onClick={() => setMenuOpen(false)} className="block py-2 pl-3 text-sm text-gray-700 hover:text-wine-700">Repas & Soirées</NavLink>
             <NavLink to="/boutique/prestations/financement" onClick={() => setMenuOpen(false)} className="block py-2 pl-3 text-sm text-gray-700 hover:text-wine-700">Financement de projet</NavLink>
@@ -199,7 +199,7 @@ export default function PublicLayout() {
                 <Link to="/boutique/raison-d-etre" className="block text-sm text-gray-300 hover:text-white">Notre raison d'être</Link>
                 <Link to="/boutique/prestations/cse" className="block text-sm text-gray-300 hover:text-white">Espace CSE</Link>
                 <Link to="/boutique/prestations/ecoles" className="block text-sm text-gray-300 hover:text-white">Partenariat Écoles</Link>
-                <Link to="/boutique/ambassadeurs" className="block text-sm text-gray-300 hover:text-white">Devenir Ambassadeur</Link>
+                <Link to="/boutique/devenir-ambassadeur" className="block text-sm text-gray-300 hover:text-white">Devenir Ambassadeur</Link>
                 <Link to="/boutique/cercle-ambassadeurs" className="block text-sm text-gray-300 hover:text-white">Cercle des ambassadeurs</Link>
                 <Link to="/boutique/ambassadeurs" className="block text-sm text-gray-300 hover:text-white">Nos Ambassadeurs</Link>
                 <Link to="/boutique/contact" className="block text-sm text-gray-300 hover:text-white">Contact</Link>
