@@ -146,6 +146,7 @@ app.use('/api/v1/admin/site-images', require('./routes/siteImages'));
 app.use('/api/v1/public/site-images', require('./routes/siteImages').publicRouter);
 app.use('/api/v1/admin/free-bottles', require('./routes/freeBottles'));
 app.use('/api/v1/paypal', require('./routes/paypal'));
+app.use('/api/v1/cawl', require('./routes/cawl'));
 app.use('/api/v1/admin/promo-codes', require('./routes/promoCodes'));
 app.use('/api/v1/promo-codes', require('./routes/promoCodes').publicRouter);
 app.use('/api/v1/admin/backup', require('./routes/backup'));
