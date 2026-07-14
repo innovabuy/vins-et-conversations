@@ -99,7 +99,11 @@ function loadTemplate(name) {
   return content;
 }
 
-function renderTemplate(name, vars = {}) {
+// Crédit prestataire, injecté dans {{CREDIT}} du layout. Affiché par défaut (mails clients) ;
+// omis quand opts.credit === false (mails internes V&C, ex. notification de contact -> admin).
+const CREDIT_HTML = '<p class="credit">Développement <a href="https://cap-numerik.fr/?utm_source=vins-conversations&amp;utm_medium=email&amp;utm_campaign=credit" rel="noopener">Cap-Numerik</a></p>';
+
+function renderTemplate(name, vars = {}, opts = {}) {
   const layout = loadTemplate('layout');
   let content = loadTemplate(name);
 
@@ -118,7 +122,8 @@ function renderTemplate(name, vars = {}) {
     .replace('{{CONTENT}}', content)
     .replace(/\{\{SUBJECT\}\}/g, vars.SUBJECT || vars.APP_NAME || 'Vins & Conversations')
     .replace(/\{\{YEAR\}\}/g, String(new Date().getFullYear()))
-    .replace(/\{\{BASE_URL\}\}/g, BASE_URL);
+    .replace(/\{\{BASE_URL\}\}/g, BASE_URL)
+    .replace(/\{\{CREDIT\}\}/g, opts.credit === false ? '' : CREDIT_HTML);
 
   // Replace any remaining vars in layout
   for (const [key, value] of Object.entries(vars)) {
@@ -338,7 +343,7 @@ async function sendContactNotification({ name, email, phone, company, type, mess
     COMPANY: company || '—',
     TYPE_LABEL: TYPE_LABELS[type] || type,
     MESSAGE: message.replace(/\n/g, '<br>'),
-  });
+  }, { credit: false });
   return sendEmail({
     to: to || process.env.ADMIN_EMAIL || 'nicolas@vins-conversations.fr',
     subject: `[Contact] ${TYPE_LABELS[type] || type} — ${name}`,
