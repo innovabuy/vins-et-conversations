@@ -72,6 +72,7 @@ import AProposPage from './pages/vitrine/AProposPage';
 import EquipePage from './pages/vitrine/EquipePage';
 import RaisonDetrePage from './pages/vitrine/RaisonDetrePage';
 import CercleAmbassadeursPage from './pages/vitrine/CercleAmbassadeursPage';
+import DevenirAmbassadeurPage from './pages/vitrine/DevenirAmbassadeurPage';
 import FAQPage from './pages/vitrine/FAQPage';
 import AvisPage from './pages/vitrine/AvisPage';
 import PartenairesPage from './pages/vitrine/PartenairesPage';
@@ -114,6 +115,7 @@ function AppRoutes() {
         <Route path="wizard" element={<TasteWizard />} />
         <Route path="selection" element={<SelectionPage />} />
         <Route path="ambassadeurs" element={<AmbassadorsPage />} />
+        <Route path="devenir-ambassadeur" element={<DevenirAmbassadeurPage />} />
         <Route path="prestations/cse" element={<PrestationCSEPage />} />
         <Route path="prestations/ecoles" element={<PrestationEcolesPage />} />
         <Route path="prestations/repas" element={<PrestationRepasPage />} />
