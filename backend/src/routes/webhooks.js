@@ -14,6 +14,11 @@ router.post('/stripe', express.raw({ type: 'application/json' }), async (req, re
     if (err.message === 'INVALID_SIGNATURE') {
       return res.status(400).json({ error: 'INVALID_SIGNATURE', message: 'Invalid webhook signature' });
     }
+    if (err.message === 'WEBHOOK_NOT_CONFIGURED') {
+      // 503 (et non 400) : Stripe réessaie sur 5xx (~3 j) → les événements
+      // reçus avant la pose du secret ne sont pas perdus.
+      return res.status(503).json({ error: 'WEBHOOK_NOT_CONFIGURED', message: 'Webhook not configured' });
+    }
     logger.error('Webhook error:', err);
     res.status(400).json({ error: 'WEBHOOK_ERROR' });
   }

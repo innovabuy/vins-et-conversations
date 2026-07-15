@@ -288,3 +288,38 @@ describe('Stripe — double traitement (confirm + webhook) → 1 seul sale', () 
     }
   });
 });
+
+describe('Stripe — webhook fail-closed hors test (secret absent)', () => {
+  it('rejette en 503 quand aucun secret exploitable n\'est configuré', async () => {
+    const savedNodeEnv = process.env.NODE_ENV;
+    const savedWorkerId = process.env.JEST_WORKER_ID;
+
+    try {
+      // Simule la prod : ni NODE_ENV=test, ni JEST_WORKER_ID
+      process.env.NODE_ENV = 'development';
+      delete process.env.JEST_WORKER_ID;
+
+      const event = {
+        type: 'payment_intent.succeeded',
+        data: { object: { id: 'pi_failopen_guard', metadata: {} } },
+      };
+
+      const res = await request(app)
+        .post('/api/v1/webhooks/stripe')
+        .set('Content-Type', 'application/json')
+        .send(event);
+
+      expect(res.status).toBe(503);
+      expect(res.body.error).toBe('WEBHOOK_NOT_CONFIGURED');
+    } finally {
+      // Restauration inconditionnelle des DEUX variables : sans elle, les
+      // tests suivants du worker tourneraient hors mode test.
+      process.env.NODE_ENV = savedNodeEnv;
+      if (savedWorkerId !== undefined) {
+        process.env.JEST_WORKER_ID = savedWorkerId;
+      } else {
+        delete process.env.JEST_WORKER_ID;
+      }
+    }
+  });
+});

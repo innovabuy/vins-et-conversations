@@ -117,6 +117,9 @@ async function handleWebhook(rawBody, signature) {
   const stripe = await getStripe();
   const webhookSecret = await getWebhookSecret();
   const hasRealSecret = webhookSecret && webhookSecret !== 'whsec_placeholder' && stripe;
+  // Bypass de signature : RÉSERVÉ AUX TESTS, jamais à l'absence de secret.
+  // Même condition que getStripe() L.12 (convention projet).
+  const isTest = process.env.NODE_ENV === 'test' || !!process.env.JEST_WORKER_ID;
 
   if (hasRealSecret) {
     try {
@@ -125,8 +128,8 @@ async function handleWebhook(rawBody, signature) {
       logger.error('Stripe webhook signature verification failed:', err.message);
       throw new Error('INVALID_SIGNATURE');
     }
-  } else {
-    // Dev/test mode: parse raw body directly
+  } else if (isTest) {
+    // Tests uniquement : parse direct du corps brut, sans vérification.
     if (Buffer.isBuffer(rawBody)) {
       event = JSON.parse(rawBody.toString('utf8'));
     } else if (typeof rawBody === 'string') {
@@ -134,6 +137,11 @@ async function handleWebhook(rawBody, signature) {
     } else {
       event = rawBody;
     }
+  } else {
+    // Hors test et sans secret exploitable : REFUS. L'endpoint est public,
+    // parser sans signature reviendrait à accepter n'importe quel POST.
+    logger.error('Stripe webhook rejected: no usable webhook secret configured');
+    throw new Error('WEBHOOK_NOT_CONFIGURED');
   }
 
   switch (event.type) {
