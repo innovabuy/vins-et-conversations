@@ -11,3 +11,6 @@ logs/
 .vscode/
 .idea/
 backend/uploads/
+# Backups locaux (.env.bak-*, docker-compose.yml.bak-*, *.conf.bak) :
+# peuvent contenir des secrets → jamais dans le dépôt.
+*.bak*
