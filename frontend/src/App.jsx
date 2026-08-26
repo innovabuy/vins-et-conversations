@@ -50,6 +50,7 @@ import ContactForm from './components/public/ContactForm';
 import CartPage from './components/public/CartPage';
 import CheckoutPage from './components/public/CheckoutPage';
 import ConfirmationPage from './components/public/ConfirmationPage';
+import CawlReturnPage from './components/public/CawlReturnPage';
 import OrderTrackingPage from './components/public/OrderTrackingPage';
 import CGVPage from './components/public/CGVPage';
 import MentionsLegalesPage from './components/public/MentionsLegalesPage';
@@ -111,6 +112,11 @@ function AppRoutes() {
         <Route path="panier" element={<CartPage />} />
         <Route path="commander" element={<CheckoutPage />} />
         <Route path="confirmation/:ref" element={<ConfirmationPage />} />
+        {/* Retour navigateur CAWL. DOIT être déclarée ici, sous /boutique et donc AVANT le
+            catch-all `*` en bas de ce fichier : sans elle, /boutique/retour-cawl tombe dans
+            le catch-all et redirige silencieusement vers l'accueil. Enfant de /boutique →
+            hérite de PublicLayout + CartProvider (le panier est vidé au succès). */}
+        <Route path="retour-cawl" element={<CawlReturnPage />} />
         <Route path="suivi" element={<OrderTrackingPage />} />
         <Route path="wizard" element={<TasteWizard />} />
         <Route path="selection" element={<SelectionPage />} />

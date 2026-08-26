@@ -1,10 +1,12 @@
 /**
  * Routes CAWL (Worldline Direct) — Hosted Checkout Page.
  *
+ *  GET  /api/v1/cawl/config          — sonde de capacité (booléen seul, aucun secret).
  *  POST /api/v1/cawl/create-session  — crée une session Hosted Checkout depuis une commande.
  *  POST /api/v1/cawl/return-status   — appelé par la page de retour NEUTRE ; renvoie le statut
  *                                      RÉEL via GetHostedCheckoutStatus (jamais depuis l'URL),
- *                                      après vérification du RETURNMAC (anti-forge).
+ *                                      après vérification du RETURNMAC (anti-forge), ainsi que
+ *                                      l'état interne de la commande (lecture seule).
  *
  * Le montant est TOUJOURS relu en base SOUS VERROU (SELECT … FOR UPDATE) et calculé
  * Math.round(order.total_ttc * 100) — jamais depuis req.body ni un objet en mémoire.
@@ -26,6 +28,21 @@ function safeEqual(a, b) {
   if (ba.length !== bb.length) return false;
   return crypto.timingSafeEqual(ba, bb);
 }
+
+// ── GET /config ──────────────────────────────────────
+// Sonde de capacité pour la vitrine : dit UNIQUEMENT si CAWL est configuré côté serveur.
+// Ne renvoie AUCUN secret (ni host, ni merchantId, ni clé) — juste un booléen, afin que
+// le tunnel boutique n'affiche pas un bouton mort tant que l'env CAWL est absent.
+// Symétrique de GET /api/v1/settings/stripe-public-key (gating du bouton Stripe).
+router.get('/config', (req, res) => {
+  const enabled = Boolean(
+    process.env.CAWL_HOST
+    && process.env.CAWL_API_KEY_ID
+    && process.env.CAWL_SECRET_API_KEY
+    && process.env.CAWL_MERCHANT_ID
+  );
+  res.json({ enabled });
+});
 
 // ── POST /create-session ─────────────────────────────
 router.post('/create-session', async (req, res) => {
@@ -112,9 +129,20 @@ router.post('/return-status', async (req, res) => {
       ? payment_out.statusOutput.statusCode
       : null;
 
-    // NB (commit 6) : statusCode===9 (CAPTURED) déclenchera confirmBoutiqueOrder (idempotent).
-    // Ici on ne fait que restituer le statut réel.
-    res.json({ status: statusBody.status || null, statusCode });
+    // État INTERNE de la commande — LECTURE SEULE, derrière la vérif RETURNMAC.
+    // La page de retour en a besoin pour savoir si le webhook est déjà passé (submitted)
+    // ou non (pending_payment) : le statut CAWL seul ne le dit pas. Aucune écriture ici —
+    // le booking reste la responsabilité EXCLUSIVE du webhook (confirmCawlOrder).
+    const order = await db('orders').where({ id: order_id }).first();
+
+    // NB (commit 6) : le booking est déclenché par le webhook, jamais par cette route.
+    // Ici on ne fait que restituer le statut réel + l'état observé de la commande.
+    res.json({
+      status: statusBody.status || null,
+      statusCode,
+      order_status: order ? order.status : null,
+      order_ref: order ? order.ref : null,
+    });
   } catch (err) {
     if (err.message === 'CAWL_NOT_CONFIGURED') {
       return res.status(503).json({ error: 'CAWL_NOT_CONFIGURED', message: 'CAWL non configuré' });

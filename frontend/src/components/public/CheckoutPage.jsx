@@ -5,8 +5,8 @@ import { Elements, CardElement, useStripe, useElements } from '@stripe/react-str
 import { useCart } from '../../contexts/CartContext';
 import { useAuth } from '../../contexts/AuthContext';
 import { useAppSettings } from '../../contexts/AppSettingsContext';
-import { boutiqueAPI, shippingAPI, authAPI, appSettingsAPI, paypalAPI, promoCodesAPI } from '../../services/api';
-import { ArrowLeft, Lock, ShoppingCart, Truck, Loader2, User, MapPin, CreditCard, Check, LogIn, UserPlus, UserX, Store, Wallet, Building2, Tag, X } from 'lucide-react';
+import { boutiqueAPI, shippingAPI, authAPI, appSettingsAPI, paypalAPI, cawlAPI, promoCodesAPI } from '../../services/api';
+import { ArrowLeft, Lock, ShoppingCart, Truck, Loader2, User, MapPin, CreditCard, Check, LogIn, UserPlus, UserX, Store, Wallet, Building2, Landmark, Tag, X } from 'lucide-react';
 
 const formatEur = (v) => new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR' }).format(v);
 
@@ -104,6 +104,7 @@ export default function CheckoutPage() {
   const [orderData, setOrderData] = useState(null); // { order_id, ref, total_ttc, client_secret }
   const [stripeObj, setStripeObj] = useState(null);
   const [paymentMethod, setPaymentMethod] = useState('stripe');
+  const [cawlEnabled, setCawlEnabled] = useState(false);
   const [promoInput, setPromoInput] = useState('');
   const [promoResult, setPromoResult] = useState(null); // { valid, promo_code_id, discount_amount, ... }
   const [promoError, setPromoError] = useState('');
@@ -112,6 +113,14 @@ export default function CheckoutPage() {
   // Load Stripe
   useEffect(() => {
     getStripePromise().then(setStripeObj);
+  }, []);
+
+  // Sonde CAWL : booléen seul (aucun secret). Tant que l'env CAWL est absent côté serveur,
+  // le bouton n'est pas rendu — pas de moyen de paiement mort dans le tunnel.
+  useEffect(() => {
+    cawlAPI.config()
+      .then(({ data }) => setCawlEnabled(Boolean(data?.enabled)))
+      .catch(() => setCawlEnabled(false));
   }, []);
 
   // Pre-fill from logged-in user + contact address
@@ -359,6 +368,31 @@ export default function CheckoutPage() {
       }
     } catch (err) {
       setOrderError(err.response?.data?.message || 'Erreur PayPal');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  // Flux CAWL : crée la session Hosted Checkout côté serveur (montant relu en base, jamais
+  // envoyé d'ici), puis redirige le navigateur vers redirectUrl. Le SDK renvoie une URL
+  // ABSOLUE — aucune concaténation manuelle avec https://payment.
+  const handleCawlPayment = async () => {
+    setSubmitting(true);
+    setOrderError('');
+    try {
+      const { data } = await cawlAPI.createSession({ order_id: orderData.order_id });
+      if (data.redirectUrl) {
+        window.location.href = data.redirectUrl;
+      } else {
+        setOrderError('URL de redirection CAWL introuvable');
+      }
+    } catch (err) {
+      const code = err.response?.data?.error;
+      if (code === 'CAWL_NOT_CONFIGURED') {
+        setOrderError('Le paiement par carte Crédit Agricole est momentanément indisponible. Choisissez un autre mode de paiement.');
+      } else {
+        setOrderError(err.response?.data?.message || 'Erreur CAWL');
+      }
     } finally {
       setSubmitting(false);
     }
@@ -643,6 +677,21 @@ export default function CheckoutPage() {
                     </div>
                   </button>
 
+                  {cawlEnabled && (
+                    <button
+                      onClick={() => setPaymentMethod('cawl')}
+                      className={`flex items-center gap-3 p-4 rounded-xl border-2 transition-all text-left ${
+                        paymentMethod === 'cawl' ? 'border-emerald-600 bg-emerald-50' : 'border-gray-200 hover:border-gray-300'
+                      }`}
+                    >
+                      <Landmark size={20} className={paymentMethod === 'cawl' ? 'text-emerald-700' : 'text-gray-400'} />
+                      <div>
+                        <p className="font-medium text-sm">Carte bancaire</p>
+                        <p className="text-xs text-gray-500">Via Credit Agricole</p>
+                      </div>
+                    </button>
+                  )}
+
                   {user?.role === 'cse' && orderData?.payment_transfer_enabled && (
                     <button
                       onClick={() => setPaymentMethod('transfer')}
@@ -685,6 +734,23 @@ export default function CheckoutPage() {
                   </button>
                   <p className="text-xs text-gray-400 text-center">
                     Vous serez redirigé vers PayPal pour finaliser le paiement.
+                  </p>
+                </div>
+              )}
+
+              {/* CAWL payment (Hosted Checkout — redirection) */}
+              {paymentMethod === 'cawl' && (
+                <div className="space-y-3">
+                  <button
+                    onClick={handleCawlPayment}
+                    disabled={submitting}
+                    className="w-full flex items-center justify-center gap-2 py-3 rounded-lg font-medium text-white bg-emerald-700 hover:bg-emerald-800 disabled:opacity-50 transition-colors"
+                  >
+                    <Landmark size={16} />
+                    {submitting ? 'Redirection vers la banque...' : `Payer ${formatEur(orderData.total_ttc)} par carte`}
+                  </button>
+                  <p className="text-xs text-gray-400 text-center">
+                    Vous serez redirigé vers la page sécurisée du Crédit Agricole pour finaliser le paiement.
                   </p>
                 </div>
               )}

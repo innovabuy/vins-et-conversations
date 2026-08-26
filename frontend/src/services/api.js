@@ -421,6 +421,16 @@ export const paypalAPI = {
   captureOrder: (data) => api.post('/paypal/capture-order', data),
 };
 
+// ─── CAWL (Worldline Direct — Hosted Checkout) ───
+// Symétrique de paypalAPI : createSession renvoie { redirectUrl } (URL ABSOLUE fournie par
+// le SDK — jamais de concaténation manuelle avec https://payment.). returnStatus est en
+// LECTURE SEULE : elle vérifie le RETURNMAC côté serveur et restitue le statut réel.
+export const cawlAPI = {
+  config: () => api.get('/cawl/config'),
+  createSession: (data) => api.post('/cawl/create-session', data),
+  returnStatus: (data) => api.post('/cawl/return-status', data),
+};
+
 // ─── Referral (Student) ─────────────────────────
 export const referralAPI = {
   myLink: (campaignId) => api.get('/referral/my-link', { params: { campaign_id: campaignId } }),

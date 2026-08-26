@@ -127,4 +127,87 @@ describe('POST /api/v1/cawl/return-status', () => {
     expect(res.body.error).toBe('RETURNMAC_MISMATCH');
     expect(cawlPaymentService.getHostedCheckoutStatus).not.toHaveBeenCalled();
   });
+
+  // ── Contrat consommé par la page de retour /boutique/retour-cawl ────────────────────
+  // La page N'ÉCRIT JAMAIS : elle distingue « webhook pas encore arrivé » de « commande
+  // bookée » via order_status. Ces 4 cas couvrent les 4 écrans possibles.
+
+  it('RETURNMAC valide → renvoie order_status + order_ref (état interne lisible par la page)', async () => {
+    cawlPaymentService.getHostedCheckoutStatus.mockResolvedValue({
+      status: 'PAYMENT_CREATED',
+      createdPaymentOutput: { payment: { id: 'PAY_1', statusOutput: { statusCode: 9 } } },
+    });
+    const res = await request(app)
+      .post('/api/v1/cawl/return-status')
+      .send({ order_id: orderId, hostedCheckoutId: 'HC_XYZ', returnmac: 'MAC_SECRET' });
+
+    expect(res.status).toBe(200);
+    expect(res.body.order_status).toBeDefined();
+    expect(res.body.order_ref).toBe('VC-CAWLTEST-' + orderId.slice(0, 8));
+  });
+
+  it('RETURNMAC forgé → 403 SANS aucune fuite de l\'état de la commande', async () => {
+    const res = await request(app)
+      .post('/api/v1/cawl/return-status')
+      .send({ order_id: orderId, hostedCheckoutId: 'HC_XYZ', returnmac: 'MAC_FORGED' });
+
+    expect(res.status).toBe(403);
+    // Un MAC forgé ne doit RIEN apprendre sur la commande : pas d'oracle de statut.
+    expect(res.body.order_status).toBeUndefined();
+    expect(res.body.order_ref).toBeUndefined();
+  });
+
+  it('webhook pas encore arrivé → order_status reste pending_payment (page = écran d\'attente)', async () => {
+    cawlPaymentService.getHostedCheckoutStatus.mockResolvedValue({
+      status: 'PAYMENT_CREATED',
+      createdPaymentOutput: { payment: { id: 'PAY_1', statusOutput: { statusCode: 9 } } },
+    });
+    const res = await request(app)
+      .post('/api/v1/cawl/return-status')
+      .send({ order_id: orderId, hostedCheckoutId: 'HC_XYZ', returnmac: 'MAC_SECRET' });
+
+    expect(res.status).toBe(200);
+    expect(res.body.statusCode).toBe(9);
+    // Capture constatée chez CAWL MAIS commande pas encore bookée : la page attend,
+    // elle ne confirme pas — et surtout la route n'a rien écrit.
+    expect(res.body.order_status).toBe('pending_payment');
+
+    // Preuve de non-écriture : le statut en base n'a pas bougé, aucun financial_event.
+    const after = await db('orders').where({ id: orderId }).first();
+    expect(after.status).toBe('pending_payment');
+    const events = await db('financial_events').where({ order_id: orderId });
+    expect(events).toHaveLength(0);
+  });
+
+  it('commande passée en submitted (webhook déjà booké) → order_status submitted', async () => {
+    // Simule le webhook arrivé AVANT le retour navigateur (l'ordre n'est pas garanti).
+    await db('orders').where({ id: orderId }).update({ status: 'submitted' });
+
+    cawlPaymentService.getHostedCheckoutStatus.mockResolvedValue({
+      status: 'PAYMENT_CREATED',
+      createdPaymentOutput: { payment: { id: 'PAY_1', statusOutput: { statusCode: 9 } } },
+    });
+    const res = await request(app)
+      .post('/api/v1/cawl/return-status')
+      .send({ order_id: orderId, hostedCheckoutId: 'HC_XYZ', returnmac: 'MAC_SECRET' });
+
+    expect(res.status).toBe(200);
+    expect(res.body.order_status).toBe('submitted');
+    expect(res.body.order_ref).toBe('VC-CAWLTEST-' + orderId.slice(0, 8));
+
+    // Toujours aucune écriture financière depuis cette route (le sale vient du webhook).
+    const events = await db('financial_events').where({ order_id: orderId });
+    expect(events).toHaveLength(0);
+  });
+});
+
+describe('GET /api/v1/cawl/config', () => {
+  it('renvoie un booléen seul — aucun secret (host, merchantId, clés) n\'est exposé', async () => {
+    const res = await request(app).get('/api/v1/cawl/config');
+    expect(res.status).toBe(200);
+    expect(typeof res.body.enabled).toBe('boolean');
+    expect(Object.keys(res.body)).toEqual(['enabled']);
+    const serialized = JSON.stringify(res.body);
+    expect(serialized).not.toMatch(/host|merchant|key|secret/i);
+  });
 });
