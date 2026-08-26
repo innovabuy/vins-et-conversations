@@ -202,6 +202,30 @@ describe('POST /api/v1/cawl/return-status', () => {
 });
 
 describe('GET /api/v1/cawl/config', () => {
+  // L'interrupteur d'exposition est lu à CHAQUE requête (pas au chargement du module),
+  // on peut donc le manipuler par test. Sauvegarde/restauration intégrales de l'env CAWL.
+  const CAWL_KEYS = ['CAWL_ENABLED', 'CAWL_HOST', 'CAWL_API_KEY_ID', 'CAWL_SECRET_API_KEY', 'CAWL_MERCHANT_ID'];
+  let saved;
+
+  beforeEach(() => {
+    saved = {};
+    for (const k of CAWL_KEYS) saved[k] = process.env[k];
+  });
+
+  afterEach(() => {
+    for (const k of CAWL_KEYS) {
+      if (saved[k] === undefined) delete process.env[k];
+      else process.env[k] = saved[k];
+    }
+  });
+
+  const setConfigured = () => {
+    process.env.CAWL_HOST = 'payment.example-cawl.fr';
+    process.env.CAWL_API_KEY_ID = 'kid';
+    process.env.CAWL_SECRET_API_KEY = 'sec';
+    process.env.CAWL_MERCHANT_ID = 'mid';
+  };
+
   it('renvoie un booléen seul — aucun secret (host, merchantId, clés) n\'est exposé', async () => {
     const res = await request(app).get('/api/v1/cawl/config');
     expect(res.status).toBe(200);
@@ -209,5 +233,42 @@ describe('GET /api/v1/cawl/config', () => {
     expect(Object.keys(res.body)).toEqual(['enabled']);
     const serialized = JSON.stringify(res.body);
     expect(serialized).not.toMatch(/host|merchant|key|secret/i);
+  });
+
+  it('config technique COMPLÈTE mais CAWL_ENABLED absent → false (l\'oubli n\'expose jamais)', async () => {
+    setConfigured();
+    delete process.env.CAWL_ENABLED;
+    const res = await request(app).get('/api/v1/cawl/config');
+    expect(res.body.enabled).toBe(false);
+  });
+
+  it('CAWL_ENABLED=true mais config technique INCOMPLÈTE → false (pas de tuile cul-de-sac)', async () => {
+    setConfigured();
+    delete process.env.CAWL_SECRET_API_KEY;
+    process.env.CAWL_ENABLED = 'true';
+    const res = await request(app).get('/api/v1/cawl/config');
+    expect(res.body.enabled).toBe(false);
+  });
+
+  it('CAWL_ENABLED=true ET config complète → true (seul cas exposant la tuile)', async () => {
+    setConfigured();
+    process.env.CAWL_ENABLED = 'true';
+    const res = await request(app).get('/api/v1/cawl/config');
+    expect(res.body.enabled).toBe(true);
+  });
+
+  it('FAIL-CLOSED : valeurs approchantes ("1", "yes", "TRUE ", "") → false, sauf "true" exact', async () => {
+    setConfigured();
+    for (const v of ['1', 'yes', 'oui', 'on', '', 'false', 'trué']) {
+      process.env.CAWL_ENABLED = v;
+      const res = await request(app).get('/api/v1/cawl/config');
+      expect({ v, enabled: res.body.enabled }).toEqual({ v, enabled: false });
+    }
+    // Tolérance volontaire : casse et espaces de bord (' TRUE ' vaut true).
+    for (const v of ['true', 'TRUE', ' true ']) {
+      process.env.CAWL_ENABLED = v;
+      const res = await request(app).get('/api/v1/cawl/config');
+      expect({ v, enabled: res.body.enabled }).toEqual({ v, enabled: true });
+    }
   });
 });

@@ -59,6 +59,11 @@ services:
       SMTP_FROM_NAME: ${SMTP_FROM_NAME}
       ADMIN_EMAIL: ${ADMIN_EMAIL}
       # ─── CAWL (Worldline Direct) — valeurs depuis .env hôte, hors git. Secrets jamais en clair. ───
+      # Interrupteur d'EXPOSITION commerciale, distinct de la config technique : tant qu'il
+      # n'est pas 'true', GET /cawl/config renvoie enabled:false et la tuile de paiement
+      # reste masquée dans le tunnel, même si les 7 secrets sont en place et le webhook
+      # déclaré au portail. Défaut 'false' : l'oubli de la variable ne peut PAS exposer CAWL.
+      CAWL_ENABLED: ${CAWL_ENABLED:-false}
       # CAWL_HOST = nom d'hôte NU (ni https://, ni slash final, ni /v2/) : le SDK applique
       # HTTPS et le port 443. Une erreur de format ici échoue SILENCIEUSEMENT.
       CAWL_HOST: ${CAWL_HOST}

@@ -1,7 +1,8 @@
 /**
  * Routes CAWL (Worldline Direct) — Hosted Checkout Page.
  *
- *  GET  /api/v1/cawl/config          — sonde de capacité (booléen seul, aucun secret).
+ *  GET  /api/v1/cawl/config          — sonde d'exposition (booléen seul, aucun secret) :
+ *                                      CAWL_ENABLED==='true' ET les 4 variables techniques.
  *  POST /api/v1/cawl/create-session  — crée une session Hosted Checkout depuis une commande.
  *  POST /api/v1/cawl/return-status   — appelé par la page de retour NEUTRE ; renvoie le statut
  *                                      RÉEL via GetHostedCheckoutStatus (jamais depuis l'URL),
@@ -30,18 +31,33 @@ function safeEqual(a, b) {
 }
 
 // ── GET /config ──────────────────────────────────────
-// Sonde de capacité pour la vitrine : dit UNIQUEMENT si CAWL est configuré côté serveur.
+// Sonde de capacité pour la vitrine : dit UNIQUEMENT si CAWL doit être proposé au client.
 // Ne renvoie AUCUN secret (ni host, ni merchantId, ni clé) — juste un booléen, afin que
-// le tunnel boutique n'affiche pas un bouton mort tant que l'env CAWL est absent.
+// le tunnel boutique n'affiche pas un moyen de paiement mort.
 // Symétrique de GET /api/v1/settings/stripe-public-key (gating du bouton Stripe).
+//
+// DEUX conditions cumulatives, et l'interrupteur prime :
+//  1. CAWL_ENABLED === 'true' — interrupteur d'exposition commerciale, DISTINCT de la
+//     configuration technique. Il existe parce que les secrets CAWL peuvent être en place
+//     (preprod déclarée au portail, webhook joignable) longtemps AVANT qu'on veuille
+//     montrer la tuile aux visiteurs de la boutique en production.
+//  2. les 4 variables techniques présentes — sinon create-session répondrait 503 et la
+//     tuile serait un cul-de-sac.
+// FAIL-CLOSED : toute valeur autre que 'true' (absente, vide, '1', 'yes', faute de frappe)
+// vaut false. On n'expose jamais un moyen de paiement par accident de casse ou d'orthographe.
+//
+// NB : cet interrupteur gate l'EXPOSITION, pas la route. create-session reste appelable
+// directement — c'est délibéré : il faut pouvoir tester le tunnel de paiement en preprod
+// pendant que la tuile est masquée aux visiteurs.
 router.get('/config', (req, res) => {
-  const enabled = Boolean(
+  const switchedOn = String(process.env.CAWL_ENABLED || '').trim().toLowerCase() === 'true';
+  const configured = Boolean(
     process.env.CAWL_HOST
     && process.env.CAWL_API_KEY_ID
     && process.env.CAWL_SECRET_API_KEY
     && process.env.CAWL_MERCHANT_ID
   );
-  res.json({ enabled });
+  res.json({ enabled: switchedOn && configured });
 });
 
 // ── POST /create-session ─────────────────────────────
