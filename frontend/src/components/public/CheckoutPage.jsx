@@ -103,8 +103,16 @@ export default function CheckoutPage() {
   const [shippingError, setShippingError] = useState('');
   const [orderData, setOrderData] = useState(null); // { order_id, ref, total_ttc, client_secret }
   const [stripeObj, setStripeObj] = useState(null);
-  const [paymentMethod, setPaymentMethod] = useState('stripe');
+  // null = aucun mode encore choisi. La sélection par défaut est DÉRIVÉE des drapeaux
+  // (effet plus bas), jamais constante : avec Stripe et PayPal masqués, un défaut 'stripe'
+  // laisserait le client devant une étape de paiement sans aucun panneau rendu.
+  const [paymentMethod, setPaymentMethod] = useState(null);
   const [cawlEnabled, setCawlEnabled] = useState(false);
+  // Exposition des moyens historiques (Stripe, PayPal). Servie par l'API — pas un VITE_*,
+  // qui serait baké dans le bundle et imposerait un rebuild pour réafficher PayPal.
+  const [legacyVisible, setLegacyVisible] = useState(false);
+  // Les deux sondes ont répondu : évite un flash « paiement indisponible » avant réponse.
+  const [flagsLoaded, setFlagsLoaded] = useState(false);
   const [promoInput, setPromoInput] = useState('');
   const [promoResult, setPromoResult] = useState(null); // { valid, promo_code_id, discount_amount, ... }
   const [promoError, setPromoError] = useState('');
@@ -115,13 +123,34 @@ export default function CheckoutPage() {
     getStripePromise().then(setStripeObj);
   }, []);
 
-  // Sonde CAWL : booléen seul (aucun secret). Tant que l'env CAWL est absent côté serveur,
-  // le bouton n'est pas rendu — pas de moyen de paiement mort dans le tunnel.
+  // Sondes d'exposition : booléens seuls (aucun secret). CAWL d'une part, moyens
+  // historiques (Stripe, PayPal) d'autre part. Les deux échouent en FERMÉ : une sonde
+  // injoignable ne peut jamais faire apparaître un moyen de paiement.
   useEffect(() => {
-    cawlAPI.config()
-      .then(({ data }) => setCawlEnabled(Boolean(data?.enabled)))
-      .catch(() => setCawlEnabled(false));
+    let alive = true;
+    Promise.allSettled([cawlAPI.config(), appSettingsAPI.paymentsVisibility()])
+      .then(([cawlRes, legacyRes]) => {
+        if (!alive) return;
+        setCawlEnabled(cawlRes.status === 'fulfilled' && Boolean(cawlRes.value?.data?.enabled));
+        setLegacyVisible(legacyRes.status === 'fulfilled' && Boolean(legacyRes.value?.data?.legacy_visible));
+        setFlagsLoaded(true);
+      });
+    return () => { alive = false; };
   }, []);
+
+  // Virement CSE : même condition que sa tuile. C'est l'unique repli quand CAWL est coupé
+  // et les moyens historiques masqués — d'où sa présence dans le calcul du cul-de-sac.
+  const transferAvailable = user?.role === 'cse' && Boolean(orderData?.payment_transfer_enabled);
+  const noPaymentAvailable = flagsLoaded && !cawlEnabled && !legacyVisible && !transferAvailable;
+
+  // Sélection par défaut DÉRIVÉE des drapeaux. Le garde `paymentMethod !== null` fait
+  // qu'une sonde répondant en retard n'écrase jamais un clic déjà effectué par le client.
+  useEffect(() => {
+    if (!flagsLoaded || paymentMethod !== null) return;
+    if (cawlEnabled) setPaymentMethod('cawl');
+    else if (transferAvailable) setPaymentMethod('transfer');
+    else if (legacyVisible) setPaymentMethod(stripeObj && orderData?.client_secret ? 'stripe' : 'paypal');
+  }, [flagsLoaded, paymentMethod, cawlEnabled, legacyVisible, transferAvailable, stripeObj, orderData]);
 
   // Pre-fill from logged-in user + contact address
   useEffect(() => {
@@ -646,36 +675,59 @@ export default function CheckoutPage() {
 
               {orderError && <div className="bg-red-50 text-red-700 text-sm p-3 rounded-lg">{orderError}</div>}
 
-              {/* Payment method selector */}
+              {/* Trois états exclusifs : sondes en vol, aucun moyen exposé, sélecteur. */}
+              {!flagsLoaded ? (
+                <div className="flex items-center gap-2 text-sm text-gray-500">
+                  <Loader2 size={16} className="animate-spin" />
+                  Chargement des moyens de paiement...
+                </div>
+              ) : noPaymentAvailable ? (
+                <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 text-sm text-amber-900 space-y-2">
+                  <p className="font-medium">Le paiement en ligne est momentanement indisponible.</p>
+                  <p>
+                    Votre commande {orderData.ref} est bien enregistree. Contactez-nous via la{' '}
+                    <Link to="/boutique/contact" className="underline font-medium">page Contact</Link>
+                    {' '}en indiquant cette reference : nous la finaliserons avec vous.
+                  </p>
+                </div>
+              ) : (
+              /* Payment method selector */
               <div className="space-y-2">
                 <p className="text-sm font-medium text-gray-700">Mode de paiement</p>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                  <button
-                    onClick={() => setPaymentMethod('stripe')}
-                    disabled={!stripeObj || !orderData.client_secret}
-                    className={`flex items-center gap-3 p-4 rounded-xl border-2 transition-all text-left ${
-                      paymentMethod === 'stripe' ? 'border-wine-600 bg-wine-50' : 'border-gray-200 hover:border-gray-300'
-                    } ${!stripeObj || !orderData.client_secret ? 'opacity-40 cursor-not-allowed' : ''}`}
-                  >
-                    <CreditCard size={20} className={paymentMethod === 'stripe' ? 'text-wine-700' : 'text-gray-400'} />
-                    <div>
-                      <p className="font-medium text-sm">Carte bancaire</p>
-                      <p className="text-xs text-gray-500">Via Stripe</p>
-                    </div>
-                  </button>
+                  {/* Moyens historiques : masques par defaut (CAWL est le moyen unique
+                      expose au client). Le code et les routes restent en place et intacts —
+                      LEGACY_PAYMENTS_VISIBLE=true les reaffiche sans rebuild frontend. */}
+                  {legacyVisible && (
+                    <>
+                      <button
+                        onClick={() => setPaymentMethod('stripe')}
+                        disabled={!stripeObj || !orderData.client_secret}
+                        className={`flex items-center gap-3 p-4 rounded-xl border-2 transition-all text-left ${
+                          paymentMethod === 'stripe' ? 'border-wine-600 bg-wine-50' : 'border-gray-200 hover:border-gray-300'
+                        } ${!stripeObj || !orderData.client_secret ? 'opacity-40 cursor-not-allowed' : ''}`}
+                      >
+                        <CreditCard size={20} className={paymentMethod === 'stripe' ? 'text-wine-700' : 'text-gray-400'} />
+                        <div>
+                          <p className="font-medium text-sm">Carte bancaire</p>
+                          <p className="text-xs text-gray-500">Via Stripe</p>
+                        </div>
+                      </button>
 
-                  <button
-                    onClick={() => setPaymentMethod('paypal')}
-                    className={`flex items-center gap-3 p-4 rounded-xl border-2 transition-all text-left ${
-                      paymentMethod === 'paypal' ? 'border-blue-600 bg-blue-50' : 'border-gray-200 hover:border-gray-300'
-                    }`}
-                  >
-                    <Wallet size={20} className={paymentMethod === 'paypal' ? 'text-blue-600' : 'text-gray-400'} />
-                    <div>
-                      <p className="font-medium text-sm">PayPal</p>
-                      <p className="text-xs text-gray-500">Paiement securise</p>
-                    </div>
-                  </button>
+                      <button
+                        onClick={() => setPaymentMethod('paypal')}
+                        className={`flex items-center gap-3 p-4 rounded-xl border-2 transition-all text-left ${
+                          paymentMethod === 'paypal' ? 'border-blue-600 bg-blue-50' : 'border-gray-200 hover:border-gray-300'
+                        }`}
+                      >
+                        <Wallet size={20} className={paymentMethod === 'paypal' ? 'text-blue-600' : 'text-gray-400'} />
+                        <div>
+                          <p className="font-medium text-sm">PayPal</p>
+                          <p className="text-xs text-gray-500">Paiement securise</p>
+                        </div>
+                      </button>
+                    </>
+                  )}
 
                   {cawlEnabled && (
                     <button
@@ -708,6 +760,7 @@ export default function CheckoutPage() {
                   )}
                 </div>
               </div>
+              )}
 
               {/* Stripe payment form */}
               {paymentMethod === 'stripe' && stripeObj && orderData.client_secret && (
@@ -772,16 +825,11 @@ export default function CheckoutPage() {
                 </div>
               )}
 
-              {/* Fallback when no stripe and no payment method selected */}
-              {paymentMethod === 'stripe' && (!stripeObj || !orderData.client_secret) && (
-                <div className="space-y-3">
-                  <p className="text-sm text-gray-500">Stripe non configure. Selectionnez PayPal ou un autre mode de paiement.</p>
-                </div>
+              {!noPaymentAvailable && (
+                <p className="text-xs text-gray-400 text-center">
+                  Paiement securise.
+                </p>
               )}
-
-              <p className="text-xs text-gray-400 text-center">
-                Paiement securise. {paymentMethod === 'stripe' && 'Carte de test : 4242 4242 4242 4242'}
-              </p>
             </div>
           )}
         </div>

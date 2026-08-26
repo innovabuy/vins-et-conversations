@@ -268,5 +268,24 @@ publicRouter.get('/stripe-public-key', async (req, res) => {
   }
 });
 
+// ─── Public: GET /api/v1/settings/payments-visibility ──
+// Drapeau d'EXPOSITION des moyens de paiement historiques (Stripe, PayPal) dans le tunnel
+// boutique. Booléen seul, aucun secret. Symétrique de GET /api/v1/cawl/config.
+//
+// Il existe parce que CAWL est devenu le moyen unique proposé au client : Stripe et PayPal
+// restent en place et fonctionnels côté serveur, mais ne sont plus rendus. Si CAWL tombe,
+// poser LEGACY_PAYMENTS_VISIBLE=true et recréer le conteneur api suffit à les réafficher —
+// AUCUN rebuild du frontend (build figé, un drapeau VITE_* serait baké dans le bundle).
+//
+// FAIL-CLOSED : toute valeur autre que 'true' (absente, vide, '1', 'yes', faute de frappe)
+// vaut false. Tolérance volontaire, identique à CAWL_ENABLED : casse et espaces de bord.
+//
+// NB : ce drapeau gate l'AFFICHAGE, pas les routes. /stripe/* et /paypal/* restent
+// appelables — c'est délibéré : aucune logique métier de paiement n'est modifiée.
+publicRouter.get('/payments-visibility', (req, res) => {
+  const legacyVisible = String(process.env.LEGACY_PAYMENTS_VISIBLE || '').trim().toLowerCase() === 'true';
+  res.json({ legacy_visible: legacyVisible });
+});
+
 module.exports = router;
 module.exports.publicRouter = publicRouter;

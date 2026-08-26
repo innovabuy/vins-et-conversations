@@ -14,7 +14,7 @@ export default function CGVPage() {
         <p>La commande est validée après confirmation du paiement. Un email de confirmation est envoyé à l'adresse fournie.</p>
 
         <h2 className="text-lg font-semibold text-gray-900">Article 4 — Paiement</h2>
-        <p>Le paiement s'effectue par carte bancaire via Stripe, plateforme sécurisée de paiement en ligne.</p>
+        <p>Le paiement s'effectue par carte bancaire via une plateforme de paiement en ligne sécurisée. Les données de carte ne transitent jamais par nos serveurs et ne sont pas conservées par Vins &amp; Conversations.</p>
 
         <h2 className="text-lg font-semibold text-gray-900">Article 5 — Livraison</h2>
         <p>La livraison est effectuée à l'adresse indiquée lors de la commande. Les délais de livraison sont communiqués à titre indicatif.</p>

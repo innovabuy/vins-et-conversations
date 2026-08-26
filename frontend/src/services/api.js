@@ -374,6 +374,10 @@ export const appSettingsAPI = {
   update: (data) => api.put('/admin/settings', data),
   stripeTest: () => api.get('/admin/settings/stripe-test'),
   stripePublicKey: () => api.get('/settings/stripe-public-key'),
+  // Sonde d'exposition des moyens historiques (Stripe, PayPal). Servie par l'API et NON
+  // par un import.meta.env : le frontend est un build figé, un drapeau baké imposerait un
+  // rebuild + bump SW pour réafficher PayPal en cas de panne CAWL.
+  paymentsVisibility: () => api.get('/settings/payments-visibility'),
   emailTest: () => api.post('/admin/settings/email-test'),
   uploadLogo: (file) => {
     const fd = new FormData();
