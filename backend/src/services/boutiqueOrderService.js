@@ -479,6 +479,130 @@ async function confirmBoutiqueOrder(orderId, paymentIntentId, capturedAmount = n
 }
 
 /**
+ * Booking d'une capture CAWL — sœur de confirmBoutiqueOrder, invariants strictement
+ * symétriques (FOR UPDATE, 'sale' réservé au paiement, écart tracé sans rejet, stock,
+ * notifications, status 'submitted' → le 12+1 reste déclenché par validateOrder, jamais ici).
+ *
+ * Deux différences STRUCTURELLES avec le chemin Stripe, qui justifient une fonction dédiée
+ * plutôt qu'une réutilisation :
+ *  1. La ligne `payments` existe DÉJÀ (créée par POST /cawl/create-session) → UPDATE, pas INSERT.
+ *  2. Corrélation par `payments.reference` (payment.id CAWL), jamais `stripe_id`.
+ *
+ * @param {string} orderId
+ * @param {string} cawlPaymentId      event.payment.id
+ * @param {number} capturedAmountEur  Encaissé RÉEL (acquiredAmount.amount / 100), calculé
+ *                                    côté serveur. JAMAIS total_ttc, jamais une entrée client.
+ */
+async function confirmCawlOrder(orderId, cawlPaymentId, capturedAmountEur) {
+  // Fail-closed : pas de booking à l'aveugle si l'encaissé n'est pas exploitable.
+  if (capturedAmountEur == null || !(capturedAmountEur > 0)) {
+    throw new Error('CAWL_INVALID_CAPTURED_AMOUNT');
+  }
+
+  return db.transaction(async (trx) => {
+    const order = await trx('orders').where({ id: orderId }).forUpdate().first();
+    if (!order) throw new Error('ORDER_NOT_FOUND');
+
+    // ── Idempotence AVANT la garde de statut — ordre DÉLIBÉRÉ ──
+    // Le mode SALE peut produire plusieurs événements pour un même payment.id (types
+    // différents → l'index UNIQUE (payment_id, type) de webhook_events ne dédoublonne PAS ;
+    // il protège la table de réception, pas le ledger). Le second événement arrive sur une
+    // commande déjà 'submitted' : tester le statut d'abord lèverait ORDER_NOT_PENDING_PAYMENT
+    // → processed=false + error = fausse alerte de supervision sur un comportement nominal.
+    // Depuis la séparation order_created ≠ sale, la présence d'un 'sale' = capture déjà bookée.
+    // Le FOR UPDATE ci-dessus sérialise aussi le cas SIMULTANÉ, pas seulement le séquentiel.
+    const existingSale = await trx('financial_events')
+      .where({ order_id: orderId, type: 'sale' })
+      .first();
+    if (existingSale) {
+      logger.info(`CAWL booking idempotent: order ${order.ref} déjà booké (sale de paiement existant)`);
+      return { ...order, idempotent: true };
+    }
+    if (order.status !== 'pending_payment') throw new Error('ORDER_NOT_PENDING_PAYMENT');
+
+    // ── Écart de montant : on TRACE, on ne rejette JAMAIS (l'argent est encaissé) ──
+    const expectedAmount = parseFloat(order.total_ttc);
+    const saleAmount = capturedAmountEur;
+    const amountMismatch = Math.abs(saleAmount - expectedAmount) > 0.005;
+    if (amountMismatch) {
+      logger.warn(`CAWL AMOUNT_MISMATCH: order ${order.ref} attendu=${expectedAmount} encaissé=${saleAmount} (payment ${cawlPaymentId})`);
+    }
+
+    await trx('orders').where({ id: orderId }).update({
+      status: 'submitted',
+      updated_at: new Date(),
+    });
+
+    // payments : la ligne 'cawl' existe (create-session) → UPDATE. INSERT en filet seulement.
+    const updated = await trx('payments')
+      .where({ order_id: orderId, method: 'cawl' })
+      .update({
+        status: 'reconciled',
+        amount: saleAmount,
+        reference: cawlPaymentId,
+        reconciled_at: new Date(),
+        updated_at: new Date(),
+      });
+    if (updated === 0) {
+      await trx('payments').insert({
+        order_id: orderId,
+        method: 'cawl',
+        amount: saleAmount,
+        status: 'reconciled',
+        reference: cawlPaymentId,
+        reconciled_at: new Date(),
+      });
+    }
+
+    // ── Booking REVENU : 'sale' de PAIEMENT uniquement (jamais 'order_created') ──
+    // financial_events reste append-only : INSERT seul, aucune mise à jour destructive.
+    const metadata = { cawl_payment_id: cawlPaymentId };
+    if (amountMismatch) {
+      metadata.amount_mismatch = { expected: expectedAmount, captured: saleAmount };
+    }
+    await trx('financial_events').insert({
+      order_id: orderId,
+      campaign_id: order.campaign_id, // campagne figée à la création (resolveCampaignId), jamais re-résolue
+      type: 'sale',
+      amount: saleAmount,
+      description: `Paiement CAWL ${cawlPaymentId} confirmé`,
+      metadata: JSON.stringify(metadata),
+    });
+
+    // Sorties de stock (items produits uniquement, pas le port) — symétrie confirmBoutiqueOrder
+    const items = await trx('order_items').where({ order_id: orderId }).whereNotNull('product_id').select('product_id', 'qty');
+    if (items.length > 0) {
+      await trx('stock_movements').insert(
+        items.map((item) => ({
+          product_id: item.product_id,
+          campaign_id: order.campaign_id,
+          type: 'exit',
+          qty: item.qty,
+          reference: order.ref,
+        }))
+      );
+    }
+
+    // Notify admins
+    const admins = await trx('users').whereIn('role', ['super_admin', 'comptable']).select('id');
+    if (admins.length) {
+      await trx('notifications').insert(
+        admins.map((a) => ({
+          user_id: a.id,
+          type: 'order',
+          message: `Nouvelle commande boutique ${order.ref} (${saleAmount.toFixed(2)} EUR)`,
+          link: `/admin/orders?selected=${orderId}`,
+        }))
+      );
+    }
+
+    logger.info(`CAWL order confirmed: ${order.ref} (payment: ${cawlPaymentId}, sale ${saleAmount})`);
+
+    return { ...order, status: 'submitted' };
+  });
+}
+
+/**
  * Get order by ref and email (public tracking)
  */
 async function getOrderByRefAndEmail(ref, email) {
@@ -540,6 +664,7 @@ module.exports = {
   upsertContact,
   createBoutiqueOrder,
   confirmBoutiqueOrder,
+  confirmCawlOrder,
   getOrderByRefAndEmail,
   resolveReferralCode,
 };
