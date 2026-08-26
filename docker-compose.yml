@@ -58,6 +58,16 @@ services:
       SMTP_FROM_EMAIL: ${SMTP_FROM_EMAIL}
       SMTP_FROM_NAME: ${SMTP_FROM_NAME}
       ADMIN_EMAIL: ${ADMIN_EMAIL}
+      # ─── CAWL (Worldline Direct) — valeurs depuis .env hôte, hors git. Secrets jamais en clair. ───
+      # CAWL_HOST = nom d'hôte NU (ni https://, ni slash final, ni /v2/) : le SDK applique
+      # HTTPS et le port 443. Une erreur de format ici échoue SILENCIEUSEMENT.
+      CAWL_HOST: ${CAWL_HOST}
+      CAWL_MERCHANT_ID: ${CAWL_MERCHANT_ID}
+      CAWL_API_KEY_ID: ${CAWL_API_KEY_ID}
+      CAWL_SECRET_API_KEY: ${CAWL_SECRET_API_KEY}
+      CAWL_INTEGRATOR: ${CAWL_INTEGRATOR}
+      CAWL_WEBHOOK_KEY_ID: ${CAWL_WEBHOOK_KEY_ID}
+      CAWL_WEBHOOK_SECRET: ${CAWL_WEBHOOK_SECRET}
     ports:
       - "3001:3001"
     # Image figée : plus de volume source (code baked-in). uploads reste monté (DONNÉES).
