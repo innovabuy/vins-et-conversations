@@ -1177,7 +1177,14 @@ exports.seed = async function (knex) {
   console.log(`✅ Grille transport: ${shippingResult.zones} zones, ${shippingResult.rates} tarifs`);
 
   // ─── Site images (emplacements) ─────────────────────
-  await knex('site_images').del();
+  // ⚠️ PAS de .del() ici (retiré le 27/08/2026). Ce seed s'exécute APRÈS les migrations
+  // (migrate puis seed), et plusieurs migrations créent des slots que cette liste ne
+  // contient pas : equipe_groupe, les galeries cse/ecoles/repas, raison_etre_*,
+  // cercle_ambassadeurs_*, financement_hero, et les heros equipe/avis/partenaires du
+  // 27/08. Un truncate ici les effaçait tous au cutover — 17 emplacements perdus, et
+  // des pages vitrine privées de leur image de fond paramétrable sans que rien ne le
+  // signale. L'insert est donc idempotent (ON CONFLICT (page, slot) DO NOTHING) et
+  // purement additif : il complète ce que les migrations ont posé au lieu de l'écraser.
   await knex('site_images').insert([
     { page: 'accueil', slot: 'accueil_hero_video', label: 'Vidéo/image hero principale', alt_text: 'Vignoble Loire Valley' },
     { page: 'accueil', slot: 'accueil_hero_fallback', label: 'Image de remplacement hero', alt_text: 'Vignoble en automne' },
@@ -1226,8 +1233,9 @@ exports.seed = async function (knex) {
     { page: 'coffrets', slot: 'coffrets_hero', label: 'Image hero page Coffrets', alt_text: 'Nos coffrets' },
     // FAQ
     { page: 'faq', slot: 'faq_hero', label: 'Image hero page FAQ', alt_text: 'Questions fréquentes' },
-  ]);
-  console.log('✅ Site images: 38 emplacements créés');
+  ]).onConflict(['page', 'slot']).ignore();
+  const totalSlots = await knex('site_images').count('id as count').first();
+  console.log(`✅ Site images: ${totalSlots.count} emplacements (38 du seed + ceux des migrations)`);
 
   console.log('✅ Seed complet Vins & Conversations — Données CDC v4');
 };
