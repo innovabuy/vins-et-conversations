@@ -30,7 +30,7 @@ function FAQItem({ q, a }) {
         <ChevronDown size={18} className={`text-gray-400 transition-transform flex-shrink-0 ml-4 ${open ? 'rotate-180' : ''}`} />
       </button>
       {open && (
-        <div className="px-5 pb-5 text-gray-600 leading-relaxed border-t border-gray-100 pt-3">
+        <div className="px-5 pb-5 text-gray-600 leading-relaxed border-t border-gray-100 pt-3 whitespace-pre-line">
           {a}
         </div>
       )}
