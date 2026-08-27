@@ -16,9 +16,19 @@ const PAGE_LABELS = {
   equipe: 'Équipe',
   coffrets: 'Coffrets',
   faq: 'FAQ',
+  avis: 'Avis clients',
+  partenaires: 'Partenaires',
+  financement: 'Financement de projet',
+  raison_etre: 'Raison d\'être',
+  cercle_ambassadeurs: 'Cercle des ambassadeurs',
 };
 
-const PAGE_ORDER = ['commun', 'accueil', 'boutique', 'prestations', 'cse', 'ecoles', 'ambassadeurs', 'repas', 'coffrets', 'apropos', 'equipe', 'faq', 'contact'];
+// ⚠️ Cette liste ne fait pas qu'ordonner : elle FILTRE (voir `pages` plus bas). Un groupe
+// absent d'ici n'est jamais affiché, même si ses slots existent en base — c'est ce qui
+// rendait financement_hero (seedé le 09/07), raison_etre_hero et cercle_ambassadeurs_hero
+// inaccessibles à Nicolas depuis leur création. Toute nouvelle valeur de site_images.page
+// doit être ajoutée ici ET dans PAGE_LABELS.
+const PAGE_ORDER = ['commun', 'accueil', 'boutique', 'prestations', 'cse', 'ecoles', 'ambassadeurs', 'repas', 'coffrets', 'apropos', 'equipe', 'raison_etre', 'cercle_ambassadeurs', 'financement', 'faq', 'avis', 'partenaires', 'contact'];
 
 export default function SiteImages() {
   const [grouped, setGrouped] = useState({});

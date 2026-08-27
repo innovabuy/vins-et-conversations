@@ -20,6 +20,7 @@ const DEFAULT_CONTENT = {
 
 export default function EquipePage() {
   const [content, setContent] = useState(DEFAULT_CONTENT);
+  const heroBg = useSiteImage('equipe_hero');
   const imgNicolas = useSiteImage('equipe_nicolas');
   const imgMatheo = useSiteImage('equipe_matheo');
   const imgMalone = useSiteImage('equipe_malone');
@@ -42,8 +43,16 @@ export default function EquipePage() {
 
   return (
     <div>
-      <section className="bg-gradient-to-br from-wine-800 via-wine-700 to-wine-900 text-white py-20">
-        <div className="max-w-4xl mx-auto px-4 text-center">
+      {/* Hero : patron conditionnel commun aux pages vitrine — image de fond + voile noir
+          si le slot equipe_hero est renseigné, dégradé wine sinon. Le slot est créé vide par la
+          migration 20260827130000, donc le rendu reste le dégradé tant que Nicolas n'a
+          rien uploadé depuis « Images site ». */}
+      <section
+        className={`relative text-white py-20 ${heroBg?.image_url ? 'bg-wine-900' : 'bg-gradient-to-br from-wine-800 via-wine-700 to-wine-900'}`}
+        style={heroBg?.image_url ? { backgroundImage: `url(${heroBg.image_url})`, backgroundSize: 'cover', backgroundPosition: 'center' } : undefined}
+      >
+        {heroBg?.image_url && <div className="absolute inset-0 bg-black/45" aria-hidden="true" />}
+        <div className="relative max-w-4xl mx-auto px-4 text-center">
           <div className="inline-flex items-center gap-2 bg-white/10 backdrop-blur rounded-full px-4 py-1.5 text-sm mb-6">
             <Users size={16} /> Notre équipe
           </div>

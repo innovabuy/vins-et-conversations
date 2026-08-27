@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { Star, ChevronRight, MessageSquare } from 'lucide-react';
 import api from '../../services/api';
+import { useSiteImage } from '../../contexts/SiteImagesContext';
 
 const DEFAULT_CONTENT = {
   hero: {
@@ -16,6 +17,7 @@ const DEFAULT_CONTENT = {
 
 export default function AvisPage() {
   const [content, setContent] = useState(DEFAULT_CONTENT);
+  const heroBg = useSiteImage('avis_hero');
 
   useEffect(() => {
     api.get('/site-pages/avis')
@@ -25,8 +27,16 @@ export default function AvisPage() {
 
   return (
     <div>
-      <section className="bg-gradient-to-br from-wine-800 via-wine-700 to-wine-900 text-white py-20">
-        <div className="max-w-4xl mx-auto px-4 text-center">
+      {/* Hero : patron conditionnel commun aux pages vitrine — image de fond + voile noir
+          si le slot avis_hero est renseigné, dégradé wine sinon. Le slot est créé vide par la
+          migration 20260827130000, donc le rendu reste le dégradé tant que Nicolas n'a
+          rien uploadé depuis « Images site ». */}
+      <section
+        className={`relative text-white py-20 ${heroBg?.image_url ? 'bg-wine-900' : 'bg-gradient-to-br from-wine-800 via-wine-700 to-wine-900'}`}
+        style={heroBg?.image_url ? { backgroundImage: `url(${heroBg.image_url})`, backgroundSize: 'cover', backgroundPosition: 'center' } : undefined}
+      >
+        {heroBg?.image_url && <div className="absolute inset-0 bg-black/45" aria-hidden="true" />}
+        <div className="relative max-w-4xl mx-auto px-4 text-center">
           <div className="inline-flex items-center gap-2 bg-white/10 backdrop-blur rounded-full px-4 py-1.5 text-sm mb-6">
             <Star size={16} /> Témoignages
           </div>
