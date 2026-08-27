@@ -2,18 +2,28 @@ import { useState, useEffect } from 'react';
 import { FileText, Save, RotateCcw, Eye, EyeOff, ChevronRight, ChevronDown } from 'lucide-react';
 import api from '../../services/api';
 
+// Liste de référence des pages vitrine éditables. Une page absente d'ici est invisible
+// dans cet écran MÊME si sa ligne existe en base et que l'API sait la servir — c'est ce
+// qui avait laissé 'prestations-financement' et 'devenir-ambassadeur' hors du back-office.
+// Toute nouvelle page vitrine branchée sur /site-pages/<slug> doit être ajoutée ici.
+// L'ordre ci-dessous est l'ordre d'affichage : il suit le parcours du site.
 const KNOWN_SLUGS = [
+  { slug: 'accueil', label: 'Accueil boutique' },
   { slug: 'prestations-cse', label: 'Prestation CSE' },
   { slug: 'prestations-ecoles', label: 'Prestation Écoles' },
   { slug: 'prestations-repas', label: 'Prestation Repas & Soirées' },
+  { slug: 'prestations-financement', label: 'Prestation Financement de projet' },
   { slug: 'a-propos', label: 'À Propos' },
   { slug: 'equipe', label: 'L\'Équipe' },
   { slug: 'raison-d-etre', label: 'Raison d\'être / Manifeste' },
+  { slug: 'ambassadeurs', label: 'Nos Ambassadeurs' },
+  { slug: 'devenir-ambassadeur', label: 'Devenir ambassadeur' },
   { slug: 'cercle-ambassadeurs', label: 'Cercle des ambassadeurs' },
   { slug: 'faq', label: 'FAQ' },
   { slug: 'avis', label: 'Avis' },
   { slug: 'partenaires', label: 'Partenaires' },
   { slug: 'coffrets', label: 'Coffrets' },
+  { slug: 'contact', label: 'Contact' },
 ];
 
 export default function SitePagesAdmin() {
@@ -166,7 +176,12 @@ export default function SitePagesAdmin() {
                 <div className="px-6 pb-6 bg-gray-50 border-t border-gray-100">
                   <div className="space-y-4 pt-4">
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Titre de la page</label>
+                      {/* Ce champ écrit site_pages.title, qui n'est affiché NULLE PART sur le site
+                          public : le H1 visible vient de content_json.hero.title ci-dessous.
+                          Le libellé le dit explicitement pour lever l'ambiguïté. */}
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Nom interne <span className="text-gray-400 font-normal">(repère back-office, non affiché sur le site)</span>
+                      </label>
                       <input
                         type="text"
                         value={editData.title}
