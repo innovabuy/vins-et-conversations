@@ -9,6 +9,23 @@ import { useSiteImage } from '../../contexts/SiteImagesContext';
 
 const formatEur = (v) => new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR' }).format(v);
 
+// Contenu par défaut du header — repris à l'identique du H1/sous-titre qui étaient
+// écrits en dur ici. Fallback si la ligne 'accueil' est absente, inactive ou injoignable.
+//
+// MODÈLE DU H1 (arbitrage du 27/08) : le titre est porté par DEUX clés distinctes,
+// title et title_highlight, parce que le H1 est bicolore — la seconde moitié est
+// rendue dans un <span className="text-wine-200">. Le <br /> et le <span> ne sont
+// rendus QUE si title_highlight est non vide : Nicolas peut donc écrire un titre sur
+// une seule ligne sans casser la mise en page. Surtout pas de convention « \n dans une
+// clé unique » : elle serait invisible dans l'éditeur JSON du back-office.
+const DEFAULT_CONTENT = {
+  hero: {
+    title: 'Des vins d\'exception',
+    title_highlight: 'pour des moments uniques',
+    subtitle: 'Découvrez notre sélection de vins français, choisis avec soin par Nicolas Froment. Chaque bouteille raconte une histoire.',
+  },
+};
+
 const COLOR_MAP = {
   rouge: 'bg-red-100 text-red-700',
   blanc: 'bg-yellow-50 text-yellow-700',
@@ -45,6 +62,14 @@ export default function BoutiqueHome() {
   const toast = useToast();
   const addToCartHandled = useRef(false);
   const heroBg = useSiteImage('accueil_hero_fallback');
+  const [content, setContent] = useState(DEFAULT_CONTENT);
+
+  // Contenu CMS du header (H1 + sous-titre). Effet dédié, dépendances vides.
+  useEffect(() => {
+    api.get('/site-pages/accueil')
+      .then(({ data }) => { if (data.content_json) setContent(data.content_json); })
+      .catch(() => {});
+  }, []);
 
   // Handle add_to_cart URL parameter (from coffrets.html)
   useEffect(() => {
@@ -153,13 +178,15 @@ export default function BoutiqueHome() {
             <Wine size={16} /> Vins sélectionnés avec passion
           </div>
           <h1 className="text-4xl sm:text-5xl lg:text-6xl font-bold mb-6 leading-tight">
-            Des vins d'exception<br />
-            <span className="text-wine-200">pour des moments uniques</span>
+            {content.hero.title}
+            {content.hero.title_highlight && (
+              <>
+                <br />
+                <span className="text-wine-200">{content.hero.title_highlight}</span>
+              </>
+            )}
           </h1>
-          <p className="text-lg text-wine-200 max-w-2xl mx-auto mb-8">
-            Découvrez notre sélection de vins français, choisis avec soin par Nicolas Froment.
-            Chaque bouteille raconte une histoire.
-          </p>
+          <p className="text-lg text-wine-200 max-w-2xl mx-auto mb-8">{content.hero.subtitle}</p>
           <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
             <a href="#catalog" className="inline-flex items-center gap-2 bg-white text-wine-800 px-6 py-3 rounded-xl font-semibold hover:bg-wine-50 transition-all">
               Découvrir nos vins <ChevronRight size={18} />

@@ -3,6 +3,16 @@ import { MapPin, Users } from 'lucide-react';
 import api from '../../services/api';
 import { useSiteImage } from '../../contexts/SiteImagesContext';
 
+// Contenu par défaut du header — repris à l'identique du H1/sous-titre qui étaient
+// écrits en dur ici. Sert de fallback si la ligne 'ambassadeurs' est absente, inactive,
+// ou si l'appel CMS échoue : le rendu reste alors exactement celui d'avant.
+const DEFAULT_CONTENT = {
+  hero: {
+    title: 'Nos Ambassadeurs',
+    subtitle: 'Retrouvez nos ambassadeurs dans toute la France',
+  },
+};
+
 const AVATAR_COLORS = [
   '#7C3AED', '#2563EB', '#059669', '#D97706', '#DC2626',
   '#8B5CF6', '#0891B2', '#65A30D', '#EA580C', '#DB2777',
@@ -26,7 +36,19 @@ export default function AmbassadorsPage() {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [regionFilter, setRegionFilter] = useState('');
+  const [content, setContent] = useState(DEFAULT_CONTENT);
   const heroBg = useSiteImage('ambassadeurs_hero');
+
+  // Contenu CMS du header. useEffect DISTINCT, à dépendances vides : le useEffect
+  // ci-dessous dépend de regionFilter et se rejoue à chaque changement de filtre — y
+  // fusionner cet appel referait un GET /site-pages/ambassadeurs à chaque clic.
+  useEffect(() => {
+    // (res) et non ({ data }) : ce composant a déjà un état nommé `data` (les
+    // ambassadeurs), que la déstructuration masquerait ici.
+    api.get('/site-pages/ambassadeurs')
+      .then((res) => { if (res.data.content_json) setContent(res.data.content_json); })
+      .catch(() => {});
+  }, []);
 
   useEffect(() => {
     const params = {};
@@ -49,8 +71,8 @@ export default function AmbassadorsPage() {
         <div className="inline-flex items-center gap-2 bg-white/10 backdrop-blur rounded-full px-4 py-1.5 text-sm mb-6">
           <Users size={16} /> Le réseau
         </div>
-        <h1 className="text-4xl sm:text-5xl font-bold mb-4">Nos Ambassadeurs</h1>
-        <p className="text-lg text-wine-100 max-w-2xl mx-auto">Retrouvez nos ambassadeurs dans toute la France</p>
+        <h1 className="text-4xl sm:text-5xl font-bold mb-4">{content.hero.title}</h1>
+        <p className="text-lg text-wine-100 max-w-2xl mx-auto">{content.hero.subtitle}</p>
       </div>
     </section>
 

@@ -1,6 +1,17 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Mail, Send, CheckCircle } from 'lucide-react';
 import api from '../../services/api';
+
+// Contenu par défaut du header — repris à l'identique du H1/sous-titre qui étaient
+// écrits en dur ici. Fallback si la ligne 'contact' est absente, inactive ou injoignable.
+// Périmètre volontairement limité au header : le bloc coordonnées et le bloc « Réponse
+// rapide » plus bas restent en dur (contenu de corps, hors lot).
+const DEFAULT_CONTENT = {
+  hero: {
+    title: 'Une question ? Un projet ?',
+    subtitle: 'N\'hésitez pas à nous écrire. Nous répondons à toutes les demandes sous 48h.',
+  },
+};
 
 const TYPES = [
   { value: 'question', label: 'Question' },
@@ -14,6 +25,13 @@ export default function ContactForm() {
   const [sending, setSending] = useState(false);
   const [sent, setSent] = useState(false);
   const [error, setError] = useState('');
+  const [content, setContent] = useState(DEFAULT_CONTENT);
+
+  useEffect(() => {
+    api.get('/site-pages/contact')
+      .then(({ data }) => { if (data.content_json) setContent(data.content_json); })
+      .catch(() => {});
+  }, []);
 
   const update = (key, val) => setForm((f) => ({ ...f, [key]: val }));
 
@@ -49,10 +67,8 @@ export default function ContactForm() {
         <div className="inline-flex items-center gap-2 bg-wine-50 text-wine-700 rounded-full px-4 py-1.5 text-sm mb-4">
           <Mail size={16} /> Nous contacter
         </div>
-        <h1 className="text-3xl sm:text-4xl font-bold text-gray-900 mb-4">Une question ? Un projet ?</h1>
-        <p className="text-gray-500 max-w-lg mx-auto">
-          N'hésitez pas à nous écrire. Nous répondons à toutes les demandes sous 48h.
-        </p>
+        <h1 className="text-3xl sm:text-4xl font-bold text-gray-900 mb-4">{content.hero.title}</h1>
+        <p className="text-gray-500 max-w-lg mx-auto">{content.hero.subtitle}</p>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-5 gap-10">
