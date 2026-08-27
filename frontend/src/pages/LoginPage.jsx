@@ -104,17 +104,46 @@ export default function LoginPage() {
             animation: 'loginFadeIn 0.8s ease-out 0.5s both',
           }}
         >
-          {/* Logo + title */}
+          {/* Logo (porte déjà le nom de la marque → pas de titre ni de sous-titre) */}
           <div className="text-center mb-6">
-            <div className="inline-flex items-center justify-center w-28 h-28 sm:w-36 sm:h-36 bg-white/10 backdrop-blur-sm rounded-3xl mb-4">
+            {/* Cartouche blanc opaque : le logo source est un JPEG à fond blanc, le
+                cartouche doit être blanc pour que la jonction reste invisible, et
+                overflow-hidden pour que ses angles droits soient rognés par l'arrondi.
+
+                ⚠️ RÉGLAGE PROVISOIRE — CÂBLÉ SUR UN FICHIER PRÉCIS ⚠️
+                Les dimensions et décalages de l'<img> ci-dessous sont calculés sur
+                /uploads/logos/logo_1783604502053.jpeg (479 × 850, fond blanc), dont le
+                dessin ne couvre que 245 × 404 px — donc ~50 % de blanc mort, décentré.
+                On agrandit l'image à 1,68× la taille « contain » et on la recale pour
+                que le cartouche cadre l'encre au lieu du blanc. Le rognage est invisible
+                uniquement parce que ce qu'on coupe est du blanc pur, sur un cartouche
+                blanc.
+                Le recalage horizontal vise le centre OPTIQUE, pas le centre de la bbox :
+                le verre (73 % de l'encre) est centré sur x=250 alors que la bbox globale
+                l'est sur x=259, et « conversations » a une bbox large mais sa masse à
+                droite. Caler sur la bbox penchait visiblement à gauche. Les valeurs
+                left ci-dessous centrent le verre ET la masse d'encre totale (à <1 px).
+
+                À L'ARRIVÉE DE LA SOURCE DÉTOURÉE (frontend/public/brand/logo-full.svg,
+                fond transparent, sans marges) : SUPPRIMER h-[…] / left-[…] / top-[…] /
+                max-w-none / overflow-hidden et revenir à un simple object-contain.
+                Laissé en place sur une image sans blanc mort, ce cadrage amputerait le
+                logo. Cf. frontend/public/brand/README.md. */}
+            <div className="relative inline-flex items-center justify-center w-24 h-32 sm:w-28 sm:h-40 bg-white rounded-3xl overflow-hidden">
               {app_logo_url ? (
-                <img src={app_logo_url} alt={app_name} className="w-24 h-24 sm:w-32 sm:h-32 object-contain" />
+                <img
+                  src={app_logo_url}
+                  alt={app_name}
+                  className="absolute w-auto max-w-none h-[215px] left-[-15px] top-[-55px] sm:h-[269px] sm:left-[-23px] sm:top-[-68px]"
+                />
               ) : (
-                <Wine className="w-12 h-12 text-white" />
+                <Wine className="w-16 h-16 sm:w-20 sm:h-20 text-wine-900" />
               )}
             </div>
-            <h1 className="text-2xl sm:text-3xl font-bold text-white">{app_name}</h1>
-            <p className="text-wine-300 text-sm mt-1">Plateforme de gestion des ventes</p>
+            {/* Repli : sans logo, le nom de la marque doit rester affiché */}
+            {!app_logo_url && (
+              <h1 className="text-2xl sm:text-3xl font-bold text-white mt-4">{app_name}</h1>
+            )}
           </div>
 
           {/* Card */}
