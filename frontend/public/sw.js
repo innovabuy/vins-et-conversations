@@ -1,14 +1,13 @@
-const CACHE_NAME = 'vc-cache-v11';
+const CACHE_NAME = 'vc-cache-v12'; // v11 = lot logo écran de connexion
 const STATIC_ASSETS = [
   '/',
   '/manifest.json',
   '/favicon.svg',
-  '/icon-72.png',
-  '/icon-96.png',
-  '/icon-128.png',
-  '/icon-144.png',
-  '/icon-192.png',
-  '/icon-512.png',
+  '/apple-touch-icon.png',
+  '/icons/icon-192.png',
+  '/icons/icon-512.png',
+  '/icons/icon-maskable-192.png',
+  '/icons/icon-maskable-512.png',
 ];
 
 // Install: cache static assets

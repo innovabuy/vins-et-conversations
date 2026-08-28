@@ -1,21 +1,34 @@
 # Icônes PWA & favicon — spécification et patchs à appliquer
 
-Statut : **structure préparée, images définitives en attente** de la source
-`frontend/public/brand/symbol.svg` (cf. `frontend/public/brand/README.md`).
+Statut : **appliqué le 28/08/2026**. Les 17 fichiers sont générés depuis
+`frontend/public/brand/symbol.svg`, et les patchs 3, 4 et 5 ci-dessous sont en place
+dans `manifest.json`, `sw.js` (`vc-cache-v12`) et `index.html`.
 
-`frontend/public/manifest.json`, `sw.js` (hors bump de version) et `index.html`
-**ne sont pas modifiés par ce lot** : déclarer des icônes qui n'existent pas encore
-casserait `cache.addAll()` du service worker (l'événement `install` rejette → le SW
-ne s'active jamais). Les patchs ci-dessous s'appliquent **le jour où les PNG existent**.
+Le document reste la spécification de référence : toute régénération d'icônes doit
+reproduire ces tailles et ces deux jeux `any` / `maskable` distincts. Rappel de la
+contrainte qui a dicté l'ordre des opérations : `cache.addAll()` rejette en entier si
+une seule entrée de `STATIC_ASSETS` manque — on ne déclare jamais une icône avant de
+l'avoir écrite sur disque.
+
+Réserves connues sur le rendu (constatées à la recette du 28/08) : le symbole tracé est
+lisible **à partir de 128 px** ; en 16/32/48 px il reste confus, comme le placeholder
+qu'il remplace (aucune régression, mais aucun gain non plus). La vraie réponse est une
+**variante simplifiée du symbole** à demander à Nicolas (verre épaissi, ou symbole blanc
+plein sur bordeaux), à régénérer ensuite avec le même script.
+
+`frontend/public/favicon.svg` a été **régénéré depuis `brand/symbol.svg`** avec le même
+cadrage que les icônes `any` (motif à 88 %, coins arrondis r = 80/512) : c'est lui l'icône
+d'onglet effective sur Chrome et Firefox, qui préfèrent le SVG quand il est déclaré — laisser
+le placeholder « V&C » y aurait annulé tout le bénéfice du lot. Le nettoyage du § 6 est fait.
 
 ---
 
-## 1. Défaut constaté sur l'existant
+## 1. Défaut constaté sur l'existant (état AVANT ce lot)
 
-Les icônes actuelles sont générées depuis `frontend/public/icon-512.svg`, un
+Les icônes d'origine étaient générées depuis `frontend/public/icon-512.svg`, un
 **placeholder générique** (verre stylisé + texte « V&C » en Arial), pas le logo de la marque.
 
-Surtout, `manifest.json` déclare aujourd'hui :
+Surtout, `manifest.json` déclarait :
 
 ```json
 { "src": "/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any maskable" }
@@ -109,6 +122,7 @@ l'install sans bénéfice.
 
 ```html
 <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+<link rel="icon" type="image/png" sizes="48x48" href="/icons/favicon-48.png" />
 <link rel="icon" type="image/png" sizes="32x32" href="/icons/favicon-32.png" />
 <link rel="icon" type="image/png" sizes="16x16" href="/icons/favicon-16.png" />
 <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
@@ -117,12 +131,19 @@ l'install sans bénéfice.
 Aujourd'hui `apple-touch-icon` pointe sur `/icon-192.png` : mauvaise taille (iOS veut 180) et
 icône à coins arrondis re-masquée par iOS, ce qui rogne deux fois les angles.
 
-`favicon.svg` doit lui aussi être régénéré depuis le symbole ; il contient actuellement le
-placeholder « V&C ».
+`favicon.svg` est régénéré depuis le symbole (rectangle bordeaux arrondi + tracés de
+`brand/symbol.svg`, cadrage identique aux icônes `any`). Il est **déclaré en premier** :
+les navigateurs qui gèrent le SVG l'utilisent et ignorent les PNG, qui ne servent que de
+repli. Toute régénération du jeu d'icônes doit donc le régénérer lui aussi, sous peine de
+laisser l'onglet désynchronisé du reste.
 
 ## 6. Nettoyage final
 
-Une fois les patchs 3–5 appliqués et vérifiés, supprimer les anciens fichiers plats à la
-racine de `frontend/public` — `icon-72/96/128/144/192/512.png`, `icon-192.svg`, `icon-512.svg` —
-et l'ancien placeholder n'est alors plus référencé nulle part. Vérifier avec
-`grep -rn "icon-512.svg\|/icon-192.png" frontend/ nginx/` avant de supprimer.
+**Fait le 28/08/2026.** Les anciens fichiers plats de `frontend/public` —
+`icon-72/96/128/144/192/512.png`, `icon-192.svg`, `icon-512.svg` — ont été supprimés après
+vérification qu'aucune référence ne subsistait dans le dépôt (hors `node_modules`, `dist` et
+`.git`). La racine de `frontend/public` ne contient plus que `favicon.svg`,
+`apple-touch-icon.png`, `manifest.json`, `sw.js` et les dossiers `icons/`, `brand/`, `images/`.
+
+Contrôle à rejouer avant toute suppression future :
+`grep -rn "icon-512.svg\|/icon-192.png" frontend/ nginx/`.
