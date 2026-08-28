@@ -41,21 +41,25 @@ Puis appliquer les trois patchs listés dans `scripts/ICONS.md`.
 
 ---
 
-## ⚠️ Dette à solder au dépôt de `logo-full.svg`
+## ✅ Dette soldée le 28/08/2026
 
-`frontend/src/pages/LoginPage.jsx` contient un **cadrage provisoire câblé sur le JPEG actuel** :
-l'image y est agrandie à **1,68× la taille « contain »** puis recalée
-(`h-[215px] left-[-18px] top-[-55px]`, variantes `sm:`) pour que le cartouche cadre l'encre
-(245 × 404 px, centrée en 54,07 % / 55,12 %) au lieu du blanc mort qui l'entoure.
+`logo-full.svg` et `symbol.svg` ont été déposés, et le cadrage provisoire de
+`frontend/src/pages/LoginPage.jsx` — qui agrandissait l'image à 1,68× puis la recalait
+pour cadrer l'encre du JPEG à fond blanc — a été **supprimé**. Sur une source détourée
+sans marges, ce cadrage aurait amputé le logo.
 
-Ces valeurs **ne sont valides que pour `logo_1783604502053.jpeg`**. Sur une source détourée
-sans marges, le même cadrage **amputerait le logo**.
+État à ce jour :
 
-À faire dès que la source transparente est en place :
+1. `app_settings.app_logo_url` = `/uploads/logos/logo-full.svg` (écriture en base, non versionnée).
+2. `LoginPage.jsx` est revenu à `className="h-full w-auto object-contain"` ; `h-[…]`,
+   `left-[…]`, `top-[…]`, `max-w-none`, `overflow-hidden` et le bloc « RÉGLAGE PROVISOIRE »
+   ont disparu.
+3. Le cartouche est redevenu carré (`w-32 h-32`, `sm:w-36 sm:h-36`) avec un padding interne,
+   puisqu'il n'y a plus de blanc mort à compenser.
+4. `CACHE_NAME` bumpé à `vc-cache-v12` dans `frontend/public/sw.js` (bump commun avec le lot
+   d'icônes PWA, cf. `scripts/ICONS.md`).
 
-1. Remplacer `app_settings.app_logo_url` par le nouveau fichier.
-2. Dans `LoginPage.jsx`, supprimer `h-[…]`, `left-[…]`, `top-[…]`, `max-w-none`,
-   `overflow-hidden` et le bloc de commentaire « RÉGLAGE PROVISOIRE », puis revenir à
-   `className="h-full w-auto object-contain"`.
-3. Redimensionner le cartouche : sans blanc mort, un carré redevient adapté.
-4. Bumper `CACHE_NAME` dans `frontend/public/sw.js`.
+⚠️ Réserve sur la source : `logo-full.svg` et `symbol.svg` sont une **vectorisation
+automatique du JPEG** (fond opaque aplati, 3 couleurs), pas des originaux. Le fichier natif
+reste à demander à Nicolas, en même temps qu'une **variante simplifiée du symbole** pour les
+petites tailles (favicon 16–48 px), où le tracé actuel reste confus.
