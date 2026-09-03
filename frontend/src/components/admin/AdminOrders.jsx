@@ -369,7 +369,7 @@ function OrderDetail({ orderId, onClose, onUpdated }) {
   };
 
   const handleValidate = async () => {
-    if (!confirm('Valider cette commande ?')) return;
+    if (!confirm('Valider cette commande ? La validation déclenche le 12+1, l\'email au client et le bon de livraison.')) return;
     setDetailError('');
     try { await ordersAPI.validate(orderId); onUpdated(); } catch (err) { setDetailError(err.response?.data?.message || 'Erreur'); }
   };
@@ -423,12 +423,12 @@ function OrderDetail({ orderId, onClose, onUpdated }) {
       <div className="flex flex-wrap gap-2">
         {(order.status === 'submitted' || order.status === 'pending_stock') && (
           <button onClick={handleValidate} className="flex items-center gap-1.5 px-3 py-1.5 text-sm rounded-lg bg-green-600 text-white hover:bg-green-700">
-            <Check size={14} /> {order.status === 'pending_stock' ? 'Marquer disponible' : 'Valider'}
+            <Check size={14} /> {order.status === 'pending_stock' ? 'Marquer disponible' : 'Valider la commande'}
           </button>
         )}
         {order.status === 'pending_payment' && (
           <button onClick={() => setShowMarkPaid(true)} className="flex items-center gap-1.5 px-3 py-1.5 text-sm rounded-lg bg-emerald-600 text-white hover:bg-emerald-700">
-            <CreditCard size={14} /> Marquer comme paye
+            <CreditCard size={14} /> Enregistrer le règlement
           </button>
         )}
         {order.status === 'validated' && (
@@ -467,7 +467,7 @@ function OrderDetail({ orderId, onClose, onUpdated }) {
       {/* Mark-paid modal */}
       {showMarkPaid && (
         <div className="border border-emerald-200 rounded-lg p-4 bg-emerald-50 space-y-3">
-          <h4 className="text-sm font-semibold text-emerald-800">Marquer comme paye</h4>
+          <h4 className="text-sm font-semibold text-emerald-800">Enregistrer le règlement</h4>
           <div>
             <label className="text-xs text-gray-600">Mode de paiement</label>
             <select value={markPaidMethod} onChange={(e) => setMarkPaidMethod(e.target.value)} className="w-full mt-1 border rounded-lg px-3 py-2 text-sm">
@@ -730,7 +730,7 @@ export default function AdminOrders() {
   useEffect(() => { campaignsAPI.list().then(res => setCampaigns(res.data.data || [])).catch(console.error); }, []);
 
   const handleValidate = async (id) => {
-    if (!confirm('Valider cette commande ?')) return;
+    if (!confirm('Valider cette commande ? La validation déclenche le 12+1, l\'email au client et le bon de livraison.')) return;
     setListError('');
     try { await ordersAPI.validate(id); fetchOrders(); } catch (err) { setListError(err.response?.data?.message || 'Erreur'); }
   };

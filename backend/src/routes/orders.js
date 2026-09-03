@@ -6,6 +6,8 @@ const orderService = require('../services/orderService');
 const { authenticate, requireRole, requireCampaignAccess, antifraudCheck } = require('../middleware/auth');
 const { validate } = require('../middleware/validate');
 const { auditAction } = require('../middleware/audit');
+const { invalidateCache } = require('../middleware/cache');
+const logger = require('../utils/logger');
 const { getAppBranding } = require('../utils/appBranding');
 const { addCapNumerikFooter } = require('../utils/pdfFooter');
 
@@ -330,7 +332,17 @@ router.post(
   }
 );
 
-// PUT /api/v1/orders/:id/mark-paid — Marquer une commande pending_payment comme payée
+// PUT /api/v1/orders/admin/:id/mark-paid — Enregistrer un règlement encaissé hors ligne.
+//
+// Symétrie STRICTE avec la confirmation webhook (boutiqueOrderService.confirmBoutiqueOrder /
+// confirmCawlBoutiqueOrder) : enregistrer un règlement fait passer la commande en 'submitted',
+// JAMAIS en 'validated'. Encaisser et valider sont deux actes distincts — la validation, avec
+// son 12+1, son email et son BL, reste le fait du bouton « Valider la commande ».
+//
+// Avant ce correctif, la route sautait directement à 'validated' et divergeait du chemin
+// nominal sur cinq axes : statut atteint, type d'événement financier ('payment_received' au
+// lieu de 'sale'), absence de sortie de stock, INSERT d'une ligne de règlement en doublon,
+// et absence de garde d'idempotence.
 router.put(
   '/admin/:id/mark-paid',
   authenticate,
@@ -340,47 +352,152 @@ router.put(
     try {
       const order = await db('orders').where({ id: req.params.id }).first();
       if (!order) return res.status(404).json({ error: 'NOT_FOUND' });
+
+      // Deux refus distincts, mais UN SEUL message pour l'utilisateur quand la situation
+      // qu'il vit est la même (« j'ai cliqué sur une commande déjà réglée ») :
+      //   - un 'sale' existe        → 409 ALREADY_PAID, quel que soit le chemin emprunté ;
+      //   - sinon, statut incompatible → 400, avec le statut réel dans le message.
+      // La présence d'un 'sale' est le critère de vérité : c'est lui qui marque le revenu
+      // booké, qu'il vienne du webhook, d'un enregistrement manuel, ou de la création d'une
+      // commande campagne (orderService.createOrder en pose un dès l'insertion).
+      const ALREADY_PAID = {
+        error: 'ALREADY_PAID',
+        message: 'Cette commande a déjà été réglée.',
+      };
+
       if (order.status !== 'pending_payment') {
-        return res.status(400).json({ error: 'INVALID_STATUS_TRANSITION', message: 'Seules les commandes en statut "paiement en cours" peuvent être marquées comme payées' });
+        const settled = await db('financial_events')
+          .where({ order_id: order.id, type: 'sale' })
+          .first();
+        if (settled) return res.status(409).json(ALREADY_PAID);
+        return res.status(400).json({
+          error: 'INVALID_STATUS_TRANSITION',
+          message: `Seules les commandes en attente de paiement peuvent recevoir un règlement (statut actuel : ${order.status}).`,
+        });
       }
 
       const { payment_method, notes } = req.body;
-      // Map order payment_method to payments.method (constraint: stripe/transfer/cash/check/paypal)
+      // Map order payment_method to payments.method (contrainte : stripe/transfer/cash/check/paypal/cawl)
       const payMethodMap = { card: 'stripe', stripe: 'stripe', transfer: 'transfer', cash: 'cash', check: 'check', paypal: 'paypal' };
       const payMethod = payMethodMap[payment_method] || 'stripe';
+      const saleAmount = parseFloat(order.total_ttc);
+
+      let alreadySettled = false;
 
       await db.transaction(async (trx) => {
+        // Verrou de ligne : sérialise deux appels concurrents. Le second attend la fin du
+        // premier, relit 'submitted', et ressort sans écrire — c'est la seule garde qui
+        // tienne réellement sous concurrence, un simple test de statut hors transaction
+        // laissant les deux appels passer de front.
+        const locked = await trx('orders').where({ id: order.id }).forUpdate().first();
+        if (locked.status !== 'pending_payment') {
+          alreadySettled = true;
+          return;
+        }
+
+        // Filet décisif : un 'sale' déjà booké signifie que le revenu est enregistré —
+        // webhook arrivé entre-temps, OU commande campagne poussée à tort en
+        // 'pending_payment' (PUT /admin/:id accepte un statut arbitraire). Sans ce filet,
+        // on doublerait le chiffre d'affaires ET la sortie de stock.
+        const existingSale = await trx('financial_events')
+          .where({ order_id: order.id, type: 'sale' })
+          .first();
+        if (existingSale) {
+          alreadySettled = true;
+          return;
+        }
+
         await trx('orders').where({ id: order.id }).update({
-          status: 'validated',
+          status: 'submitted',
           payment_method: payment_method || order.payment_method,
           notes: notes ? (order.notes ? `${order.notes}\n${notes}` : notes) : order.notes,
           updated_at: new Date(),
         });
 
+        // Règlement : la ligne posée à la création de la session de paiement existe déjà
+        // (méthode 'cawl' ou 'stripe', statut 'pending') → UPDATE. INSERT en filet seulement,
+        // pour ne jamais créer un second règlement sur la même commande.
+        const existingPayment = await trx('payments')
+          .where({ order_id: order.id })
+          .orderBy('created_at')
+          .first();
+        if (existingPayment) {
+          await trx('payments').where({ id: existingPayment.id }).update({
+            method: payMethod,
+            amount: saleAmount,
+            status: 'reconciled',
+            reconciled_at: new Date(),
+            updated_at: new Date(),
+          });
+        } else {
+          await trx('payments').insert({
+            order_id: order.id,
+            method: payMethod,
+            amount: saleAmount,
+            status: 'reconciled',
+            reconciled_at: new Date(),
+          });
+        }
+
+        // Booking REVENU : 'sale', comme le webhook. financial_events reste append-only.
         await trx('financial_events').insert({
           order_id: order.id,
           campaign_id: order.campaign_id,
-          type: 'payment_received',
-          amount: parseFloat(order.total_ttc),
-          description: `Paiement manuel — ${payment_method || 'non précisé'}`,
+          type: 'sale',
+          amount: saleAmount,
+          description: `Règlement encaissé hors ligne — ${payment_method || 'non précisé'}`,
+          metadata: JSON.stringify({
+            manual: true,
+            payment_method: payment_method || null,
+            recorded_by: req.user.userId,
+          }),
         });
 
-        await trx('payments').insert({
-          order_id: order.id,
-          method: payMethod,
-          amount: parseFloat(order.total_ttc),
-          status: 'reconciled',
-          reconciled_at: new Date(),
-        });
+        // Sorties de stock (items produits uniquement, pas le port) — symétrie webhook.
+        const items = await trx('order_items')
+          .where({ order_id: order.id })
+          .whereNotNull('product_id')
+          .select('product_id', 'qty');
+        if (items.length > 0) {
+          await trx('stock_movements').insert(
+            items.map((item) => ({
+              product_id: item.product_id,
+              campaign_id: order.campaign_id,
+              type: 'exit',
+              qty: item.qty,
+              reference: order.ref,
+            }))
+          );
+        }
+
+        // Notification aux admins — symétrie webhook.
+        const admins = await trx('users').whereIn('role', ['super_admin', 'comptable']).select('id');
+        if (admins.length) {
+          await trx('notifications').insert(
+            admins.map((a) => ({
+              user_id: a.id,
+              type: 'order',
+              message: `Règlement enregistré — ${order.ref} (${saleAmount.toFixed(2)} EUR)`,
+              link: `/admin/orders?selected=${order.id}`,
+            }))
+          );
+        }
       });
 
-      // Invalidate Redis cache
-      try {
-        const redis = require('../config/redis');
-        if (redis.client) await redis.client.flushDb();
-      } catch (_) { /* graceful */ }
+      if (alreadySettled) {
+        logger.info(`mark-paid refusé: règlement déjà enregistré pour ${order.ref}`);
+        return res.status(409).json(ALREADY_PAID);
+      }
 
       const updated = await db('orders').where({ id: order.id }).first();
+
+      // Invalidation CIBLÉE du cache de lecture (namespace vc:cache:* uniquement).
+      // Remplace un flushDb() qui visait toute la base Redis — et qui, de fait, ne s'exécutait
+      // jamais : config/redis.js n'expose pas `.client`, la garde était toujours fausse.
+      await invalidateCache('vc:cache:*');
+
+      logger.info(`Règlement enregistré pour ${order.ref} (${payMethod}, ${saleAmount}) → submitted`);
+
       res.json(updated);
     } catch (err) {
       res.status(500).json({ error: 'SERVER_ERROR', message: err.message });

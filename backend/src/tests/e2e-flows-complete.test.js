@@ -138,7 +138,7 @@ test('E2E-03: FLUX 3 — referral ambassadeur → CA + palier', async () => {
   expect(dash.body.tier).toBeDefined();
 });
 
-test('E2E-04: FLUX 4 — mark-paid → validated + financial_event + payment', async () => {
+test('E2E-04: FLUX 4 — mark-paid → submitted + sale + payment reconcilie (symetrie webhook)', async () => {
   const res = await boutiqueCheckout(null, null);
   expect(res.status).toBe(201);
   const oid = res.body.order_id;
@@ -147,12 +147,20 @@ test('E2E-04: FLUX 4 — mark-paid → validated + financial_event + payment', a
     .set('Authorization', `Bearer ${adminToken}`)
     .send({ payment_method: 'card' });
   expect(mp.status).toBe(200);
-  expect(mp.body.status).toBe('validated');
+  // Enregistrer un reglement n'est PAS valider : la commande s'arrete a 'submitted'.
+  expect(mp.body.status).toBe('submitted');
 
-  const fe = await db('financial_events').where({ order_id: oid, type: 'payment_received' }).first();
+  const fe = await db('financial_events').where({ order_id: oid, type: 'sale' }).first();
   expect(fe).toBeTruthy();
   const pay = await db('payments').where({ order_id: oid, status: 'reconciled' }).first();
   expect(pay).toBeTruthy();
+
+  // La validation reste disponible et reste un acte distinct.
+  const val = await request(app).post(`/api/v1/orders/admin/${oid}/validate`)
+    .set('Authorization', `Bearer ${adminToken}`);
+  expect(val.status).toBe(200);
+  const after = await db('orders').where({ id: oid }).first();
+  expect(after.status).toBe('validated');
 });
 
 test('E2E-05: FLUX 6 — admin crée pour étudiant avec target_user_id', async () => {
