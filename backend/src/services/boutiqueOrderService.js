@@ -145,13 +145,17 @@ async function createBoutiqueOrder({ cartItems, customer, referralCode, delivery
     .groupBy('product_id')
     .select(
       'product_id',
-      db.raw("SUM(CASE WHEN type IN ('initial', 'entry', 'return') THEN qty ELSE 0 END) as total_in"),
-      db.raw("SUM(CASE WHEN type IN ('exit', 'adjustment') THEN qty ELSE 0 END) as total_out")
+      // Solde de stock — formule unique du projet (cf. stock.js, campaigns.js, suppliers.js,
+      // exports.js, dashboardService.js) : tout ce qui n'est pas une entrée est soustrait,
+      // ce qui inclut 'exit', 'free' (bouteilles offertes 12+1) et 'correction'.
+      // L'ancienne variante total_in/total_out ignorait 'free' et 'correction', et listait
+      // un type 'adjustment' absent de la contrainte stock_movements_type_check.
+      db.raw("COALESCE(SUM(CASE WHEN type IN ('initial','entry','return') THEN qty ELSE -qty END), 0) as current_stock")
     );
 
   const stockMap = {};
   stockBalances.forEach((s) => {
-    stockMap[s.product_id] = parseInt(s.total_in) - parseInt(s.total_out);
+    stockMap[s.product_id] = parseInt(s.current_stock, 10);
   });
 
   let hasBackorderItems = false;

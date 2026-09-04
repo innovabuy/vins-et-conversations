@@ -69,11 +69,11 @@ router.get('/catalog', async (req, res) => {
       .groupBy('product_id')
       .select(
         'product_id',
-        db.raw("SUM(CASE WHEN type IN ('initial', 'entry', 'return') THEN qty ELSE 0 END) as total_in"),
-        db.raw("SUM(CASE WHEN type IN ('exit', 'adjustment') THEN qty ELSE 0 END) as total_out")
+        // Formule unique du projet — voir boutiqueOrderService : 'free' et 'correction' comptent.
+        db.raw("COALESCE(SUM(CASE WHEN type IN ('initial','entry','return') THEN qty ELSE -qty END), 0) as current_stock")
       ) : [];
     const stockMap = {};
-    stockBalances.forEach(s => { stockMap[s.product_id] = parseInt(s.total_in) - parseInt(s.total_out); });
+    stockBalances.forEach(s => { stockMap[s.product_id] = parseInt(s.current_stock, 10); });
 
     res.json({
       data: products.map(p => {
@@ -129,11 +129,11 @@ router.get('/catalog/:id', async (req, res) => {
     const stockRow = await db('stock_movements')
       .where('product_id', product.id)
       .select(
-        db.raw("COALESCE(SUM(CASE WHEN type IN ('initial', 'entry', 'return') THEN qty ELSE 0 END), 0) as total_in"),
-        db.raw("COALESCE(SUM(CASE WHEN type IN ('exit', 'adjustment') THEN qty ELSE 0 END), 0) as total_out")
+        // Formule unique du projet — voir boutiqueOrderService : 'free' et 'correction' comptent.
+        db.raw("COALESCE(SUM(CASE WHEN type IN ('initial','entry','return') THEN qty ELSE -qty END), 0) as current_stock")
       )
       .first();
-    const stock = parseInt(stockRow.total_in) - parseInt(stockRow.total_out);
+    const stock = parseInt(stockRow.current_stock, 10);
     product.in_stock = stock > 0;
     product.allow_backorder = product.allow_backorder || false;
 
