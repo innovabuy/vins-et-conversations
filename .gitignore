@@ -14,3 +14,10 @@ backend/uploads/
 # Backups locaux (.env.bak-*, docker-compose.yml.bak-*, *.conf.bak) :
 # peuvent contenir des secrets → jamais dans le dépôt.
 *.bak*
+
+# Fichiers d'environnement datés (préprod, bascules CAWL) : contiennent des secrets.
+.env.preprod-*
+# Scripts d'exploitation locaux (injection de variables, tests de préprod) :
+# portent des identifiants → hors dépôt.
+set_cawl_env.sh
+test_cawl_preprod.sh
