@@ -1,4 +1,4 @@
-const CACHE_NAME = 'vc-cache-v12'; // v11 = lot logo écran de connexion
+const CACHE_NAME = 'vc-cache-v13'; // v12 = lot en-têtes vitrine + logo + icônes PWA (28/08)
 const STATIC_ASSETS = [
   '/',
   '/manifest.json',
