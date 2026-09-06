@@ -13,7 +13,6 @@
       "WebSearch(*)",
       "Task(*)"
     ],
-    "deny": [],
-    "defaultMode": "bypassPermissions"
+    "deny": []
   }
 }
