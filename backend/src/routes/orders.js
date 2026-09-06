@@ -327,6 +327,14 @@ router.post(
       if (err.message === 'ORDER_NOT_FOUND') {
         return res.status(404).json({ error: 'NOT_FOUND' });
       }
+      // Garde de règlement (orderService.validateOrder) : pas d'encaissement booké,
+      // donc pas de validation. Message explicite, sans quoi l'écran n'affiche qu'« Erreur ».
+      if (err.message === 'ORDER_NOT_SETTLED') {
+        return res.status(409).json({
+          error: 'ORDER_NOT_SETTLED',
+          message: 'Cette commande ne peut pas être validée : aucun règlement n\'est enregistré. Enregistrez le règlement avant de valider.',
+        });
+      }
       res.status(400).json({ error: err.message });
     }
   }
@@ -365,14 +373,23 @@ router.put(
         message: 'Cette commande a déjà été réglée.',
       };
 
-      if (order.status !== 'pending_payment') {
+      // Statuts recevables pour un règlement. 'pending_stock' y figure comme RATTRAPAGE
+      // assumé, et non comme un second correctif : une commande en attente de stock n'a
+      // aujourd'hui aucun chemin de reprise de paiement côté client (le back sait créer
+      // une session, l'exposition manque). Enregistrer le règlement ici est donc le seul
+      // moyen de la faire avancer. Le corps de la route est inchangé : la commande passe
+      // en 'submitted' avec son événement 'sale' et ses sorties de stock, puis se valide
+      // normalement.
+      const SETTLEABLE_STATUSES = ['pending_payment', 'pending_stock'];
+
+      if (!SETTLEABLE_STATUSES.includes(order.status)) {
         const settled = await db('financial_events')
           .where({ order_id: order.id, type: 'sale' })
           .first();
         if (settled) return res.status(409).json(ALREADY_PAID);
         return res.status(400).json({
           error: 'INVALID_STATUS_TRANSITION',
-          message: `Seules les commandes en attente de paiement peuvent recevoir un règlement (statut actuel : ${order.status}).`,
+          message: `Seules les commandes en attente de paiement ou de réapprovisionnement peuvent recevoir un règlement (statut actuel : ${order.status}).`,
         });
       }
 
@@ -390,7 +407,7 @@ router.put(
         // tienne réellement sous concurrence, un simple test de statut hors transaction
         // laissant les deux appels passer de front.
         const locked = await trx('orders').where({ id: order.id }).forUpdate().first();
-        if (locked.status !== 'pending_payment') {
+        if (!SETTLEABLE_STATUSES.includes(locked.status)) {
           alreadySettled = true;
           return;
         }

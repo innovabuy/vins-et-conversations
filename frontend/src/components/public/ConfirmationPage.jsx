@@ -8,6 +8,9 @@ export default function ConfirmationPage() {
   const [searchParams] = useSearchParams();
 
   const isPaypalReturn = searchParams.get('paypal') === '1';
+  // Rupture de stock : paramètre posé par la page de commande, qui court-circuite le
+  // tunnel de paiement (CheckoutPage — navigate '…?backorder=1').
+  const isBackorder = searchParams.get('backorder') === '1';
   const orderId = searchParams.get('order_id');
   const token = searchParams.get('token'); // = paypal_order_id, ajouté par PayPal au retour
 
@@ -113,6 +116,62 @@ export default function ConfirmationPage() {
           </Link>
           <Link to="/boutique/contact" className="inline-flex items-center justify-center gap-2 px-5 py-2.5 border rounded-xl text-sm hover:bg-gray-50">
             Nous contacter
+          </Link>
+        </div>
+      </div>
+    );
+  }
+
+  // ── Commande en rupture : enregistrée mais NON réglée. Le tunnel de paiement a été
+  //    court-circuité en amont, donc aucun encaissement n'a eu lieu, et AUCUN email n'est
+  //    envoyé sur ce chemin (boutiqueOrderService n'appelle pas emailService, et sans
+  //    paiement il n'y a pas de webhook). On ne promet donc ni confirmation par email,
+  //    ni expédition : le règlement se fait au recontact. ──
+  if (isBackorder) {
+    return (
+      <div className="max-w-2xl mx-auto px-4 py-20 text-center">
+        <div className="inline-flex items-center justify-center w-16 h-16 bg-amber-100 rounded-full mb-6">
+          <Package size={32} className="text-amber-600" />
+        </div>
+
+        <h1 className="text-3xl font-bold text-gray-900 mb-3">Votre commande est enregistrée</h1>
+        <p className="text-gray-600 mb-2">
+          Commande <span className="font-semibold text-wine-700">{ref}</span> — en attente de réapprovisionnement.
+        </p>
+        <p className="text-gray-500 text-sm mb-8">
+          Un ou plusieurs articles ne sont pas en stock.{' '}
+          <span className="font-semibold">Elle n'a pas été réglée</span> : aucun paiement ne vous a été demandé.
+        </p>
+
+        <div className="bg-amber-50 border border-amber-200 rounded-xl p-6 mb-8 text-left">
+          <h3 className="font-semibold text-gray-900 mb-3 flex items-center gap-2">
+            <AlertCircle size={18} className="text-amber-600" /> Ce qui se passe ensuite
+          </h3>
+          <ol className="space-y-2 text-sm text-gray-700">
+            <li className="flex items-start gap-2">
+              <span className="bg-amber-100 text-amber-800 rounded-full w-5 h-5 flex items-center justify-center text-xs font-bold mt-0.5">1</span>
+              <span>Nous réapprovisionnons les articles concernés</span>
+            </li>
+            <li className="flex items-start gap-2">
+              <span className="bg-amber-100 text-amber-800 rounded-full w-5 h-5 flex items-center justify-center text-xs font-bold mt-0.5">2</span>
+              <span>Nous vous recontactons pour convenir du règlement</span>
+            </li>
+            <li className="flex items-start gap-2">
+              <span className="bg-amber-100 text-amber-800 rounded-full w-5 h-5 flex items-center justify-center text-xs font-bold mt-0.5">3</span>
+              <span>Préparation et livraison une fois le règlement encaissé</span>
+            </li>
+          </ol>
+        </div>
+
+        <div className="flex flex-col sm:flex-row gap-3 justify-center">
+          <Link to="/boutique/suivi" className="inline-flex items-center justify-center gap-2 px-5 py-2.5 border rounded-xl text-sm hover:bg-gray-50">
+            Suivre ma commande
+          </Link>
+          <Link to="/boutique/contact" className="inline-flex items-center justify-center gap-2 px-5 py-2.5 border rounded-xl text-sm hover:bg-gray-50">
+            Nous contacter
+          </Link>
+          <Link to="/boutique" className="btn-primary inline-flex items-center justify-center gap-2 px-5 py-2.5">
+            Continuer mes achats <ArrowRight size={16} />
           </Link>
         </div>
       </div>

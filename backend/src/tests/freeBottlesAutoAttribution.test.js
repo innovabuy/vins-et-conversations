@@ -74,6 +74,17 @@ async function createSubmittedOrder({ userId, referredBy = null, source = 'campa
     total_items: totalItems,
   });
   createdOrderIds.add(orderId);
+  // Evenement de vente, comme le fait createOrder des l'insertion (orderService.js).
+  // Sans lui la fixture decrit un etat que le systeme ne sait pas produire : une commande
+  // 'submitted' dont le revenu n'a jamais ete booke. La garde de reglement de validateOrder
+  // la refuserait, a juste titre.
+  await db('financial_events').insert({
+    order_id: orderId,
+    campaign_id: campaignId,
+    type: 'sale',
+    amount: totalTtc,
+    description: `Commande de test 12+1 ${orderId}`,
+  });
   for (const it of items) {
     await db('order_items').insert({
       id: uuidv4(),

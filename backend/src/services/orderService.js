@@ -446,6 +446,16 @@ async function validateOrder(orderId, adminUserId) {
   if (!order) throw new Error('ORDER_NOT_FOUND');
   if (!['submitted', 'pending_stock'].includes(order.status)) throw new Error('ORDER_NOT_SUBMITTABLE');
 
+  // Garde de règlement — aucune validation sans encaissement.
+  // Critère de vérité : la présence d'un financial_events 'sale', le MÊME que celui déjà
+  // retenu par la route d'enregistrement du règlement (routes/orders.js, mark-paid). Il est
+  // posé par les trois seuls chemins qui bookent réellement le revenu : la confirmation
+  // webhook, l'enregistrement manuel, et createOrder pour les commandes de campagne.
+  // Effet : « Marquer disponible » conserve son comportement, mais ne peut plus valider une
+  // commande en attente de stock qui n'a jamais été réglée.
+  const settled = await db('financial_events').where({ order_id: orderId, type: 'sale' }).first();
+  if (!settled) throw new Error('ORDER_NOT_SETTLED');
+
   // Modèle C : déterminer le bénéficiaire du 12+1
   const referralSources = ['student_referral', 'ambassador_referral'];
   const isReferralFlow = !!order.referred_by && referralSources.includes(order.source);
@@ -454,9 +464,10 @@ async function validateOrder(orderId, adminUserId) {
   let freeBottlesCreated = 0;
 
   await db.transaction(async (trx) => {
-    // Modèle A — on n'attribue que les paliers franchis PAR cette validation
+    // Modèle B — on n'attribue que les paliers franchis PAR cette validation
     // (= earned_après − earned_avant), pas tout le solde campagne. Le backlog
-    // historique non matérialisé reste non attribué (assumé).
+    // historique non matérialisé reste non attribué (assumé) : le modèle B exclut
+    // toute attribution rétroactive.
     //
     // earned_avant : on charge les règles et on calcule AVANT de flipper le statut.
     // À ce stade l'order est encore 'submitted', donc EXCLU de calculateFreeBottles
@@ -494,7 +505,7 @@ async function validateOrder(orderId, adminUserId) {
     if (balance.disabled) return;
     if (!balance.details || balance.details.length === 0) return;
 
-    // Delta de paliers franchis par cette commande (Modèle A).
+    // Delta de paliers franchis par cette commande (Modèle B).
     const earnedDelta = Math.max(0, balance.earned - earnedBefore);
     if (earnedDelta <= 0) return;
 
@@ -518,7 +529,7 @@ async function validateOrder(orderId, adminUserId) {
       if (r.product_id) usedByProduct.set(r.product_id, parseInt(r.count, 10));
     }
 
-    // Modèle A : plafond global = nombre de paliers franchis par CETTE validation.
+    // Modèle B : plafond global = nombre de paliers franchis par CETTE validation.
     // (Remplace balance.available, qui déversait tout le solde campagne → bug du
     //  déversement en bloc.) Le `pending = earned − used` par produit ci-dessous reste
     //  borné par `remaining = totalToCreate − createdCount`, donc on ne crée jamais plus

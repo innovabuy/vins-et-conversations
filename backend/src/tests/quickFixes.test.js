@@ -10,6 +10,7 @@ const PASSWORD = 'VinsConv2026!';
 let adminToken, studentToken, campaignId;
 let pendingPaymentOrderId, pendingPaymentOrderId2, submittedOrderId;
 let campOrderId, draftOrderId;
+let pendingStockPayableId, pendingStockNoSaleId, submittedWithSaleId;
 let productId;
 
 beforeAll(async () => {
@@ -101,6 +102,45 @@ beforeAll(async () => {
     reference: 'VC-QF-CAMP01',
   });
 
+  // ── Rupture de stock (R3) ────────────────────────────────────────────────
+  // Commande en attente de stock, jamais reglee : aucun 'sale'. C'est l'etat reel
+  // produit par le checkout boutique quand un article est en rupture.
+  pendingStockPayableId = uuidv4();
+  await db('orders').insert({
+    id: pendingStockPayableId, ref: 'VC-QF-PS01', campaign_id: campaignId,
+    status: 'pending_stock', total_ht: 10.00, total_ttc: 12.00, total_items: 1,
+  });
+  await db('order_items').insert({
+    order_id: pendingStockPayableId, product_id: productId, qty: 1,
+    unit_price_ht: 10.00, unit_price_ttc: 12.00, vat_rate: 20.00, type: 'product',
+  });
+
+  // Seconde commande en attente de stock, dediee a la garde de validation.
+  pendingStockNoSaleId = uuidv4();
+  await db('orders').insert({
+    id: pendingStockNoSaleId, ref: 'VC-QF-PS02', campaign_id: campaignId,
+    status: 'pending_stock', total_ht: 10.00, total_ttc: 12.00, total_items: 1,
+  });
+  await db('order_items').insert({
+    order_id: pendingStockNoSaleId, product_id: productId, qty: 1,
+    unit_price_ht: 10.00, unit_price_ttc: 12.00, vat_rate: 20.00, type: 'product',
+  });
+
+  // Commande reglee (porte un 'sale') : temoin de non-regression de la garde.
+  submittedWithSaleId = uuidv4();
+  await db('orders').insert({
+    id: submittedWithSaleId, ref: 'VC-QF-PS03', campaign_id: campaignId,
+    status: 'submitted', total_ht: 10.00, total_ttc: 12.00, total_items: 1,
+  });
+  await db('order_items').insert({
+    order_id: submittedWithSaleId, product_id: productId, qty: 1,
+    unit_price_ht: 10.00, unit_price_ttc: 12.00, vat_rate: 20.00, type: 'product',
+  });
+  await db('financial_events').insert({
+    order_id: submittedWithSaleId, campaign_id: campaignId, type: 'sale', amount: 12.00,
+    description: 'QF test commande reglee',
+  });
+
   // Commande en brouillon, sans aucun 'sale' : sert a distinguer le 400 du 409.
   draftOrderId = uuidv4();
   await db('orders').insert({
@@ -110,7 +150,8 @@ beforeAll(async () => {
 }, 15000);
 
 afterAll(async () => {
-  const refs = ['VC-QF-PP01', 'VC-QF-PP02', 'VC-QF-SUB01', 'VC-QF-CAMP01', 'VC-QF-DRAFT01'];
+  const refs = ['VC-QF-PP01', 'VC-QF-PP02', 'VC-QF-SUB01', 'VC-QF-CAMP01', 'VC-QF-DRAFT01',
+    'VC-QF-PS01', 'VC-QF-PS02', 'VC-QF-PS03'];
   const ids = await db('orders').whereIn('ref', refs).select('id');
   const orderIds = ids.map((o) => o.id);
   if (orderIds.length) {
@@ -340,5 +381,67 @@ describe('QF-B: Quantity limit', () => {
     expect(res.status).toBe(400);
     expect(res.body.error).toBe('VALIDATION_ERROR');
     expect(res.body.message).toContain('999');
+  });
+});
+
+
+// ─────────────────────────────────────────────────────────────────────────────
+// R3 — Rattrapage des commandes en rupture et garde de reglement.
+//
+// Contexte : aucun chemin de reprise de paiement n'existe cote client pour une
+// commande en attente de stock. L'enregistrement du reglement est donc le seul
+// moyen de la faire avancer, et la validation ne doit plus pouvoir passer outre.
+// ─────────────────────────────────────────────────────────────────────────────
+describe('R3: rupture de stock et garde de reglement', () => {
+  test('PS-01: mark-paid sur pending_stock → 200, submitted, sale + sortie de stock', async () => {
+    const res = await request(app)
+      .put(`/api/v1/orders/admin/${pendingStockPayableId}/mark-paid`)
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send({ payment_method: 'transfer', notes: 'Reglement encaisse apres reappro' });
+
+    expect(res.status).toBe(200);
+    // Le corps de la route est inchange : encaisser n'est pas valider.
+    expect(res.body.status).toBe('submitted');
+
+    const fe = await db('financial_events')
+      .where({ order_id: pendingStockPayableId, type: 'sale' })
+      .first();
+    expect(fe).toBeTruthy();
+    expect(parseFloat(fe.amount)).toBe(12.00);
+
+    const moves = await db('stock_movements').where({ reference: 'VC-QF-PS01', type: 'exit' });
+    expect(moves).toHaveLength(1);
+
+    const payments = await db('payments').where({ order_id: pendingStockPayableId });
+    expect(payments).toHaveLength(1);
+    expect(payments[0].status).toBe('reconciled');
+  });
+
+  test('PS-02: validate sur pending_stock sans reglement → 409 ORDER_NOT_SETTLED, aucun effet', async () => {
+    const res = await request(app)
+      .post(`/api/v1/orders/admin/${pendingStockNoSaleId}/validate`)
+      .set('Authorization', `Bearer ${adminToken}`);
+
+    expect(res.status).toBe(409);
+    expect(res.body.error).toBe('ORDER_NOT_SETTLED');
+    expect(res.body.message).toMatch(/reglement|règlement/i);
+
+    // La garde leve AVANT toute ecriture : statut inchange, aucun 12+1, aucun BL.
+    const order = await db('orders').where({ id: pendingStockNoSaleId }).first();
+    expect(order.status).toBe('pending_stock');
+    const freebies = await db('financial_events')
+      .where({ order_id: pendingStockNoSaleId, type: 'free_bottle' });
+    expect(freebies).toHaveLength(0);
+    const bl = await db('delivery_notes').where({ order_id: pendingStockNoSaleId }).first();
+    expect(bl).toBeFalsy();
+  });
+
+  test('PS-03: validate sur une commande reglee → 200 (la garde ne produit pas de faux positif)', async () => {
+    const res = await request(app)
+      .post(`/api/v1/orders/admin/${submittedWithSaleId}/validate`)
+      .set('Authorization', `Bearer ${adminToken}`);
+
+    expect(res.status).toBe(200);
+    expect(res.body.status).toBe('validated');
   });
 });
